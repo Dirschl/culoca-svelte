@@ -22,22 +22,22 @@ export const POST = async ({ request }) => {
       const id = crypto.randomUUID();
       const filename = `${id}.jpg`;
 
-      // Resize image to 512px for gallery
+      // Resize image to multiple sizes
       const sizes = await resizeJPG(buf);
       
-      // Get ACTUAL dimensions of the processed 512px image
-      let width = 512;
-      let height = 512;
+      // Get ACTUAL dimensions of the original image
+      let width = 2048;
+      let height = 2048;
       
       try {
-        // Get metadata from the processed 512px image
-        const metadata = await sharp(sizes.jpg512).metadata();
-        width = metadata.width || 512;
-        height = metadata.height || 512;
+        // Get metadata from the original image
+        const originalMetadata = await sharp(buf).metadata();
+        width = originalMetadata.width || 2048;
+        height = originalMetadata.height || 2048;
         
-        console.log(`Processed image dimensions: ${width} x ${height}`);
+        console.log(`Original image dimensions: ${width} x ${height}`);
       } catch (metaError) {
-        console.log('Failed to get processed image metadata, using defaults');
+        console.log('Failed to get original image metadata, using defaults');
       }
 
       // Upload to both storage buckets
