@@ -1,11 +1,13 @@
 <script lang="ts">
   import { supabase } from '$lib/supabaseClient';
-  import Justified from '$lib/Justified.svelte';
   import { onMount } from 'svelte';
   import { writable } from 'svelte/store';
+  import Justified from '$lib/Justified.svelte';
 
   const pics = writable<any[]>([]);
   let page = 0, size = 40, loading = false, hasMoreImages = true;
+  let useJustifiedLayout = true;
+  let profileAvatar: string | null = null;
 
   async function loadMore() {
     if (loading || !hasMoreImages) return; 
@@ -46,17 +48,6 @@
   let uploadPreviews: string[] = [];
   let isDragOver = false;
 
-  // Layout toggle
-  let useJustifiedLayout = true;
-
-  // Toggle layout and save preference
-  function toggleLayout(justified: boolean) {
-    useJustifiedLayout = justified;
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('galleryLayout', justified ? 'justified' : 'grid');
-    }
-  }
-
   async function deleteAllImages() {
     if (!confirm('Wirklich ALLE Bilder löschen? Diese Aktion kann nicht rückgängig gemacht werden!')) {
       return;
@@ -78,7 +69,8 @@
         throw new Error(result.message);
       }
     } catch (error) {
-      uploadMessage = `❌ Fehler beim Löschen: ${error.message}`;
+      const err = error as Error;
+      uploadMessage = `❌ Fehler beim Löschen: ${err.message}`;
     } finally {
       uploading = false;
       setTimeout(() => {
@@ -176,7 +168,8 @@
       uploadMessage = `✅ Successfully uploaded ${totalFiles} image(s)!`;
 
     } catch (error) {
-      uploadMessage = `❌ Upload failed: ${error.message}`;
+      const err = error as Error;
+      uploadMessage = `❌ Upload failed: ${err.message}`;
     } finally {
       uploading = false;
       currentUploading = '';
@@ -216,23 +209,54 @@
     }
   }
 
-  onMount(() => {
-    // Load saved layout preference
+  function updateLayoutFromStorage() {
     if (typeof localStorage !== 'undefined') {
       const savedLayout = localStorage.getItem('galleryLayout');
-      if (savedLayout) {
-        useJustifiedLayout = savedLayout === 'justified';
+      useJustifiedLayout = savedLayout === 'justified';
+    }
+  }
+
+  async function loadProfileAvatar() {
+    // Try localStorage cache first
+    if (typeof localStorage !== 'undefined') {
+      const cached = localStorage.getItem('profileAvatar');
+      if (cached) {
+        profileAvatar = cached;
+        return;
       }
     }
+    // Get user
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    // Fetch profile
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('avatar_url')
+      .eq('id', user.id)
+      .single();
+    if (data && data.avatar_url) {
+      if (data.avatar_url.startsWith('http')) {
+        profileAvatar = data.avatar_url;
+      } else {
+        profileAvatar = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/avatars/${data.avatar_url}`;
+      }
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('profileAvatar', profileAvatar);
+      }
+    }
+  }
 
+  onMount(() => {
+    updateLayoutFromStorage();
+    loadProfileAvatar();
     loadMore();
-    
-    // Add scroll listener for infinite scroll
     window.addEventListener('scroll', handleScroll, { passive: true });
-    
-    // Cleanup on destroy
+    window.addEventListener('galleryLayoutChanged', updateLayoutFromStorage);
+    window.addEventListener('profileSaved', loadProfileAvatar);
     return () => {
       window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('galleryLayoutChanged', updateLayoutFromStorage);
+      window.removeEventListener('profileSaved', loadProfileAvatar);
     };
   });
 </script>
@@ -672,289 +696,139 @@
     font-size: 1rem;
   }
 
-  /* Layout Toggle Controls */
-  .layout-controls {
+  /* Floating Settings Button */
+  .settings-fab {
+    position: fixed;
+    right: 1.5rem;
+    bottom: 1.5rem;
+    z-index: 50;
+    width: 56px;
+    height: 56px;
+    background: #222b45;
+    color: #fff;
+    border-radius: 50%;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.18);
     display: flex;
     align-items: center;
-    gap: 1rem;
+    justify-content: center;
+    transition: background 0.2s, box-shadow 0.2s, transform 0.1s;
+    border: none;
+    outline: none;
+    cursor: pointer;
+    font-size: 1.5rem;
+    text-decoration: none;
+  }
+  .settings-fab:hover {
+    background: #0066cc;
+    color: #fff;
+    box-shadow: 0 8px 24px rgba(0,102,204,0.18);
+    transform: scale(1.08);
+  }
+  @media (max-width: 600px) {
+    .settings-fab {
+      right: 1rem;
+      bottom: 1rem;
+      width: 48px;
+      height: 48px;
+      font-size: 1.2rem;
+    }
   }
 
-
-
-  .toggle-container {
+  /* Floating Profile Button */
+  .profile-fab {
+    position: fixed;
+    right: 1.5rem;
+    bottom: 5.5rem;
+    z-index: 51;
+    width: 56px;
+    height: 56px;
+    background: #444;
+    color: #fff;
+    border-radius: 50%;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.18);
     display: flex;
-    gap: 0;
-    border-radius: 4px;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s, box-shadow 0.2s, transform 0.1s;
+    border: none;
+    outline: none;
+    cursor: pointer;
+    font-size: 1.5rem;
+    text-decoration: none;
     overflow: hidden;
   }
-
-  .layout-btn {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 1rem;
-    cursor: pointer;
-    font-size: 0.85rem;
-    font-weight: 500;
-    transition: all 0.2s ease;
-    position: relative;
-    border-right: none;
+  .profile-fab:hover {
+    background: #0066cc;
+    color: #fff;
+    box-shadow: 0 8px 24px rgba(0,102,204,0.18);
+    transform: scale(1.08);
+  }
+  .profile-avatar-btn {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+    display: block;
+  }
+  @media (max-width: 600px) {
+    .profile-fab {
+      right: 1rem;
+      bottom: 4.5rem;
+      width: 48px;
+      height: 48px;
+      font-size: 1.2rem;
+    }
   }
 
-  .layout-btn:last-child {
-    border-right: 1px solid #2d2d44;
-  }
-
-  .layout-btn svg {
-    opacity: 0.7;
-  }
-
-  .layout-btn.active svg {
-    opacity: 1;
-  }
-
-  /* Grid Layout */
+  /* Grid Layout (klassisch) */
   .grid-layout {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 1px;
-    padding: 0;
+    grid-template-columns: repeat(auto-fill, minmax(256px, 1fr));
+    gap: 2px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 1rem 0 2rem 0;
   }
-
+  @media (max-width: 600px) {
+    .grid-layout {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
   .grid-item {
-    aspect-ratio: 1;
+    background: #181828;
+    border-radius: 0;
     overflow: hidden;
-    background: #1a1a2e;
-    border: none;
-    transition: all 0.3s ease;
+    /* box-shadow: 0 2px 8px rgba(0,0,0,0.10); */
+    transition: box-shadow 0.2s, transform 0.2s;
     cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    aspect-ratio: 1/1;
     position: relative;
   }
-
   .grid-item:hover {
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    /* Kein box-shadow oder transform auf dem Container */
   }
-
-  .grid-item:focus-within {
-    outline: 2px solid #0066cc;
-    outline-offset: 2px;
-  }
-
   .grid-item img {
     width: 100%;
     height: 100%;
     object-fit: cover;
     display: block;
-    transition: all 0.3s ease;
+    transition: transform 0.3s cubic-bezier(.4,0,.2,1);
   }
-
   .grid-item:hover img {
-    filter: brightness(1.1) contrast(1.05);
+    transform: scale(1.04);
   }
 
-  .grid-item img:focus {
-    outline: none;
-  }
-
-  /* Full Size Mobile Responsive */
-  @media (max-width: 768px) {
-    .grid-layout {
-      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-      gap: 1px;
-    }
-
-    .layout-controls {
-      flex-direction: row;
-      align-items: center;
-      justify-content: center;
-      gap: 0;
-      padding: 0.5rem 0.75rem;
-    }
-
-    .upload-section {
-      padding: 0.5rem 0.75rem;
-    }
-
-    .drop-zone {
-      padding: 2rem 1rem;
-    }
-
-    .drop-content h3 {
-      font-size: 1rem;
-    }
-
-    .drop-content p {
-      font-size: 0.85rem;
-    }
-
-    .upload-actions {
-      flex-direction: column;
-      gap: 0.75rem;
-    }
-
-    .upload-btn {
-      min-width: 100%;
-      padding: 0.75rem;
-      font-size: 16px; /* Prevents zoom on iOS */
-    }
-  }
-
-  @media (max-width: 480px) {
-    .grid-layout {
-      grid-template-columns: repeat(3, 1fr);
-      gap: 1px;
-    }
-
-    .layout-btn {
-      padding: 0.5rem 0.75rem;
-      font-size: 0.8rem;
-    }
-
-
-  }
-
-     /* Ultra mobile - maximize screen usage */
-   @media (max-width: 375px) {
-     .grid-layout {
-       grid-template-columns: repeat(3, 1fr);
-     }
-     
-     .upload-section {
-       padding: 0.25rem 0.5rem;
-     }
-     
-     .layout-controls {
-       padding: 0.25rem 0.5rem;
-     }
-
-     .drop-zone {
-       padding: 1.5rem 0.75rem;
-     }
-
-     .drop-content h3 {
-       font-size: 0.9rem;
-     }
-
-     .upload-icon svg {
-       width: 36px;
-       height: 36px;
-     }
-   }
-
-  /* Dark Night Blue Theme - Full Size Mobile App */
-  :global(html, body) {
-    background: #0f1419;
-    color: white;
-    margin: 0;
-    padding: 0;
-    font-family: system-ui, -apple-system, sans-serif;
-    min-height: 100vh;
-    width: 100%;
-    overflow-x: hidden;
-  }
-
-  :global(*) {
-    box-sizing: border-box;
-  }
-
-  /* Touch-optimized for mobile */
-  :global(body) {
-    -webkit-touch-callout: none;
-    -webkit-user-select: none;
-    -webkit-tap-highlight-color: transparent;
-    touch-action: manipulation;
-  }
-
-  .upload-section {
-    background: #0f1419;
-    color: white;
-    padding: 0.75rem;
-  }
-
-  .upload-form input[type="file"] {
-    background: #1a1a2e;
-    border: 1px solid #2d2d44;
-    color: white;
-  }
-
-  .upload-form input[type="file"]::-webkit-file-upload-button {
-    background: #0066cc;
-    color: white;
-    border: none;
-    padding: 0.25rem 0.5rem;
-    border-radius: 3px;
-    margin-right: 0.5rem;
-  }
-
-  .layout-controls {
-    background: #0f1419;
-    color: white;
-    padding: 0.75rem;
-    margin: 0;
-  }
-
-
-
-  .layout-btn {
-    background: #1a1a2e;
-    color: #ccc;
-    border: 1px solid #2d2d44;
-  }
-
-  .layout-btn:hover {
-    background: #242447;
-    color: white;
-  }
-
-  .layout-btn.active {
-    background: #0066cc;
-    color: white;
-    border-color: #0066cc;
-  }
-
-  .loading-indicator {
-    color: white;
-  }
-
-  .empty-state {
-    color: #ccc;
-  }
-
-  .empty-state h3 {
-    color: white;
-  }
 </style>
-
-<!-- Layout Toggle -->
-<div class="layout-controls">
-  <div class="toggle-container">
-    <button 
-      class="layout-btn"
-      class:active={useJustifiedLayout}
-      on:click={() => toggleLayout(true)}
-    >
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M2 4h20v4H2V4zm0 6h8v4H2v-4zm10 0h10v4H12v-4zM2 16h6v4H2v-4zm8 0h14v4H10v-4z"/>
-      </svg>
-      Justified
-    </button>
-    <button 
-      class="layout-btn"
-      class:active={!useJustifiedLayout}
-      on:click={() => toggleLayout(false)}
-    >
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z"/>
-      </svg>
-      Grid
-    </button>
-  </div>
-</div>
 
 <!-- Gallery with Infinite Scroll -->
 <div class="gallery-container">
   {#if useJustifiedLayout}
-    <Justified items={$pics} gap={1} targetRowHeight={220} />
+    <div class="justified-wrapper">
+      <Justified items={$pics} gap={1} targetRowHeight={220} />
+    </div>
   {:else}
     <div class="grid-layout">
       {#each $pics as pic}
@@ -991,3 +865,23 @@
     </div>
   {/if}
 </div>
+
+<!-- Floating Settings Button -->
+<a href="/settings" class="settings-fab" title="Einstellungen">
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="3"/>
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 8 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 8a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 8 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09A1.65 1.65 0 0 0 16 4.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 8c.14.31.22.65.22 1v.09A1.65 1.65 0 0 0 21 12c0 .35-.08.69-.22 1z"/>
+  </svg>
+</a>
+
+<!-- Floating Profile Button -->
+<a href="/profile" class="profile-fab" title="Profil">
+  {#if profileAvatar}
+    <img src={profileAvatar || ''} alt="Profilbild" class="profile-avatar-btn" />
+  {:else}
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="8" r="4"/>
+      <path d="M2 20c0-4 8-6 10-6s10 2 10 6"/>
+    </svg>
+  {/if}
+</a>

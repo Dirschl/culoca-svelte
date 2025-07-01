@@ -2,13 +2,28 @@
   import { onMount } from 'svelte';
   import justifiedLayout from 'justified-layout';
 
+  // Typen für justified-layout
+  interface LayoutBox {
+    aspectRatio: number;
+    top: number;
+    width: number;
+    height: number;
+    left: number;
+    row?: number;
+  }
+  interface JustifiedLayoutResult {
+    containerHeight: number;
+    widowCount: number;
+    boxes: LayoutBox[];
+  }
+
   export let items: { src: string; width: number; height: number; id: string }[] = [];
   export let containerWidth = 1024;
   export let targetRowHeight = 200;  // Increased for better visibility
-  export let gap = 1;  // Minimal gap for mobile
+  export let gap = 2;  // Set default gap to 2px
 
-  let boxes = [];
-  let layout = { boxes: [], containerHeight: 0 };
+  let boxes: LayoutBox[] = [];
+  let layout: JustifiedLayoutResult = { boxes: [], containerHeight: 0, widowCount: 0 };
   
   // Reactive layout calculation
   $: if (items.length > 0 && containerWidth > 0) {
@@ -91,14 +106,14 @@
     width: 100%;
     min-height: 200px;
     background: #0f1419;
-    padding: 0;
-    margin: 0;
+    padding: 0 !important;
+    margin: 0 !important;
   }
-  .pic-container { 
-    position: absolute; 
-    cursor: pointer; 
+  .pic-container {
+    position: absolute;
+    cursor: pointer;
     overflow: hidden;
-    transition: all 0.3s ease;
+    transition: box-shadow 0.3s ease;
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
   }
   .pic-container:focus {
@@ -106,17 +121,17 @@
     outline-offset: 2px;
   }
   .pic-container:hover {
-    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.18);
   }
-  .pic { 
-    width: 100%; 
-    height: 100%; 
-    object-fit: cover; 
+  .pic {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
     display: block;
-    transition: all 0.3s ease;
+    transition: transform 0.3s cubic-bezier(.4,0,.2,1);
   }
   .pic-container:hover .pic {
-    filter: brightness(1.1) contrast(1.05);
+    transform: scale(1.04);
   }
   .debug-info {
     position: fixed;

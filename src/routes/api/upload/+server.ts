@@ -25,6 +25,18 @@ export const POST = async ({ request }) => {
       // Resize image to multiple sizes
       const sizes = await resizeJPG(buf);
       
+      // Prüfe die tatsächlichen Dimensionen der 2048px-Datei
+      let jpg2048Width = 0;
+      let jpg2048Height = 0;
+      try {
+        const meta2048 = await sharp(sizes.jpg2048).metadata();
+        jpg2048Width = meta2048.width || 0;
+        jpg2048Height = meta2048.height || 0;
+        console.log(`DEBUG: 2048px resized image dimensions: ${jpg2048Width}x${jpg2048Height}`);
+      } catch (e) {
+        console.log('DEBUG: Fehler beim Auslesen der 2048px-Dimensionen:', e);
+      }
+
       // Get ACTUAL dimensions of the original image
       let width = 2048;
       let height = 2048;
