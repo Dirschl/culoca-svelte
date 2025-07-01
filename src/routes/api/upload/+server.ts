@@ -42,6 +42,7 @@ export const POST = async ({ request }) => {
 
       // Upload to both storage buckets with same filename
       // Upload 2048px version
+      console.log(`Uploading 2048px version: ${filename}`);
       const { error: upload2048Error } = await supabase.storage
         .from('images-2048')
         .upload(filename, sizes.jpg2048, { 
@@ -50,7 +51,9 @@ export const POST = async ({ request }) => {
         });
 
       if (upload2048Error) {
-        console.warn('2048px upload failed:', upload2048Error);
+        console.error('2048px upload failed:', upload2048Error);
+      } else {
+        console.log('2048px upload successful');
       }
 
       // Upload 512px version
@@ -67,15 +70,18 @@ export const POST = async ({ request }) => {
       }
 
       // Insert into database with both paths
+      const dbRecord = {
+        id,
+        path_512: filename,
+        path_2048: upload2048Error ? null : filename,
+        width,
+        height,
+      };
+      console.log('Inserting database record:', dbRecord);
+      
       const { data: dbData, error: dbError } = await supabase
         .from('images')
-        .insert({
-          id,
-          path_512: filename,
-          path_2048: upload2048Error ? null : filename,
-          width,
-          height,
-        })
+        .insert(dbRecord)
         .select()
         .single();
 

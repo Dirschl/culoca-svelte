@@ -4,23 +4,71 @@
   import { onMount } from 'svelte';
 
   let img;
+  let loading = true;
+  let error = null;
 
   onMount(async () => {
-    const { data } = await supabase
-      .from('images')
-      .select('*')
-      .eq('id', $page.params.id)
-      .single();
-    img = data;
+    try {
+      const { data, error: fetchError } = await supabase
+        .from('images')
+        .select('*')
+        .eq('id', $page.params.id)
+        .single();
+      
+      if (fetchError) {
+        error = fetchError.message;
+        return;
+      }
+      
+      img = data;
+      console.log('Image data:', img);
+      console.log('path_2048:', img?.path_2048);
+      console.log('path_512:', img?.path_512);
+    } catch (err) {
+      error = err.message;
+    } finally {
+      loading = false;
+    }
   });
 </script>
 
-{#if img}
-  <img
-    src={`https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${img.path_2048}`}
-    alt={img.original_name}
-    class="max-w-full mx-auto"
-  />
-  <h1 class="text-xl font-semibold mt-4">{img.title ?? 'Kein Titel'}</h1>
-  <p class="mt-2">{img.description}</p>
+{#if loading}
+  <div class="p-8 text-center">Loading...</div>
+{:else if error}
+  <div class="p-8 text-center text-red-500">Error: {error}</div>
+{:else if img}
+  <div class="p-4">
+    <h1 class="text-xl font-semibold mb-4">{img.original_name || 'Kein Titel'}</h1>
+    
+    <!-- Debug Info -->
+    <div class="mb-4 p-2 bg-gray-100 text-sm">
+      <strong>Debug Info:</strong><br>
+      path_512: {img.path_512}<br>
+      path_2048: {img.path_2048}<br>
+      Dimensions: {img.width} x {img.height}
+    </div>
+    
+    <!-- 2048px Image -->
+    {#if img.path_2048}
+      <img
+        src={`https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${img.path_2048}`}
+        alt={img.original_name}
+        class="max-w-full mx-auto mb-2"
+        on:error={() => console.log('2048px image failed to load')}
+        on:load={() => console.log('2048px image loaded successfully')}
+      />
+      <p class="text-sm text-gray-600">Showing 2048px version</p>
+    {:else}
+      <img
+        src={`https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${img.path_512}`}
+        alt={img.original_name}
+        class="max-w-full mx-auto mb-2"
+      />
+      <p class="text-sm text-red-600">Fallback: Showing 512px version (path_2048 is null)</p>
+    {/if}
+    
+    <p class="mt-2">{img.description || ''}</p>
+  </div>
+{:else}
+  <div class="p-8 text-center">Image not found</div>
 {/if}
