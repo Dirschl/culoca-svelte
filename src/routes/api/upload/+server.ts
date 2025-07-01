@@ -128,7 +128,7 @@ export const POST = async ({ request }) => {
       if (title) dbRecord.title = title;
       if (description) dbRecord.description = description;
       if (keywords) dbRecord.keywords = keywords;
-      console.log('Inserting database record:', dbRecord);
+      console.log('Inserting database record:', JSON.stringify(dbRecord, null, 2));
       
       const { data: dbData, error: dbError } = await supabase
         .from('images')
@@ -138,6 +138,7 @@ export const POST = async ({ request }) => {
 
       if (dbError) {
         console.error('Database error:', dbError);
+        console.error('Failed record:', JSON.stringify(dbRecord, null, 2));
         // Clean up uploaded file if database insert fails
         await supabase.storage.from('images-512').remove([filename]);
         throw error(500, `Database error: ${dbError.message}`);
