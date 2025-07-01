@@ -14,7 +14,19 @@
   async function loginWithProvider(provider: 'google' | 'facebook') {
     loading = true;
     error = '';
-    const { error: authError } = await supabase.auth.signInWithOAuth({ provider });
+    
+    // Für Produktionsumgebung: Explizite Redirect-URL setzen
+    const redirectTo = typeof window !== 'undefined' && window.location.hostname !== 'localhost' 
+      ? `${window.location.origin}/auth/callback`
+      : undefined;
+    
+    const { error: authError } = await supabase.auth.signInWithOAuth({ 
+      provider,
+      options: {
+        redirectTo
+      }
+    });
+    
     if (authError) error = authError.message;
     loading = false;
   }

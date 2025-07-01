@@ -52,21 +52,37 @@ export const POST = async ({ request }) => {
         console.log('Failed to get original image metadata, using defaults');
       }
 
-      // --- NEU: EXIF GPS auslesen ---
+      // --- EXIF Daten auslesen ---
       let lat = null, lon = null;
+      let title = null, description = null, keywords = null;
+      
       try {
-        const exif = await exifr.gps(buf);
-        if (exif && exif.latitude && exif.longitude) {
-          lat = exif.latitude;
-          lon = exif.longitude;
+        // GPS-Daten
+        const gps = await exifr.gps(buf);
+        if (gps && gps.latitude && gps.longitude) {
+          lat = gps.latitude;
+          lon = gps.longitude;
           console.log(`EXIF GPS: lat=${lat}, lon=${lon}`);
-        } else {
-          console.log('No EXIF GPS data found');
+        }
+        
+        // Vollständige EXIF-Daten für Titel, Beschreibung, Keywords
+        const exif = await exifr.parse(buf);
+        if (exif) {
+          // Titel aus verschiedenen EXIF-Feldern
+          title = exif.ImageDescription || exif.DocumentName || exif.XPTitle || exif.Title || null;
+          
+          // Beschreibung aus verschiedenen EXIF-Feldern
+          description = exif.UserComment || exif.ImageDescription || exif.XPComment || exif.Comment || null;
+          
+          // Keywords aus verschiedenen EXIF-Feldern
+          keywords = exif.XPKeywords || exif.Keywords || exif.Subject || null;
+          
+          console.log(`EXIF extracted - Title: ${title}, Description: ${description}, Keywords: ${keywords}`);
         }
       } catch (e) {
-        console.log('Error reading EXIF GPS:', e);
+        console.log('Error reading EXIF data:', e);
       }
-      // --- ENDE NEU ---
+      // --- ENDE EXIF ---
 
       // Upload to both storage buckets with same filename
       // Upload 2048px version
@@ -97,7 +113,7 @@ export const POST = async ({ request }) => {
         throw error(500, `Upload failed: ${uploadError.message}`);
       }
 
-      // Insert into database with both paths
+      // Insert into database with both paths and EXIF data
       const dbRecord = {
         id,
         path_512: filename,
@@ -105,7 +121,10 @@ export const POST = async ({ request }) => {
         width,
         height,
         lat,
-        lon
+        lon,
+        title,
+        description,
+        keywords
       };
       console.log('Inserting database record:', dbRecord);
       

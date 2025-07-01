@@ -35,11 +35,11 @@
     if (loading || !hasMoreImages) return; 
     loading = true;
     
-    // Wenn User eingeloggt ist und Distanz aktiviert ist, lade alle Bilder für Sortierung
-    if (isLoggedIn && showDistance && userLat !== null && userLon !== null && page === 0) {
-      const { data } = await supabase
-        .from('images')
-        .select('id,path_512,path_2048,width,height,lat,lon');
+          // Wenn User eingeloggt ist und Distanz aktiviert ist, lade alle Bilder für Sortierung
+      if (isLoggedIn && showDistance && userLat !== null && userLon !== null && page === 0) {
+        const { data } = await supabase
+          .from('images')
+          .select('id,path_512,path_2048,width,height,lat,lon,title,description,keywords');
       
       if (data) {
         const allPics = data.map((d: any) => ({
@@ -49,7 +49,10 @@
           width: d.width,
           height: d.height,
           lat: d.lat,
-          lon: d.lon
+          lon: d.lon,
+          title: d.title,
+          description: d.description,
+          keywords: d.keywords
         }));
 
         // Sortiere nach Entfernung
@@ -64,11 +67,11 @@
       }
     } else {
       // Normale Pagination für nicht eingeloggte User oder wenn Distanz deaktiviert ist
-      const { data } = await supabase
-        .from('images')
-        .select('id,path_512,path_2048,width,height,lat,lon')
-        .order('created_at', { ascending: false })
-        .range(page * size, page * size + size - 1);
+          const { data } = await supabase
+      .from('images')
+      .select('id,path_512,path_2048,width,height,lat,lon,title,description,keywords')
+      .order('created_at', { ascending: false })
+      .range(page * size, page * size + size - 1);
       
       if (data) {
         // Check if we got fewer items than requested - means we reached the end
@@ -83,7 +86,10 @@
           width: d.width,
           height: d.height,
           lat: d.lat,
-          lon: d.lon
+          lon: d.lon,
+          title: d.title,
+          description: d.description,
+          keywords: d.keywords
         }));
 
         pics.update((p: any[]) => [...p, ...newPics]);
@@ -214,7 +220,12 @@
               src: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${img.path_512}`,
               srcHD: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${img.path_2048}`,
               width: img.width,
-              height: img.height
+              height: img.height,
+              lat: img.lat,
+              lon: img.lon,
+              title: img.title,
+              description: img.description,
+              keywords: img.keywords
             })),
             ...p
           ]);
@@ -397,7 +408,12 @@
               src: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${img.path_512}`,
               srcHD: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${img.path_2048}`,
               width: img.width,
-              height: img.height
+              height: img.height,
+              lat: img.lat,
+              lon: img.lon,
+              title: img.title,
+              description: img.description,
+              keywords: img.keywords
             })),
             ...p
           ]);
@@ -429,7 +445,19 @@
   async function loginWithProvider(provider: 'google' | 'facebook') {
     loginLoading = true;
     loginError = '';
-    const { error: authError } = await supabase.auth.signInWithOAuth({ provider });
+    
+    // Für Produktionsumgebung: Explizite Redirect-URL setzen
+    const redirectTo = typeof window !== 'undefined' && window.location.hostname !== 'localhost' 
+      ? `${window.location.origin}/auth/callback`
+      : undefined;
+    
+    const { error: authError } = await supabase.auth.signInWithOAuth({ 
+      provider,
+      options: {
+        redirectTo
+      }
+    });
+    
     if (authError) loginError = authError.message;
     loginLoading = false;
   }
