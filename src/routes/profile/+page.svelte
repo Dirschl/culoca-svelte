@@ -2,28 +2,39 @@
   import { supabase } from '$lib/supabaseClient';
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
+  import { page } from '$app/stores';
 
   let user: any = null;
   let profile: any = null;
   let loading = true;
   let saving = false;
+  let error = '';
+  let success = '';
   let avatarFile: File | null = null;
   let avatarPreview: string | null = null;
   let message = '';
   let messageType: 'success' | 'error' = 'success';
 
   // Profile fields
-  let fullName = '';
+  let name = '';
   let address = '';
   let phone = '';
   let website = '';
-  let facebook = '';
   let instagram = '';
+  let facebook = '';
   let twitter = '';
-  let showAddress = false;
-  let showPhone = false;
-  let showWebsite = false;
-  let showSocial = false;
+  let visible = true;
+  let show_phone = false;
+  let show_address = false;
+  let show_website = false;
+  let show_social = false;
+
+  $: nameValid = name.length >= 2 && name.length <= 60;
+  $: phoneValid = phone.length === 0 || /^\+?[0-9\- ]{7,20}$/.test(phone);
+  $: websiteValid = website.length === 0 || website.startsWith('http');
+  $: instagramValid = instagram.length === 0 || instagram.startsWith('https://');
+  $: facebookValid = facebook.length === 0 || facebook.startsWith('https://');
+  $: twitterValid = twitter.length === 0 || twitter.startsWith('https://');
 
   onMount(async () => {
     const { data: { user: currentUser } } = await supabase.auth.getUser();
@@ -46,17 +57,17 @@
       if (error && error.code !== 'PGRST116') throw error;
       if (data) {
         profile = data;
-        fullName = data.full_name || '';
+        name = data.full_name || '';
         address = data.address || '';
         phone = data.phone || '';
         website = data.website || '';
-        facebook = data.facebook || '';
         instagram = data.instagram || '';
+        facebook = data.facebook || '';
         twitter = data.twitter || '';
-        showAddress = data.show_address ?? false;
-        showPhone = data.show_phone ?? false;
-        showWebsite = data.show_website ?? false;
-        showSocial = data.show_social ?? false;
+        show_address = data.show_address ?? false;
+        show_phone = data.show_phone ?? false;
+        show_website = data.show_website ?? false;
+        show_social = data.show_social ?? false;
       }
     } catch (error) {
       console.error('Error loading profile:', error);
@@ -97,17 +108,17 @@
       }
       const profileData = {
         id: user.id,
-        full_name: fullName,
+        full_name: name,
         address,
         phone,
         website,
-        facebook,
         instagram,
+        facebook,
         twitter,
-        show_address: showAddress,
-        show_phone: showPhone,
-        show_website: showWebsite,
-        show_social: showSocial,
+        show_address: show_address,
+        show_phone: show_phone,
+        show_website: show_website,
+        show_social: show_social,
         avatar_url: avatarPath,
         updated_at: new Date().toISOString()
       };
@@ -200,7 +211,7 @@
         </div>
         <div class="profile-main">
           <label for="fullName">Vollständiger Name</label>
-          <input id="fullName" type="text" bind:value={fullName} placeholder="Dein vollständiger Name" />
+          <input id="fullName" type="text" bind:value={name} placeholder="Dein vollständiger Name" />
           <div class="profile-meta">
             <span class="profile-email">{user.email}</span>
           </div>
@@ -213,7 +224,7 @@
           <label for="address">Adresse</label>
           <textarea id="address" bind:value={address} placeholder="Deine Adresse" rows="2"></textarea>
           <label class="checkbox-label">
-            <input type="checkbox" bind:checked={showAddress} />
+            <input type="checkbox" bind:checked={show_address} />
             <span class="checkmark"></span>
             Adresse öffentlich anzeigen
           </label>
@@ -222,7 +233,7 @@
           <label for="phone">Telefonnummer</label>
           <input id="phone" type="tel" bind:value={phone} placeholder="Deine Telefonnummer" />
           <label class="checkbox-label">
-            <input type="checkbox" bind:checked={showPhone} />
+            <input type="checkbox" bind:checked={show_phone} />
             <span class="checkmark"></span>
             Telefonnummer öffentlich anzeigen
           </label>
@@ -231,7 +242,7 @@
           <label for="website">Webseite</label>
           <input id="website" type="url" bind:value={website} placeholder="https://deine-website.de" />
           <label class="checkbox-label">
-            <input type="checkbox" bind:checked={showWebsite} />
+            <input type="checkbox" bind:checked={show_website} />
             <span class="checkmark"></span>
             Webseite öffentlich anzeigen
           </label>
@@ -253,7 +264,7 @@
           <input id="twitter" type="url" bind:value={twitter} placeholder="https://twitter.com/dein-profil" />
         </div>
         <label class="checkbox-label">
-          <input type="checkbox" bind:checked={showSocial} />
+          <input type="checkbox" bind:checked={show_social} />
           <span class="checkmark"></span>
           Social Media Links öffentlich anzeigen
         </label>

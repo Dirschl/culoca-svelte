@@ -1,24 +1,26 @@
-<script lang="ts">
-  import { page } from '$app/stores';
-  import { supabase } from '$lib/supabaseClient';
+<script>
   import { onMount } from 'svelte';
+  import { supabase } from '$lib/supabaseClient';
+  import { page } from '$app/stores';
 
-  let imageData: any = null;
+  let image = null;
   let loading = true;
   let error = '';
+
+  $: imageId = $page.params.id;
 
   onMount(async () => {
     try {
       const { data, error: fetchError } = await supabase
         .from('images')
         .select('*')
-        .eq('id', $page.params.id)
+        .eq('id', imageId)
         .single();
 
       if (fetchError) {
         error = fetchError.message;
       } else {
-        imageData = data;
+        image = data;
       }
     } catch (err) {
       error = 'Failed to load image';
@@ -28,17 +30,17 @@
   });
 
   // Determine best image source
-  $: imageSource = imageData ? (() => {
+  $: imageSource = image ? (() => {
     const baseUrl = 'https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public';
-    if (imageData.path_2048) {
-      return `${baseUrl}/images-2048/${imageData.path_2048}`;
+    if (image.path_2048) {
+      return `${baseUrl}/images-2048/${image.path_2048}`;
     }
-    return `${baseUrl}/images-512/${imageData.path_512}`;
+    return `${baseUrl}/images-512/${image.path_512}`;
   })() : '';
 </script>
 
 <svelte:head>
-  <title>{imageData?.title || imageData?.original_name || `Image ${imageData?.id}` || 'Loading...'}</title>
+  <title>{image?.title || image?.original_name || `Image ${image?.id}` || 'Loading...'}</title>
 </svelte:head>
 
 <div class="page">
@@ -59,13 +61,13 @@
     </div>
   {:else if error}
     <div class="error">❌ Fehler: {error}</div>
-  {:else if imageData}
+  {:else if image}
     <div class="content">
       <!-- Main Image -->
       <div class="image-wrapper">
         <img
           src={imageSource}
-          alt={imageData.title || imageData.original_name || `Image ${imageData.id}`}
+          alt={image.title || image.original_name || `Image ${image.id}`}
           class="main-image"
         />
       </div>
@@ -73,11 +75,11 @@
       <!-- Image Information -->
       <div class="info-section">
         <h1 class="title">
-          {imageData.title || imageData.original_name || `Bild ${imageData.id.substring(0, 8)}...`}
+          {image.title || image.original_name || `Bild ${image.id.substring(0, 8)}...`}
         </h1>
         
-        {#if imageData.description}
-          <p class="description">{imageData.description}</p>
+        {#if image.description}
+          <p class="description">{image.description}</p>
         {:else}
           <p class="description placeholder">Keine Beschreibung verfügbar</p>
         {/if}
@@ -87,24 +89,24 @@
           <div class="meta-grid">
             <div class="meta-item">
               <span class="meta-label">Auflösung:</span>
-              <span class="meta-value">{imageData.width} × {imageData.height} px</span>
+              <span class="meta-value">{image.width} × {image.height} px</span>
             </div>
-            {#if imageData.created_at}
+            {#if image.created_at}
               <div class="meta-item">
                 <span class="meta-label">Hochgeladen:</span>
-                <span class="meta-value">{new Date(imageData.created_at).toLocaleDateString('de-DE')}</span>
+                <span class="meta-value">{new Date(image.created_at).toLocaleDateString('de-DE')}</span>
               </div>
             {/if}
-            {#if imageData.camera}
+            {#if image.camera}
               <div class="meta-item">
                 <span class="meta-label">Kamera:</span>
-                <span class="meta-value">{imageData.camera}</span>
+                <span class="meta-value">{image.camera}</span>
               </div>
             {/if}
-            {#if imageData.lens}
+            {#if image.lens}
               <div class="meta-item">
                 <span class="meta-label">Objektiv:</span>
-                <span class="meta-value">{imageData.lens}</span>
+                <span class="meta-value">{image.lens}</span>
               </div>
             {/if}
           </div>

@@ -1,5 +1,7 @@
 <script lang="ts">
   let files: FileList;
+  let uploadList = [];
+  let loading = false;
 
   async function send() {
     const fd = new FormData();

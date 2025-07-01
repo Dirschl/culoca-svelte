@@ -52,6 +52,22 @@ export const POST = async ({ request }) => {
         console.log('Failed to get original image metadata, using defaults');
       }
 
+      // --- NEU: EXIF GPS auslesen ---
+      let lat = null, lon = null;
+      try {
+        const exif = await exifr.gps(buf);
+        if (exif && exif.latitude && exif.longitude) {
+          lat = exif.latitude;
+          lon = exif.longitude;
+          console.log(`EXIF GPS: lat=${lat}, lon=${lon}`);
+        } else {
+          console.log('No EXIF GPS data found');
+        }
+      } catch (e) {
+        console.log('Error reading EXIF GPS:', e);
+      }
+      // --- ENDE NEU ---
+
       // Upload to both storage buckets with same filename
       // Upload 2048px version
       console.log(`Uploading 2048px version: ${filename}`);
@@ -88,6 +104,8 @@ export const POST = async ({ request }) => {
         path_2048: upload2048Error ? null : filename,
         width,
         height,
+        lat,
+        lon
       };
       console.log('Inserting database record:', dbRecord);
       

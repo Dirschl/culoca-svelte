@@ -17,13 +17,19 @@
     boxes: LayoutBox[];
   }
 
-  export let items: { src: string; width: number; height: number; id: string }[] = [];
+  export let items: { src: string; width: number; height: number; id: string; lat?: number; lon?: number }[] = [];
   export let containerWidth = 1024;
   export let targetRowHeight = 200;  // Increased for better visibility
   export let gap = 2;  // Set default gap to 2px
+  export let showDistance: boolean = false;
+  export let userLat: number | null = null;
+  export let userLon: number | null = null;
+  export let getDistanceFromLatLonInMeters: ((lat1: number, lon1: number, lat2: number, lon2: number) => number) | null = null;
+  export let showCompass: boolean = false;
 
   let boxes: LayoutBox[] = [];
   let layout: JustifiedLayoutResult = { boxes: [], containerHeight: 0, widowCount: 0 };
+  let deviceHeading: number | null = null;
   
   // Reactive layout calculation
   $: if (items.length > 0 && containerWidth > 0) {
@@ -37,6 +43,7 @@
         containerWidth, 
         targetRowHeight, 
         boxSpacing: gap,
+        containerPadding: 0,
         maxNumRows: 100,  // Allow many rows
         forceAspectRatio: false,  // Keep original aspect ratios
         showWidows: true,  // Show incomplete last row
@@ -69,6 +76,12 @@
     }
   }
   
+  function handleOrientation(event: DeviceOrientationEvent) {
+    if (event.absolute && typeof event.alpha === 'number') {
+      deviceHeading = 360 - event.alpha;
+    }
+  }
+  
   onMount(() => {
     resize();
     window.addEventListener('resize', resize);
@@ -82,9 +95,16 @@
       resizeObserver.observe(galleryEl);
     }
     
+    if (showCompass && window.DeviceOrientationEvent) {
+      window.addEventListener('deviceorientationabsolute', handleOrientation, true);
+      window.addEventListener('deviceorientation', handleOrientation, true);
+    }
+    
     return () => {
       window.removeEventListener('resize', resize);
       resizeObserver.disconnect();
+      window.removeEventListener('deviceorientationabsolute', handleOrientation, true);
+      window.removeEventListener('deviceorientation', handleOrientation, true);
     };
   });
 
@@ -98,6 +118,16 @@
       handleImageClick(itemId);
     }
   }
+
+  function getAzimuth(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    const toRad = (deg: number) => deg * Math.PI / 180;
+    const dLon = toRad(lon2 - lon1);
+    const y = Math.sin(dLon) * Math.cos(toRad(lat2));
+    const x = Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) - Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(dLon);
+    let brng = Math.atan2(y, x) * 180 / Math.PI;
+    brng = (brng + 360) % 360;
+    return brng;
+  }
 </script>
 
 <style>
@@ -105,9 +135,11 @@
     position: relative; 
     width: 100%;
     min-height: 200px;
-    background: #0f1419;
     padding: 0 !important;
     margin: 0 !important;
+    border: none !important;
+    background: #181828 !important;
+    box-shadow: none !important;
   }
   .pic-container {
     position: absolute;
@@ -146,6 +178,20 @@
     z-index: 1000;
     pointer-events: none;
   }
+  .distance-label {
+    position: absolute;
+    left: 12px;
+    bottom: 12px;
+    background: rgba(24,24,40,0.85);
+    backdrop-filter: blur(4px);
+    color: #fff;
+    font-size: 1.1rem;
+    font-weight: 500;
+    border-radius: 8px;
+    padding: 2px 12px;
+    z-index: 2;
+    pointer-events: none;
+  }
 </style>
 
 <div bind:this={galleryEl}
@@ -177,6 +223,21 @@
             alt="Gallery image {item.id}"
             loading="lazy"
           />
+          {#if showDistance && userLat !== null && userLon !== null && item.lat && item.lon && getDistanceFromLatLonInMeters}
+            <div class="distance-label" style="position: absolute; left: 12px; bottom: 12px; background: rgba(24,24,40,0.55); backdrop-filter: blur(4px); color: #fff; font-size: 1.1rem; font-weight: 500; border-radius: 8px; padding: 2px 12px; z-index: 2; pointer-events: none;">
+              {getDistanceFromLatLonInMeters(userLat, userLon, item.lat, item.lon)}
+            </div>
+          {/if}
+          {#if showCompass && userLat !== null && userLon !== null && item.lat && item.lon && deviceHeading !== null}
+            <div class="compass" style="position: absolute; left: 12px; bottom: 48px; z-index: 3;">
+              <svg width="36" height="36" viewBox="0 0 36 36">
+                <circle cx="18" cy="18" r="16" fill="rgba(24,24,40,0.55)" stroke="#fff" stroke-width="2" />
+                <g transform="rotate({getAzimuth(userLat, userLon, item.lat, item.lon) - deviceHeading}, 18, 18)">
+                  <polygon points="18,6 24,24 18,20 12,24" fill="#ff5252" />
+                </g>
+              </svg>
+            </div>
+          {/if}
         </div>
       {/if}
     {/each}

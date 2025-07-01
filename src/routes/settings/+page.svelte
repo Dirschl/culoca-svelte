@@ -25,6 +25,13 @@
   let showPhone = false;
   let showWebsite = false;
   let showSocial = false;
+  let showDistance = false;
+  let showCompass = false;
+
+  let galleryLayout = 'grid';
+
+  let userLat: number | null = null;
+  let userLon: number | null = null;
 
   onMount(async () => {
     // Check if user is authenticated
@@ -47,6 +54,11 @@
     
     await loadProfile();
     loading = false;
+    // Initialisiere showDistance aus localStorage oder Profil
+    if (typeof localStorage !== 'undefined') {
+      const stored = localStorage.getItem('showDistance');
+      if (stored !== null) showDistance = stored === 'true';
+    }
   });
 
   async function loadProfile() {
@@ -76,6 +88,8 @@
         showPhone = data.show_phone ?? false;
         showWebsite = data.show_website ?? false;
         showSocial = data.show_social ?? false;
+        showDistance = data.show_distance ?? false;
+        showCompass = data.show_compass ?? false;
       }
     } catch (error) {
       console.error('Error loading profile:', error);
@@ -138,6 +152,8 @@
         show_phone: showPhone,
         show_website: showWebsite,
         show_social: showSocial,
+        show_distance: showDistance,
+        show_compass: showCompass,
         avatar_url: avatarPath,
         updated_at: new Date().toISOString()
       };
@@ -152,6 +168,8 @@
       // Save layout preference to localStorage
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem('galleryLayout', useJustifiedLayout ? 'justified' : 'grid');
+        localStorage.setItem('showDistance', showDistance ? 'true' : 'false');
+        localStorage.setItem('showCompass', showCompass ? 'true' : 'false');
       }
 
       profile = profileData;
@@ -206,6 +224,21 @@
     localStorage.setItem('galleryLayout', useJustifiedLayout ? 'justified' : 'grid');
     window.dispatchEvent(new Event('galleryLayoutChanged'));
   }
+
+  function getLocation() {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition((pos) => {
+        userLat = pos.coords.latitude;
+        userLon = pos.coords.longitude;
+      });
+    }
+  }
+
+  function handleShowDistanceChange() {
+    if (showDistance && (userLat === null || userLon === null)) {
+      getLocation();
+    }
+  }
 </script>
 
 <svelte:head>
@@ -248,6 +281,22 @@
             <span class="slider"></span>
           </label>
           <span class="toggle-desc">{useJustifiedLayout ? 'Justified' : 'Grid'}</span>
+        </div>
+        <div class="gallery-toggle-row">
+          <span class="toggle-label">Entfernung anzeigen:</span>
+          <label class="switch">
+            <input type="checkbox" bind:checked={showDistance} on:change={handleShowDistanceChange} />
+            <span class="slider"></span>
+          </label>
+          <span class="toggle-desc">{showDistance ? 'Ja' : 'Nein'}</span>
+        </div>
+        <div class="gallery-toggle-row">
+          <span class="toggle-label">Kompass anzeigen:</span>
+          <label class="switch">
+            <input type="checkbox" bind:checked={showCompass} />
+            <span class="slider"></span>
+          </label>
+          <span class="toggle-desc">{showCompass ? 'Ja' : 'Nein'}</span>
         </div>
       </section>
 
