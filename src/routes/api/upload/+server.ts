@@ -40,13 +40,11 @@ export const POST = async ({ request }) => {
         console.log('Failed to get original image metadata, using defaults');
       }
 
-      // Upload to both storage buckets
-      const filename2048 = `${id}_2048.jpg`;
-      
+      // Upload to both storage buckets with same filename
       // Upload 2048px version
       const { error: upload2048Error } = await supabase.storage
         .from('images-2048')
-        .upload(filename2048, sizes.jpg2048, { 
+        .upload(filename, sizes.jpg2048, { 
           contentType: 'image/jpeg',
           upsert: false
         });
@@ -74,7 +72,7 @@ export const POST = async ({ request }) => {
         .insert({
           id,
           path_512: filename,
-          path_2048: upload2048Error ? null : filename2048,
+          path_2048: upload2048Error ? null : filename,
           width,
           height,
         })
