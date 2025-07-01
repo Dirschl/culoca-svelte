@@ -114,18 +114,20 @@ export const POST = async ({ request }) => {
       }
 
       // Insert into database with both paths and EXIF data
-      const dbRecord = {
+      const dbRecord: any = {
         id,
         path_512: filename,
         path_2048: upload2048Error ? null : filename,
         width,
         height,
         lat,
-        lon,
-        title,
-        description,
-        keywords
+        lon
       };
+
+      // Füge EXIF-Felder nur hinzu, wenn sie nicht null sind
+      if (title) dbRecord.title = title;
+      if (description) dbRecord.description = description;
+      if (keywords) dbRecord.keywords = keywords;
       console.log('Inserting database record:', dbRecord);
       
       const { data: dbData, error: dbError } = await supabase
