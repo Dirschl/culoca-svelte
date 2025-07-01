@@ -13,7 +13,7 @@
     
     const { data } = await supabase
       .from('images')
-      .select('id,path_512,width,height')
+      .select('id,path_2048,width,height')
       .order('created_at', { ascending: false })
       .range(page * size, page * size + size - 1);
     
@@ -25,7 +25,7 @@
       
       pics.update((p) => [...p, ...data.map((d) => ({
         id: d.id,
-        src: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${d.path_512}`,
+        src: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${d.path_2048}`,
         width: d.width,
         height: d.height
       }))]);
@@ -162,7 +162,7 @@
           pics.update(p => [
             ...result.images.map((img: any) => ({
               id: img.id,
-              src: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${img.path_512}`,
+              src: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${img.path_2048}`,
               width: img.width,
               height: img.height
             })),
