@@ -64,7 +64,9 @@
   <link rel="icon" type="image/png" href="/culoca-icon.png" />
 </svelte:head>
 
-<div class="min-h-screen flex items-center justify-center bg-[#0a1124]">
+<div
+  class="min-h-screen flex items-center justify-center bg-[#0a1124] md:fixed md:inset-0 md:z-50 md:bg-black/60 md:backdrop-blur"
+>
   <div class="bg-white/10 backdrop-blur-md rounded-2xl shadow-2xl p-4 w-full max-w-md flex flex-col items-center">
     <img src="/culoca-logo-512px.png" alt="Culoca Logo" class="w-64 aspect-square object-contain mb-2 drop-shadow-lg" />
 

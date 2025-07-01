@@ -15,6 +15,16 @@
   let deviceHeading: number | null = null;
   let showUploadDialog = false;
   let showExifDialog = false;
+  let isLoggedIn = false;
+
+  // Login-Overlay Variablen
+  let loginEmail = '';
+  let loginPassword = '';
+  let loginLoading = false;
+  let loginError = '';
+  let loginInfo = '';
+  let showRegister = false;
+  let authChecked = false; // Prüft, ob der Login-Status bereits geladen wurde
 
   // EXIF Upload Variablen
   let exifFiles: FileList;
@@ -25,30 +35,62 @@
     if (loading || !hasMoreImages) return; 
     loading = true;
     
-    const { data } = await supabase
-      .from('images')
-      .select('id,path_512,path_2048,width,height,lat,lon')
-      .order('created_at', { ascending: false })
-      .range(page * size, page * size + size - 1);
-    
-    if (data) {
-      // Check if we got fewer items than requested - means we reached the end
-      if (data.length < size) {
+    // Wenn User eingeloggt ist und Distanz aktiviert ist, lade alle Bilder für Sortierung
+    if (isLoggedIn && showDistance && userLat !== null && userLon !== null && page === 0) {
+      const { data } = await supabase
+        .from('images')
+        .select('id,path_512,path_2048,width,height,lat,lon');
+      
+      if (data) {
+        const allPics = data.map((d: any) => ({
+          id: d.id,
+          src: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${d.path_512}`,
+          srcHD: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${d.path_2048}`,
+          width: d.width,
+          height: d.height,
+          lat: d.lat,
+          lon: d.lon
+        }));
+
+        // Sortiere nach Entfernung
+        const sortedPics = allPics.sort((a, b) => {
+          const distA = a.lat && a.lon ? getDistanceInMeters(userLat!, userLon!, a.lat, a.lon) : Number.MAX_VALUE;
+          const distB = b.lat && b.lon ? getDistanceInMeters(userLat!, userLon!, b.lat, b.lon) : Number.MAX_VALUE;
+          return distA - distB; // Geringste Entfernung zuerst
+        });
+
+        pics.set(sortedPics);
+        hasMoreImages = false; // Alle Bilder geladen
+      }
+    } else {
+      // Normale Pagination für nicht eingeloggte User oder wenn Distanz deaktiviert ist
+      const { data } = await supabase
+        .from('images')
+        .select('id,path_512,path_2048,width,height,lat,lon')
+        .order('created_at', { ascending: false })
+        .range(page * size, page * size + size - 1);
+      
+      if (data) {
+        // Check if we got fewer items than requested - means we reached the end
+        if (data.length < size) {
+          hasMoreImages = false;
+        }
+        
+        const newPics = data.map((d: any) => ({
+          id: d.id,
+          src: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${d.path_512}`,
+          srcHD: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${d.path_2048}`,
+          width: d.width,
+          height: d.height,
+          lat: d.lat,
+          lon: d.lon
+        }));
+
+        pics.update((p: any[]) => [...p, ...newPics]);
+      } else {
+        // No data returned - we've reached the end
         hasMoreImages = false;
       }
-      
-      pics.update((p: any[]) => [...p, ...data.map((d: any) => ({
-        id: d.id,
-        src: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${d.path_512}`,
-        srcHD: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${d.path_2048}`,
-        width: d.width,
-        height: d.height,
-        lat: d.lat,
-        lon: d.lon
-      }))]);
-    } else {
-      // No data returned - we've reached the end
-      hasMoreImages = false;
     }
     
     page++; 
@@ -274,6 +316,13 @@
       navigator.geolocation.getCurrentPosition((pos) => {
         userLat = pos.coords.latitude;
         userLon = pos.coords.longitude;
+        // Lade Galerie neu, wenn Standort verfügbar ist und Distanz aktiviert ist
+        if (isLoggedIn && showDistance) {
+          pics.set([]);
+          page = 0;
+          hasMoreImages = true;
+          loadMore();
+        }
       });
     }
   }
@@ -292,6 +341,17 @@
     } else {
       return meters + 'm';
     }
+  }
+
+  function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    const R = 6371000;
+    const dLat = (lat2-lat1) * Math.PI/180;
+    const dLon = (lon2-lon1) * Math.PI/180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) *
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return Math.round(R * c);
   }
 
   function handleOrientation(event: DeviceOrientationEvent) {
@@ -365,6 +425,45 @@
     exifMessage = '';
   }
 
+  // Login-Funktionen
+  async function loginWithProvider(provider: 'google' | 'facebook') {
+    loginLoading = true;
+    loginError = '';
+    const { error: authError } = await supabase.auth.signInWithOAuth({ provider });
+    if (authError) loginError = authError.message;
+    loginLoading = false;
+  }
+
+  async function loginWithEmail() {
+    loginLoading = true;
+    loginError = '';
+    const { error: authError } = await supabase.auth.signInWithPassword({ email: loginEmail, password: loginPassword });
+    if (authError) {
+      loginError = authError.message;
+    } else {
+      // Erfolgreicher Login - isLoggedIn wird automatisch aktualisiert
+      loginEmail = '';
+      loginPassword = '';
+    }
+    loginLoading = false;
+  }
+
+  async function signupWithEmail() {
+    loginLoading = true;
+    loginError = '';
+    loginInfo = '';
+    const { error: authError } = await supabase.auth.signUp({ email: loginEmail, password: loginPassword });
+    if (authError) {
+      loginError = authError.message;
+    } else {
+      loginInfo = 'Bitte bestätige deine E-Mail-Adresse. Du kannst dich nach der Bestätigung anmelden.';
+      loginEmail = '';
+      loginPassword = '';
+      showRegister = false;
+    }
+    loginLoading = false;
+  }
+
   // ESC key handler
   function handleKeydown(event: KeyboardEvent) {
     if (event.key === 'Escape') {
@@ -372,7 +471,30 @@
     }
   }
 
-  onMount(() => {
+  onMount(async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    isLoggedIn = !!user;
+    authChecked = true; // Markiere, dass der Login-Status geprüft wurde
+    if (!isLoggedIn) {
+      useJustifiedLayout = true;
+      showDistance = false;
+      showCompass = false;
+    }
+    
+    // Auth State Listener für Echtzeit-Updates
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      isLoggedIn = !!session;
+      authChecked = true;
+      if (isLoggedIn) {
+        loadShowDistanceAndCompass();
+        loadProfileAvatar();
+      } else {
+        useJustifiedLayout = true;
+        showDistance = false;
+        showCompass = false;
+      }
+    });
+    
     loadShowDistanceAndCompass();
     updateLayoutFromStorage();
     loadProfileAvatar();
@@ -392,6 +514,7 @@
       window.removeEventListener('keydown', handleKeydown);
       window.removeEventListener('deviceorientationabsolute', handleOrientation, true);
       window.removeEventListener('deviceorientation', handleOrientation, true);
+      subscription?.unsubscribe();
     };
   });
 </script>
@@ -564,25 +687,30 @@
 {/if}
 
 <!-- Floating Settings Button -->
+{#if isLoggedIn}
 <a href="/settings" class="settings-fab" title="Einstellungen">
   <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <circle cx="12" cy="12" r="3"/>
     <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 8 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 8a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 8 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09A1.65 1.65 0 0 0 16 4.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 8c.14.31.22.65.22 1v.09A1.65 1.65 0 0 0 21 12c0 .35-.08.69-.22 1z"/>
   </svg>
 </a>
+{/if}
 
 <!-- Culoca Logo -->
 <img src="/culoca-logo-512px.png" alt="Culoca" class="culoca-logo" />
 
 <!-- Floating EXIF Upload Button (nur Desktop) -->
+{#if isLoggedIn}
 <button class="exif-fab" on:click={() => showExifDialog = true} title="EXIF Upload">
   <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <rect x="3" y="3" width="18" height="18" rx="2"/>
     <path d="M9 9h6v6H9z"/>
   </svg>
 </button>
+{/if}
 
 <!-- Floating + Button (Upload) -->
+{#if isLoggedIn}
 <button class="plus-fab" on:click={() => showUploadDialog = true} title="Bild hochladen">
   <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <circle cx="12" cy="12" r="10"/>
@@ -590,8 +718,10 @@
     <line x1="8" y1="12" x2="16" y2="12"/>
   </svg>
 </button>
+{/if}
 
 <!-- Floating Profile Button -->
+{#if isLoggedIn}
 <a href="/profile" class="profile-fab" title="Profil">
   {#if profileAvatar}
     <img src={profileAvatar || ''} alt="Profilbild" class="profile-avatar-btn" />
@@ -602,6 +732,7 @@
     </svg>
   {/if}
 </a>
+{/if}
 
 <!-- Galerie bleibt erhalten -->
 <div class="gallery-container">
@@ -609,10 +740,10 @@
     <div class="justified-wrapper">
       <Justified 
         items={$pics} 
-        gap={1} 
+        gap={2} 
         targetRowHeight={220}
-        showDistance={showDistance}
-        showCompass={showCompass}
+        showDistance={isLoggedIn && showDistance}
+        showCompass={isLoggedIn && showCompass}
         userLat={userLat}
         userLon={userLon}
         getDistanceFromLatLonInMeters={getDistanceFromLatLonInMeters}
@@ -622,21 +753,29 @@
     <div class="grid-layout">
       {#each $pics as pic}
         <div class="grid-item">
-          <img 
-            src={pic.src} 
-            alt="Gallery image {pic.id}"
-            on:click={() => location.href = `/image/${pic.id}`}
-            on:keydown={(e) => e.key === 'Enter' && (location.href = `/image/${pic.id}`)}
-            tabindex="0"
-            role="button"
-            aria-label="View image {pic.id}"
-          />
-          {#if showDistance && userLat !== null && userLon !== null && pic.lat && pic.lon}
+          {#if isLoggedIn}
+            <img 
+              src={pic.src} 
+              alt="Gallery image {pic.id}"
+              on:click={() => location.href = `/image/${pic.id}`}
+              on:keydown={(e) => e.key === 'Enter' && (location.href = `/image/${pic.id}`)}
+              tabindex="0"
+              role="button"
+              aria-label="View image {pic.id}"
+            />
+          {:else}
+            <img 
+              src={pic.src} 
+              alt="Gallery image {pic.id}"
+              style="cursor: default; pointer-events: none;"
+            />
+          {/if}
+          {#if isLoggedIn && showDistance && userLat !== null && userLon !== null && pic.lat && pic.lon}
             <div class="distance-label">
               {getDistanceFromLatLonInMeters(userLat, userLon, pic.lat, pic.lon)}
             </div>
           {/if}
-          {#if showCompass && userLat !== null && userLon !== null && pic.lat && pic.lon && deviceHeading !== null}
+          {#if isLoggedIn && showCompass && userLat !== null && userLon !== null && pic.lat && pic.lon && deviceHeading !== null}
             <div class="compass" style="position: absolute; left: 12px; bottom: 48px; z-index: 3;">
               <svg width="36" height="36" viewBox="0 0 36 36">
                 <circle cx="18" cy="18" r="16" fill="rgba(24,24,40,0.55)" stroke="#fff" stroke-width="2" />
@@ -666,6 +805,64 @@
     <div class="empty-state">
       <h3>Noch keine Bilder vorhanden</h3>
       <p>Lade deine ersten Bilder hoch, um die Galerie zu starten!</p>
+    </div>
+  {/if}
+
+  <!-- Login Overlay für nicht eingeloggte User -->
+  {#if !isLoggedIn && authChecked}
+    <div class="login-overlay">
+      <div class="login-overlay-content">
+        <img src="/culoca-logo-512px.png" alt="Culoca Logo" class="login-logo" />
+
+        {#if loginError}
+          <div class="login-error">{loginError}</div>
+        {/if}
+        {#if loginInfo}
+          <div class="login-info">{loginInfo}</div>
+        {/if}
+
+        <div class="social-login">
+          <button class="social-btn google-btn" on:click={() => loginWithProvider('google')} disabled={loginLoading}>
+            <svg class="social-icon" viewBox="0 0 48 48" fill="none">
+              <g>
+                <path fill="#4285F4" d="M24 9.5c3.54 0 6.7 1.22 9.19 3.23l6.85-6.85C36.45 2.36 30.68 0 24 0 14.82 0 6.71 5.06 2.69 12.44l7.98 6.2C12.13 13.13 17.62 9.5 24 9.5z"/>
+                <path fill="#34A853" d="M46.1 24.5c0-1.64-.15-3.22-.42-4.74H24v9.01h12.42c-.54 2.9-2.18 5.36-4.65 7.03l7.19 5.6C43.98 37.13 46.1 31.3 46.1 24.5z"/>
+                <path fill="#FBBC05" d="M9.67 28.64c-1.13-3.36-1.13-6.92 0-10.28l-7.98-6.2C-1.13 17.13-1.13 31.87 1.69 37.84l7.98-6.2z"/>
+                <path fill="#EA4335" d="M24 46c6.48 0 11.92-2.14 15.9-5.82l-7.19-5.6c-2.01 1.35-4.6 2.15-8.71 2.15-6.38 0-11.87-3.63-14.33-8.94l-7.98 6.2C6.71 42.94 14.82 48 24 48z"/>
+              </g>
+            </svg>
+          </button>
+          <button class="social-btn facebook-btn" on:click={() => loginWithProvider('facebook')} disabled={loginLoading}>
+            <svg class="social-icon" viewBox="0 0 32 32" fill="none">
+              <circle cx="16" cy="16" r="16" fill="white"/>
+              <path d="M20.5 16H18V24H15V16H13.5V13.5H15V12.25C15 10.73 15.67 9 18 9H20.5V11.5H19.25C18.84 11.5 18.5 11.84 18.5 12.25V13.5H20.5L20 16Z" fill="#23272F"/>
+            </svg>
+          </button>
+        </div>
+
+        <div class="login-tabs">
+          <button class="tab-btn" class:active={!showRegister} on:click={() => showRegister = false}>Anmelden</button>
+          <button class="tab-btn" class:active={showRegister} on:click={() => showRegister = true}>Registrieren</button>
+        </div>
+
+        {#if !showRegister}
+          <form class="login-form" on:submit|preventDefault={loginWithEmail}>
+            <input class="login-input" type="email" placeholder="E-Mail" bind:value={loginEmail} required />
+            <input class="login-input" type="password" placeholder="Passwort" bind:value={loginPassword} required />
+            <button class="login-submit-btn" type="submit" disabled={loginLoading}>
+              {loginLoading ? 'Anmelden...' : 'Anmelden'}
+            </button>
+          </form>
+        {:else}
+          <form class="login-form" on:submit|preventDefault={signupWithEmail}>
+            <input class="login-input" type="email" placeholder="E-Mail" bind:value={loginEmail} required />
+            <input class="login-input" type="password" placeholder="Passwort" bind:value={loginPassword} required />
+            <button class="login-submit-btn" type="submit" disabled={loginLoading}>
+              {loginLoading ? 'Registrieren...' : 'Registrieren'}
+            </button>
+          </form>
+        {/if}
+      </div>
     </div>
   {/if}
 </div>
@@ -1322,7 +1519,10 @@
     }
   }
   .distance-label {
-    font-size: 0.85rem;
+    font-size: 0.7rem;
+    font-weight: 500;
+    color: #fff;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
   }
   .plus-fab {
     background: #28a745;
@@ -1430,6 +1630,179 @@
       width: 48px;
       height: 48px;
       font-size: 1.2rem;
+    }
+  }
+
+  /* Login Overlay */
+  .login-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+
+  .login-overlay-content {
+    background: #181a20;
+    color: #fff;
+    padding: 3rem;
+    border-radius: 16px;
+    text-align: center;
+    max-width: 400px;
+    margin: 2rem;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  }
+
+  .login-logo {
+    width: 128px;
+    height: 128px;
+    margin-bottom: 1rem;
+    object-fit: contain;
+  }
+
+  .login-error {
+    background: #dc3545;
+    color: #fff;
+    padding: 0.75rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    font-weight: 500;
+  }
+
+  .login-info {
+    background: #28a745;
+    color: #fff;
+    padding: 0.75rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    font-weight: 500;
+  }
+
+  .social-login {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin-bottom: 2rem;
+  }
+
+  .social-btn {
+    background: #fff;
+    border: none;
+    border-radius: 50%;
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  }
+
+  .social-btn:hover:not(:disabled) {
+    transform: scale(1.05);
+  }
+
+  .social-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .social-icon {
+    width: 32px;
+    height: 32px;
+  }
+
+  .login-tabs {
+    display: flex;
+    margin-bottom: 1.5rem;
+    border-radius: 8px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .tab-btn {
+    flex: 1;
+    padding: 0.75rem 1rem;
+    background: transparent;
+    border: none;
+    color: #fff;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease;
+  }
+
+  .tab-btn.active {
+    background: #ff6b35;
+    color: #fff;
+  }
+
+  .tab-btn:not(.active) {
+    color: #ff6b35;
+  }
+
+  .login-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .login-input {
+    width: 100%;
+    padding: 0.75rem;
+    border: none;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.8);
+    color: #000;
+    font-size: 1rem;
+    box-sizing: border-box;
+  }
+
+  .login-input::placeholder {
+    color: #666;
+  }
+
+  .login-input:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px #ff6b35;
+  }
+
+  .login-submit-btn {
+    width: 100%;
+    padding: 0.75rem;
+    background: #ff6b35;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background 0.2s ease;
+  }
+
+  .login-submit-btn:hover:not(:disabled) {
+    background: #e55a2b;
+  }
+
+  .login-submit-btn:disabled {
+    background: #666;
+    cursor: not-allowed;
+  }
+
+  @media (max-width: 600px) {
+    .login-overlay-content {
+      padding: 2rem;
+      margin: 1rem;
+    }
+    
+    .login-logo {
+      width: 96px;
+      height: 96px;
     }
   }
 

@@ -3,11 +3,15 @@
 	import { onMount } from 'svelte';
 	import { writable } from 'svelte/store';
 	import { page } from '$app/stores';
+	import { supabase } from '$lib/supabaseClient';
 
 	// Kein $props, keine runes
 
 	// Modal-Store
 	export const showUploadModal = writable(false);
+
+	// Login-Status
+	let isLoggedIn = false;
 
 	// Klassische Svelte 4 States
 	let title = '';
@@ -29,10 +33,15 @@
 	$: keywordsTooFew = keywordList.length > 0 && keywordList.length < 5;
 	$: keywordsTooMany = keywordList.length > 50;
 	$: keywordsRemaining = 50 - keywordList.length;
+
+	onMount(async () => {
+		const { data: { user } } = await supabase.auth.getUser();
+		isLoggedIn = !!user;
+	});
 </script>
 
-<!-- Floating Action Button (+) nur auf der Startseite anzeigen -->
-{#if $page.url.pathname === '/'}
+<!-- Floating Action Button (+) nur auf der Startseite UND nur für eingeloggte User anzeigen -->
+{#if $page.url.pathname === '/' && isLoggedIn}
 <button class="fab-upload" on:click={() => showUploadModal.set(true)} title="Neuen Content hinzufügen">
 	<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 		<circle cx="12" cy="12" r="10"/>
