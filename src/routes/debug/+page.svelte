@@ -15,8 +15,7 @@
         .from('images')
         .select('id, title, lat, lon')
         .not('lat', 'is', null)
-        .not('lon', 'is', null)
-        .limit(10);
+        .not('lon', 'is', null);
 
       if (error1) {
         console.error('Error fetching images with GPS:', error1);
@@ -28,8 +27,7 @@
       const { data: withoutGPS, error: error2 } = await supabase
         .from('images')
         .select('id, title, lat, lon')
-        .or('lat.is.null,lon.is.null')
-        .limit(10);
+        .or('lat.is.null,lon.is.null');
 
       if (error2) {
         console.error('Error fetching images without GPS:', error2);
@@ -78,8 +76,7 @@
         .from('images')
         .select('id, title, lat, lon')
         .not('lat', 'is', null)
-        .not('lon', 'is', null)
-        .limit(10);
+        .not('lon', 'is', null);
 
       if (error1) {
         console.error('Error fetching images with GPS:', error1);
@@ -91,8 +88,7 @@
       const { data: withoutGPS, error: error2 } = await supabase
         .from('images')
         .select('id, title, lat, lon')
-        .or('lat.is.null,lon.is.null')
-        .limit(10);
+        .or('lat.is.null,lon.is.null');
 
       if (error2) {
         console.error('Error fetching images without GPS:', error2);

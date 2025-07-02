@@ -49,7 +49,7 @@
   // Speech synthesis for autoguide
   let speechSynthesis: SpeechSynthesis | null = null;
   let currentSpeech: SpeechSynthesisUtterance | null = null;
-  let autoguideBarVisible = false;
+  let autoguideBarVisible = true; // Always visible when autoguide is enabled
   let autoguideText = '';
 
   // Autoguide functions
@@ -115,17 +115,16 @@
     
     currentSpeech.onend = () => {
       console.log('Speech ended:', titleToSpeak);
+      // Keep the bar visible, just clear the text after a delay
       setTimeout(() => {
-        autoguideBarVisible = false;
         autoguideText = '';
       }, 2000);
     };
     
     currentSpeech.onerror = (event) => {
       console.error('Speech error:', event.error);
-      // Still show the bar even if speech fails
+      // Keep the bar visible, just clear the text after a delay
       setTimeout(() => {
-        autoguideBarVisible = false;
         autoguideText = '';
       }, 3000);
     };
@@ -1326,23 +1325,26 @@
 {/if}
 
 <!-- Autoguide Bar -->
-{#if autoguide && autoguideBarVisible}
+{#if autoguide}
   <div class="autoguide-bar">
     <div class="autoguide-content">
+      <!-- Das kleine Autoguide-Logo wurde entfernt -->
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
         <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
         <line x1="12" y1="19" x2="12" y2="23"/>
         <line x1="8" y1="23" x2="16" y2="23"/>
       </svg>
-      <span class="autoguide-text">{autoguideText}</span>
-      <button 
-        class="test-speech-btn" 
-        on:click={() => speakTitle(autoguideText)}
-        title="Sprachausgabe testen"
-      >
-        🔊
-      </button>
+      <span class="autoguide-text">{autoguideText || 'Audioguide aktiv'}</span>
+      {#if autoguideText}
+        <button 
+          class="test-speech-btn" 
+          on:click={() => speakTitle(autoguideText)}
+          title="Sprachausgabe testen"
+        >
+          🔊
+        </button>
+      {/if}
     </div>
   </div>
 {/if}
@@ -2171,13 +2173,13 @@
   /* Culoca Logo */
   .culoca-logo {
     position: fixed;
-    top: 0rem;
+    top: 15px;
     right: 20px;
     left: auto;
     bottom: auto;
     z-index: 50;
-    width: 128px;
-    height: 128px;
+    width: 140px;
+    /* height: 72px; */
     transition: opacity 0.2s ease;
     object-fit: contain;
   }
@@ -2527,7 +2529,7 @@
     padding: 0.75rem 1rem;
     box-shadow: 0 2px 10px rgba(0, 102, 204, 0.3);
     animation: slideDown 0.3s ease-out;
-    margin-bottom: 1rem;
+    margin-bottom: 2px;
   }
 
   .autoguide-content {
@@ -2537,6 +2539,13 @@
     gap: 0.5rem;
     max-width: 800px;
     margin: 0 auto;
+  }
+
+  .autoguide-logo {
+    width: 32px;
+    height: 32px;
+    object-fit: contain;
+    filter: brightness(0) invert(1); /* Make logo white */
   }
 
   .autoguide-text {
