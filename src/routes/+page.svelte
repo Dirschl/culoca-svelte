@@ -3,6 +3,7 @@
   import { onMount } from 'svelte';
   import { writable } from 'svelte/store';
   import Justified from '$lib/Justified.svelte';
+  import { beforeNavigate, afterNavigate } from '$app/navigation';
 
   const pics = writable<any[]>([]);
   let page = 0, size = 40, loading = false, hasMoreImages = true;
@@ -31,15 +32,83 @@
   let exifUploading = false;
   let exifMessage = '';
 
+  // Preload gallery in background when on detail page
+  let preloadInterval: number | null = null;
+  
+  // GPS tracking for automatic sorting
+  let gpsWatchId: number | null = null;
+  let lastKnownLat: number | null = null;
+  let lastKnownLon: number | null = null;
+  let gpsTrackingActive = false;
+  const GPS_UPDATE_THRESHOLD = 10; // meters
+  const GPS_UPDATE_INTERVAL = 5000; // 5 seconds
+
+  function startGalleryPreload() {
+    // Only preload if we're not already on the main page
+    if (typeof window !== 'undefined' && window.location.pathname !== '/') {
+      console.log('Starting gallery preload in background...');
+      
+      // Load all images at once instead of batching
+      loadAllImages();
+    }
+  }
+  
+  async function loadAllImages() {
+    if (loading) return;
+    
+    console.log('Loading all images for preload...');
+    loading = true;
+    
+    try {
+      // Load all images in one request
+      const { data } = await supabase
+        .from('images')
+        .select('id,path_512,path_2048,width,height,lat,lon,title,description,keywords')
+        .order('created_at', { ascending: false });
+      
+      if (data) {
+        const allPics = data.map((d: any) => ({
+          id: d.id,
+          src: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${d.path_512}`,
+          srcHD: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${d.path_2048}`,
+          width: d.width,
+          height: d.height,
+          lat: d.lat,
+          lon: d.lon,
+          title: d.title,
+          description: d.description,
+          keywords: d.keywords
+        }));
+
+        // Sort by distance if user is logged in and distance is enabled
+        if (isLoggedIn && showDistance && userLat !== null && userLon !== null) {
+          allPics.sort((a, b) => {
+            const distA = a.lat && a.lon ? getDistanceInMeters(userLat!, userLon!, a.lat, a.lon) : Number.MAX_VALUE;
+            const distB = b.lat && b.lon ? getDistanceInMeters(userLat!, userLon!, b.lat, b.lon) : Number.MAX_VALUE;
+            return distA - distB;
+          });
+        }
+
+        pics.set(allPics);
+        hasMoreImages = false;
+        console.log(`Preload complete: ${allPics.length} images loaded`);
+      }
+    } catch (error) {
+      console.error('Error during preload:', error);
+    } finally {
+      loading = false;
+    }
+  }
+
   async function loadMore() {
     if (loading || !hasMoreImages) return; 
     loading = true;
     
-          // Wenn User eingeloggt ist und Distanz aktiviert ist, lade alle Bilder für Sortierung
-      if (isLoggedIn && showDistance && userLat !== null && userLon !== null && page === 0) {
-        const { data } = await supabase
-          .from('images')
-          .select('id,path_512,path_2048,width,height,lat,lon,title,description,keywords');
+    // Wenn User eingeloggt ist und Distanz aktiviert ist, lade alle Bilder für Sortierung
+    if (isLoggedIn && showDistance && userLat !== null && userLon !== null && page === 0) {
+      const { data } = await supabase
+        .from('images')
+        .select('id,path_512,path_2048,width,height,lat,lon,title,description,keywords');
       
       if (data) {
         const allPics = data.map((d: any) => ({
@@ -67,11 +136,11 @@
       }
     } else {
       // Normale Pagination für nicht eingeloggte User oder wenn Distanz deaktiviert ist
-          const { data } = await supabase
-      .from('images')
-      .select('id,path_512,path_2048,width,height,lat,lon,title,description,keywords')
-      .order('created_at', { ascending: false })
-      .range(page * size, page * size + size - 1);
+      const { data } = await supabase
+        .from('images')
+        .select('id,path_512,path_2048,width,height,lat,lon,title,description,keywords')
+        .order('created_at', { ascending: false })
+        .range(page * size, page * size + size - 1);
       
       if (data) {
         // Check if we got fewer items than requested - means we reached the end
@@ -329,18 +398,12 @@
       .single();
     showDistance = data?.show_distance ?? false;
     showCompass = data?.show_compass ?? false;
+    
+    // Start GPS tracking if distance is enabled
     if (showDistance && navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition((pos) => {
-        userLat = pos.coords.latitude;
-        userLon = pos.coords.longitude;
-        // Lade Galerie neu, wenn Standort verfügbar ist und Distanz aktiviert ist
-        if (isLoggedIn && showDistance) {
-          pics.set([]);
-          page = 0;
-          hasMoreImages = true;
-          loadMore();
-        }
-      });
+      startGPSTracking();
+    } else {
+      stopGPSTracking();
     }
   }
 
@@ -525,6 +588,121 @@
     }
   }
 
+  function startGPSTracking() {
+    if (!navigator.geolocation || gpsTrackingActive) return;
+    
+    console.log('Starting GPS tracking for automatic sorting...');
+    gpsTrackingActive = true;
+    
+    // Get initial position
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        lastKnownLat = pos.coords.latitude;
+        lastKnownLon = pos.coords.longitude;
+        userLat = pos.coords.latitude;
+        userLon = pos.coords.longitude;
+        console.log(`Initial GPS position: ${userLat}, ${userLon}`);
+        
+        // If distance sorting is enabled, reload gallery with new position
+        if (isLoggedIn && showDistance) {
+          reloadGalleryWithNewPosition();
+        }
+      },
+      (error) => {
+        console.error('GPS tracking error:', error);
+        gpsTrackingActive = false;
+      }
+    );
+    
+    // Start watching for position changes
+    gpsWatchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        const newLat = pos.coords.latitude;
+        const newLon = pos.coords.longitude;
+        
+        if (lastKnownLat !== null && lastKnownLon !== null) {
+          const distance = getDistanceInMeters(lastKnownLat, lastKnownLon, newLat, newLon);
+          
+          if (distance > GPS_UPDATE_THRESHOLD) {
+            console.log(`Position changed by ${distance}m, updating gallery...`);
+            lastKnownLat = newLat;
+            lastKnownLon = newLon;
+            userLat = newLat;
+            userLon = newLon;
+            
+            // Reload gallery with new position
+            if (isLoggedIn && showDistance) {
+              reloadGalleryWithNewPosition();
+            }
+          }
+        } else {
+          lastKnownLat = newLat;
+          lastKnownLon = newLon;
+          userLat = newLat;
+          userLon = newLon;
+        }
+      },
+      (error) => {
+        console.error('GPS watch error:', error);
+        gpsTrackingActive = false;
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: GPS_UPDATE_INTERVAL
+      }
+    );
+  }
+  
+  function stopGPSTracking() {
+    if (gpsWatchId !== null) {
+      navigator.geolocation.clearWatch(gpsWatchId);
+      gpsWatchId = null;
+    }
+    gpsTrackingActive = false;
+    console.log('GPS tracking stopped');
+  }
+  
+  async function reloadGalleryWithNewPosition() {
+    if (!isLoggedIn || !showDistance || userLat === null || userLon === null) return;
+    
+    console.log('Reloading gallery with new GPS position...');
+    
+    try {
+      const { data } = await supabase
+        .from('images')
+        .select('id,path_512,path_2048,width,height,lat,lon,title,description,keywords');
+      
+      if (data) {
+        const allPics = data.map((d: any) => ({
+          id: d.id,
+          src: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${d.path_512}`,
+          srcHD: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${d.path_2048}`,
+          width: d.width,
+          height: d.height,
+          lat: d.lat,
+          lon: d.lon,
+          title: d.title,
+          description: d.description,
+          keywords: d.keywords
+        }));
+
+        // Sort by distance to new position
+        const sortedPics = allPics.sort((a, b) => {
+          const distA = a.lat && a.lon ? getDistanceInMeters(userLat!, userLon!, a.lat, a.lon) : Number.MAX_VALUE;
+          const distB = b.lat && b.lon ? getDistanceInMeters(userLat!, userLon!, b.lat, b.lon) : Number.MAX_VALUE;
+          return distA - distB;
+        });
+
+        pics.set(sortedPics);
+        hasMoreImages = false;
+        console.log(`Gallery reordered: ${sortedPics.length} images sorted by distance`);
+      }
+    } catch (error) {
+      console.error('Error reloading gallery with new position:', error);
+    }
+  }
+
   onMount(async () => {
     const { data: { user } } = await supabase.auth.getUser();
     isLoggedIn = !!user;
@@ -552,7 +730,26 @@
     loadShowDistanceAndCompass();
     updateLayoutFromStorage();
     loadProfileAvatar();
+    
+      // Normal load for main page
     loadMore();
+    
+    // Set up navigation event handlers for preloading
+    beforeNavigate(({ to }) => {
+      // If navigating to a detail page, start preloading gallery
+      if (to?.url.pathname.startsWith('/image/')) {
+        console.log('Navigating to detail page, starting gallery preload...');
+        startGalleryPreload();
+      }
+    });
+    
+    afterNavigate(({ to }) => {
+      // If we're back on the main page, stop preloading and show loaded images
+      if (to?.url.pathname === '/') {
+        console.log('Back on main page, preload complete');
+      }
+    });
+    
     window.addEventListener('scroll', handleScroll, { passive: true });
     window.addEventListener('galleryLayoutChanged', updateLayoutFromStorage);
     window.addEventListener('profileSaved', loadProfileAvatar);
@@ -561,6 +758,7 @@
       window.addEventListener('deviceorientationabsolute', handleOrientation, true);
       window.addEventListener('deviceorientation', handleOrientation, true);
     }
+    
     return () => {
       window.removeEventListener('scroll', handleScroll);
       window.removeEventListener('galleryLayoutChanged', updateLayoutFromStorage);
@@ -569,6 +767,7 @@
       window.removeEventListener('deviceorientationabsolute', handleOrientation, true);
       window.removeEventListener('deviceorientation', handleOrientation, true);
       subscription?.unsubscribe();
+      stopGPSTracking();
     };
   });
 </script>

@@ -624,7 +624,7 @@
     object-fit: contain;
     width: 100%;
     height: auto;
-    max-height: 90vh;
+    max-height: 80vh;
     margin: 0 auto;
     background: none;
     border: none;
