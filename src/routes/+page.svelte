@@ -1,7 +1,7 @@
 <script lang="ts">
   import { supabase } from '$lib/supabaseClient';
   import { onMount } from 'svelte';
-  import { writable } from 'svelte/store';
+  import { writable, get } from 'svelte/store';
   import Justified from '$lib/Justified.svelte';
   import { beforeNavigate, afterNavigate } from '$app/navigation';
 
@@ -11,6 +11,7 @@
   let profileAvatar: string | null = null;
   let showDistance = false;
   let showCompass = false;
+  let autoguide = false;
   let userLat: number | null = null;
   let userLon: number | null = null;
   let deviceHeading: number | null = null;
@@ -44,6 +45,64 @@
   const GPS_UPDATE_INTERVAL = 5000; // 5 seconds
   const RADIUS_CHECK_INTERVAL = 10000; // 10 seconds - check if we need more images
   let radiusCheckInterval: number | null = null;
+
+  // Speech synthesis for autoguide
+  let speechSynthesis: SpeechSynthesis | null = null;
+  let currentSpeech: SpeechSynthesisUtterance | null = null;
+  let autoguideBarVisible = false;
+  let autoguideText = '';
+
+  // Autoguide functions
+  function initSpeechSynthesis() {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      speechSynthesis = window.speechSynthesis;
+    }
+  }
+
+  function speakTitle(title: string) {
+    if (!autoguide || !speechSynthesis) return;
+    
+    // Stop any current speech
+    if (currentSpeech) {
+      speechSynthesis.cancel();
+    }
+    
+    // Extract title up to first comma
+    const titleToSpeak = title.split(',')[0].trim();
+    
+    // Create new speech utterance
+    currentSpeech = new SpeechSynthesisUtterance(titleToSpeak);
+    currentSpeech.lang = 'de-DE';
+    currentSpeech.rate = 0.9;
+    currentSpeech.pitch = 1.0;
+    currentSpeech.volume = 0.8;
+    
+    // Show autoguide bar
+    autoguideText = titleToSpeak;
+    autoguideBarVisible = true;
+    
+    // Hide bar after speech ends
+    currentSpeech.onend = () => {
+      setTimeout(() => {
+        autoguideBarVisible = false;
+        autoguideText = '';
+      }, 2000);
+    };
+    
+    speechSynthesis.speak(currentSpeech);
+  }
+
+  function announceFirstImage() {
+    if (!autoguide) return;
+    
+    const currentPics = get(pics);
+    if (currentPics.length > 0) {
+      const firstImage = currentPics[0];
+      if (firstImage.title) {
+        speakTitle(firstImage.title);
+      }
+    }
+  }
 
   function startGalleryPreload() {
     // Only preload if we're not already on the main page
@@ -135,6 +194,11 @@
 
         pics.set(sortedPics);
         hasMoreImages = false; // Alle Bilder geladen
+        
+        // Announce first image if autoguide is enabled
+        if (autoguide && sortedPics.length > 0) {
+          setTimeout(() => announceFirstImage(), 500);
+        }
       }
     } else {
       // Normale Pagination für nicht eingeloggte User oder wenn Distanz deaktiviert ist
@@ -164,6 +228,11 @@
         }));
 
         pics.update((p: any[]) => [...p, ...newPics]);
+        
+        // Announce first image if autoguide is enabled and this is the first load
+        if (autoguide && page === 0 && newPics.length > 0) {
+          setTimeout(() => announceFirstImage(), 500);
+        }
       } else {
         // No data returned - we've reached the end
         hasMoreImages = false;
@@ -395,11 +464,12 @@
     if (!user) return;
     const { data } = await supabase
       .from('profiles')
-      .select('show_distance, show_compass')
+      .select('show_distance, show_compass, autoguide')
       .eq('id', user.id)
       .single();
     showDistance = data?.show_distance ?? false;
     showCompass = data?.show_compass ?? false;
+    autoguide = data?.autoguide ?? false;
     
     // Start GPS tracking if distance is enabled
     if (showDistance && navigator.geolocation) {
@@ -753,7 +823,11 @@
       useJustifiedLayout = true;
       showDistance = false;
       showCompass = false;
+      autoguide = false;
     }
+    
+    // Initialize speech synthesis for autoguide
+    initSpeechSynthesis();
     
     // Auth State Listener für Echtzeit-Updates
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -766,6 +840,7 @@
         useJustifiedLayout = true;
         showDistance = false;
         showCompass = false;
+        autoguide = false;
       }
     });
     
@@ -1033,6 +1108,21 @@
     </svg>
   {/if}
 </a>
+{/if}
+
+<!-- Autoguide Bar -->
+{#if autoguide && autoguideBarVisible}
+  <div class="autoguide-bar">
+    <div class="autoguide-content">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+        <line x1="12" y1="19" x2="12" y2="23"/>
+        <line x1="8" y1="23" x2="16" y2="23"/>
+      </svg>
+      <span class="autoguide-text">{autoguideText}</span>
+    </div>
+  </div>
 {/if}
 
 <!-- Galerie bleibt erhalten -->
@@ -2204,6 +2294,56 @@
       max-height: 100% !important;
       object-fit: cover;
       display: block;
+    }
+  }
+
+  /* Autoguide Bar */
+  .autoguide-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(135deg, #0066cc, #0099ff);
+    color: white;
+    padding: 0.75rem 1rem;
+    z-index: 1000;
+    box-shadow: 0 2px 10px rgba(0, 102, 204, 0.3);
+    animation: slideDown 0.3s ease-out;
+  }
+
+  .autoguide-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    max-width: 800px;
+    margin: 0 auto;
+  }
+
+  .autoguide-text {
+    font-weight: 600;
+    font-size: 1rem;
+    text-align: center;
+  }
+
+  @keyframes slideDown {
+    from {
+      transform: translateY(-100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  @media (max-width: 600px) {
+    .autoguide-bar {
+      padding: 0.5rem 0.75rem;
+    }
+    
+    .autoguide-text {
+      font-size: 0.9rem;
     }
   }
 

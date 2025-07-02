@@ -27,6 +27,7 @@
   let showSocial = false;
   let showDistance = false;
   let showCompass = false;
+  let autoguide = false;
 
   let galleryLayout = 'grid';
 
@@ -90,6 +91,7 @@
         showSocial = data.show_social ?? false;
         showDistance = data.show_distance ?? false;
         showCompass = data.show_compass ?? false;
+        autoguide = data.autoguide ?? false;
       }
     } catch (error) {
       console.error('Error loading profile:', error);
@@ -154,6 +156,7 @@
         show_social: showSocial,
         show_distance: showDistance,
         show_compass: showCompass,
+        autoguide: autoguide,
         avatar_url: avatarPath,
         updated_at: new Date().toISOString()
       };
@@ -170,6 +173,7 @@
         localStorage.setItem('galleryLayout', useJustifiedLayout ? 'justified' : 'grid');
         localStorage.setItem('showDistance', showDistance ? 'true' : 'false');
         localStorage.setItem('showCompass', showCompass ? 'true' : 'false');
+        localStorage.setItem('autoguide', autoguide ? 'true' : 'false');
       }
 
       profile = profileData;
@@ -297,6 +301,14 @@
             <span class="slider"></span>
           </label>
           <span class="toggle-desc">{showCompass ? 'Ja' : 'Nein'}</span>
+        </div>
+        <div class="gallery-toggle-row">
+          <span class="toggle-label">Autoguide:</span>
+          <label class="switch">
+            <input type="checkbox" bind:checked={autoguide} />
+            <span class="slider"></span>
+          </label>
+          <span class="toggle-desc">{autoguide ? 'Aktiviert' : 'Deaktiviert'}</span>
         </div>
       </section>
 
