@@ -28,6 +28,8 @@
   let show_address = false;
   let show_website = false;
   let show_social = false;
+  let email = '';
+  let show_email = false;
 
   $: nameValid = name.length >= 2 && name.length <= 60;
   $: phoneValid = phone.length === 0 || /^\+?[0-9\- ]{7,20}$/.test(phone);
@@ -64,10 +66,12 @@
         instagram = data.instagram || '';
         facebook = data.facebook || '';
         twitter = data.twitter || '';
+        email = data.email || '';
         show_address = data.show_address ?? false;
         show_phone = data.show_phone ?? false;
         show_website = data.show_website ?? false;
         show_social = data.show_social ?? false;
+        show_email = data.show_email ?? false;
       }
     } catch (error) {
       console.error('Error loading profile:', error);
@@ -120,7 +124,9 @@
         show_website: show_website,
         show_social: show_social,
         avatar_url: avatarPath,
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
+        email,
+        show_email
       };
       const { error } = await supabase
         .from('profiles')
@@ -236,6 +242,15 @@
             <input type="checkbox" bind:checked={show_phone} />
             <span class="checkmark"></span>
             Telefonnummer öffentlich anzeigen
+          </label>
+        </div>
+        <div class="form-group">
+          <label for="email">E-Mail</label>
+          <input id="email" type="email" bind:value={email} placeholder="Deine E-Mail-Adresse" />
+          <label class="checkbox-label">
+            <input type="checkbox" bind:checked={show_email} />
+            <span class="checkmark"></span>
+            E-Mail öffentlich anzeigen
           </label>
         </div>
         <div class="form-group">

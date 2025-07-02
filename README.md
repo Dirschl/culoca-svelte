@@ -1,38 +1,76 @@
-# sv
+# Culoca Photo Gallery
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+Eine moderne Foto-Galerie mit SvelteKit und Supabase.
 
-## Creating a project
+## Features
 
-If you're seeing this, you've probably already done this step. Congrats!
+- 📸 Drag & Drop Upload
+- 🗺️ GPS-basierte Standortanzeige
+- 🧭 Kompass-Richtung
+- 📱 Responsive Design
+- 🔐 OAuth Authentication (Google, Facebook)
+- 📊 EXIF-Daten Extraktion
+- 🎨 Zwei Layout-Modi: Grid und Justified
+
+## Setup
+
+### 1. Installation
 
 ```bash
-# create a new project in the current directory
-npx sv create
-
-# create a new project in my-app
-npx sv create my-app
+npm install
 ```
 
-## Developing
+### 2. Umgebungsvariablen
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+Erstelle eine `.env` Datei:
+
+```env
+PUBLIC_SUPABASE_URL=your_supabase_url
+PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
+### 3. Datenbank Setup
+
+Führe das SQL-Skript aus, um EXIF-Felder hinzuzufügen:
+
+```sql
+-- In der Supabase SQL Editor ausführen:
+ALTER TABLE images ADD COLUMN IF NOT EXISTS title TEXT;
+ALTER TABLE images ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE images ADD COLUMN IF NOT EXISTS keywords TEXT;
+```
+
+Oder verwende die Datei `add-exif-fields-simple.sql` im Supabase SQL Editor.
+
+### 4. Entwicklung
 
 ```bash
 npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
 ```
 
-## Building
+## EXIF Upload Problem
 
-To create a production version of your app:
+Falls der EXIF-Upload nicht funktioniert, liegt das wahrscheinlich daran, dass die Datenbank-Felder `title`, `description` und `keywords` noch nicht existieren.
+
+**Lösung:**
+1. Gehe zu deinem Supabase Dashboard
+2. Öffne den SQL Editor
+3. Führe das folgende SQL aus:
+
+```sql
+ALTER TABLE images ADD COLUMN IF NOT EXISTS title TEXT;
+ALTER TABLE images ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE images ADD COLUMN IF NOT EXISTS keywords TEXT;
+```
+
+Der Upload-Code hat jetzt eine Fallback-Funktion, die auch ohne EXIF-Felder funktioniert, aber die EXIF-Daten werden dann nicht gespeichert.
+
+## Deployment
 
 ```bash
 npm run build
 ```
 
-You can preview the production build with `npm run preview`.
+## Lizenz
 
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+MIT

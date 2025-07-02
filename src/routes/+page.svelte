@@ -27,7 +27,7 @@
   let authChecked = false; // Prüft, ob der Login-Status bereits geladen wurde
 
   // EXIF Upload Variablen
-  let exifFiles: FileList;
+  let exifFiles: FileList | null = null;
   let exifUploading = false;
   let exifMessage = '';
 
@@ -201,6 +201,12 @@
 
         const formData = new FormData();
         formData.append('files', file);
+        
+        // Attach profile_id so that the server can persist it
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        if (currentUser) {
+          formData.append('profile_id', currentUser.id);
+        }
         
         const response = await fetch('/api/upload', { method: 'POST', body: formData });
         const result = await response.json();
@@ -382,20 +388,38 @@
   }
 
   async function uploadExifFiles() {
+    console.log('uploadExifFiles called');
+    console.log('exifFiles:', exifFiles);
+    
     if (!exifFiles || exifFiles.length === 0) {
       exifMessage = 'Bitte Bilder auswählen';
+      console.log('No files selected');
       return;
     }
 
     exifUploading = true;
-    exifMessage = '';
+    exifMessage = 'Upload wird gestartet...';
+    console.log(`Starting upload of ${exifFiles.length} files`);
 
     try {
       const formData = new FormData();
-      Array.from(exifFiles).forEach((file) => formData.append('files', file));
+      Array.from(exifFiles).forEach((file) => {
+        formData.append('files', file);
+        console.log('Added file to formData:', file.name, file.size);
+      });
       
+      // Attach profile_id once for batch upload
+      const { data: { user: batchUser } } = await supabase.auth.getUser();
+      if (batchUser) {
+        formData.append('profile_id', batchUser.id);
+      }
+      
+      console.log('Sending request to /api/upload');
       const response = await fetch('/api/upload', { method: 'POST', body: formData });
+      console.log('Response received:', response.status, response.statusText);
+      
       const result = await response.json();
+      console.log('Response JSON:', result);
       
       if (result.status === 'success') {
         exifMessage = `✅ ${exifFiles.length} Bild(er) erfolgreich hochgeladen!`;
@@ -411,9 +435,9 @@
               height: img.height,
               lat: img.lat,
               lon: img.lon,
-              title: img.title,
-              description: img.description,
-              keywords: img.keywords
+              title: img.title || null,
+              description: img.description || null,
+              keywords: img.keywords || null
             })),
             ...p
           ]);
@@ -429,9 +453,11 @@
       }
     } catch (error) {
       const err = error as Error;
+      console.error('Upload error:', err);
       exifMessage = `❌ Upload fehlgeschlagen: ${err.message}`;
     } finally {
       exifUploading = false;
+      console.log('Upload finished');
     }
   }
 
@@ -695,6 +721,12 @@
         {/if}
         
         <div class="exif-actions">
+          <button 
+            on:click={() => console.log('Button clicked!')} 
+            class="exif-upload-btn"
+          >
+            Test Button
+          </button>
           <button 
             on:click={uploadExifFiles} 
             disabled={exifUploading || !exifFiles || exifFiles.length === 0}

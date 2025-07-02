@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { supabase } from '$lib/supabaseClient';
   let files: FileList;
   let uploadList = [];
   let loading = false;
@@ -6,6 +7,10 @@
   async function send() {
     const fd = new FormData();
     Array.from(files).forEach((f) => fd.append('files', f));
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      fd.append('profile_id', user.id);
+    }
     const res = await fetch('/api/upload', { method: 'POST', body: fd });
     alert(await res.text());
   }

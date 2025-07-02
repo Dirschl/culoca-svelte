@@ -1,13 +1,29 @@
 import { json, error } from '@sveltejs/kit';
 import { supabase } from '$lib/supabaseClient';
 import { resizeJPG } from '$lib/image';
-import exifr from 'exifr';
 import sharp from 'sharp';
+import * as exifr from 'exifr';
+import { Buffer } from 'buffer';
+
+// -- Helper: fix IPTC strings that were decoded as Latin-1 instead of UTF-8
+function fixEncoding(str: string | null): string | null {
+  if (!str) return str;
+  // Heuristic: if the string contains the replacement pattern "Ã" it is likely mis-decoded
+  if (str.includes('Ã')) {
+    try {
+      return Buffer.from(str, 'latin1').toString('utf8');
+    } catch { /* ignore */ }
+  }
+  return str;
+}
 
 export const POST = async ({ request }) => {
   try {
     const form = await request.formData();
     const files = form.getAll('files') as File[];
+
+    // NEW: Allow profile_id to be passed explicitly from the client.
+    const passedProfileId = form.get('profile_id') as string | null;
 
     if (!files.length) {
       throw error(400, 'No files received');
@@ -15,12 +31,18 @@ export const POST = async ({ request }) => {
 
     const results = [];
 
+    // Get current user (from Supabase auth cookie) – may be null when using anon key
+    const { data: { user } } = await supabase.auth.getUser();
+    // Prefer value coming from form; fall back to authenticated user id, otherwise null
+    const profile_id = passedProfileId || user?.id || null;
+
     for (const file of files) {
       console.log(`Processing file: ${file.name}`);
       
       const buf = Buffer.from(await file.arrayBuffer());
       const id = crypto.randomUUID();
       const filename = `${id}.jpg`;
+      const baseName = file.name.replace(/\.[^/.]+$/, '');
 
       // Resize image to multiple sizes
       const sizes = await resizeJPG(buf);
@@ -52,37 +74,108 @@ export const POST = async ({ request }) => {
         console.log('Failed to get original image metadata, using defaults');
       }
 
-      // --- EXIF Daten auslesen ---
-      let lat = null, lon = null;
-      let title = null, description = null, keywords = null;
-      
+      // --- EXIF Daten auslesen (aktiviert) ---
+      let lat: number | null = null;
+      let lon: number | null = null;
+      let title: string | null = null;
+      let description: string | null = null;
+      let keywords: string | null = null;
+      let camera: string | null = null;
+      let lens: string | null = null;
+
+      let exif: any = null;
       try {
-        // GPS-Daten
-        const gps = await exifr.gps(buf);
-        if (gps && gps.latitude && gps.longitude) {
-          lat = gps.latitude;
-          lon = gps.longitude;
-          console.log(`EXIF GPS: lat=${lat}, lon=${lon}`);
-        }
-        
-        // Vollständige EXIF-Daten für Titel, Beschreibung, Keywords
-        const exif = await exifr.parse(buf);
+        exif = await exifr.parse(buf, { iptc: true });
         if (exif) {
-          // Titel aus verschiedenen EXIF-Feldern
-          title = exif.ImageDescription || exif.DocumentName || exif.XPTitle || exif.Title || null;
-          
-          // Beschreibung aus verschiedenen EXIF-Feldern
-          description = exif.UserComment || exif.ImageDescription || exif.XPComment || exif.Comment || null;
-          
-          // Keywords aus verschiedenen EXIF-Feldern
-          keywords = exif.XPKeywords || exif.Keywords || exif.Subject || null;
-          
-          console.log(`EXIF extracted - Title: ${title}, Description: ${description}, Keywords: ${keywords}`);
+          if (typeof exif.latitude === 'number' && typeof exif.longitude === 'number') {
+            lat = exif.latitude;
+            lon = exif.longitude;
+          }
+          description = exif.ImageDescription || exif.Description || exif.UserComment || null;
+          description = fixEncoding(description);
+          // Prefer explicit IPTC Headline field if present, then fall back to other possible headline/title tags
+          title = exif.IPTCHeadline
+            || (exif.iptc ? exif.iptc.Headline : null)
+            || exif['IPTC:Headline']
+            || exif.ObjectName
+            || exif.Headline
+            || exif.HeadLine
+            || exif.Title
+            || exif.title
+            || exif.XPTitle
+            || null;
+          title = fixEncoding(title);
+          if (title && title.length > 60) {
+            title = title.slice(0, 60);
+          }
+          if (description && description.length > 160) {
+            description = description.slice(0, 160);
+          }
+          camera = exif.Model || null;
+          lens = exif.LensModel || null;
+
+          // Debug: Ausgabe aller vorhandenen EXIF/ IPTC/ XMP Felder mit Wert
+          Object.entries(exif).forEach(([key, val]) => {
+            if (val !== undefined && val !== null && val !== '') {
+              console.log(`EXIF ${key}:`, val);
+            }
+          });
+
+          // Heuristische Suche nach IPTC-Feldern mit Punkt-Notation (z.B. "Iptc.Application2.ObjectName")
+          if (!title) {
+            for (const [k, v] of Object.entries(exif)) {
+              if (typeof v === 'string') {
+                const keyLower = k.toLowerCase();
+                if (keyLower.endsWith('objectname') || keyLower.endsWith('headline') || keyLower.endsWith('title')) {
+                  title = v;
+                  break;
+                }
+              }
+            }
+          }
+
+          // Keywords – unterstützen mehrere Quellen (EXIF, IPTC)
+          if (!keywords) {
+            if (Array.isArray(exif.Keywords)) {
+              keywords = exif.Keywords.join(', ');
+            } else if (typeof exif.Keywords === 'string') {
+              keywords = exif.Keywords;
+            }
+          }
+
+          if (!keywords && exif.iptc && Array.isArray((exif.iptc as any).Keywords)) {
+            keywords = (exif.iptc as any).Keywords.join(', ');
+          }
+
+          if (!keywords && typeof exif['IPTC:Keywords'] === 'string') {
+            keywords = exif['IPTC:Keywords'];
+          }
+          // Heuristische Suche: jedes Feld, das auf 'keywords' endet und ein Array/String ist
+          if (!keywords) {
+            for (const [k, v] of Object.entries(exif)) {
+              if (k.toLowerCase().endsWith('keywords')) {
+                if (Array.isArray(v)) {
+                  keywords = (v as any).join(', ');
+                } else if (typeof v === 'string') {
+                  keywords = v as string;
+                }
+                if (keywords) break;
+              }
+            }
+          }
+
+          keywords = fixEncoding(keywords);
         }
-      } catch (e) {
-        console.log('Error reading EXIF data:', e);
+      } catch (exifErr) {
+        console.warn('⚠️ EXIF parsing failed:', exifErr);
       }
       // --- ENDE EXIF ---
+
+      // Wenn Keywords-String vorhanden → in Array umwandeln (Postgres text[] erwartet JS-Array)
+      let keywordsArray: string[] | null = null;
+      if (keywords) {
+        keywordsArray = keywords.split(',').map((k) => k.trim()).filter(Boolean);
+      }
 
       // Upload to both storage buckets with same filename
       // Upload 2048px version
@@ -113,32 +206,100 @@ export const POST = async ({ request }) => {
         throw error(500, `Upload failed: ${uploadError.message}`);
       }
 
+      // --- Build condensed EXIF data to store as JSON ---
+      const exifData: Record<string, any> = {};
+      if (width && height) { exifData.ImageWidth = width; exifData.ImageHeight = height; }
+      if (exif?.Make) exifData.Make = fixEncoding(exif.Make);
+      if (exif?.Model) exifData.Model = fixEncoding(exif.Model);
+      if (lens) exifData.LensModel = lens;
+      if (exif?.Orientation) exifData.Orientation = exif.Orientation;
+      if (exif?.ExposureTime) exifData.ExposureTime = exif.ExposureTime;
+      if (exif?.FNumber) exifData.FNumber = exif.FNumber;
+      if (exif?.ISO) exifData.ISO = exif.ISO;
+      if (exif?.FocalLength) exifData.FocalLength = exif.FocalLength;
+      if (exif?.ApertureValue) exifData.ApertureValue = exif.ApertureValue;
+      if (exif?.DateTimeOriginal || exif?.CreateDate) {
+        exifData.CreateDate = exif?.DateTimeOriginal || exif?.CreateDate;
+      }
+      if (exif?.Artist) exifData.Artist = fixEncoding(exif.Artist);
+      if (exif?.Copyright) exifData.Copyright = fixEncoding(exif.Copyright);
+      // Original file size in bytes
+      exifData.FileSize = file.size;
+
       // Insert into database with both paths and EXIF data
       const dbRecord: any = {
         id,
+        profile_id,
         path_512: filename,
         path_2048: upload2048Error ? null : filename,
         width,
         height,
         lat,
-        lon
+        lon,
+        camera,
+        lens,
+        original_name: baseName,
+        ...(keywordsArray ? { keywords: keywordsArray } : {}),
+        exif_data: Object.keys(exifData).length ? exifData : null
       };
 
       // Füge EXIF-Felder nur hinzu, wenn sie nicht null sind
       if (title) dbRecord.title = title;
       if (description) dbRecord.description = description;
-      if (keywords) dbRecord.keywords = keywords;
+      if (camera) dbRecord.camera = camera;
       console.log('Inserting database record:', JSON.stringify(dbRecord, null, 2));
       
-      const { data: dbData, error: dbError } = await supabase
+      // Versuche zuerst mit allen Feldern zu inserten
+      let { data: dbData, error: dbError } = await supabase
         .from('images')
         .insert(dbRecord)
         .select()
         .single();
 
+      // Falls das fehlschlägt, versuche es ohne EXIF-Felder
+      if (dbError && (dbError.message.includes('column') || dbError.message.includes('does not exist'))) {
+        console.log('EXIF fields not available, trying without them...');
+        const fallbackRecord = {
+          id,
+          profile_id,
+          path_512: filename,
+          path_2048: upload2048Error ? null : filename,
+          width,
+          height,
+          lat,
+          lon,
+          original_name: baseName,
+          ...(keywordsArray ? { keywords: keywordsArray } : {}),
+          exif_data: Object.keys(exifData).length ? exifData : null
+        };
+        
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from('images')
+          .insert(fallbackRecord)
+          .select()
+          .single();
+          
+        if (fallbackError) {
+          console.error('Fallback insert also failed:', fallbackError);
+          throw error(500, `Database error: ${fallbackError.message}`);
+        }
+        
+        dbData = fallbackData;
+        dbError = null;
+        console.log('Successfully inserted without EXIF fields');
+        
+        // Füge eine Warnung hinzu, dass EXIF-Felder fehlen
+        console.warn('⚠️ EXIF fields (title, description, keywords) are not available in the database. Please run the SQL script to add them.');
+      }
+
       if (dbError) {
         console.error('Database error:', dbError);
         console.error('Failed record:', JSON.stringify(dbRecord, null, 2));
+        console.error('Error details:', {
+          message: dbError.message,
+          details: dbError.details,
+          hint: dbError.hint
+        });
         // Clean up uploaded file if database insert fails
         await supabase.storage.from('images-512').remove([filename]);
         throw error(500, `Database error: ${dbError.message}`);
