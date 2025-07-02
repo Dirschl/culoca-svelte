@@ -56,11 +56,38 @@
   function initSpeechSynthesis() {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       speechSynthesis = window.speechSynthesis;
+      
+      // On mobile, we need to resume speech synthesis if it was paused
+      if (speechSynthesis.paused) {
+        speechSynthesis.resume();
+      }
+      
+      // Check if speech synthesis is supported and working
+      console.log('Speech synthesis available:', !!speechSynthesis);
+      console.log('Speech synthesis speaking:', speechSynthesis.speaking);
+      console.log('Speech synthesis paused:', speechSynthesis.paused);
+      
+      // On mobile, we need user interaction to enable speech
+      if (speechSynthesis && autoguide) {
+        // Add a one-time click handler to enable speech
+        const enableSpeech = () => {
+          console.log('User interaction detected - enabling speech synthesis');
+          speechSynthesis.resume();
+          document.removeEventListener('click', enableSpeech);
+          document.removeEventListener('touchstart', enableSpeech);
+        };
+        
+        document.addEventListener('click', enableSpeech, { once: true });
+        document.addEventListener('touchstart', enableSpeech, { once: true });
+      }
     }
   }
 
   function speakTitle(title: string) {
-    if (!autoguide || !speechSynthesis) return;
+    if (!autoguide || !speechSynthesis) {
+      console.log('Autoguide or speech synthesis not available');
+      return;
+    }
     
     // Stop any current speech
     if (currentSpeech) {
@@ -75,21 +102,64 @@
     currentSpeech.lang = 'de-DE';
     currentSpeech.rate = 0.9;
     currentSpeech.pitch = 1.0;
-    currentSpeech.volume = 0.8;
+    currentSpeech.volume = 1.0; // Increased volume for mobile
     
     // Show autoguide bar
     autoguideText = titleToSpeak;
     autoguideBarVisible = true;
     
-    // Hide bar after speech ends
+    // Add event listeners for debugging
+    currentSpeech.onstart = () => {
+      console.log('Speech started:', titleToSpeak);
+    };
+    
     currentSpeech.onend = () => {
+      console.log('Speech ended:', titleToSpeak);
       setTimeout(() => {
         autoguideBarVisible = false;
         autoguideText = '';
       }, 2000);
     };
     
-    speechSynthesis.speak(currentSpeech);
+    currentSpeech.onerror = (event) => {
+      console.error('Speech error:', event.error);
+      // Still show the bar even if speech fails
+      setTimeout(() => {
+        autoguideBarVisible = false;
+        autoguideText = '';
+      }, 3000);
+    };
+    
+    // Mobile-specific handling
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    if (isMobile) {
+      console.log('Mobile device detected - using mobile speech handling');
+      
+      // On mobile, we need to resume speech synthesis if it was paused
+      if (speechSynthesis.paused) {
+        console.log('Mobile: Resuming paused speech synthesis');
+        speechSynthesis.resume();
+      }
+      
+      // Add a small delay for mobile devices
+      setTimeout(() => {
+        try {
+          speechSynthesis.speak(currentSpeech);
+          console.log('Mobile: Speech synthesis speak called');
+        } catch (error) {
+          console.error('Mobile: Error calling speech synthesis:', error);
+        }
+      }, 100);
+    } else {
+      // Desktop handling
+      try {
+        speechSynthesis.speak(currentSpeech);
+        console.log('Desktop: Speech synthesis speak called');
+      } catch (error) {
+        console.error('Desktop: Error calling speech synthesis:', error);
+      }
+    }
   }
 
   function announceFirstImage() {
@@ -101,6 +171,36 @@
       if (firstImage.title) {
         speakTitle(firstImage.title);
       }
+    }
+  }
+
+  // Test function for speech synthesis
+  function testSpeech() {
+    console.log('Testing speech synthesis...');
+    if (speechSynthesis) {
+      const testUtterance = new SpeechSynthesisUtterance('Test der Sprachausgabe');
+      testUtterance.lang = 'de-DE';
+      testUtterance.volume = 1.0;
+      testUtterance.onstart = () => console.log('Test speech started');
+      testUtterance.onend = () => console.log('Test speech ended');
+      testUtterance.onerror = (e) => console.error('Test speech error:', e.error);
+      
+      // Resume if paused (common on mobile)
+      if (speechSynthesis.paused) {
+        speechSynthesis.resume();
+      }
+      
+      speechSynthesis.speak(testUtterance);
+    } else {
+      console.log('Speech synthesis not available');
+    }
+  }
+
+  // Mobile speech activation
+  function activateMobileSpeech() {
+    if (speechSynthesis && speechSynthesis.paused) {
+      speechSynthesis.resume();
+      console.log('Mobile speech synthesis activated');
     }
   }
 
@@ -829,6 +929,26 @@
     // Initialize speech synthesis for autoguide
     initSpeechSynthesis();
     
+    // Mobile-specific speech synthesis setup
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      // On mobile, we need user interaction to enable speech
+      const enableMobileSpeech = () => {
+        console.log('Mobile: User interaction detected - enabling speech synthesis');
+        if (speechSynthesis && speechSynthesis.paused) {
+          speechSynthesis.resume();
+        }
+        // Remove listeners after first interaction
+        document.removeEventListener('click', enableMobileSpeech);
+        document.removeEventListener('touchstart', enableMobileSpeech);
+        document.removeEventListener('scroll', enableMobileSpeech);
+      };
+      
+      // Add listeners for mobile speech activation
+      document.addEventListener('click', enableMobileSpeech, { once: true });
+      document.addEventListener('touchstart', enableMobileSpeech, { once: true });
+      document.addEventListener('scroll', enableMobileSpeech, { once: true });
+    }
+    
     // Auth State Listener für Echtzeit-Updates
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       isLoggedIn = !!session;
@@ -1121,6 +1241,13 @@
         <line x1="8" y1="23" x2="16" y2="23"/>
       </svg>
       <span class="autoguide-text">{autoguideText}</span>
+      <button 
+        class="test-speech-btn" 
+        on:click={() => speakTitle(autoguideText)}
+        title="Sprachausgabe testen"
+      >
+        🔊
+      </button>
     </div>
   </div>
 {/if}
@@ -2324,6 +2451,31 @@
     font-weight: 600;
     font-size: 1rem;
     text-align: center;
+  }
+
+  .test-speech-btn {
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-left: 0.5rem;
+  }
+
+  .test-speech-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.1);
+  }
+
+  .test-speech-btn:active {
+    transform: scale(0.95);
   }
 
   @keyframes slideDown {
