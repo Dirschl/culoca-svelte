@@ -42,6 +42,8 @@
   let gpsTrackingActive = false;
   const GPS_UPDATE_THRESHOLD = 10; // meters
   const GPS_UPDATE_INTERVAL = 5000; // 5 seconds
+  const RADIUS_CHECK_INTERVAL = 10000; // 10 seconds - check if we need more images
+  let radiusCheckInterval: number | null = null;
 
   function startGalleryPreload() {
     // Only preload if we're not already on the main page
@@ -591,7 +593,7 @@
   function startGPSTracking() {
     if (!navigator.geolocation || gpsTrackingActive) return;
     
-    console.log('Starting GPS tracking for automatic sorting...');
+    console.log('Starting optimized GPS tracking...');
     gpsTrackingActive = true;
     
     // Get initial position
@@ -601,63 +603,103 @@
         lastKnownLon = pos.coords.longitude;
         userLat = pos.coords.latitude;
         userLon = pos.coords.longitude;
-        console.log(`Initial GPS position: ${userLat}, ${userLon}`);
         
-        // If distance sorting is enabled, reload gallery with new position
-        if (isLoggedIn && showDistance) {
-          reloadGalleryWithNewPosition();
+        // Initial load with distance sorting
+        if (showDistance) {
+          pics.set([]);
+          page = 0;
+          hasMoreImages = true;
+          loadMore();
         }
-      },
-      (error) => {
-        console.error('GPS tracking error:', error);
-        gpsTrackingActive = false;
-      }
-    );
-    
-    // Start watching for position changes
-    gpsWatchId = navigator.geolocation.watchPosition(
-      (pos) => {
-        const newLat = pos.coords.latitude;
-        const newLon = pos.coords.longitude;
         
-        if (lastKnownLat !== null && lastKnownLon !== null) {
-          const distance = getDistanceInMeters(lastKnownLat, lastKnownLon, newLat, newLon);
-          
-          if (distance > GPS_UPDATE_THRESHOLD) {
-            console.log(`Position changed by ${distance}m, updating gallery...`);
-            lastKnownLat = newLat;
-            lastKnownLon = newLon;
-            userLat = newLat;
-            userLon = newLon;
-            
-            // Reload gallery with new position
-            if (isLoggedIn && showDistance) {
-              reloadGalleryWithNewPosition();
-            }
+        // Start continuous tracking
+        gpsWatchId = navigator.geolocation.watchPosition(
+          handlePositionUpdate,
+          (error) => console.error('GPS tracking error:', error),
+          { 
+            enableHighAccuracy: true, 
+            maximumAge: 3000, 
+            timeout: 5000 
           }
-        } else {
-          lastKnownLat = newLat;
-          lastKnownLon = newLon;
-          userLat = newLat;
-          userLon = newLon;
-        }
+        );
+        
+        // Start radius checking for new images
+        radiusCheckInterval = window.setInterval(checkRadiusForNewImages, RADIUS_CHECK_INTERVAL);
       },
-      (error) => {
-        console.error('GPS watch error:', error);
-        gpsTrackingActive = false;
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: GPS_UPDATE_INTERVAL
-      }
+      (error) => console.error('Initial GPS error:', error),
+      { enableHighAccuracy: true, timeout: 10000 }
     );
+  }
+
+  function handlePositionUpdate(pos: GeolocationPosition) {
+    const newLat = pos.coords.latitude;
+    const newLon = pos.coords.longitude;
+    
+    if (lastKnownLat === null || lastKnownLon === null) {
+      lastKnownLat = newLat;
+      lastKnownLon = newLon;
+      return;
+    }
+    
+    // Calculate distance moved
+    const distance = calculateDistance(lastKnownLat, lastKnownLon, newLat, newLon);
+    
+    if (distance > GPS_UPDATE_THRESHOLD) {
+      console.log(`Moved ${distance.toFixed(1)}m, updating position...`);
+      
+      lastKnownLat = newLat;
+      lastKnownLon = newLon;
+      userLat = newLat;
+      userLon = newLon;
+      
+      // Only resort existing images, don't reload from server
+      resortExistingImages();
+    }
+  }
+
+  function resortExistingImages() {
+    if (!showDistance || pics.length === 0) return;
+    
+    console.log('Resorting existing images based on new position...');
+    
+    // Sort existing images by distance without reloading
+    const sortedPics = [...pics].sort((a: any, b: any) => {
+      if (!a.lat || !a.lon || !b.lat || !b.lon) return 0;
+      
+      const distA = calculateDistance(userLat, userLon, a.lat, a.lon);
+      const distB = calculateDistance(userLat, userLon, b.lat, b.lon);
+      
+      return distA - distB;
+    });
+    
+    pics.set(sortedPics);
+  }
+
+  function checkRadiusForNewImages() {
+    if (!showDistance || !hasMoreImages || loading) return;
+    
+    // Check if we're approaching the radius limit
+    const visibleImages = pics.filter((pic: any) => {
+      if (!pic.lat || !pic.lon) return false;
+      const distance = calculateDistance(userLat, userLon, pic.lat, pic.lon);
+      return distance <= 5000; // 5km radius
+    });
+    
+    // If we have less than 20 images in 5km radius, load more
+    if (visibleImages.length < 20) {
+      console.log(`Only ${visibleImages.length} images in 5km radius, loading more...`);
+      loadMore();
+    }
   }
   
   function stopGPSTracking() {
     if (gpsWatchId !== null) {
       navigator.geolocation.clearWatch(gpsWatchId);
       gpsWatchId = null;
+    }
+    if (radiusCheckInterval !== null) {
+      clearInterval(radiusCheckInterval);
+      radiusCheckInterval = null;
     }
     gpsTrackingActive = false;
     console.log('GPS tracking stopped');
@@ -1453,6 +1495,21 @@
     box-shadow: none;
   }
 
+  /* Mobile responsive grid */
+  @media (max-width: 768px) {
+    .grid-layout {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .grid-layout {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1px;
+    }
+  }
+
   .grid-item {
     background: #181828;
     border-radius: 0;
@@ -1465,6 +1522,14 @@
     justify-content: center;
     aspect-ratio: 1/1;
     position: relative;
+  }
+
+  /* Mobile optimizations */
+  @media (max-width: 768px) {
+    .grid-item {
+      aspect-ratio: 1/1;
+      border-radius: 0;
+    }
   }
   .grid-item:hover {
     /* Kein box-shadow oder transform auf dem Container */
@@ -1495,6 +1560,27 @@
     pointer-events: none;
   }
 
+  /* Mobile distance label optimization */
+  @media (max-width: 768px) {
+    .distance-label {
+      font-size: 1rem;
+      padding: 4px 16px;
+      left: 16px;
+      bottom: 16px;
+      border-radius: 12px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .distance-label {
+      font-size: 1.1rem;
+      padding: 6px 18px;
+      left: 20px;
+      bottom: 20px;
+      border-radius: 14px;
+    }
+  }
+
   /* FAB Styles */
   .plus-fab {
     background: #28a745;
@@ -1519,15 +1605,6 @@
   }
   .plus-fab:hover {
     background: #218838;
-  }
-  @media (max-width: 600px) {
-    .plus-fab {
-      right: 1rem;
-      bottom: 12.5rem;
-      width: 48px;
-      height: 48px;
-      font-size: 1.2rem;
-    }
   }
   .exif-fab {
     background: #ff9800;
@@ -1556,6 +1633,33 @@
   @media (max-width: 768px) {
     .exif-fab {
       display: none !important;
+    }
+  }
+
+  /* Mobile FAB alignment */
+  @media (max-width: 600px) {
+    .plus-fab {
+      right: 1rem;
+      bottom: 12rem;
+      width: 48px;
+      height: 48px;
+      font-size: 1.2rem;
+    }
+    
+    .settings-fab {
+      right: 1rem;
+      bottom: 1rem;
+      width: 48px;
+      height: 48px;
+      font-size: 1.2rem;
+    }
+    
+    .profile-fab {
+      right: 1rem;
+      bottom: 6.5rem;
+      width: 48px;
+      height: 48px;
+      font-size: 1.2rem;
     }
   }
 
@@ -1771,10 +1875,10 @@
   @media (max-width: 600px) {
     .culoca-logo {
       top: 0.5rem;
-      right: 8px;
+      right: 0.5rem;
       left: auto;
-      width: 96px;
-      height: 96px;
+      width: 6rem;
+      height: 6rem;
     }
   }
   .distance-label {
@@ -1835,15 +1939,6 @@
     color: #fff;
     box-shadow: 0 8px 24px rgba(0,102,204,0.18);
     transform: scale(1.08);
-  }
-  @media (max-width: 600px) {
-    .settings-fab {
-      right: 1rem;
-      bottom: 1rem;
-      width: 48px;
-      height: 48px;
-      font-size: 1.2rem;
-    }
   }
 
   /* Floating Profile Button */
@@ -2062,6 +2157,53 @@
     .login-logo {
       width: 96px;
       height: 96px;
+    }
+  }
+
+  .fab-stack {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    position: fixed;
+    right: 1.5rem;
+    bottom: 1.5rem;
+    z-index: 100;
+    gap: 1.1rem;
+  }
+  @media (max-width: 600px) {
+    .fab-stack {
+      right: 1rem;
+      bottom: 1rem;
+      gap: 0.7rem;
+    }
+    .fab-stack .plus-fab,
+    .fab-stack .profile-fab,
+    .fab-stack .settings-fab {
+      width: 3rem !important;
+      height: 3rem !important;
+      min-width: 3rem !important;
+      min-height: 3rem !important;
+      max-width: 3rem !important;
+      max-height: 3rem !important;
+      font-size: 1.2rem !important;
+      margin: 0 !important;
+      position: static !important;
+      border-radius: 50% !important;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 !important;
+    }
+    .fab-stack .plus-fab svg,
+    .fab-stack .profile-fab svg,
+    .fab-stack .settings-fab svg,
+    .fab-stack .profile-fab img {
+      width: 100% !important;
+      height: 100% !important;
+      max-width: 100% !important;
+      max-height: 100% !important;
+      object-fit: cover;
+      display: block;
     }
   }
 

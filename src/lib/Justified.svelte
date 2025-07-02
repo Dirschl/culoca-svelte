@@ -19,7 +19,7 @@
 
   export let items: { src: string; width: number; height: number; id: string; lat?: number; lon?: number }[] = [];
   export let containerWidth = 1024;
-  export let targetRowHeight = 200;  // Increased for better visibility
+  export let targetRowHeight = 200;  // Will be adjusted responsively
   export let gap = 2;  // Set default gap to 2px
   export let showDistance: boolean = false;
   export let userLat: number | null = null;
@@ -31,6 +31,17 @@
   let layout: JustifiedLayoutResult = { boxes: [], containerHeight: 0, widowCount: 0 };
   let deviceHeading: number | null = null;
   
+  // Responsive target row height calculation
+  $: responsiveTargetRowHeight = (() => {
+    if (containerWidth <= 480) {
+      return 120; // Mobile: smaller height for more images per row
+    } else if (containerWidth <= 768) {
+      return 150; // Tablet: medium height
+    } else {
+      return 200; // Desktop: original height
+    }
+  })();
+
   // Reactive layout calculation
   $: if (items.length > 0 && containerWidth > 0) {
     try {
@@ -41,7 +52,7 @@
       
       layout = justifiedLayout(inputItems, { 
         containerWidth, 
-        targetRowHeight, 
+        targetRowHeight: responsiveTargetRowHeight, 
         boxSpacing: gap,
         containerPadding: 0,
         maxNumRows: 100,  // Allow many rows
@@ -55,7 +66,7 @@
       console.log('Adobe Stock-style layout calculated:', {
         itemCount: items.length,
         containerWidth,
-        targetRowHeight,
+        targetRowHeight: responsiveTargetRowHeight,
         boxes: boxes.length,
         containerHeight: layout.containerHeight
       });
@@ -180,17 +191,46 @@
   }
   .distance-label {
     position: absolute;
-    left: 12px;
-    bottom: 12px;
-    background: rgba(24,24,40,0.85);
+    left: 8px;
+    bottom: 8px;
+    background: rgba(24,24,40,0.55);
     backdrop-filter: blur(4px);
     color: #fff;
-    font-size: 1.1rem;
+    font-size: 0.7rem;
     font-weight: 500;
-    border-radius: 8px;
-    padding: 2px 12px;
+    border-radius: 6px;
+    padding: 1px 8px;
     z-index: 2;
     pointer-events: none;
+  }
+
+  /* Mobile distance label optimization */
+  @media (max-width: 768px) {
+    .distance-label {
+      font-size: 0.75rem;
+      padding: 2px 10px;
+      left: 10px;
+      bottom: 10px;
+      border-radius: 8px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .distance-label {
+      font-size: 0.8rem;
+      padding: 2px 12px;
+      left: 12px;
+      bottom: 12px;
+      border-radius: 10px;
+    }
+  }
+  .justified-grid {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: transparent;
+    box-shadow: none;
   }
 </style>
 
@@ -224,7 +264,7 @@
             loading="lazy"
           />
           {#if showDistance && userLat !== null && userLon !== null && item.lat && item.lon && getDistanceFromLatLonInMeters}
-            <div class="distance-label" style="position: absolute; left: 12px; bottom: 12px; background: rgba(24,24,40,0.55); backdrop-filter: blur(4px); color: #fff; font-size: 1.1rem; font-weight: 500; border-radius: 8px; padding: 2px 12px; z-index: 2; pointer-events: none;">
+            <div class="distance-label">
               {getDistanceFromLatLonInMeters(userLat, userLon, item.lat, item.lon)}
             </div>
           {/if}

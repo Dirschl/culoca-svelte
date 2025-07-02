@@ -33,6 +33,9 @@ export const POST = async ({ request }) => {
 
     // Get current user (from Supabase auth cookie) – may be null when using anon key
     const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw error(401, 'Nicht angemeldet. Bitte zuerst einloggen.');
+    }
     // Prefer value coming from form; fall back to authenticated user id, otherwise null
     const profile_id = passedProfileId || user?.id || null;
 

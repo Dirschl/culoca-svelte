@@ -182,14 +182,16 @@
     if (currentUser && image && image.profile_id === currentUser.id) {
       editingTitle = true;
       titleEditValue = image.title || '';
-      // Focus the input after it's rendered
+      // Focus the input after it's rendered with longer delay for mobile
       setTimeout(() => {
         const input = document.getElementById('title-edit-input');
         if (input) {
           input.focus();
           input.select();
+          // Force mobile keyboard to appear
+          input.click();
         }
-      }, 0);
+      }, 100);
     }
   }
 
@@ -237,14 +239,16 @@
     if (currentUser && image && image.profile_id === currentUser.id) {
       editingDescription = true;
       descriptionEditValue = image.description || '';
-      // Focus the input after it's rendered
+      // Focus the input after it's rendered with longer delay for mobile
       setTimeout(() => {
         const input = document.getElementById('description-edit-input');
         if (input) {
           input.focus();
           input.select();
+          // Force mobile keyboard to appear
+          input.click();
         }
-      }, 0);
+      }, 100);
     }
   }
 
@@ -345,6 +349,10 @@
                   class="title-edit-input"
                   class:valid={titleEditValue.length >= 40}
                   placeholder="Titel eingeben..."
+                  autocomplete="off"
+                  autocorrect="off"
+                  autocapitalize="sentences"
+                  inputmode="text"
                 />
                 <span class="char-count" class:valid={titleEditValue.length >= 40}>
                   {titleEditValue.length}/60
@@ -367,6 +375,10 @@
                 class:valid={descriptionEditValue.length >= 140}
                 placeholder="Beschreibung eingeben..."
                 rows="3"
+                autocomplete="off"
+                autocorrect="off"
+                autocapitalize="sentences"
+                inputmode="text"
               ></textarea>
               <span class="char-count" class:valid={descriptionEditValue.length >= 140}>
                 {descriptionEditValue.length}/160
@@ -397,26 +409,28 @@
           {/if}
 
           {#if image.lat && image.lon && nearby.length}
-            {#if useJustifiedLayout}
-              <div class="justified-wrapper">
-                <Justified
-                  items={nearby}
-                  gap={2}
-                  showDistance={true}
-                  userLat={image.lat}
-                  userLon={image.lon}
-                  getDistanceFromLatLonInMeters={getDistanceFromLatLonInMeters}
-                />
-              </div>
-            {:else}
-              <div class="grid-layout">
-                {#each nearby as img}
-                  <div class="grid-item" on:click={() => window.location.href = `/image/${img.id}` } tabindex="0" role="button" aria-label={`Bild ${img.title || img.id}` }>
-                    <img src={img.src} alt={img.title || 'Bild'} />
-                  </div>
-                {/each}
-              </div>
-            {/if}
+            <div class="edge-to-edge-gallery">
+              {#if useJustifiedLayout}
+                <div class="justified-wrapper">
+                  <Justified
+                    items={nearby}
+                    gap={2}
+                    showDistance={true}
+                    userLat={image.lat}
+                    userLon={image.lon}
+                    getDistanceFromLatLonInMeters={getDistanceFromLatLonInMeters}
+                  />
+                </div>
+              {:else}
+                <div class="grid-layout">
+                  {#each nearby as img}
+                    <div class="grid-item" on:click={() => window.location.href = `/image/${img.id}` } tabindex="0" role="button" aria-label={`Bild ${img.title || img.id}` }>
+                      <img src={img.src} alt={img.title || 'Bild'} />
+                    </div>
+                  {/each}
+                </div>
+              {/if}
+            </div>
           {/if}
         </div>
 
@@ -847,51 +861,25 @@
     text-decoration: underline;
   }
 
-  .justified-wrapper { width: 100%; margin-top: 2rem; }
-  .grid-layout {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(256px, 1fr));
-    gap: 2px;
-    width: 100%;
-    margin: 0 auto;
-    padding: 0;
-    background: transparent;
-    border: none;
-    box-shadow: none;
+  .edge-to-edge-gallery {
+    margin-left: calc(-1 * var(--info-section-padding-x, 1.5rem));
+    margin-right: calc(-1 * var(--info-section-padding-x, 1.5rem));
+    width: calc(100% + 2 * var(--info-section-padding-x, 1.5rem));
   }
-  .grid-item {
-    aspect-ratio: 1/1;
-    overflow: hidden;
-    transition: box-shadow 0.2s, transform 0.2s;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
+
+  @media (max-width: 768px) {
+    .edge-to-edge-gallery {
+      margin-left: calc(-1 * var(--info-section-padding-x-mobile, 1rem));
+      margin-right: calc(-1 * var(--info-section-padding-x-mobile, 1rem));
+      width: calc(100% + 2 * var(--info-section-padding-x-mobile, 1rem));
+    }
   }
-  .grid-item img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-    transition: transform 0.3s cubic-bezier(.4,0,.2,1);
-  }
-  .grid-item:hover img {
-    transform: scale(1.04);
-  }
-  .distance-label { 
-    position: absolute;
-    left: 12px;
-    bottom: 12px;
-    background: rgba(24,24,40,0.55);
-    backdrop-filter: blur(4px);
-    color: #fff;
-    font-size: 0.85rem;
-    font-weight: 500;
-    border-radius: 8px;
-    padding: 2px 12px;
-    z-index: 2;
-    pointer-events: none;
+  @media (max-width: 480px) {
+    .edge-to-edge-gallery {
+      margin-left: calc(-1 * var(--info-section-padding-x-xs, 0.75rem));
+      margin-right: calc(-1 * var(--info-section-padding-x-xs, 0.75rem));
+      width: calc(100% + 2 * var(--info-section-padding-x-xs, 0.75rem));
+    }
   }
 
   /* Title editing styles */
@@ -922,6 +910,11 @@
     text-align: center;
     width: 100%;
     transition: border-color 0.2s;
+    /* Mobile optimizations */
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    font-size: 16px; /* Prevents zoom on iOS */
   }
 
   .title-edit-input:focus {
@@ -983,6 +976,11 @@
     min-height: 100px;
     resize: vertical;
     transition: border-color 0.2s;
+    /* Mobile optimizations */
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    font-size: 16px; /* Prevents zoom on iOS */
   }
 
   .description-edit-input:focus {
@@ -992,5 +990,14 @@
 
   .description-edit-input.valid {
     border-color: #4ade80;
+  }
+
+  @media (max-width: 600px) {
+    .grid-layout {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 2px;
+      margin: 0;
+      padding: 0;
+    }
   }
 </style> 
