@@ -822,9 +822,40 @@
       userLat = newLat;
       userLon = newLon;
       
-      // Only resort existing images, don't reload from server
-      resortExistingImages();
+      // Check if we should reload gallery to get closer images
+      const shouldReload = checkIfCloserImagesAvailable();
+      
+      if (shouldReload) {
+        console.log('Closer images available, reloading gallery...');
+        reloadGalleryWithNewPosition();
+      } else {
+        // Only resort existing images if no closer images are available
+        console.log('No closer images available, just resorting existing images...');
+        resortExistingImages();
+      }
     }
+  }
+
+  function checkIfCloserImagesAvailable(): boolean {
+    if (!showDistance || $pics.length === 0) return false;
+    
+    // Get the distance to the farthest currently loaded image
+    const currentPics = $pics;
+    let maxDistance = 0;
+    
+    for (const pic of currentPics) {
+      if (pic.lat && pic.lon) {
+        const distance = getDistanceInMeters(userLat!, userLon!, pic.lat, pic.lon);
+        maxDistance = Math.max(maxDistance, distance);
+      }
+    }
+    
+    console.log(`Current max distance to loaded images: ${maxDistance.toFixed(1)}m`);
+    
+    // If we have a reasonable number of images loaded and they're all within a good radius,
+    // we probably don't need to reload. But if the max distance is very large,
+    // there might be closer images we haven't loaded yet.
+    return maxDistance > 10000; // 10km threshold - if farthest image is >10km away, reload
   }
 
   function resortExistingImages() {
@@ -876,11 +907,33 @@
   }
   
   async function reloadGalleryWithNewPosition() {
-    if (!isLoggedIn || !showDistance || userLat === null || userLon === null) return;
+    if (!isLoggedIn || !showDistance) return;
     
-    console.log('Reloading gallery with new GPS position...');
+    console.log('Reloading gallery with fresh GPS position...');
     
+    // First, get a fresh GPS position to ensure we have the most current location
     try {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0 // Force fresh position
+        });
+      });
+      
+      // Update position variables
+      const newLat = position.coords.latitude;
+      const newLon = position.coords.longitude;
+      
+      console.log(`Fresh GPS position: ${newLat}, ${newLon}`);
+      
+      // Update stored positions
+      lastKnownLat = newLat;
+      lastKnownLon = newLon;
+      userLat = newLat;
+      userLon = newLon;
+      
+      // Now reload gallery with fresh position
       const { data } = await supabase
         .from('images')
         .select('id,path_512,path_2048,width,height,lat,lon,title,description,keywords');
@@ -899,7 +952,7 @@
           keywords: d.keywords
         }));
 
-        // Sort by distance to new position
+        // Sort by distance to fresh position
         const sortedPics = allPics.sort((a, b) => {
           const distA = a.lat && a.lon ? getDistanceInMeters(userLat!, userLon!, a.lat, a.lon) : Number.MAX_VALUE;
           const distB = b.lat && b.lon ? getDistanceInMeters(userLat!, userLon!, b.lat, b.lon) : Number.MAX_VALUE;
@@ -908,10 +961,52 @@
 
         pics.set(sortedPics);
         hasMoreImages = false;
-        console.log(`Gallery reordered: ${sortedPics.length} images sorted by distance`);
+        console.log(`Gallery reordered with fresh position: ${sortedPics.length} images sorted by distance`);
+        
+        // Announce first image if autoguide is enabled
+        if (autoguide && sortedPics.length > 0) {
+          setTimeout(() => announceFirstImage(), 500);
+        }
       }
     } catch (error) {
-      console.error('Error reloading gallery with new position:', error);
+      console.error('Error getting fresh GPS position or reloading gallery:', error);
+      // Fallback: try with current position if fresh position fails
+      if (userLat !== null && userLon !== null) {
+        console.log('Falling back to current position...');
+        // Use existing reloadGalleryWithNewPosition logic with current position
+        try {
+          const { data } = await supabase
+            .from('images')
+            .select('id,path_512,path_2048,width,height,lat,lon,title,description,keywords');
+          
+          if (data) {
+            const allPics = data.map((d: any) => ({
+              id: d.id,
+              src: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${d.path_512}`,
+              srcHD: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${d.path_2048}`,
+              width: d.width,
+              height: d.height,
+              lat: d.lat,
+              lon: d.lon,
+              title: d.title,
+              description: d.description,
+              keywords: d.keywords
+            }));
+
+            const sortedPics = allPics.sort((a, b) => {
+              const distA = a.lat && a.lon ? getDistanceInMeters(userLat!, userLon!, a.lat, a.lon) : Number.MAX_VALUE;
+              const distB = b.lat && b.lon ? getDistanceInMeters(userLat!, userLon!, b.lat, b.lon) : Number.MAX_VALUE;
+              return distA - distB;
+            });
+
+            pics.set(sortedPics);
+            hasMoreImages = false;
+            console.log(`Gallery reordered with fallback position: ${sortedPics.length} images sorted by distance`);
+          }
+        } catch (fallbackError) {
+          console.error('Fallback gallery reload also failed:', fallbackError);
+        }
+      }
     }
   }
 
@@ -2426,16 +2521,13 @@
 
   /* Autoguide Bar */
   .autoguide-bar {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
+    position: static;
     background: linear-gradient(135deg, #0066cc, #0099ff);
     color: white;
     padding: 0.75rem 1rem;
-    z-index: 1000;
     box-shadow: 0 2px 10px rgba(0, 102, 204, 0.3);
     animation: slideDown 0.3s ease-out;
+    margin-bottom: 1rem;
   }
 
   .autoguide-content {
