@@ -34,6 +34,12 @@
   let userLat: number | null = null;
   let userLon: number | null = null;
 
+  // GPS tracking variables
+  let gpsWatchId: number | null = null;
+  let lastKnownLat: number | null = null;
+  let lastKnownLon: number | null = null;
+  let gpsTrackingActive = false;
+
   onMount(async () => {
     // Check if user is authenticated
     const { data: { user: currentUser } } = await supabase.auth.getUser();
@@ -55,11 +61,22 @@
     
     await loadProfile();
     loading = false;
+    
     // Initialisiere showDistance aus localStorage oder Profil
     if (typeof localStorage !== 'undefined') {
       const stored = localStorage.getItem('showDistance');
       if (stored !== null) showDistance = stored === 'true';
     }
+    
+    // Start GPS tracking if distance is enabled
+    if (showDistance && navigator.geolocation) {
+      startGPSTracking();
+    }
+    
+    // Cleanup function
+    return () => {
+      stopGPSTracking();
+    };
   });
 
   async function loadProfile() {
@@ -179,6 +196,13 @@
       profile = profileData;
       showMessage('Profil erfolgreich gespeichert!', 'success');
 
+      // Start GPS tracking if distance is enabled
+      if (showDistance && navigator.geolocation) {
+        startGPSTracking();
+      } else {
+        stopGPSTracking();
+      }
+
       // Clear avatar preview
       if (avatarPreview) {
         URL.revokeObjectURL(avatarPreview);
@@ -229,19 +253,75 @@
     window.dispatchEvent(new Event('galleryLayoutChanged'));
   }
 
-  function getLocation() {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition((pos) => {
-        userLat = pos.coords.latitude;
-        userLon = pos.coords.longitude;
-      });
-    }
+  function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    const R = 6371000;
+    const dLat = (lat2-lat1) * Math.PI/180;
+    const dLon = (lon2-lon1) * Math.PI/180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) *
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return Math.round(R * c);
   }
 
-  function handleShowDistanceChange() {
-    if (showDistance && (userLat === null || userLon === null)) {
-      getLocation();
+  function startGPSTracking() {
+    if (!navigator.geolocation || gpsTrackingActive) return;
+    
+    console.log('Settings: Starting GPS tracking...');
+    gpsTrackingActive = true;
+    
+    // Get initial position
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        lastKnownLat = pos.coords.latitude;
+        lastKnownLon = pos.coords.longitude;
+        userLat = pos.coords.latitude;
+        userLon = pos.coords.longitude;
+        
+        console.log(`Settings: Initial GPS position: ${userLat}, ${userLon}`);
+        
+        // Start continuous tracking
+        gpsWatchId = navigator.geolocation.watchPosition(
+          (newPos) => {
+            const newLat = newPos.coords.latitude;
+            const newLon = newPos.coords.longitude;
+            
+            if (lastKnownLat !== null && lastKnownLon !== null) {
+              const distance = getDistanceInMeters(lastKnownLat, lastKnownLon, newLat, newLon);
+              if (distance > 10) { // 10 meters threshold
+                console.log(`Settings: Position updated: ${newLat}, ${newLon}`);
+                lastKnownLat = newLat;
+                lastKnownLon = newLon;
+                userLat = newLat;
+                userLon = newLon;
+              }
+            } else {
+              lastKnownLat = newLat;
+              lastKnownLon = newLon;
+              userLat = newLat;
+              userLon = newLon;
+            }
+          },
+          (error) => console.error('Settings: GPS tracking error:', error),
+          { 
+            enableHighAccuracy: true, 
+            maximumAge: 3000, 
+            timeout: 5000 
+          }
+        );
+      },
+      (error) => console.error('Settings: Initial GPS error:', error),
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }
+
+  function stopGPSTracking() {
+    if (gpsWatchId !== null) {
+      navigator.geolocation.clearWatch(gpsWatchId);
+      gpsWatchId = null;
     }
+    gpsTrackingActive = false;
+    console.log('Settings: GPS tracking stopped');
   }
 </script>
 
@@ -289,7 +369,7 @@
         <div class="gallery-toggle-row">
           <span class="toggle-label">Entfernung anzeigen:</span>
           <label class="switch">
-            <input type="checkbox" bind:checked={showDistance} on:change={handleShowDistanceChange} />
+            <input type="checkbox" bind:checked={showDistance} on:change={startGPSTracking} />
             <span class="slider"></span>
           </label>
           <span class="toggle-desc">{showDistance ? 'Ja' : 'Nein'}</span>
