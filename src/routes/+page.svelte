@@ -812,7 +812,7 @@
     }
     
     // Calculate distance moved
-    const distance = calculateDistance(lastKnownLat, lastKnownLon, newLat, newLon);
+    const distance = getDistanceInMeters(lastKnownLat, lastKnownLon, newLat, newLon);
     
     if (distance > GPS_UPDATE_THRESHOLD) {
       console.log(`Moved ${distance.toFixed(1)}m, updating position...`);
@@ -836,8 +836,8 @@
     const sortedPics = [...pics].sort((a: any, b: any) => {
       if (!a.lat || !a.lon || !b.lat || !b.lon) return 0;
       
-      const distA = calculateDistance(userLat, userLon, a.lat, a.lon);
-      const distB = calculateDistance(userLat, userLon, b.lat, b.lon);
+      const distA = getDistanceInMeters(userLat, userLon, a.lat, a.lon);
+      const distB = getDistanceInMeters(userLat, userLon, b.lat, b.lon);
       
       return distA - distB;
     });
@@ -851,7 +851,7 @@
     // Check if we're approaching the radius limit
     const visibleImages = pics.filter((pic: any) => {
       if (!pic.lat || !pic.lon) return false;
-      const distance = calculateDistance(userLat, userLon, pic.lat, pic.lon);
+      const distance = getDistanceInMeters(userLat, userLon, pic.lat, pic.lon);
       return distance <= 5000; // 5km radius
     });
     
