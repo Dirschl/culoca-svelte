@@ -90,9 +90,24 @@ export const POST = async ({ request }) => {
       try {
         exif = await exifr.parse(buf, { iptc: true });
         if (exif) {
+          console.log(`EXIF data found for ${file.name}:`, Object.keys(exif));
+          
+          // Debug GPS extraction specifically
+          console.log(`GPS fields in EXIF:`, {
+            latitude: exif.latitude,
+            longitude: exif.longitude,
+            gpsLatitude: exif.gpsLatitude,
+            gpsLongitude: exif.gpsLongitude,
+            GPSLatitude: exif.GPSLatitude,
+            GPSLongitude: exif.GPSLongitude
+          });
+          
           if (typeof exif.latitude === 'number' && typeof exif.longitude === 'number') {
             lat = exif.latitude;
             lon = exif.longitude;
+            console.log(`GPS coordinates extracted: ${lat}, ${lon}`);
+          } else {
+            console.log(`No valid GPS coordinates found in ${file.name}`);
           }
           description = exif.ImageDescription || exif.Description || exif.UserComment || null;
           description = fixEncoding(description);
