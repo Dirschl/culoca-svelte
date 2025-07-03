@@ -7,7 +7,7 @@
   import { beforeNavigate, afterNavigate } from '$app/navigation';
 
   const pics = writable<any[]>([]);
-  let page = 0, size = 100, loading = false, hasMoreImages = true;
+  let page = 0, size = 50, loading = false, hasMoreImages = true;
   let useJustifiedLayout = true;
   let profileAvatar: string | null = null;
   let showDistance = false;
@@ -306,10 +306,50 @@
         }));
         pics.update((p: any[]) => [...p, ...newPics]);
         console.log(`[Gallery] RPC loaded ${data.length} images, total now: ${$pics.length}`);
+        
+        // Wenn RPC weniger Bilder zurückgibt als erwartet, lade den Rest mit normaler Pagination
         if (data.length < size) {
-          hasMoreImages = false;
-          console.log(`[Gallery] RPC hasMoreImages set to false, data.length (${data.length}) < size (${size})`);
+          console.log(`[Gallery] RPC returned ${data.length} images, expected ${size}. Loading remaining with normal pagination.`);
+          
+          // Lade die restlichen Bilder mit normaler Pagination
+          const remainingSize = size - data.length;
+          const normalPage = Math.floor($pics.length / size);
+          console.log(`[Gallery] Loading remaining ${remainingSize} images with normal pagination, page: ${normalPage}`);
+          
+          const { data: remainingData } = await supabase
+            .from('images')
+            .select('id,path_512,path_2048,width,height,lat,lon,title,description,keywords')
+            .order('created_at', { ascending: false })
+            .range(normalPage * size + data.length, normalPage * size + size - 1);
+          
+          if (remainingData && remainingData.length > 0) {
+            const remainingPics = remainingData.map((d: any) => ({
+              id: d.id,
+              src: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${d.path_512}`,
+              srcHD: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${d.path_2048}`,
+              width: d.width,
+              height: d.height,
+              lat: d.lat,
+              lon: d.lon,
+              title: d.title,
+              description: d.description,
+              keywords: d.keywords
+            }));
+            pics.update((p: any[]) => [...p, ...remainingPics]);
+            console.log(`[Gallery] Normal pagination loaded ${remainingData.length} additional images, total now: ${$pics.length}`);
+          }
+          
+          // Prüfe, ob es noch mehr Bilder gibt
+          const totalImages = await supabase
+            .from('images')
+            .select('id', { count: 'exact' });
+          
+          if (totalImages.count && $pics.length >= totalImages.count) {
+            hasMoreImages = false;
+            console.log(`[Gallery] All ${totalImages.count} images loaded, hasMoreImages set to false`);
+          }
         }
+        
         if (autoguide && page === 0 && newPics.length > 0) {
           setTimeout(() => announceFirstImage(), 500);
         }
