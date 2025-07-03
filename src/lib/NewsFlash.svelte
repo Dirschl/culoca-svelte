@@ -1,5 +1,5 @@
 <script lang="ts">
-import { onMount } from 'svelte';
+import { onMount, onDestroy } from 'svelte';
 import { goto } from '$app/navigation';
 import type { NewsFlashImage } from './types';
 
@@ -14,6 +14,8 @@ let images: NewsFlashImage[] = [];
 let loading = true;
 let errorMsg = '';
 let mounted = false;
+let refreshInterval: number | null = null;
+let lastUpdate = new Date();
 
 async function fetchImages() {
   loading = true;
@@ -29,6 +31,7 @@ async function fetchImages() {
     console.log('NewsFlash: Response:', data);
     if (data.status === 'success') {
       images = data.images || [];
+      lastUpdate = new Date();
       console.log('NewsFlash: Loaded', images.length, 'images');
       if (images.length > 0) {
         console.log('NewsFlash: First image:', images[0]);
@@ -45,13 +48,38 @@ async function fetchImages() {
   loading = false;
 }
 
+function startAutoRefresh() {
+  if (refreshInterval) {
+    clearInterval(refreshInterval);
+  }
+  if (mode !== 'aus') {
+    refreshInterval = setInterval(() => {
+      console.log('NewsFlash: Auto-refresh triggered');
+      fetchImages();
+    }, 30000); // Alle 30 Sekunden
+  }
+}
+
+function stopAutoRefresh() {
+  if (refreshInterval) {
+    clearInterval(refreshInterval);
+    refreshInterval = null;
+  }
+}
+
 onMount(() => {
   mounted = true;
   fetchImages();
+  startAutoRefresh();
+});
+
+onDestroy(() => {
+  stopAutoRefresh();
 });
 
 $: if (mounted && mode !== 'aus') {
   fetchImages();
+  startAutoRefresh();
 }
 
 function handleImageClick(img: NewsFlashImage) {
@@ -95,7 +123,7 @@ function toggleLayout() {
     {:else if images.length === 0}
       <div class="newsflash-empty">Keine Uploads gefunden.</div>
     {:else}
-      <div class="newsflash-info">Neueste {images.length} Uploads</div>
+      <div class="newsflash-info">Neueste {images.length} Uploads • Zuletzt aktualisiert: {lastUpdate.toLocaleTimeString()}</div>
       {#if layout === 'strip' || layout === 'justified'}
         <div class="newsflash-strip" tabindex="0">
           {#each images as img (img.id)}
