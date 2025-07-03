@@ -1388,7 +1388,7 @@
   <NewsFlash 
     mode={newsFlashMode} 
     userId={currentUser?.id} 
-    layout={useJustifiedLayout ? 'justified' : 'grid'}
+    layout="strip"
     showToggles={false}
   />
 {/if}

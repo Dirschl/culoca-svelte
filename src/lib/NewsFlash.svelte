@@ -30,6 +30,10 @@ async function fetchImages() {
     if (data.status === 'success') {
       images = data.images || [];
       console.log('NewsFlash: Loaded', images.length, 'images');
+      if (images.length > 0) {
+        console.log('NewsFlash: First image:', images[0]);
+        console.log('NewsFlash: Last image:', images[images.length - 1]);
+      }
     } else {
       errorMsg = data.message || 'Fehler beim Laden der Bilder.';
       console.log('NewsFlash: Error:', errorMsg);
@@ -91,6 +95,7 @@ function toggleLayout() {
     {:else if images.length === 0}
       <div class="newsflash-empty">Keine Uploads gefunden.</div>
     {:else}
+      <div class="newsflash-info">Neueste {images.length} Uploads</div>
       {#if layout === 'strip' || layout === 'justified'}
         <div class="newsflash-strip" tabindex="0">
           {#each images as img (img.id)}
@@ -143,6 +148,12 @@ function toggleLayout() {
   color: #aaa;
   font-size: 0.95rem;
   padding: 0.5rem 0;
+}
+.newsflash-info {
+  color: #4fa3f7;
+  font-size: 0.9rem;
+  padding: 0.25rem 0;
+  font-weight: 500;
 }
 .newsflash-strip {
   display: flex;
