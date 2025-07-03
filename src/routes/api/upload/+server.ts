@@ -221,12 +221,19 @@ export const POST = async ({ request }) => {
         // Upload to both storage buckets with same filename
         // Upload 2048px version
         console.log(`Uploading 2048px version: ${filename}`);
-        const { error: upload2048Error } = await supabase.storage
-          .from('images-2048')
-          .upload(filename, sizes.jpg2048, { 
-            contentType: 'image/jpeg',
-            upsert: false
-          });
+        let upload2048Error = null;
+        try {
+          const { error: error2048 } = await supabase.storage
+            .from('images-2048')
+            .upload(filename, sizes.jpg2048, { 
+              contentType: 'image/jpeg',
+              upsert: false
+            });
+          upload2048Error = error2048;
+        } catch (storageError) {
+          console.error('Storage upload error (2048px):', storageError);
+          upload2048Error = storageError;
+        }
 
         if (upload2048Error) {
           console.error('2048px upload failed:', upload2048Error);
@@ -235,16 +242,26 @@ export const POST = async ({ request }) => {
         }
 
         // Upload 512px version
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('images-512')
-          .upload(filename, sizes.jpg512, { 
-            contentType: 'image/jpeg',
-            upsert: false
-          });
+        let uploadError = null;
+        let uploadData = null;
+        try {
+          const { data, error } = await supabase.storage
+            .from('images-512')
+            .upload(filename, sizes.jpg512, { 
+              contentType: 'image/jpeg',
+              upsert: false
+            });
+          uploadData = data;
+          uploadError = error;
+        } catch (storageError) {
+          console.error('Storage upload error (512px):', storageError);
+          uploadError = storageError;
+        }
 
         if (uploadError) {
           console.error('Upload error:', uploadError);
-          throw error(500, `Upload failed: ${uploadError.message}`);
+          const errorMessage = uploadError instanceof Error ? uploadError.message : String(uploadError);
+          throw error(500, `Upload failed: ${errorMessage}`);
         }
 
         // --- Build condensed EXIF data to store as JSON ---
@@ -293,11 +310,21 @@ export const POST = async ({ request }) => {
         
         // Versuche zuerst mit allen Feldern zu inserten
         console.log('Attempting database insert...');
-        let { data: dbData, error: dbError } = await supabase
-          .from('images')
-          .insert(dbRecord)
-          .select()
-          .single();
+        let dbData = null;
+        let dbError = null;
+        
+        try {
+          const { data, error } = await supabase
+            .from('images')
+            .insert(dbRecord)
+            .select()
+            .single();
+          dbData = data;
+          dbError = error;
+        } catch (insertError) {
+          console.error('Database insert exception:', insertError);
+          dbError = insertError;
+        }
 
         console.log('Database insert result:', { data: dbData, error: dbError });
 
@@ -405,11 +432,24 @@ export const POST = async ({ request }) => {
 
   } catch (err) {
     console.error('Upload error:', err);
+    console.error('Error stack:', err instanceof Error ? err.stack : 'No stack trace');
+    console.error('Error details:', {
+      name: err instanceof Error ? err.name : 'Unknown',
+      message: err instanceof Error ? err.message : String(err),
+      cause: err instanceof Error ? err.cause : undefined
+    });
+    
     const errorMessage = err instanceof Error ? err.message : 'Upload failed';
     const statusCode = (err as any)?.status || 500;
+    
     return json({ 
       status: 'error', 
-      message: errorMessage 
+      message: errorMessage,
+      details: err instanceof Error ? {
+        name: err.name,
+        message: err.message,
+        stack: err.stack
+      } : undefined
     }, { status: statusCode });
   }
 };

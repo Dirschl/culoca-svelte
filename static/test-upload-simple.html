@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple Upload Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .result { background: #f5f5f5; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .error { background: #ffe6e6; color: #d00; }
+        .success { background: #e6ffe6; color: #0a0; }
+    </style>
+</head>
+<body>
+    <h1>Simple Upload Test</h1>
+    <p>Diese Seite testet das Upload-API ohne Authentifizierung zuerst.</p>
+    
+    <input type="file" id="fileInput" accept="image/*">
+    <button onclick="testUpload()">Test Upload</button>
+    
+    <div id="result"></div>
+
+    <script>
+        async function testUpload() {
+            const fileInput = document.getElementById('fileInput');
+            const resultDiv = document.getElementById('result');
+            
+            if (!fileInput.files.length) {
+                resultDiv.innerHTML = '<div class="error">Bitte eine Datei auswählen</div>';
+                return;
+            }
+
+            const file = fileInput.files[0];
+            const formData = new FormData();
+            formData.append('files', file);
+
+            try {
+                resultDiv.innerHTML = '<div class="result">Uploading...</div>';
+                
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    resultDiv.innerHTML = `
+                        <div class="success">
+                            <h3>✅ Upload erfolgreich!</h3>
+                            <pre>${JSON.stringify(result, null, 2)}</pre>
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="error">
+                            <h3>❌ Upload fehlgeschlagen</h3>
+                            <pre>${JSON.stringify(result, null, 2)}</pre>
+                        </div>
+                    `;
+                }
+                
+                console.log('Upload result:', result);
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        <h3>❌ Fehler beim Upload</h3>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+                console.error('Upload error:', error);
+            }
+        }
+    </script>
+</body>
+</html> 
