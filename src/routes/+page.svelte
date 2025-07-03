@@ -272,7 +272,7 @@
   }
 
   async function loadMore(reason = 'default') {
-    console.log(`[Gallery] loadMore called, reason: ${reason}`);
+    console.log(`[Gallery] loadMore called, reason: ${reason}, page: ${page}, size: ${size}, hasMoreImages: ${hasMoreImages}, loading: ${loading}`);
     if (loading || !hasMoreImages) return; 
     loading = true;
 
@@ -305,14 +305,17 @@
           keywords: d.keywords
         }));
         pics.update((p: any[]) => [...p, ...newPics]);
+        console.log(`[Gallery] RPC loaded ${data.length} images, total now: ${$pics.length}`);
         if (data.length < size) {
           hasMoreImages = false;
+          console.log(`[Gallery] RPC hasMoreImages set to false, data.length (${data.length}) < size (${size})`);
         }
         if (autoguide && page === 0 && newPics.length > 0) {
           setTimeout(() => announceFirstImage(), 500);
         }
       } else {
         hasMoreImages = false;
+        console.log(`[Gallery] RPC no data returned, hasMoreImages set to false`);
       }
       page++;
       loading = false;
@@ -320,6 +323,7 @@
     }
 
     // Normale Pagination für nicht eingeloggte User oder wenn Distanz deaktiviert ist
+    console.log(`[Gallery] Using normal pagination, range: ${page * size} to ${page * size + size - 1}`);
     const { data } = await supabase
       .from('images')
       .select('id,path_512,path_2048,width,height,lat,lon,title,description,keywords')
@@ -327,8 +331,10 @@
       .range(page * size, page * size + size - 1);
 
     if (data) {
+      console.log(`[Gallery] Normal pagination loaded ${data.length} images`);
       if (data.length < size) {
         hasMoreImages = false;
+        console.log(`[Gallery] Normal pagination hasMoreImages set to false, data.length (${data.length}) < size (${size})`);
       }
       const newPics = data.map((d: any) => ({
         id: d.id,
@@ -343,11 +349,13 @@
         keywords: d.keywords
       }));
       pics.update((p: any[]) => [...p, ...newPics]);
+      console.log(`[Gallery] Total images now: ${$pics.length}`);
       if (autoguide && page === 0 && newPics.length > 0) {
         setTimeout(() => announceFirstImage(), 500);
       }
     } else {
       hasMoreImages = false;
+      console.log(`[Gallery] Normal pagination no data returned, hasMoreImages set to false`);
     }
 
     page++; 
