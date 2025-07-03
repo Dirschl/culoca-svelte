@@ -2,7 +2,6 @@ import { json, error } from '@sveltejs/kit';
 import { supabase } from '$lib/supabaseClient';
 import { resizeJPG } from '$lib/image';
 import sharp from 'sharp';
-import * as exifr from 'exifr';
 import { Buffer } from 'buffer';
 
 // -- Helper: fix IPTC strings that were decoded as Latin-1 instead of UTF-8
@@ -21,35 +20,24 @@ export const POST = async ({ request }) => {
   try {
     const form = await request.formData();
     const files = form.getAll('files') as File[];
-
-    // NEW: Allow profile_id to be passed explicitly from the client.
     const passedProfileId = form.get('profile_id') as string | null;
-
     if (!files.length) {
       throw error(400, 'No files received');
     }
-
     const results = [];
-
-    // Get current user (from Supabase auth cookie) – may be null when using anon key
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       throw error(401, 'Nicht angemeldet. Bitte zuerst einloggen.');
     }
-    // Prefer value coming from form; fall back to authenticated user id, otherwise null
     const profile_id = passedProfileId || user?.id || null;
-
     for (const file of files) {
       console.log(`Processing file: ${file.name}`);
-      
       const buf = Buffer.from(await file.arrayBuffer());
       const id = crypto.randomUUID();
       const filename = `${id}.jpg`;
       const baseName = file.name.replace(/\.[^/.]+$/, '');
-
       // Resize image to multiple sizes
       const sizes = await resizeJPG(buf);
-      
       // Prüfe die tatsächlichen Dimensionen der 2048px-Datei
       let jpg2048Width = 0;
       let jpg2048Height = 0;
@@ -61,140 +49,33 @@ export const POST = async ({ request }) => {
       } catch (e) {
         console.log('DEBUG: Fehler beim Auslesen der 2048px-Dimensionen:', e);
       }
-
       // Get ACTUAL dimensions of the original image
       let width = 2048;
       let height = 2048;
-      
       try {
-        // Get metadata from the original image
         const originalMetadata = await sharp(buf).metadata();
         width = originalMetadata.width || 2048;
         height = originalMetadata.height || 2048;
-        
         console.log(`Original image dimensions: ${width} x ${height}`);
       } catch (metaError) {
         console.log('Failed to get original image metadata, using defaults');
       }
-
-      // --- EXIF Daten auslesen (aktiviert) ---
-      let lat: number | null = null;
-      let lon: number | null = null;
-      let title: string | null = null;
-      let description: string | null = null;
-      let keywords: string | null = null;
-      let camera: string | null = null;
-      let lens: string | null = null;
-
-      let exif: any = null;
-      try {
-        exif = await exifr.parse(buf, { iptc: true });
-        if (exif) {
-          console.log(`EXIF data found for ${file.name}:`, Object.keys(exif));
-          
-          // Debug GPS extraction specifically
-          console.log(`GPS fields in EXIF:`, {
-            latitude: exif.latitude,
-            longitude: exif.longitude,
-            gpsLatitude: exif.gpsLatitude,
-            gpsLongitude: exif.gpsLongitude,
-            GPSLatitude: exif.GPSLatitude,
-            GPSLongitude: exif.GPSLongitude
-          });
-          
-          if (typeof exif.latitude === 'number' && typeof exif.longitude === 'number') {
-            lat = exif.latitude;
-            lon = exif.longitude;
-            console.log(`GPS coordinates extracted: ${lat}, ${lon}`);
-          } else {
-            console.log(`No valid GPS coordinates found in ${file.name}`);
-          }
-          description = exif.ImageDescription || exif.Description || exif.UserComment || null;
-          description = fixEncoding(description);
-          // Prefer explicit IPTC Headline field if present, then fall back to other possible headline/title tags
-          title = exif.IPTCHeadline
-            || (exif.iptc ? exif.iptc.Headline : null)
-            || exif['IPTC:Headline']
-            || exif.ObjectName
-            || exif.Headline
-            || exif.HeadLine
-            || exif.Title
-            || exif.title
-            || exif.XPTitle
-            || null;
-          title = fixEncoding(title);
-          if (title && title.length > 60) {
-            title = title.slice(0, 60);
-          }
-          if (description && description.length > 160) {
-            description = description.slice(0, 160);
-          }
-          camera = exif.Model || null;
-          lens = exif.LensModel || null;
-
-          // Debug: Ausgabe aller vorhandenen EXIF/ IPTC/ XMP Felder mit Wert
-          Object.entries(exif).forEach(([key, val]) => {
-            if (val !== undefined && val !== null && val !== '') {
-              console.log(`EXIF ${key}:`, val);
-            }
-          });
-
-          // Heuristische Suche nach IPTC-Feldern mit Punkt-Notation (z.B. "Iptc.Application2.ObjectName")
-          if (!title) {
-            for (const [k, v] of Object.entries(exif)) {
-              if (typeof v === 'string') {
-                const keyLower = k.toLowerCase();
-                if (keyLower.endsWith('objectname') || keyLower.endsWith('headline') || keyLower.endsWith('title')) {
-                  title = v;
-                  break;
-                }
-              }
-            }
-          }
-
-          // Keywords – unterstützen mehrere Quellen (EXIF, IPTC)
-          if (!keywords) {
-            if (Array.isArray(exif.Keywords)) {
-              keywords = exif.Keywords.join(', ');
-            } else if (typeof exif.Keywords === 'string') {
-              keywords = exif.Keywords;
-            }
-          }
-
-          if (!keywords && exif.iptc && Array.isArray((exif.iptc as any).Keywords)) {
-            keywords = (exif.iptc as any).Keywords.join(', ');
-          }
-
-          if (!keywords && typeof exif['IPTC:Keywords'] === 'string') {
-            keywords = exif['IPTC:Keywords'];
-          }
-          // Heuristische Suche: jedes Feld, das auf 'keywords' endet und ein Array/String ist
-          if (!keywords) {
-            for (const [k, v] of Object.entries(exif)) {
-              if (k.toLowerCase().endsWith('keywords')) {
-                if (Array.isArray(v)) {
-                  keywords = (v as any).join(', ');
-                } else if (typeof v === 'string') {
-                  keywords = v as string;
-                }
-                if (keywords) break;
-              }
-            }
-          }
-
-          keywords = fixEncoding(keywords);
-        }
-      } catch (exifErr) {
-        console.warn('⚠️ EXIF parsing failed:', exifErr);
-      }
-      // --- ENDE EXIF ---
-
-      // Wenn Keywords-String vorhanden → in Array umwandeln (Postgres text[] erwartet JS-Array)
+      // --- EXIF-Logik entfernt ---
+      // Die Metadaten werden nicht mehr aus EXIF gelesen
+      // Stattdessen: Lese Metadaten ggf. aus FormData oder anderen Quellen
+      // Beispiel: (hier als Platzhalter, ggf. anpassen)
+      let lat = form.get('lat') ? Number(form.get('lat')) : null;
+      let lon = form.get('lon') ? Number(form.get('lon')) : null;
+      let title = form.get('title') as string | null;
+      let description = form.get('description') as string | null;
+      let keywords = form.get('keywords') as string | null;
+      let camera = form.get('camera') as string | null;
+      let lens = form.get('lens') as string | null;
+      // Keywords-Array für Postgres
       let keywordsArray: string[] | null = null;
       if (keywords) {
         keywordsArray = keywords.split(',').map((k) => k.trim()).filter(Boolean);
       }
-
       // Upload to both storage buckets with same filename
       // Upload 2048px version
       console.log(`Uploading 2048px version: ${filename}`);
@@ -204,13 +85,11 @@ export const POST = async ({ request }) => {
           contentType: 'image/jpeg',
           upsert: false
         });
-
       if (upload2048Error) {
         console.error('2048px upload failed:', upload2048Error);
       } else {
         console.log('2048px upload successful');
       }
-
       // Upload 512px version
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('images-512')
@@ -218,33 +97,11 @@ export const POST = async ({ request }) => {
           contentType: 'image/jpeg',
           upsert: false
         });
-
       if (uploadError) {
         console.error('Upload error:', uploadError);
         throw error(500, `Upload failed: ${uploadError.message}`);
       }
-
-      // --- Build condensed EXIF data to store as JSON ---
-      const exifData: Record<string, any> = {};
-      if (width && height) { exifData.ImageWidth = width; exifData.ImageHeight = height; }
-      if (exif?.Make) exifData.Make = fixEncoding(exif.Make);
-      if (exif?.Model) exifData.Model = fixEncoding(exif.Model);
-      if (lens) exifData.LensModel = lens;
-      if (exif?.Orientation) exifData.Orientation = exif.Orientation;
-      if (exif?.ExposureTime) exifData.ExposureTime = exif.ExposureTime;
-      if (exif?.FNumber) exifData.FNumber = exif.FNumber;
-      if (exif?.ISO) exifData.ISO = exif.ISO;
-      if (exif?.FocalLength) exifData.FocalLength = exif.FocalLength;
-      if (exif?.ApertureValue) exifData.ApertureValue = exif.ApertureValue;
-      if (exif?.DateTimeOriginal || exif?.CreateDate) {
-        exifData.CreateDate = exif?.DateTimeOriginal || exif?.CreateDate;
-      }
-      if (exif?.Artist) exifData.Artist = fixEncoding(exif.Artist);
-      if (exif?.Copyright) exifData.Copyright = fixEncoding(exif.Copyright);
-      // Original file size in bytes
-      exifData.FileSize = file.size;
-
-      // Insert into database with both paths and EXIF data
+      // Insert into database
       const dbRecord: any = {
         id,
         profile_id,
@@ -257,59 +114,17 @@ export const POST = async ({ request }) => {
         camera,
         lens,
         original_name: baseName,
-        ...(keywordsArray ? { keywords: keywordsArray } : {}),
-        exif_data: Object.keys(exifData).length ? exifData : null
+        ...(keywordsArray ? { keywords: keywordsArray } : {})
       };
-
-      // Füge EXIF-Felder nur hinzu, wenn sie nicht null sind
       if (title) dbRecord.title = title;
       if (description) dbRecord.description = description;
       if (camera) dbRecord.camera = camera;
       console.log('Inserting database record:', JSON.stringify(dbRecord, null, 2));
-      
-      // Versuche zuerst mit allen Feldern zu inserten
       let { data: dbData, error: dbError } = await supabase
         .from('images')
         .insert(dbRecord)
         .select()
         .single();
-
-      // Falls das fehlschlägt, versuche es ohne EXIF-Felder
-      if (dbError && (dbError.message.includes('column') || dbError.message.includes('does not exist'))) {
-        console.log('EXIF fields not available, trying without them...');
-        const fallbackRecord = {
-          id,
-          profile_id,
-          path_512: filename,
-          path_2048: upload2048Error ? null : filename,
-          width,
-          height,
-          lat,
-          lon,
-          original_name: baseName,
-          ...(keywordsArray ? { keywords: keywordsArray } : {}),
-          exif_data: Object.keys(exifData).length ? exifData : null
-        };
-        
-        const { data: fallbackData, error: fallbackError } = await supabase
-          .from('images')
-          .insert(fallbackRecord)
-          .select()
-          .single();
-          
-        if (fallbackError) {
-          console.error('Fallback insert also failed:', fallbackError);
-          throw error(500, `Database error: ${fallbackError.message}`);
-        }
-        
-        dbData = fallbackData;
-        dbError = null;
-        console.log('Successfully inserted without EXIF fields');
-        
-        // Füge eine Warnung hinzu, dass EXIF-Felder fehlen
-        console.warn('⚠️ EXIF fields (title, description, keywords) are not available in the database. Please run the SQL script to add them.');
-      }
-
       if (dbError) {
         console.error('Database error:', dbError);
         console.error('Failed record:', JSON.stringify(dbRecord, null, 2));
@@ -318,21 +133,17 @@ export const POST = async ({ request }) => {
           details: dbError.details,
           hint: dbError.hint
         });
-        // Clean up uploaded file if database insert fails
         await supabase.storage.from('images-512').remove([filename]);
         throw error(500, `Database error: ${dbError.message}`);
       }
-
       results.push(dbData);
       console.log(`Successfully processed: ${file.name}`);
     }
-
     return json({ 
       status: 'success', 
       message: `Successfully uploaded ${results.length} images`,
       images: results
     });
-
   } catch (err) {
     console.error('Upload error:', err);
     const errorMessage = err instanceof Error ? err.message : 'Upload failed';

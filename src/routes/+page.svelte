@@ -51,6 +51,7 @@
   let currentSpeech: SpeechSynthesisUtterance | null = null;
   let autoguideBarVisible = true; // Always visible when autoguide is enabled
   let autoguideText = '';
+  let lastSpokenText = '';
 
   // Autoguide functions
   function initSpeechSynthesis() {
@@ -96,6 +97,13 @@
     
     // Extract title up to first comma
     const titleToSpeak = title.split(',')[0].trim();
+    
+    // Verhindere doppelte Ansage
+    if (titleToSpeak === lastSpokenText) {
+      console.log('Audioguide: Text wurde bereits angesagt, keine Wiederholung.');
+      return;
+    }
+    lastSpokenText = titleToSpeak;
     
     // Create new speech utterance
     currentSpeech = new SpeechSynthesisUtterance(titleToSpeak);
@@ -260,16 +268,15 @@
     }
   }
 
-  async function loadMore() {
+  async function loadMore(reason = 'default') {
+    console.log(`[Gallery] loadMore called, reason: ${reason}`);
     if (loading || !hasMoreImages) return; 
     loading = true;
-    
-    // Wenn User eingeloggt ist und Distanz aktiviert ist, lade alle Bilder für Sortierung
+
     if (isLoggedIn && showDistance && userLat !== null && userLon !== null && page === 0) {
       const { data } = await supabase
         .from('images')
         .select('id,path_512,path_2048,width,height,lat,lon,title,description,keywords');
-      
       if (data) {
         const allPics = data.map((d: any) => ({
           id: d.id,
@@ -283,61 +290,52 @@
           description: d.description,
           keywords: d.keywords
         }));
-
-        // Sortiere nach Entfernung
         const sortedPics = allPics.sort((a, b) => {
           const distA = a.lat && a.lon ? getDistanceInMeters(userLat!, userLon!, a.lat, a.lon) : Number.MAX_VALUE;
           const distB = b.lat && b.lon ? getDistanceInMeters(userLat!, userLon!, b.lat, b.lon) : Number.MAX_VALUE;
-          return distA - distB; // Geringste Entfernung zuerst
+          return distA - distB;
         });
-
         pics.set(sortedPics);
-        hasMoreImages = false; // Alle Bilder geladen
-        
-        // Announce first image if autoguide is enabled
+        hasMoreImages = false;
         if (autoguide && sortedPics.length > 0) {
           setTimeout(() => announceFirstImage(), 500);
         }
-      }
-    } else {
-      // Normale Pagination für nicht eingeloggte User oder wenn Distanz deaktiviert ist
-      const { data } = await supabase
-        .from('images')
-        .select('id,path_512,path_2048,width,height,lat,lon,title,description,keywords')
-        .order('created_at', { ascending: false })
-        .range(page * size, page * size + size - 1);
-      
-      if (data) {
-        // Check if we got fewer items than requested - means we reached the end
-        if (data.length < size) {
-          hasMoreImages = false;
-        }
-        
-        const newPics = data.map((d: any) => ({
-          id: d.id,
-          src: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${d.path_512}`,
-          srcHD: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${d.path_2048}`,
-          width: d.width,
-          height: d.height,
-          lat: d.lat,
-          lon: d.lon,
-          title: d.title,
-          description: d.description,
-          keywords: d.keywords
-        }));
-
-        pics.update((p: any[]) => [...p, ...newPics]);
-        
-        // Announce first image if autoguide is enabled and this is the first load
-        if (autoguide && page === 0 && newPics.length > 0) {
-          setTimeout(() => announceFirstImage(), 500);
-        }
-      } else {
-        // No data returned - we've reached the end
-        hasMoreImages = false;
+        loading = false;
+        return; // <--- Pagination überspringen!
       }
     }
-    
+
+    // Normale Pagination für nicht eingeloggte User oder wenn Distanz deaktiviert ist
+    const { data } = await supabase
+      .from('images')
+      .select('id,path_512,path_2048,width,height,lat,lon,title,description,keywords')
+      .order('created_at', { ascending: false })
+      .range(page * size, page * size + size - 1);
+
+    if (data) {
+      if (data.length < size) {
+        hasMoreImages = false;
+      }
+      const newPics = data.map((d: any) => ({
+        id: d.id,
+        src: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${d.path_512}`,
+        srcHD: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${d.path_2048}`,
+        width: d.width,
+        height: d.height,
+        lat: d.lat,
+        lon: d.lon,
+        title: d.title,
+        description: d.description,
+        keywords: d.keywords
+      }));
+      pics.update((p: any[]) => [...p, ...newPics]);
+      if (autoguide && page === 0 && newPics.length > 0) {
+        setTimeout(() => announceFirstImage(), 500);
+      }
+    } else {
+      hasMoreImages = false;
+    }
+
     page++; 
     loading = false;
   }
@@ -529,17 +527,12 @@
   }
 
   async function loadProfileAvatar() {
-    // Try localStorage cache first
-    if (typeof localStorage !== 'undefined') {
-      const cached = localStorage.getItem('profileAvatar');
-      if (cached) {
-        profileAvatar = cached;
-        return;
-      }
-    }
-    // Get user
+    // Kein localStorage mehr, immer aktuell laden
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) {
+      profileAvatar = null;
+      return;
+    }
     // Fetch profile
     const { data, error } = await supabase
       .from('profiles')
@@ -552,9 +545,8 @@
       } else {
         profileAvatar = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/avatars/${data.avatar_url}`;
       }
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('profileAvatar', profileAvatar);
-      }
+    } else {
+      profileAvatar = null;
     }
   }
 
@@ -761,38 +753,24 @@
 
   function startGPSTracking() {
     if (!navigator.geolocation || gpsTrackingActive) return;
-    
-    console.log('Starting optimized GPS tracking...');
     gpsTrackingActive = true;
-    
-    // Get initial position
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         lastKnownLat = pos.coords.latitude;
         lastKnownLon = pos.coords.longitude;
         userLat = pos.coords.latitude;
         userLon = pos.coords.longitude;
-        
-        // Initial load with distance sorting
         if (showDistance) {
           pics.set([]);
           page = 0;
           hasMoreImages = true;
-          loadMore();
+          loadMore('initial mount'); // Jetzt erst laden!
         }
-        
-        // Start continuous tracking
         gpsWatchId = navigator.geolocation.watchPosition(
           handlePositionUpdate,
           (error) => console.error('GPS tracking error:', error),
-          { 
-            enableHighAccuracy: true, 
-            maximumAge: 3000, 
-            timeout: 5000 
-          }
+          { enableHighAccuracy: true, maximumAge: 3000, timeout: 5000 }
         );
-        
-        // Start radius checking for new images
         radiusCheckInterval = window.setInterval(checkRadiusForNewImages, RADIUS_CHECK_INTERVAL);
       },
       (error) => console.error('Initial GPS error:', error),
@@ -836,7 +814,7 @@
   }
 
   function checkIfCloserImagesAvailable(): boolean {
-    if (!showDistance || $pics.length === 0) return false;
+    if (!showDistance || !$pics.length) return false;
     
     // Get the distance to the farthest currently loaded image
     const currentPics = $pics;
@@ -858,12 +836,12 @@
   }
 
   function resortExistingImages() {
-    if (!showDistance || pics.length === 0) return;
+    if (!showDistance || !$pics.length) return;
     
     console.log('Resorting existing images based on new position...');
     
     // Sort existing images by distance without reloading
-    const sortedPics = [...pics].sort((a: any, b: any) => {
+    const sortedPics = [...$pics].sort((a: any, b: any) => {
       if (!a.lat || !a.lon || !b.lat || !b.lon) return 0;
       
       const distA = getDistanceInMeters(userLat, userLon, a.lat, a.lon);
@@ -877,15 +855,16 @@
 
   function checkRadiusForNewImages() {
     if (!showDistance || !hasMoreImages || loading) return;
-    
-    // Check if we're approaching the radius limit
-    const visibleImages = pics.filter((pic: any) => {
+
+    // Sicherstellen, dass $pics ein Array ist
+    const currentPics = Array.isArray($pics) ? $pics : [];
+
+    const visibleImages = currentPics.filter((pic: any) => {
       if (!pic.lat || !pic.lon) return false;
       const distance = getDistanceInMeters(userLat, userLon, pic.lat, pic.lon);
       return distance <= 5000; // 5km radius
     });
-    
-    // If we have less than 20 images in 5km radius, load more
+
     if (visibleImages.length < 20) {
       console.log(`Only ${visibleImages.length} images in 5km radius, loading more...`);
       loadMore();
@@ -1009,41 +988,49 @@
     }
   }
 
+  // Navigation-Handler direkt im Komponenten-Scope (nicht im onMount!)
+  beforeNavigate(({ to }) => {
+    if (to?.url.pathname.startsWith('/image/')) {
+      console.log('Navigating to detail page, starting gallery preload...');
+      startGalleryPreload();
+    }
+  });
+
+  afterNavigate(({ to }) => {
+    if (to?.url.pathname === '/') {
+      console.log('Back on main page, preload complete');
+    }
+  });
+
   onMount(async () => {
     const { data: { user } } = await supabase.auth.getUser();
     isLoggedIn = !!user;
-    authChecked = true; // Markiere, dass der Login-Status geprüft wurde
+    authChecked = true;
     if (!isLoggedIn) {
       useJustifiedLayout = true;
       showDistance = false;
       showCompass = false;
       autoguide = false;
     }
-    
+
     // Initialize speech synthesis for autoguide
     initSpeechSynthesis();
-    
+
     // Mobile-specific speech synthesis setup
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      // On mobile, we need user interaction to enable speech
       const enableMobileSpeech = () => {
-        console.log('Mobile: User interaction detected - enabling speech synthesis');
         if (speechSynthesis && speechSynthesis.paused) {
           speechSynthesis.resume();
         }
-        // Remove listeners after first interaction
         document.removeEventListener('click', enableMobileSpeech);
         document.removeEventListener('touchstart', enableMobileSpeech);
         document.removeEventListener('scroll', enableMobileSpeech);
       };
-      
-      // Add listeners for mobile speech activation
       document.addEventListener('click', enableMobileSpeech, { once: true });
       document.addEventListener('touchstart', enableMobileSpeech, { once: true });
       document.addEventListener('scroll', enableMobileSpeech, { once: true });
     }
-    
-    // Auth State Listener für Echtzeit-Updates
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       isLoggedIn = !!session;
       authChecked = true;
@@ -1057,30 +1044,22 @@
         autoguide = false;
       }
     });
-    
-    loadShowDistanceAndCompass();
+
+    await loadShowDistanceAndCompass();
     updateLayoutFromStorage();
-    loadProfileAvatar();
-    
-      // Normal load for main page
-    loadMore();
-    
-    // Set up navigation event handlers for preloading
-    beforeNavigate(({ to }) => {
-      // If navigating to a detail page, start preloading gallery
-      if (to?.url.pathname.startsWith('/image/')) {
-        console.log('Navigating to detail page, starting gallery preload...');
-        startGalleryPreload();
+    await loadProfileAvatar();
+
+    // Prüfe, ob Daten aus sessionStorage geladen werden
+    const sessionPics = sessionStorage.getItem('galleryPics');
+    if (sessionPics) {
+      pics.set(JSON.parse(sessionPics));
+    } else {
+      if (!showDistance) {
+        loadMore('initial mount');
       }
-    });
-    
-    afterNavigate(({ to }) => {
-      // If we're back on the main page, stop preloading and show loaded images
-      if (to?.url.pathname === '/') {
-        console.log('Back on main page, preload complete');
-      }
-    });
-    
+      // Wenn showDistance aktiv ist, wird loadMore im GPS-Callback von startGPSTracking aufgerufen
+    }
+
     window.addEventListener('scroll', handleScroll, { passive: true });
     window.addEventListener('galleryLayoutChanged', updateLayoutFromStorage);
     window.addEventListener('profileSaved', loadProfileAvatar);
@@ -1089,7 +1068,7 @@
       window.addEventListener('deviceorientationabsolute', handleOrientation, true);
       window.addEventListener('deviceorientation', handleOrientation, true);
     }
-    
+
     return () => {
       window.removeEventListener('scroll', handleScroll);
       window.removeEventListener('galleryLayoutChanged', updateLayoutFromStorage);
@@ -1328,7 +1307,6 @@
 {#if autoguide}
   <div class="autoguide-bar">
     <div class="autoguide-content">
-      <!-- Das kleine Autoguide-Logo wurde entfernt -->
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
         <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
@@ -1336,15 +1314,7 @@
         <line x1="8" y1="23" x2="16" y2="23"/>
       </svg>
       <span class="autoguide-text">{autoguideText || 'Audioguide aktiv'}</span>
-      {#if autoguideText}
-        <button 
-          class="test-speech-btn" 
-          on:click={() => speakTitle(autoguideText)}
-          title="Sprachausgabe testen"
-        >
-          🔊
-        </button>
-      {/if}
+      <!-- Lautsprechersymbol entfernt -->
     </div>
   </div>
 {/if}
@@ -2552,31 +2522,6 @@
     font-weight: 600;
     font-size: 1rem;
     text-align: center;
-  }
-
-  .test-speech-btn {
-    background: rgba(255, 255, 255, 0.2);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    border-radius: 50%;
-    width: 32px;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-size: 1rem;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    margin-left: 0.5rem;
-  }
-
-  .test-speech-btn:hover {
-    background: rgba(255, 255, 255, 0.3);
-    transform: scale(1.1);
-  }
-
-  .test-speech-btn:active {
-    transform: scale(0.95);
   }
 
   @keyframes slideDown {

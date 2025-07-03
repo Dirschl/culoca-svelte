@@ -1001,16 +1001,4 @@
     }
   }
 
-  .culoca-logo {
-    position: fixed;
-    top: 25px;
-    right: 20px;
-    left: auto;
-    bottom: auto;
-    z-index: 50;
-    width: 172px;
-    height: 72px;
-    transition: opacity 0.2s ease;
-    object-fit: contain;
-  }
 </style> 
