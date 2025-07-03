@@ -40,6 +40,7 @@
         error = fetchError.message;
       } else {
         image = data;
+        if (!image.exif_data) image.exif_data = {};
         titleEditValue = image.title || '';
       }
     } catch (err) {
@@ -487,31 +488,31 @@
           </div>
           <!-- Column 2: All EXIF/Meta -->
           <div class="meta-column">
-            {#if image.exif_data.ImageWidth}
+            {#if image.exif_data && image.exif_data.ImageWidth}
               <div class="meta-line">Auflösung: {image.exif_data.ImageWidth}×{image.exif_data.ImageHeight} px</div>
             {/if}
-            {#if image.exif_data.FileSize}
+            {#if image.exif_data && image.exif_data.FileSize}
               <div class="meta-line">Dateigröße: {formatFileSize(image.exif_data.FileSize)}</div>
             {/if}
-            {#if image.exif_data.Make}
+            {#if image.exif_data && image.exif_data.Make}
               <div class="meta-line">Kamera: {image.exif_data.Make} {image.exif_data.Model}</div>
             {/if}
-            {#if image.exif_data.LensModel}
+            {#if image.exif_data && image.exif_data.LensModel}
               <div class="meta-line">Objektiv: {image.exif_data.LensModel}</div>
             {/if}
-            {#if image.exif_data.FocalLength}
+            {#if image.exif_data && image.exif_data.FocalLength}
               <div class="meta-line">Brennweite: {image.exif_data.FocalLength} mm</div>
             {/if}
-            {#if image.exif_data.ISO}
+            {#if image.exif_data && image.exif_data.ISO}
               <div class="meta-line">ISO: {image.exif_data.ISO}</div>
             {/if}
-            {#if image.exif_data.FNumber}
+            {#if image.exif_data && image.exif_data.FNumber}
               <div class="meta-line">Blende: ƒ/{image.exif_data.FNumber}</div>
             {/if}
-            {#if image.exif_data.ExposureTime}
+            {#if image.exif_data && image.exif_data.ExposureTime}
               <div class="meta-line">Verschlusszeit: {formatExposureTime(image.exif_data.ExposureTime)}</div>
             {/if}
-            {#if image.exif_data.CreateDate}
+            {#if image.exif_data && image.exif_data.CreateDate}
               <div class="meta-line">Aufgenommen: {new Date(image.exif_data.CreateDate).toLocaleDateString('de-DE')}</div>
             {/if}
             {#if image.created_at}
@@ -520,10 +521,10 @@
             {#if image.lat && image.lon}
               <div class="meta-line">GPS: {image.lat.toFixed(5)}, {image.lon.toFixed(5)}</div>
             {/if}
-            {#if image.exif_data.Artist}
+            {#if image.exif_data && image.exif_data.Artist}
               <div class="meta-line">Fotograf: {image.exif_data.Artist}</div>
             {/if}
-            {#if image.exif_data.Copyright}
+            {#if image.exif_data && image.exif_data.Copyright}
               <div class="meta-line">© {image.exif_data.Copyright}</div>
             {/if}
           </div>

@@ -28,6 +28,7 @@
   let showDistance = false;
   let showCompass = false;
   let autoguide = false;
+  let newsFlashMode: 'aus' | 'eigene' | 'alle' = 'alle';
 
   let galleryLayout = 'grid';
 
@@ -73,6 +74,13 @@
       startGPSTracking();
     }
     
+    if (typeof localStorage !== 'undefined') {
+      const storedNewsFlash = localStorage.getItem('newsFlashMode');
+      if (storedNewsFlash === 'aus' || storedNewsFlash === 'eigene' || storedNewsFlash === 'alle') {
+        newsFlashMode = storedNewsFlash;
+      }
+    }
+    
     // Cleanup function
     return () => {
       stopGPSTracking();
@@ -109,6 +117,7 @@
         showDistance = data.show_distance ?? false;
         showCompass = data.show_compass ?? false;
         autoguide = data.autoguide ?? false;
+        newsFlashMode = data.newsflash_mode ?? 'alle';
       }
     } catch (error) {
       console.error('Error loading profile:', error);
@@ -175,6 +184,7 @@
         show_compass: showCompass,
         autoguide: autoguide,
         avatar_url: avatarPath,
+        newsflash_mode: newsFlashMode,
         updated_at: new Date().toISOString()
       };
 
@@ -191,6 +201,7 @@
         localStorage.setItem('showDistance', showDistance ? 'true' : 'false');
         localStorage.setItem('showCompass', showCompass ? 'true' : 'false');
         localStorage.setItem('autoguide', autoguide ? 'true' : 'false');
+        localStorage.setItem('newsFlashMode', newsFlashMode);
       }
 
       profile = profileData;
@@ -389,6 +400,17 @@
             <span class="slider"></span>
           </label>
           <span class="toggle-desc">{autoguide ? 'Aktiviert' : 'Deaktiviert'}</span>
+        </div>
+        <div class="gallery-toggle-row">
+          <span class="toggle-label">News-Flash:</span>
+          <div class="toggle-group">
+            <button type="button" class="toggle-btn {newsFlashMode === 'aus' ? 'active' : ''}" on:click={() => newsFlashMode = 'aus'}>Aus</button>
+            <button type="button" class="toggle-btn {newsFlashMode === 'eigene' ? 'active' : ''}" on:click={() => newsFlashMode = 'eigene'}>Eigene</button>
+            <button type="button" class="toggle-btn {newsFlashMode === 'alle' ? 'active' : ''}" on:click={() => newsFlashMode = 'alle'}>Alle</button>
+          </div>
+          <span class="toggle-desc">
+            {newsFlashMode === 'aus' ? 'Ausgeblendet' : newsFlashMode === 'eigene' ? 'Nur eigene Uploads' : 'Alle Uploads'}
+          </span>
         </div>
       </section>
 
@@ -704,5 +726,15 @@
     .signout-btn {
       justify-content: center;
     }
+  }
+
+  .toggle-group {
+    display: flex;
+    gap: 0.5rem;
+  }
+  .toggle-btn.active {
+    background: #4fa3f7;
+    color: #fff;
+    font-weight: bold;
   }
 </style> 

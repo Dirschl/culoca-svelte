@@ -2,7 +2,6 @@
   import { supabase } from '$lib/supabaseClient';
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
-  import { page } from '$app/stores';
 
   let user: any = null;
   let profile: any = null;
@@ -31,6 +30,11 @@
   let email = '';
   let show_email = false;
 
+  let errorLogExists = false;
+  let errorLogUrl = '';
+  let userId = '';
+  let errorLogFiles: string[] = [];
+
   $: nameValid = name.length >= 2 && name.length <= 60;
   $: phoneValid = phone.length === 0 || /^\+?[0-9\- ]{7,20}$/.test(phone);
   $: websiteValid = website.length === 0 || website.startsWith('http');
@@ -47,6 +51,16 @@
     user = currentUser;
     await loadProfile();
     loading = false;
+    userId = user.id;
+    const { data, error } = await supabase.storage.from('errorlogs').list('');
+    if (data) {
+      errorLogFiles = data.map((f: any) => f.name);
+      if (data.find((f: any) => f.name === `${user.id}.json`)) {
+        errorLogExists = true;
+        const { data: urlData } = await supabase.storage.from('errorlogs').createSignedUrl(`${user.id}.json`, 60);
+        if (urlData?.signedUrl) errorLogUrl = urlData.signedUrl;
+      }
+    }
   });
 
   async function loadProfile() {
@@ -166,6 +180,23 @@
     }
     return null;
   }
+
+  async function downloadErrorLog() {
+    if (errorLogUrl) {
+      window.open(errorLogUrl, '_blank');
+    }
+  }
+
+  async function deleteErrorLog() {
+    if (!userId) return;
+    await supabase.storage.from('errorlogs').remove([`${userId}.json`]);
+    errorLogExists = false;
+    errorLogUrl = '';
+  }
+
+  function goHome() {
+    goto('/');
+  }
 </script>
 
 <svelte:head>
@@ -181,7 +212,7 @@
   <div class="page-container">
     <!-- Zurück zur Startseite Button -->
     <div class="back-button-container">
-      <a href="/" class="back-home-btn">
+      <a href="/" class="back-home-btn" on:click={goHome}>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
           <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
         </svg>
@@ -344,6 +375,23 @@
           </div>
         {/if}
       </form>
+    </div>
+
+    <div class="profile-actions">
+      <button on:click={goHome}>Zurück zur Hauptseite</button>
+      {#if errorLogExists}
+        <div class="errorlog-info">Es liegen abgelehnte Uploads vor.</div>
+        <button on:click={downloadErrorLog}>Fehlerlog herunterladen</button>
+        <button on:click={deleteErrorLog}>Fehlerlog löschen</button>
+      {/if}
+      <div class="debug-errorlog-files">
+        <b>Debug: errorlogs im Storage:</b>
+        <ul>
+          {#each errorLogFiles as file}
+            <li>{file}</li>
+          {/each}
+        </ul>
+      </div>
     </div>
   </div>
 {/if}
@@ -722,5 +770,17 @@
       padding: 0.5rem 1rem;
       font-size: 0.9rem;
     }
+  }
+
+  .profile-actions {
+    margin-top: 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .errorlog-info {
+    color: #aaa;
+    font-size: 0.9rem;
   }
 </style> 

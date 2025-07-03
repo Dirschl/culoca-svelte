@@ -3,21 +3,24 @@
   import { onMount } from 'svelte';
   import { writable, get } from 'svelte/store';
   import Justified from '$lib/Justified.svelte';
+  import NewsFlash from '$lib/NewsFlash.svelte';
   import { beforeNavigate, afterNavigate } from '$app/navigation';
 
   const pics = writable<any[]>([]);
-  let page = 0, size = 40, loading = false, hasMoreImages = true;
+  let page = 0, size = 100, loading = false, hasMoreImages = true;
   let useJustifiedLayout = true;
   let profileAvatar: string | null = null;
   let showDistance = false;
   let showCompass = false;
   let autoguide = false;
+  let newsFlashMode: 'aus' | 'eigene' | 'alle' = 'alle';
   let userLat: number | null = null;
   let userLon: number | null = null;
   let deviceHeading: number | null = null;
   let showUploadDialog = false;
   let showExifDialog = false;
   let isLoggedIn = false;
+  let currentUser: any = null;
 
   // Login-Overlay Variablen
   let loginEmail = '';
@@ -273,12 +276,23 @@
     if (loading || !hasMoreImages) return; 
     loading = true;
 
-    if (isLoggedIn && showDistance && userLat !== null && userLon !== null && page === 0) {
-      const { data } = await supabase
-        .from('images')
-        .select('id,path_512,path_2048,width,height,lat,lon,title,description,keywords');
-      if (data) {
-        const allPics = data.map((d: any) => ({
+    if (isLoggedIn && showDistance && userLat !== null && userLon !== null) {
+      // Lade die nächste Seite nach Entfernung sortiert per RPC
+      const { data, error } = await supabase
+        .rpc('images_by_distance', {
+          user_lat: userLat,
+          user_lon: userLon,
+          page,
+          page_size: size
+        });
+      if (error) {
+        console.error('RPC error:', error);
+        hasMoreImages = false;
+        loading = false;
+        return;
+      }
+      if (data && data.length > 0) {
+        const newPics = data.map((d: any) => ({
           id: d.id,
           src: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${d.path_512}`,
           srcHD: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${d.path_2048}`,
@@ -290,19 +304,19 @@
           description: d.description,
           keywords: d.keywords
         }));
-        const sortedPics = allPics.sort((a, b) => {
-          const distA = a.lat && a.lon ? getDistanceInMeters(userLat!, userLon!, a.lat, a.lon) : Number.MAX_VALUE;
-          const distB = b.lat && b.lon ? getDistanceInMeters(userLat!, userLon!, b.lat, b.lon) : Number.MAX_VALUE;
-          return distA - distB;
-        });
-        pics.set(sortedPics);
-        hasMoreImages = false;
-        if (autoguide && sortedPics.length > 0) {
+        pics.update((p: any[]) => [...p, ...newPics]);
+        if (data.length < size) {
+          hasMoreImages = false;
+        }
+        if (autoguide && page === 0 && newPics.length > 0) {
           setTimeout(() => announceFirstImage(), 500);
         }
-        loading = false;
-        return; // <--- Pagination überspringen!
+      } else {
+        hasMoreImages = false;
       }
+      page++;
+      loading = false;
+      return;
     }
 
     // Normale Pagination für nicht eingeloggte User oder wenn Distanz deaktiviert ist
@@ -438,14 +452,19 @@
 
         const formData = new FormData();
         formData.append('files', file);
-        
         // Attach profile_id so that the server can persist it
-        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        const { data: { user: currentUser }, data: { session } } = await supabase.auth.getSession();
         if (currentUser) {
           formData.append('profile_id', currentUser.id);
         }
-        
-        const response = await fetch('/api/upload', { method: 'POST', body: formData });
+        const access_token = session?.access_token;
+        const response = await fetch('/api/upload', {
+          method: 'POST',
+          headers: {
+            ...(access_token ? { 'Authorization': `Bearer ${access_token}` } : {})
+          },
+          body: formData
+        });
         const result = await response.json();
         
         if (result.status !== 'success') {
@@ -553,14 +572,17 @@
   async function loadShowDistanceAndCompass() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
+    currentUser = user;
     const { data } = await supabase
       .from('profiles')
-      .select('show_distance, show_compass, autoguide')
+      .select('show_distance, show_compass, autoguide, use_justified_layout, newsflash_mode')
       .eq('id', user.id)
       .single();
     showDistance = data?.show_distance ?? false;
     showCompass = data?.show_compass ?? false;
     autoguide = data?.autoguide ?? false;
+    useJustifiedLayout = data?.use_justified_layout ?? true;
+    newsFlashMode = data?.newsflash_mode ?? 'alle';
     
     // Start GPS tracking if distance is enabled
     if (showDistance && navigator.geolocation) {
@@ -631,17 +653,19 @@
       const formData = new FormData();
       Array.from(exifFiles).forEach((file) => {
         formData.append('files', file);
-        console.log('Added file to formData:', file.name, file.size);
       });
-      
-      // Attach profile_id once for batch upload
-      const { data: { user: batchUser } } = await supabase.auth.getUser();
+      const { data: { user: batchUser }, data: { session } } = await supabase.auth.getSession();
       if (batchUser) {
         formData.append('profile_id', batchUser.id);
       }
-      
-      console.log('Sending request to /api/upload');
-      const response = await fetch('/api/upload', { method: 'POST', body: formData });
+      const access_token = session?.access_token;
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        headers: {
+          ...(access_token ? { 'Authorization': `Bearer ${access_token}` } : {})
+        },
+        body: formData
+      });
       console.log('Response received:', response.status, response.statusText);
       
       const result = await response.json();
@@ -751,6 +775,24 @@
     }
   }
 
+  function saveLastKnownLocation(lat, lon) {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('lastLat', lat.toString());
+      localStorage.setItem('lastLon', lon.toString());
+    }
+  }
+
+  function loadLastKnownLocation() {
+    if (typeof localStorage !== 'undefined') {
+      const lat = localStorage.getItem('lastLat');
+      const lon = localStorage.getItem('lastLon');
+      if (lat && lon) {
+        return { lat: parseFloat(lat), lon: parseFloat(lon) };
+      }
+    }
+    return null;
+  }
+
   function startGPSTracking() {
     if (!navigator.geolocation || gpsTrackingActive) return;
     gpsTrackingActive = true;
@@ -760,11 +802,12 @@
         lastKnownLon = pos.coords.longitude;
         userLat = pos.coords.latitude;
         userLon = pos.coords.longitude;
+        saveLastKnownLocation(userLat, userLon);
         if (showDistance) {
           pics.set([]);
           page = 0;
           hasMoreImages = true;
-          loadMore('initial mount'); // Jetzt erst laden!
+          loadMore('initial mount');
         }
         gpsWatchId = navigator.geolocation.watchPosition(
           handlePositionUpdate,
@@ -781,6 +824,7 @@
   function handlePositionUpdate(pos: GeolocationPosition) {
     const newLat = pos.coords.latitude;
     const newLon = pos.coords.longitude;
+    saveLastKnownLocation(newLat, newLon);
     
     if (lastKnownLat === null || lastKnownLon === null) {
       lastKnownLat = newLat;
@@ -1005,12 +1049,14 @@
   onMount(async () => {
     const { data: { user } } = await supabase.auth.getUser();
     isLoggedIn = !!user;
+    currentUser = user;
     authChecked = true;
     if (!isLoggedIn) {
       useJustifiedLayout = true;
       showDistance = false;
       showCompass = false;
       autoguide = false;
+      newsFlashMode = 'alle';
     }
 
     // Initialize speech synthesis for autoguide
@@ -1033,6 +1079,7 @@
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       isLoggedIn = !!session;
+      currentUser = session?.user || null;
       authChecked = true;
       if (isLoggedIn) {
         loadShowDistanceAndCompass();
@@ -1042,11 +1089,13 @@
         showDistance = false;
         showCompass = false;
         autoguide = false;
+        newsFlashMode = 'alle';
       }
     });
 
+    // WICHTIG: Erst Einstellungen laden, dann Galerie
     await loadShowDistanceAndCompass();
-    updateLayoutFromStorage();
+    // updateLayoutFromStorage(); // <-- Entfernt, da Einstellungen bereits aus DB geladen wurden
     await loadProfileAvatar();
 
     // Prüfe, ob Daten aus sessionStorage geladen werden
@@ -1054,6 +1103,7 @@
     if (sessionPics) {
       pics.set(JSON.parse(sessionPics));
     } else {
+      // Galerie erst laden, nachdem alle Einstellungen geladen sind
       if (!showDistance) {
         loadMore('initial mount');
       }
@@ -1067,6 +1117,20 @@
     if (showCompass && window.DeviceOrientationEvent) {
       window.addEventListener('deviceorientationabsolute', handleOrientation, true);
       window.addEventListener('deviceorientation', handleOrientation, true);
+    }
+
+    // Vor dem ersten GPS-Fix: Letzte bekannte Koordinaten verwenden
+    if (showDistance && (userLat === null || userLon === null)) {
+      const lastLocation = loadLastKnownLocation();
+      if (lastLocation) {
+        userLat = lastLocation.lat;
+        userLon = lastLocation.lon;
+        // Galerie mit diesen Koordinaten laden
+        pics.set([]);
+        page = 0;
+        hasMoreImages = true;
+        loadMore('last known location');
+      }
     }
 
     return () => {
@@ -1317,6 +1381,16 @@
       <!-- Lautsprechersymbol entfernt -->
     </div>
   </div>
+{/if}
+
+<!-- NewsFlash-Komponente über der Galerie -->
+{#if newsFlashMode !== 'aus'}
+  <NewsFlash 
+    mode={newsFlashMode} 
+    userId={currentUser?.id} 
+    layout={useJustifiedLayout ? 'justified' : 'grid'}
+    showToggles={false}
+  />
 {/if}
 
 <!-- Galerie bleibt erhalten -->
