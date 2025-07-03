@@ -16,10 +16,9 @@ let errorMsg = '';
 let mounted = false;
 let refreshInterval: number | null = null;
 let lastUpdate = new Date();
+let lastImageId: string | null = null;
 
 async function fetchImages() {
-  loading = true;
-  errorMsg = '';
   let url = `/api/images?limit=${limit}`;
   if (mode === 'eigene' && userId) {
     url += `&user_id=${userId}`;
@@ -30,13 +29,32 @@ async function fetchImages() {
     const data = await res.json();
     console.log('NewsFlash: Response:', data);
     if (data.status === 'success') {
-      images = data.images || [];
-      lastUpdate = new Date();
-      console.log('NewsFlash: Loaded', images.length, 'images');
-      if (images.length > 0) {
-        console.log('NewsFlash: First image:', images[0]);
-        console.log('NewsFlash: Last image:', images[images.length - 1]);
+      const newImages = data.images || [];
+      
+      // Incremental Update: Nur neue Bilder vorne dran setzen
+      if (newImages.length > 0 && lastImageId && newImages[0].id !== lastImageId) {
+        // Neue Bilder gefunden - nur die neuen vorne dran setzen
+        const existingIds = new Set(images.map(img => img.id));
+        const newImagesToAdd = newImages.filter(img => !existingIds.has(img.id));
+        
+        if (newImagesToAdd.length > 0) {
+          console.log('NewsFlash: Adding', newImagesToAdd.length, 'new images');
+          images = [...newImagesToAdd, ...images].slice(0, limit);
+          lastUpdate = new Date();
+        }
+      } else if (newImages.length > 0 && !lastImageId) {
+        // Erster Load
+        images = newImages;
+        lastUpdate = new Date();
+        console.log('NewsFlash: Initial load of', images.length, 'images');
       }
+      
+      if (newImages.length > 0) {
+        lastImageId = newImages[0].id;
+      }
+      
+      loading = false;
+      errorMsg = '';
     } else {
       errorMsg = data.message || 'Fehler beim Laden der Bilder.';
       console.log('NewsFlash: Error:', errorMsg);
@@ -45,7 +63,6 @@ async function fetchImages() {
     errorMsg = 'Netzwerkfehler beim Laden der NewsFlash-Bilder.';
     console.log('NewsFlash: Network error:', e);
   }
-  loading = false;
 }
 
 function startAutoRefresh() {
@@ -123,9 +140,9 @@ function toggleLayout() {
     {:else if images.length === 0}
       <div class="newsflash-empty">Keine Uploads gefunden.</div>
     {:else}
-      <div class="newsflash-info">Neueste {images.length} Uploads • Zuletzt aktualisiert: {lastUpdate.toLocaleTimeString()}</div>
       {#if layout === 'strip' || layout === 'justified'}
         <div class="newsflash-strip" tabindex="0">
+          <div class="newsflash-time">{lastUpdate.toLocaleTimeString()}</div>
           {#each images as img (img.id)}
             <div class="newsflash-thumb" on:click={() => handleImageClick(img)} tabindex="0" role="button" aria-label={img.title || img.original_name || 'Bild'}>
               <img src={"https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/" + img.path_512} alt={img.title || img.original_name || 'Bild'} />
@@ -134,6 +151,7 @@ function toggleLayout() {
         </div>
       {:else if layout === 'grid'}
         <div class="newsflash-grid" tabindex="0">
+          <div class="newsflash-time">{lastUpdate.toLocaleTimeString()}</div>
           {#each images as img (img.id)}
             <div class="newsflash-thumb" on:click={() => handleImageClick(img)} tabindex="0" role="button" aria-label={img.title || img.original_name || 'Bild'}>
               <img src={"https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/" + img.path_512} alt={img.title || img.original_name || 'Bild'} />
@@ -254,5 +272,16 @@ function toggleLayout() {
   border-radius: 0;
   margin: 0;
   padding: 0;
+}
+.newsflash-time {
+  color: #4fa3f7;
+  font-size: 0.8rem;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  transform: rotate(180deg);
+  align-self: flex-end;
+  margin-right: 8px;
+  font-weight: 500;
+  white-space: nowrap;
 }
 </style> 
