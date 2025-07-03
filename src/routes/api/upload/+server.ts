@@ -19,6 +19,7 @@ function fixEncoding(str: string | null): string | null {
 
 export const POST = async ({ request }) => {
   try {
+    console.log('=== UPLOAD API CALLED ===');
     const form = await request.formData();
     const files = form.getAll('files') as File[];
 
@@ -26,8 +27,11 @@ export const POST = async ({ request }) => {
     const passedProfileId = form.get('profile_id') as string | null;
 
     if (!files.length) {
+      console.log('No files received');
       throw error(400, 'No files received');
     }
+
+    console.log(`Received ${files.length} files`);
 
     // Get current user (from Supabase auth cookie) – may be null when using anon key
     const { data: { user } } = await supabase.auth.getUser();
@@ -54,10 +58,15 @@ export const POST = async ({ request }) => {
     }
     
     if (!authenticatedUser) {
+      console.log('No authenticated user found');
       throw error(401, 'Nicht angemeldet. Bitte zuerst einloggen.');
     }
+    
+    console.log('Authenticated user:', authenticatedUser.id);
+    
     // Prefer value coming from form; fall back to authenticated user id, otherwise null
     const profile_id = passedProfileId || authenticatedUser?.id || null;
+    console.log('Using profile_id:', profile_id);
 
     const results = [];
     const successfulUploads: string[] = [];
@@ -283,11 +292,14 @@ export const POST = async ({ request }) => {
         console.log('Inserting database record:', JSON.stringify(dbRecord, null, 2));
         
         // Versuche zuerst mit allen Feldern zu inserten
+        console.log('Attempting database insert...');
         let { data: dbData, error: dbError } = await supabase
           .from('images')
           .insert(dbRecord)
           .select()
           .single();
+
+        console.log('Database insert result:', { data: dbData, error: dbError });
 
         // Falls das fehlschlägt, versuche es ohne EXIF-Felder
         if (dbError && (dbError.message.includes('column') || dbError.message.includes('does not exist'))) {
@@ -307,11 +319,15 @@ export const POST = async ({ request }) => {
             exif_data: Object.keys(exifData).length ? exifData : null
           };
           
+          console.log('Attempting fallback insert with:', JSON.stringify(fallbackRecord, null, 2));
+          
           const { data: fallbackData, error: fallbackError } = await supabase
             .from('images')
             .insert(fallbackRecord)
             .select()
             .single();
+            
+          console.log('Fallback insert result:', { data: fallbackData, error: fallbackError });
             
           if (fallbackError) {
             console.error('Fallback insert also failed:', fallbackError);
@@ -335,10 +351,12 @@ export const POST = async ({ request }) => {
             hint: dbError.hint
           });
           // Clean up uploaded file if database insert fails
+          console.log('Cleaning up uploaded file due to database error...');
           await supabase.storage.from('images-512').remove([filename]);
           throw error(500, `Database error: ${dbError.message}`);
         }
 
+        console.log('Database insert successful:', dbData);
         results.push(dbData);
         successfulUploads.push(file.name);
         console.log(`✅ Successfully processed: ${file.name}`);
