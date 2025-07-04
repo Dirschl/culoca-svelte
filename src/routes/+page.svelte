@@ -57,6 +57,8 @@
   let autoguideText = '';
   let lastSpokenText = '';
 
+  let audioActivated = false;
+
   // Autoguide functions
   function initSpeechSynthesis() {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
@@ -182,6 +184,28 @@
       if (firstImage.title) {
         speakTitle(firstImage.title);
       }
+    }
+  }
+
+  function activateAudioGuide() {
+    if (!speechSynthesis) initSpeechSynthesis();
+    if (speechSynthesis) {
+      // iOS: Einmal Dummy sprechen, um zu aktivieren
+      const dummy = new SpeechSynthesisUtterance(' ');
+      dummy.lang = 'de-DE';
+      dummy.volume = 0;
+      speechSynthesis.speak(dummy);
+      speechSynthesis.resume();
+      
+      // Teste die Sprachausgabe mit einem kurzen Text
+      const testUtterance = new SpeechSynthesisUtterance('Sprachausgabe aktiviert');
+      testUtterance.lang = 'de-DE';
+      testUtterance.volume = 1.0;
+      testUtterance.onend = () => {
+        console.log('Audio guide activated');
+      };
+      speechSynthesis.speak(testUtterance);
+      audioActivated = true;
     }
   }
 
@@ -1467,14 +1491,17 @@
 {#if autoguide}
   <div class="autoguide-bar">
     <div class="autoguide-content">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
-        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-        <line x1="12" y1="19" x2="12" y2="23"/>
-        <line x1="8" y1="23" x2="16" y2="23"/>
-      </svg>
       <span class="autoguide-text">{autoguideText || 'Audioguide aktiv'}</span>
-      <!-- Lautsprechersymbol entfernt -->
+      {#if !audioActivated}
+        <button class="speaker-btn" on:click={activateAudioGuide} title="Sprachausgabe aktivieren">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+            <line x1="12" y1="19" x2="12" y2="23"/>
+            <line x1="8" y1="23" x2="16" y2="23"/>
+          </svg>
+        </button>
+      {/if}
     </div>
   </div>
 {/if}
@@ -2692,6 +2719,27 @@
     font-weight: 600;
     font-size: 1rem;
     text-align: center;
+  }
+
+  .speaker-btn {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .speaker-btn:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+
+  .speaker-btn:active {
+    background-color: rgba(255, 255, 255, 0.2);
   }
 
   @keyframes slideDown {

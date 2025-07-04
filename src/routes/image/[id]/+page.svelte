@@ -13,6 +13,7 @@
   let profile: any = null;
   let nearby: any[] = [];
   let radius = 500; // meters, default
+  let radiusLoaded = false;
   let mapEl: HTMLDivElement;
   let map: any;
   let keywordsList: string[] = [];
@@ -23,6 +24,7 @@
   let editingDescription = false;
   let descriptionEditValue = '';
 
+
   $: imageId = $page.params.id;
 
   onMount(async () => {
@@ -30,6 +32,15 @@
       // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       currentUser = user;
+
+      // Radius aus localStorage laden (pro User), erst wenn currentUser gesetzt ist
+      if (browser && currentUser && !radiusLoaded) {
+        const storedRadius = localStorage.getItem(`detailRadius_${currentUser.id}`);
+        if (storedRadius) {
+          radius = parseInt(storedRadius, 10) || 500;
+        }
+        radiusLoaded = true;
+      }
 
       const { data, error: fetchError } = await supabase
         .from('images')
@@ -74,6 +85,10 @@
   function getDistanceFromLatLonInMeters(lat1: number, lon1: number, lat2: number, lon2: number): string {
     const meters = getDistanceInMeters(lat1, lon1, lat2, lon2);
     return meters >= 1000 ? (meters / 1000).toFixed(1).replace('.', ',') + 'km' : meters + 'm';
+  }
+
+  function getDistanceForJustified(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    return getDistanceInMeters(lat1, lon1, lat2, lon2);
   }
 
   async function fetchProfile(profileId: string) {
@@ -184,16 +199,16 @@
     if (currentUser && image && image.profile_id === currentUser.id) {
       editingTitle = true;
       titleEditValue = image.title || '';
-      // Focus the input after it's rendered with longer delay for mobile
-      setTimeout(() => {
-        const input = document.getElementById('title-edit-input');
-        if (input) {
-          input.focus();
-          input.select();
-          // Force mobile keyboard to appear
-          input.click();
-        }
-      }, 100);
+              // Focus the input after it's rendered with longer delay for mobile
+        setTimeout(() => {
+          const input = document.getElementById('title-edit-input') as HTMLInputElement;
+          if (input) {
+            input.focus();
+            input.select();
+            // Force mobile keyboard to appear
+            input.click();
+          }
+        }, 100);
     }
   }
 
@@ -243,7 +258,7 @@
       descriptionEditValue = image.description || '';
       // Focus the input after it's rendered with longer delay for mobile
       setTimeout(() => {
-        const input = document.getElementById('description-edit-input');
+        const input = document.getElementById('description-edit-input') as HTMLTextAreaElement;
         if (input) {
           input.focus();
           input.select();
@@ -308,6 +323,13 @@
     const savedLayout = localStorage.getItem('galleryLayout');
     useJustifiedLayout = savedLayout === 'justified';
   }
+
+  // Radius speichern, wenn er sich ändert und geladen wurde
+  $: if (browser && currentUser && radiusLoaded) {
+    localStorage.setItem(`detailRadius_${currentUser.id}`, String(radius));
+  }
+
+
 </script>
 
 <svelte:head>
@@ -424,7 +446,7 @@
                     showDistance={true}
                     userLat={image.lat}
                     userLon={image.lon}
-                    getDistanceFromLatLonInMeters={getDistanceFromLatLonInMeters}
+                    getDistanceFromLatLonInMeters={getDistanceForJustified}
                   />
                 </div>
               {:else}
@@ -465,30 +487,6 @@
                   {/if}
                   {#if profile.show_country && profile.country}
                     <div>{profile.country}</div>
-                  {/if}
-                </div>
-                <div class="creator-contact">
-                  {#if profile.show_phone && profile.phone}
-                    <div>📞 {profile.phone}</div>
-                  {/if}
-                  {#if profile.show_email && profile.email}
-                    <div>✉️ <a href={`mailto:${profile.email}`}>{profile.email}</a></div>
-                  {/if}
-                  {#if profile.show_website && profile.website}
-                    <div>🌐 <a href={profile.website} target="_blank" rel="noopener">{profile.website}</a></div>
-                  {/if}
-                  {#if profile.show_social && (profile.facebook || profile.instagram || profile.twitter)}
-                    <div class="creator-socials">
-                      {#if profile.facebook}
-                        <a href={profile.facebook} target="_blank" rel="noopener" title="Facebook" class="social-link"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:middle;"><path d="M22.675 0h-21.35C.595 0 0 .592 0 1.326v21.348C0 23.408.595 24 1.325 24h11.495v-9.294H9.692v-3.622h3.128V8.413c0-3.1 1.893-4.788 4.659-4.788 1.325 0 2.463.099 2.797.143v3.24l-1.918.001c-1.504 0-1.797.715-1.797 1.763v2.313h3.587l-.467 3.622h-3.12V24h6.116C23.406 24 24 23.408 24 22.674V1.326C24 .592 23.406 0 22.675 0"/></svg></a>
-                      {/if}
-                      {#if profile.instagram}
-                        <a href={profile.instagram} target="_blank" rel="noopener" title="Instagram" class="social-link"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:middle;"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 1.366.062 2.633.334 3.608 1.308.974.974 1.246 2.241 1.308 3.608.058 1.266.069 1.646.069 4.85s-.012 3.584-.07 4.85c-.062 1.366-.334 2.633-1.308 3.608-.974.974-2.241 1.246-3.608 1.308-1.266.058-1.646.069-4.85.069s-3.584-.012-4.85-.07c-1.366-.062-2.633-.334-3.608-1.308-.974-.974-1.246-2.241-1.308-3.608C2.175 15.647 2.163 15.267 2.163 12s.012-3.584.07-4.85c.062-1.366.334-2.633 1.308-3.608C4.515 2.497 5.782 2.225 7.148 2.163 8.414 2.105 8.794 2.094 12 2.094zm0-2.163C8.741 0 8.332.012 7.052.07 5.771.128 4.635.4 3.661 1.374c-.974.974-1.246 2.241-1.308 3.608C2.175 8.353 2.163 8.733 2.163 12s.012 3.584.07 4.85c.062 1.366.334 2.633 1.308 3.608.974.974 2.241 1.246 3.608 1.308 1.266.058 1.646.069 4.85.069s3.584-.012 4.85-.07c1.366-.062 2.633-.334 3.608-1.308.974-.974 1.246-2.241 1.308-3.608.058-1.266.069-1.646.069-4.85s-.012-3.584-.07-4.85c-.062-1.366-.334-2.633-1.308-3.608-.974-.974-2.241-1.246-3.608-1.308C15.259.012 15.267 0 12 0zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zm0 10.162a3.999 3.999 0 1 1 0-7.998 3.999 3.999 0 0 1 0 7.998zm6.406-11.845a1.44 1.44 0 1 0 0 2.88 1.44 1.44 0 0 0 0-2.88z"/></svg></a>
-                      {/if}
-                      {#if profile.twitter}
-                        <a href={profile.twitter} target="_blank" rel="noopener" title="Twitter/X" class="social-link"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:middle;"><path d="M24 4.557a9.93 9.93 0 0 1-2.828.775 4.932 4.932 0 0 0 2.165-2.724c-.951.555-2.005.959-3.127 1.184A4.916 4.916 0 0 0 16.616 3c-2.717 0-4.924 2.206-4.924 4.924 0 .386.044.763.127 1.124C7.728 8.807 4.1 6.884 1.671 3.965c-.423.724-.666 1.561-.666 2.475 0 1.708.87 3.216 2.188 4.099a4.904 4.904 0 0 1-2.229-.616c-.054 1.997 1.397 3.872 3.448 4.29a4.936 4.936 0 0 1-2.224.084c.627 1.956 2.444 3.377 4.6 3.417A9.867 9.867 0 0 1 0 21.543a13.94 13.94 0 0 0 7.548 2.212c9.058 0 14.009-7.513 14.009-14.009 0-.213-.005-.425-.014-.636A10.012 10.012 0 0 0 24 4.557z"/></svg></a>
-                      {/if}
-                    </div>
                   {/if}
                 </div>
               </div>
