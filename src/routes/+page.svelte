@@ -356,9 +356,9 @@
         
         // Update gallery stats
         const totalCount = await getTotalImageCount();
-        updateGalleryStats($pics.length + data.length, totalCount);
+        updateGalleryStats($pics.length, totalCount);
         
-        console.log(`[Gallery] RPC loaded ${data.length} images, total now: ${$pics.length + data.length}`);
+        console.log(`[Gallery] RPC loaded ${data.length} images, total now: ${$pics.length}`);
         
         // Wenn RPC weniger Bilder zurückgibt als erwartet, lade den Rest mit normaler Pagination
         if (data.length < size) {
@@ -413,6 +413,10 @@
             });
             pics.set(sortedPics);
             console.log(`[Gallery] Global resort completed: ${sortedPics.length} images sorted by distance`);
+            
+            // Update gallery stats after resort
+            const totalCount = await getTotalImageCount();
+            updateGalleryStats(sortedPics.length, totalCount);
           }
         }
         
@@ -458,9 +462,9 @@
       
       // Update gallery stats
       const totalCount = await getTotalImageCount();
-      updateGalleryStats($pics.length + data.length, totalCount);
+      updateGalleryStats($pics.length, totalCount);
       
-      console.log(`[Gallery] Total images now: ${$pics.length + data.length}`);
+      console.log(`[Gallery] Total images now: ${$pics.length}`);
       if (autoguide && page === 0 && newPics.length > 0) {
         setTimeout(() => announceFirstImage(), 500);
       }
@@ -497,6 +501,9 @@
         pics.set([]); // Clear the gallery
         page = 0; // Reset pagination
         hasMoreImages = true; // Reset for future uploads
+        
+        // Reset gallery stats
+        updateGalleryStats(0, 0);
       } else {
         throw new Error(result.message);
       }
@@ -610,6 +617,10 @@
             })),
             ...p
           ]);
+          
+          // Update gallery stats after upload
+          const totalCount = await getTotalImageCount();
+          updateGalleryStats($pics.length, totalCount);
         }
       }
 
@@ -810,6 +821,10 @@
             })),
             ...p
           ]);
+          
+          // Update gallery stats after EXIF upload
+          const totalCount = await getTotalImageCount();
+          updateGalleryStats($pics.length, totalCount);
         }
         
         // Close dialog after success
