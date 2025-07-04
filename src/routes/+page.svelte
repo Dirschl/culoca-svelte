@@ -5,6 +5,7 @@
   import Justified from '$lib/Justified.svelte';
   import NewsFlash from '$lib/NewsFlash.svelte';
   import { beforeNavigate, afterNavigate } from '$app/navigation';
+  import { updateGalleryStats } from '$lib/galleryStats';
 
   const pics = writable<any[]>([]);
   let page = 0, size = 50, loading = false, hasMoreImages = true;
@@ -262,12 +263,35 @@
 
         pics.set(allPics);
         hasMoreImages = false;
-        console.log(`Preload complete: ${allPics.length} images loaded`);
+        
+        // Update gallery stats
+        const totalCount = await getTotalImageCount();
+        updateGalleryStats(allPics.length, totalCount);
+        
+        console.log(`Preload complete: ${allPics.length} images loaded, total: ${totalCount}`);
       }
     } catch (error) {
       console.error('Error during preload:', error);
     } finally {
       loading = false;
+    }
+  }
+
+  async function getTotalImageCount() {
+    try {
+      const { count, error } = await supabase
+        .from('images')
+        .select('id', { count: 'exact' });
+      
+      if (error) {
+        console.error('Error getting total image count:', error);
+        return 0;
+      }
+      
+      return count || 0;
+    } catch (error) {
+      console.error('Error getting total image count:', error);
+      return 0;
     }
   }
 
@@ -305,7 +329,12 @@
           keywords: d.keywords
         }));
         pics.update((p: any[]) => [...p, ...newPics]);
-        console.log(`[Gallery] RPC loaded ${data.length} images, total now: ${$pics.length}`);
+        
+        // Update gallery stats
+        const totalCount = await getTotalImageCount();
+        updateGalleryStats($pics.length + data.length, totalCount);
+        
+        console.log(`[Gallery] RPC loaded ${data.length} images, total now: ${$pics.length + data.length}`);
         
         // Wenn RPC weniger Bilder zurückgibt als erwartet, lade den Rest mit normaler Pagination
         if (data.length < size) {
@@ -402,7 +431,12 @@
         keywords: d.keywords
       }));
       pics.update((p: any[]) => [...p, ...newPics]);
-      console.log(`[Gallery] Total images now: ${$pics.length}`);
+      
+      // Update gallery stats
+      const totalCount = await getTotalImageCount();
+      updateGalleryStats($pics.length + data.length, totalCount);
+      
+      console.log(`[Gallery] Total images now: ${$pics.length + data.length}`);
       if (autoguide && page === 0 && newPics.length > 0) {
         setTimeout(() => announceFirstImage(), 500);
       }

@@ -2,6 +2,7 @@
   import { supabase } from '$lib/supabaseClient';
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
+  import { darkMode } from '$lib/darkMode';
 
   let user: any = null;
   let profile: any = null;
@@ -79,6 +80,8 @@
       if (storedNewsFlash === 'aus' || storedNewsFlash === 'eigene' || storedNewsFlash === 'alle') {
         newsFlashMode = storedNewsFlash;
       }
+      
+
     }
     
     // Cleanup function
@@ -202,6 +205,7 @@
         localStorage.setItem('showCompass', showCompass ? 'true' : 'false');
         localStorage.setItem('autoguide', autoguide ? 'true' : 'false');
         localStorage.setItem('newsFlashMode', newsFlashMode);
+
       }
 
       profile = profileData;
@@ -411,6 +415,14 @@
           <span class="toggle-desc">
             {newsFlashMode === 'aus' ? 'Ausgeblendet' : newsFlashMode === 'eigene' ? 'Nur eigene Uploads' : 'Alle Uploads'}
           </span>
+        </div>
+        <div class="gallery-toggle-row">
+          <span class="toggle-label">Dark Mode:</span>
+          <label class="switch">
+            <input type="checkbox" bind:checked={$darkMode} />
+            <span class="slider"></span>
+          </label>
+          <span class="toggle-desc">{$darkMode ? 'Dunkel' : 'Hell'}</span>
         </div>
       </section>
 

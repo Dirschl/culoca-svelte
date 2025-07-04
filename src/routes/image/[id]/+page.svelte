@@ -5,6 +5,7 @@
   import Justified from '$lib/Justified.svelte';
   import { browser } from '$app/environment';
   import { tick } from 'svelte';
+  import { darkMode } from '$lib/darkMode';
 
   let image: any = null;
   let loading = true;
@@ -323,8 +324,8 @@
     <div class="error">❌ Fehler: {error}</div>
   {:else if image}
     <div class="content">
-      <!-- Main Image -->
-      <div class="image-wrapper">
+      <!-- Main Image with Passepartout Effect -->
+      <div class="passepartout-container" class:dark={$darkMode}>
         <a href="/" class="image-link">
           <img
             src={imageSource}
@@ -332,11 +333,9 @@
             class="main-image"
           />
         </a>
-      </div>
-
-      <!-- Image Information -->
-      <div class="info-section">
-        <div class="centered-content">
+        
+        <!-- Image Information inside Passepartout -->
+        <div class="passepartout-info">
           <h1 class="title" class:editable={isCreator} on:click={startEditTitle}>
             {#if editingTitle}
               <div class="title-edit-container">
@@ -394,6 +393,12 @@
               {/if}
             </p>
           {/if}
+        </div>
+      </div>
+
+      <!-- Image Information -->
+      <div class="info-section">
+        <div class="centered-content">
           
           {#if image.lat && image.lon}
             <div class="action-buttons">
@@ -620,33 +625,36 @@
     padding: 0;
   }
 
-  /* Image Display - Fixed 800px Height */
-  .image-wrapper {
+  /* Passepartout Effect - Photo in Photo Card */
+  .passepartout-container {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    justify-content: center;
-    width: 100vw;
-    max-width: 100vw;
-    height: auto;
-    min-height: unset;
-    max-height: 90vh;
+    justify-content: flex-start;
+    width: 100%;
+    padding: 20px 20px 20px 20px; /* Equal padding top and bottom */
+    background: #f5f5f5; /* Light photo card background */
     margin: 0 auto;
-    background: transparent !important;
-    border: none;
-    box-shadow: none;
-    padding: 0;
+  }
+
+  .passepartout-container.dark {
+    background: #1a1a1a; /* Dark photo card background */
+  }
+
+  .passepartout-info {
+    margin-top: 1.5rem;
+    text-align: center;
+    width: 100%;
   }
 
   .main-image {
     display: block;
+    width: auto;
+    height: 800px; /* Fixed height as requested */
+    max-width: 100%;
     object-fit: contain;
-    width: 100%;
-    height: auto;
-    max-height: 80vh;
-    margin: 0 auto;
-    background: none;
-    border: none;
-    box-shadow: none;
+    border: 1px solid #ffffff; /* White border around the image */
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   }
 
   /* Info Section */
@@ -663,6 +671,12 @@
     line-height: 1.3;
   }
 
+  /* Light mode title styling */
+  .passepartout-container:not(.dark) .title {
+    color: #4a4a4a; /* Noble gray for light mode */
+    font-weight: 700;
+  }
+
   .description {
     font-size: 1rem;
     color: #ccc;
@@ -670,19 +684,35 @@
     margin: 0 0 2rem 0;
   }
 
+  /* Light mode description styling */
+  .passepartout-container:not(.dark) .description {
+    color: #6b6b6b; /* Noble gray for light mode */
+    font-weight: 500;
+  }
+
   .description.placeholder {
     color: #666;
     font-style: italic;
   }
 
+  /* Light mode placeholder styling */
+  .passepartout-container:not(.dark) .description.placeholder {
+    color: #999;
+    font-style: italic;
+  }
+
   /* Mobile Optimizations */
   @media (max-width: 768px) {
-    .image-wrapper {
-      height: 400px;
+    .passepartout-container {
+      padding: 15px 15px 15px 15px; /* Equal padding */
+    }
+
+    .passepartout-info {
+      margin-top: 1rem;
     }
 
     .main-image {
-      height: 400px;
+      height: 500px;
     }
 
     .info-section {
@@ -695,12 +725,16 @@
   }
 
   @media (max-width: 480px) {
-    .image-wrapper {
-      height: 300px;
+    .passepartout-container {
+      padding: 10px 10px 10px 10px; /* Equal padding */
+    }
+
+    .passepartout-info {
+      margin-top: 0.75rem;
     }
 
     .main-image {
-      height: 300px;
+      height: 400px;
     }
 
     .info-section {

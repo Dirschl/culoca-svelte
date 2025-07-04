@@ -2,6 +2,7 @@
 import { onMount, onDestroy } from 'svelte';
 import { goto } from '$app/navigation';
 import type { NewsFlashImage } from './types';
+import { galleryStats } from './galleryStats';
 
 // Modus: 'eigene', 'alle', 'aus'
 export let mode: 'eigene' | 'alle' | 'aus' = 'alle';
@@ -18,6 +19,7 @@ let refreshInterval: number | null = null;
 let lastUpdate = new Date();
 let lastImageId: string | null = null;
 
+
 async function fetchImages() {
   let url = `/api/images?limit=${limit}`;
   if (mode === 'eigene' && userId) {
@@ -30,6 +32,7 @@ async function fetchImages() {
     console.log('NewsFlash: Response:', data);
     if (data.status === 'success') {
       const newImages = data.images || [];
+
       
       // Incremental Update: Nur neue Bilder vorne dran setzen
       if (newImages.length > 0 && lastImageId && newImages[0].id !== lastImageId) {
@@ -73,7 +76,7 @@ function startAutoRefresh() {
     refreshInterval = setInterval(() => {
       console.log('NewsFlash: Auto-refresh triggered');
       fetchImages();
-    }, 30000); // Alle 30 Sekunden
+    }, 60000); // Alle 60 Sekunden (1 Minute)
   }
 }
 
@@ -142,7 +145,7 @@ function toggleLayout() {
     {:else}
       {#if layout === 'strip' || layout === 'justified'}
         <div class="newsflash-strip" tabindex="0">
-          <div class="newsflash-time">{lastUpdate.toLocaleTimeString()}</div>
+          <div class="newsflash-time">{lastUpdate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} {$galleryStats.loadedCount}/{$galleryStats.totalCount}</div>
           {#each images as img (img.id)}
             <div class="newsflash-thumb" on:click={() => handleImageClick(img)} tabindex="0" role="button" aria-label={img.title || img.original_name || 'Bild'}>
               <img src={"https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/" + img.path_512} alt={img.title || img.original_name || 'Bild'} />
@@ -151,7 +154,7 @@ function toggleLayout() {
         </div>
       {:else if layout === 'grid'}
         <div class="newsflash-grid" tabindex="0">
-          <div class="newsflash-time">{lastUpdate.toLocaleTimeString()}</div>
+          <div class="newsflash-time">{lastUpdate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} {$galleryStats.loadedCount}/{$galleryStats.totalCount}</div>
           {#each images as img (img.id)}
             <div class="newsflash-thumb" on:click={() => handleImageClick(img)} tabindex="0" role="button" aria-label={img.title || img.original_name || 'Bild'}>
               <img src={"https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/" + img.path_512} alt={img.title || img.original_name || 'Bild'} />
@@ -310,5 +313,10 @@ function toggleLayout() {
   margin-right: 8px;
   font-weight: 500;
   white-space: nowrap;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.2;
 }
 </style> 

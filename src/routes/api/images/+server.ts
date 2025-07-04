@@ -7,22 +7,53 @@ export const GET = async ({ url }) => {
     const limit = parseInt(url.searchParams.get('limit') || '12', 10);
     const user_id = url.searchParams.get('user_id');
 
-    let query = supabase
+    // Build query for images with title, description, and GPS data
+    let imagesQuery = supabase
       .from('images')
-      .select('id, path_512, path_2048, original_name, created_at, user_id, profile_id, title, description')
+      .select('id, path_512, path_2048, original_name, created_at, user_id, profile_id, title, description, lat, lon')
+      .not('title', 'is', null)
+      .not('description', 'is', null)
+      .not('lat', 'is', null)
+      .not('lon', 'is', null)
       .order('created_at', { ascending: false })
       .limit(limit);
 
     if (user_id) {
-      query = query.eq('user_id', user_id);
+      imagesQuery = imagesQuery.eq('user_id', user_id);
     }
 
-    const { data, error: dbError } = await query;
+    // Get total count of images with title, description, and GPS data
+    let totalQuery = supabase
+      .from('images')
+      .select('id', { count: 'exact' })
+      .not('title', 'is', null)
+      .not('description', 'is', null)
+      .not('lat', 'is', null)
+      .not('lon', 'is', null);
+
+    if (user_id) {
+      totalQuery = totalQuery.eq('user_id', user_id);
+    }
+
+    const [{ data, error: dbError }, { count, error: countError }] = await Promise.all([
+      imagesQuery,
+      totalQuery
+    ]);
+
     if (dbError) {
       throw error(500, dbError.message);
     }
 
-    return json({ status: 'success', images: data });
+    if (countError) {
+      throw error(500, countError.message);
+    }
+
+    return json({ 
+      status: 'success', 
+      images: data, 
+      totalCount: count || 0,
+      loadedCount: data?.length || 0
+    });
   } catch (err) {
     console.error('API /api/images error:', err);
     const message = (err instanceof Error) ? err.message : 'Unknown error';
