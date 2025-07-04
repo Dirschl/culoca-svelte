@@ -427,6 +427,9 @@
                   {#each nearby as img}
                     <div class="grid-item" on:click={() => window.location.href = `/image/${img.id}` } tabindex="0" role="button" aria-label={`Bild ${img.title || img.id}` }>
                       <img src={img.src} alt={img.title || 'Bild'} />
+                      <div class="distance-label">
+                        {getDistanceFromLatLonInMeters(image.lat, image.lon, img.lat, img.lon)}
+                      </div>
                     </div>
                   {/each}
                 </div>
@@ -993,12 +996,100 @@
     border-color: #4ade80;
   }
 
-  @media (max-width: 600px) {
+  /* Grid Layout Styles - Same as main page */
+  .grid-layout {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(256px, 1fr));
+    gap: 2px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 0;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+  }
+
+  /* Mobile responsive grid */
+  @media (max-width: 768px) {
     .grid-layout {
       grid-template-columns: repeat(2, 1fr);
-      gap: 2px;
-      margin: 0;
-      padding: 0;
+      gap: 1px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .grid-layout {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1px;
+    }
+  }
+
+  .grid-item {
+    background: #181828;
+    border-radius: 0;
+    overflow: hidden;
+    transition: box-shadow 0.2s, transform 0.2s;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    aspect-ratio: 1/1;
+    position: relative;
+  }
+
+  /* Mobile optimizations */
+  @media (max-width: 768px) {
+    .grid-item {
+      aspect-ratio: 1/1;
+      border-radius: 0;
+    }
+  }
+
+  .grid-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform 0.3s cubic-bezier(.4,0,.2,1);
+  }
+
+  .grid-item:hover img {
+    transform: scale(1.04);
+  }
+
+  .distance-label {
+    position: absolute;
+    left: 12px;
+    bottom: 12px;
+    background: rgba(24,24,40,0.55);
+    backdrop-filter: blur(4px);
+    color: #fff;
+    font-size: 0.85rem;
+    font-weight: 500;
+    border-radius: 8px;
+    padding: 2px 12px;
+    z-index: 2;
+    pointer-events: none;
+  }
+
+  /* Mobile distance label optimization */
+  @media (max-width: 768px) {
+    .distance-label {
+      font-size: 1rem;
+      padding: 4px 16px;
+      left: 16px;
+      bottom: 16px;
+      border-radius: 12px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .distance-label {
+      font-size: 1.1rem;
+      padding: 6px 18px;
+      left: 20px;
+      bottom: 20px;
+      border-radius: 14px;
     }
   }
 

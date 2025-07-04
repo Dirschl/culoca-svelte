@@ -276,7 +276,7 @@
     if (loading || !hasMoreImages) return; 
     loading = true;
 
-    if (isLoggedIn && showDistance && userLat !== null && userLon !== null) {
+    if (userLat !== null && userLon !== null) {
       // Lade die nächste Seite nach Entfernung sortiert per RPC
       const { data, error } = await supabase
         .rpc('images_by_distance', {
@@ -347,6 +347,19 @@
           if (totalImages.count && $pics.length >= totalImages.count) {
             hasMoreImages = false;
             console.log(`[Gallery] All ${totalImages.count} images loaded, hasMoreImages set to false`);
+          }
+          
+          // Nach dem Laden aller Bilder eine globale Neusortierung durchführen
+          if (userLat !== null && userLon !== null) {
+            console.log(`[Gallery] Performing global resort after loading all images...`);
+            const currentPics = get(pics);
+            const sortedPics = [...currentPics].sort((a: any, b: any) => {
+              const distA = a.lat && a.lon ? getDistanceInMeters(userLat!, userLon!, a.lat, a.lon) : Number.MAX_VALUE;
+              const distB = b.lat && b.lon ? getDistanceInMeters(userLat!, userLon!, b.lat, b.lon) : Number.MAX_VALUE;
+              return distA - distB;
+            });
+            pics.set(sortedPics);
+            console.log(`[Gallery] Global resort completed: ${sortedPics.length} images sorted by distance`);
           }
         }
         
@@ -851,7 +864,8 @@
         userLat = pos.coords.latitude;
         userLon = pos.coords.longitude;
         saveLastKnownLocation(userLat, userLon);
-        if (showDistance) {
+        // Wenn GPS-Koordinaten verfügbar sind, lade Bilder nach Entfernung sortiert
+        if (userLat !== null && userLon !== null) {
           pics.set([]);
           page = 0;
           hasMoreImages = true;
@@ -906,7 +920,7 @@
   }
 
   function checkIfCloserImagesAvailable(): boolean {
-    if (!showDistance || !$pics.length) return false;
+    if (!userLat || !userLon || !$pics.length) return false;
     
     // Get the distance to the farthest currently loaded image
     const currentPics = $pics;
@@ -914,7 +928,7 @@
     
     for (const pic of currentPics) {
       if (pic.lat && pic.lon) {
-        const distance = getDistanceInMeters(userLat!, userLon!, pic.lat, pic.lon);
+        const distance = getDistanceInMeters(userLat, userLon, pic.lat, pic.lon);
         maxDistance = Math.max(maxDistance, distance);
       }
     }
@@ -928,7 +942,7 @@
   }
 
   function resortExistingImages() {
-    if (!showDistance || !$pics.length) return;
+    if (!userLat || !userLon || !$pics.length) return;
     
     console.log('Resorting existing images based on new position...');
     
@@ -946,7 +960,7 @@
   }
 
   function checkRadiusForNewImages() {
-    if (!showDistance || !hasMoreImages || loading) return;
+    if (!userLat || !userLon || !hasMoreImages || loading) return;
 
     // Sicherstellen, dass $pics ein Array ist
     const currentPics = Array.isArray($pics) ? $pics : [];

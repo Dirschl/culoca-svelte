@@ -8,19 +8,12 @@ import { Buffer } from 'buffer';
 // -- Helper: fix IPTC strings that were decoded as Latin-1 instead of UTF-8
 function fixEncoding(str: string | null): string | null {
   if (!str) return str;
-  
-  // Einfache, saubere UTF-8 Konvertierung
-  try {
-    // Wenn der String Umlaut-Probleme hat, konvertiere von Latin1 zu UTF-8
-    if (str.includes('Ã')) {
-      const fixed = Buffer.from(str, 'latin1').toString('utf8');
-      console.log('🔧 Fixed encoding:', str, '->', fixed);
-      return fixed;
-    }
-  } catch (e) {
-    console.log('🔧 Encoding fix failed for:', str);
+  // Heuristic: if the string contains the replacement pattern "Ã" it is likely mis-decoded
+  if (str.includes('Ã')) {
+    try {
+      return Buffer.from(str, 'latin1').toString('utf8');
+    } catch { /* ignore */ }
   }
-  
   return str;
 }
 
@@ -100,6 +93,18 @@ export const POST = async ({ request }) => {
         // Resize image to multiple sizes
         const sizes = await resizeJPG(buf);
         
+        // Prüfe die tatsächlichen Dimensionen der 2048px-Datei
+        let jpg2048Width = 0;
+        let jpg2048Height = 0;
+        try {
+          const meta2048 = await sharp(sizes.jpg2048).metadata();
+          jpg2048Width = meta2048.width || 0;
+          jpg2048Height = meta2048.height || 0;
+          console.log(`DEBUG: 2048px resized image dimensions: ${jpg2048Width}x${jpg2048Height}`);
+        } catch (e) {
+          console.log('DEBUG: Fehler beim Auslesen der 2048px-Dimensionen:', e);
+        }
+
         // Get ACTUAL dimensions of the original image
         let width = 2048;
         let height = 2048;
@@ -109,11 +114,14 @@ export const POST = async ({ request }) => {
           const originalMetadata = await sharp(buf).metadata();
           width = originalMetadata.width || 2048;
           height = originalMetadata.height || 2048;
+          
+          console.log(`Original image dimensions: ${width} x ${height}`);
         } catch (metaError) {
-          // Use defaults if metadata extraction fails
+          console.log('Failed to get original image metadata, using defaults');
         }
 
-        // --- EXIF Daten auslesen ---
+        // --- EXIF Daten auslesen (aktiviert) ---
+        console.log('🔍 Starting EXIF extraction...');
         let lat: number | null = null;
         let lon: number | null = null;
         let title: string | null = null;
@@ -125,7 +133,11 @@ export const POST = async ({ request }) => {
         let exif: any = null;
         try {
           exif = await exifr.parse(buf, { iptc: true });
+          console.log('🔍 EXIF parsing completed');
           if (exif) {
+            console.log('🔍 EXIF data found:', Object.keys(exif));
+            console.log('🔍 IPTC data:', exif.iptc ? Object.keys(exif.iptc) : 'no iptc');
+            
             // GPS coordinates
             if (exif.latitude && exif.longitude) {
               lat = exif.latitude;
@@ -134,18 +146,29 @@ export const POST = async ({ request }) => {
 
             // Title - IPTC Headline hat Priorität, dann andere Quellen
             if (!title) {
+              console.log('🔍 Looking for title...');
+              console.log('🔍 Available IPTC fields:', Object.keys(exif).filter(k => k.includes('IPTC')));
+              if (exif.iptc) {
+                console.log('🔍 Available iptc fields:', Object.keys(exif.iptc));
+              }
+              
               // KORREKTUR: IPTC Headline hat höchste Priorität
               if (exif['IPTC:Headline']) {
-                title = fixEncoding(exif['IPTC:Headline']);
+                title = exif['IPTC:Headline'];
+                console.log('✅ Found title from IPTC:Headline:', title);
               } else if (exif.iptc && (exif.iptc as any).Headline) {
-                title = fixEncoding((exif.iptc as any).Headline);
+                title = (exif.iptc as any).Headline;
+                console.log('✅ Found title from iptc.Headline:', title);
               } else if (exif.iptc && (exif.iptc as any).ObjectName) {
-                title = fixEncoding((exif.iptc as any).ObjectName);
+                title = (exif.iptc as any).ObjectName;
+                console.log('✅ Found title from iptc.ObjectName:', title);
               } else if (exif['IPTC:ObjectName']) {
-                title = fixEncoding(exif['IPTC:ObjectName']);
+                title = exif['IPTC:ObjectName'];
+                console.log('✅ Found title from IPTC:ObjectName:', title);
+              } else if (exif.ImageDescription) {
+                title = exif.ImageDescription;
+                console.log('✅ Found title from ImageDescription:', title);
               }
-              // ENTFERNT: ImageDescription wird nicht mehr als title verwendet!
-              // ImageDescription ist eine Beschreibung, kein Titel
             }
 
             // Heuristische Suche: jedes Feld, das auf 'title' oder 'headline' endet
@@ -153,7 +176,7 @@ export const POST = async ({ request }) => {
               for (const [k, v] of Object.entries(exif)) {
                 const keyLower = k.toLowerCase();
                 if (keyLower.endsWith('title') || keyLower.endsWith('headline') || keyLower.endsWith('objectname')) {
-                  title = fixEncoding(v as string);
+                  title = v as string;
                   break;
                 }
               }
@@ -161,17 +184,23 @@ export const POST = async ({ request }) => {
 
             // Description - IPTC Description hat Priorität, dann andere Quellen
             if (!description) {
+              console.log('🔍 Looking for description...');
               if (exif['IPTC:Description']) {
-                description = fixEncoding(exif['IPTC:Description']);
+                description = exif['IPTC:Description'];
+                console.log('✅ Found description from IPTC:Description:', description);
               } else if (exif.iptc && (exif.iptc as any).Description) {
-                description = fixEncoding((exif.iptc as any).Description);
+                description = (exif.iptc as any).Description;
+                console.log('✅ Found description from iptc.Description:', description);
               } else if (exif.iptc && (exif.iptc as any).CaptionAbstract) {
-                description = fixEncoding((exif.iptc as any).CaptionAbstract);
+                description = (exif.iptc as any).CaptionAbstract;
+                console.log('✅ Found description from iptc.CaptionAbstract:', description);
               } else if (exif['IPTC:CaptionAbstract']) {
-                description = fixEncoding(exif['IPTC:CaptionAbstract']);
-              } else if (exif.ImageDescription) {
-                // ImageDescription ist eine Beschreibung, nicht ein Titel
-                description = fixEncoding(exif.ImageDescription);
+                description = exif['IPTC:CaptionAbstract'];
+                console.log('✅ Found description from IPTC:CaptionAbstract:', description);
+              } else if (exif.ImageDescription && !title) {
+                // Nur als Fallback, wenn kein Titel gefunden wurde
+                description = exif.ImageDescription;
+                console.log('✅ Found description from ImageDescription (fallback):', description);
               }
             }
 
@@ -218,8 +247,18 @@ export const POST = async ({ request }) => {
             keywords = fixEncoding(keywords);
           }
         } catch (exifErr) {
-          console.warn('EXIF parsing failed:', exifErr);
+          console.warn('⚠️ EXIF parsing failed:', exifErr);
         }
+        
+        console.log('🔍 EXIF extraction completed');
+        console.log('🔍 Final EXIF results:');
+        console.log('  - title:', title);
+        console.log('  - description:', description);
+        console.log('  - lat/lon:', lat, lon);
+        console.log('  - camera:', camera);
+        console.log('  - lens:', lens);
+        console.log('  - keywords:', keywords);
+        // --- ENDE EXIF ---
 
         // Wenn Keywords-String vorhanden → in Array umwandeln (Postgres text[] erwartet JS-Array)
         let keywordsArray: string[] | null = null;
@@ -228,27 +267,35 @@ export const POST = async ({ request }) => {
         }
 
         // --- Fallback-Logik für title und description ---
+        // title: EXIF, IPTC, sonst Dateiname (baseName)
+        console.log('🔍 Final title before fallback:', title);
+        console.log('🔍 Final description before fallback:', description);
+        
+        // KORREKTUR: Stelle sicher, dass title und description nicht vertauscht werden
+        // Wenn title leer ist, aber description gefüllt ist, könnte es ein Fehler sein
+        if (!title && description) {
+          console.log('⚠️ WARNING: title is empty but description is filled. This might be a field mapping error.');
+        }
+        
         // KORREKTUR: Wenn title zu lang ist (wie eine Beschreibung), könnte es ein Fehler sein
         if (title && title.length > 100 && !description) {
+          console.log('⚠️ WARNING: title seems very long, might be a description. Moving to description field.');
           description = title;
           title = baseName;
+          console.log('⚠️ Moved long title to description, using baseName as title:', title);
         }
         
-        // Fallback für title: Dateiname verwenden, wenn kein Titel gefunden wurde
         if (!title) {
           title = baseName;
+          console.log('⚠️ Using baseName as title fallback:', title);
         }
-        
-        // Sicherheitskürzung: Titel auf 200 Zeichen begrenzen (statt 255 für Sicherheit)
-        if (title && title.length > 200) {
-          title = title.slice(0, 200);
-          console.log('⚠️ Truncated title to 200 chars:', title);
+        if (title && title.length > 255) {
+          title = title.slice(0, 255);
+          console.log('⚠️ Truncated title to 255 chars:', title);
         }
-        
-        // Sicherheitskürzung: Beschreibung auf 200 Zeichen begrenzen (statt 255 für Sicherheit)
-        if (description && description.length > 200) {
-          description = description.slice(0, 200);
-          console.log('⚠️ Truncated description to 200 chars:', description);
+        if (description && description.length > 255) {
+          description = description.slice(0, 255);
+          console.log('⚠️ Truncated description to 255 chars:', description);
         }
 
         // Upload to both storage buckets with same filename
