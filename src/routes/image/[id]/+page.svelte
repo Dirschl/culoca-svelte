@@ -476,7 +476,30 @@
 </script>
 
 <svelte:head>
-  <title>{image?.title || image?.original_name || `Image ${image?.id}` || 'Loading...'}</title>
+  <title>{image?.title || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}</title>
+  <meta name="description" content={image?.description || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="article">
+  <meta property="og:title" content={image?.title || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
+  <meta property="og:description" content={image?.description || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
+  <meta property="og:url" content={`https://culoca.com/image/${imageId}`}> 
+  <meta property="og:image" content={`https://culoca.com/api/og-image/${imageId}`}> 
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content={image?.title || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
+  <meta name="twitter:description" content={image?.description || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
+  <meta name="twitter:image" content={`https://culoca.com/api/og-image/${imageId}`}> 
+
+  <!-- Dynamisches Favicon (image-64, fallback image-512) -->
+  {#if image?.path_64}
+    <link rel="icon" type="image/jpeg" href={`https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/${image.path_64}`}/>
+  {:else if image?.path_512}
+    <link rel="icon" type="image/jpeg" href={`https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${image.path_512}`}/>
+  {/if}
 </svelte:head>
 
 <div class="page">
