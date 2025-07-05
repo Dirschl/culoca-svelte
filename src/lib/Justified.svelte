@@ -24,7 +24,7 @@
   export let showDistance: boolean = false;
   export let userLat: number | null = null;
   export let userLon: number | null = null;
-  export let getDistanceFromLatLonInMeters: ((lat1: number, lon1: number, lat2: number, lon2: number) => number) | null = null;
+  export let getDistanceFromLatLonInMeters: ((lat1: number, lon1: number, lat2: number, lon2: number) => string) | null = null;
   export let showCompass: boolean = false;
 
   let boxes: LayoutBox[] = [];
@@ -149,8 +149,9 @@
     padding: 0 !important;
     margin: 0 !important;
     border: none !important;
-    background: #181828 !important;
+    background: transparent !important;
     box-shadow: none !important;
+    overflow: hidden;
   }
   .pic-container {
     position: absolute;
@@ -158,13 +159,16 @@
     overflow: hidden;
     transition: box-shadow 0.3s ease;
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    background: transparent;
   }
   .pic-container:focus {
     outline: 3px solid #0066cc;
     outline-offset: 2px;
+    background: transparent;
   }
   .pic-container:hover {
     box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+    background: transparent;
   }
   .pic {
     width: 100%;
@@ -172,6 +176,7 @@
     object-fit: cover;
     display: block;
     transition: transform 0.3s cubic-bezier(.4,0,.2,1);
+    background: transparent;
   }
   .pic-container:hover .pic {
     transform: scale(1.04);
@@ -193,7 +198,7 @@
     position: absolute;
     left: 8px;
     bottom: 8px;
-    background: rgba(24,24,40,0.55);
+    background: rgba(0,0,0,0.55);
     backdrop-filter: blur(4px);
     color: #fff;
     font-size: 0.7rem;

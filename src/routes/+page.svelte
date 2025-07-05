@@ -1670,31 +1670,31 @@
   /* Drag & Drop Zone */
   .drop-zone {
     position: relative;
-    border: 2px dashed #2d2d44;
+    border: 2px dashed var(--border-color);
     border-radius: 12px;
     padding: 3rem 2rem;
     text-align: center;
     cursor: pointer;
     transition: all 0.3s ease;
-    background: #1a1a2e;
+    background: var(--bg-tertiary);
     margin-bottom: 1rem;
   }
 
   .drop-zone:hover {
-    border-color: #0066cc;
-    background: #1e1e3a;
+    border-color: var(--accent-color);
+    background: var(--border-color);
   }
 
   .drop-zone.drag-over {
-    border-color: #0099ff;
-    background: #1e1e3a;
+    border-color: var(--accent-hover);
+    background: var(--border-color);
     transform: scale(1.02);
-    box-shadow: 0 4px 20px rgba(0, 153, 255, 0.2);
+    box-shadow: 0 4px 20px var(--shadow);
   }
 
   .drop-zone.uploading {
-    border-color: #28a745;
-    background: #1a2e1a;
+    border-color: var(--success-color);
+    background: var(--bg-secondary);
     cursor: not-allowed;
   }
 
@@ -1726,13 +1726,13 @@
   .drop-content h3 {
     margin: 0;
     font-size: 1.2rem;
-    color: white;
+    color: var(--text-primary);
     font-weight: 600;
   }
 
   .drop-content p {
     margin: 0;
-    color: #aaa;
+    color: var(--text-secondary);
     font-size: 0.9rem;
   }
 
@@ -1773,7 +1773,7 @@
     flex: 1;
     min-width: 200px;
     padding: 0.75rem 1rem;
-    background: #0066cc;
+    background: var(--accent-color);
     color: white;
     border: none;
     border-radius: 6px;
@@ -1784,7 +1784,7 @@
   }
 
   .upload-btn:hover:not(:disabled) {
-    background: #0052a3;
+    background: var(--accent-hover);
   }
 
   .upload-btn:disabled {
@@ -2176,14 +2176,14 @@
   }
 
   .dialog-content {
-    background: #1a1a2e;
+    background: var(--bg-secondary);
     border-radius: 12px;
     max-width: 600px;
     width: 100%;
     max-height: 90vh;
     overflow-y: auto;
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
-    border: 1px solid #2d2d44;
+    box-shadow: 0 20px 40px var(--shadow);
+    border: 1px solid var(--border-color);
   }
 
   .dialog-header {
@@ -2191,12 +2191,12 @@
     justify-content: space-between;
     align-items: center;
     padding: 1.5rem;
-    border-bottom: 1px solid #2d2d44;
+    border-bottom: 1px solid var(--border-color);
   }
 
   .dialog-header h2 {
     margin: 0;
-    color: white;
+    color: var(--text-primary);
     font-size: 1.5rem;
     font-weight: 600;
   }
@@ -2204,7 +2204,7 @@
   .close-btn {
     background: none;
     border: none;
-    color: #aaa;
+    color: var(--text-muted);
     font-size: 2rem;
     cursor: pointer;
     padding: 0;
@@ -2218,8 +2218,8 @@
   }
 
   .close-btn:hover {
-    background: #2d2d44;
-    color: white;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
   }
 
   /* EXIF Upload Styles */
@@ -2228,7 +2228,7 @@
   }
 
   .exif-description {
-    color: #ccc;
+    color: var(--text-secondary);
     margin: 0 0 1.5rem 0;
     line-height: 1.5;
   }
@@ -2246,42 +2246,42 @@
     align-items: center;
     gap: 0.75rem;
     padding: 1rem 1.5rem;
-    background: #2d2d44;
-    border: 2px dashed #0066cc;
+    background: var(--bg-tertiary);
+    border: 2px dashed var(--accent-color);
     border-radius: 8px;
     cursor: pointer;
-    color: #ccc;
+    color: var(--text-secondary);
     transition: all 0.2s ease;
     font-weight: 500;
   }
 
   .exif-file-label:hover {
-    background: #3d3d54;
-    border-color: #0099ff;
-    color: white;
+    background: var(--border-color);
+    border-color: var(--accent-hover);
+    color: var(--text-primary);
   }
 
   .exif-file-label svg {
-    color: #0066cc;
+    color: var(--accent-color);
   }
 
   .selected-files {
     margin-bottom: 1.5rem;
     padding: 1rem;
-    background: #2d2d44;
+    background: var(--bg-tertiary);
     border-radius: 8px;
   }
 
   .selected-files h4 {
     margin: 0 0 0.75rem 0;
-    color: white;
+    color: var(--text-primary);
     font-size: 1rem;
   }
 
   .selected-files ul {
     margin: 0;
     padding-left: 1.5rem;
-    color: #ccc;
+    color: var(--text-secondary);
   }
 
   .selected-files li {
@@ -2498,14 +2498,14 @@
   }
 
   .login-overlay-content {
-    background: #181a20;
-    color: #fff;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
     padding: 3rem;
     border-radius: 16px;
     text-align: center;
     max-width: 400px;
     margin: 2rem;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 8px 32px var(--shadow);
   }
 
   .login-logo {
@@ -2706,10 +2706,10 @@
   /* Autoguide Bar */
   .autoguide-bar {
     position: static;
-    background: linear-gradient(135deg, #0066cc, #0099ff);
+    background: linear-gradient(135deg, var(--accent-color), var(--accent-hover));
     color: white;
     padding: 0.75rem 1rem;
-    box-shadow: 0 2px 10px rgba(0, 102, 204, 0.3);
+    box-shadow: 0 2px 10px var(--shadow);
     animation: slideDown 0.3s ease-out;
     margin-bottom: 2px;
   }

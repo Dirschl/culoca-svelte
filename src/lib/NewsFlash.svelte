@@ -169,8 +169,8 @@ function toggleLayout() {
 <style>
 .newsflash-bar {
   width: 100%;
-  background: var(--color-bg, #181c24);
-  border-bottom: 1px solid #222;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
   box-sizing: border-box;
   overflow-x: auto;
   min-height: 80px;
@@ -181,8 +181,8 @@ function toggleLayout() {
   margin-bottom: 0.25rem;
 }
 .toggle-btn {
-  background: #222;
-  color: #fff;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
   border: none;
   border-radius: 4px;
   padding: 0.25rem 0.75rem;
@@ -191,10 +191,10 @@ function toggleLayout() {
   transition: background 0.2s;
 }
 .toggle-btn:hover {
-  background: #444;
+  background: var(--border-color);
 }
 .newsflash-loading, .newsflash-error, .newsflash-empty {
-  color: #aaa;
+  color: var(--text-secondary);
   font-size: 0.95rem;
   padding: 0.5rem 0;
 }
