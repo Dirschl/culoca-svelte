@@ -72,6 +72,11 @@
         });
         if (!image.exif_data) image.exif_data = {};
         titleEditValue = image.title || '';
+        
+        // Favicon sofort aktualisieren
+        if (browser) {
+          updateFavicon();
+        }
       }
     } catch (err) {
       error = 'Failed to load image';
@@ -307,6 +312,32 @@
     }
   }
 
+  async function deleteImage() {
+    if (!confirm('Möchtest du dieses Bild wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.')) {
+      return;
+    }
+
+    try {
+      // Delete image from database
+      const { error: deleteError } = await supabase
+        .from('images')
+        .delete()
+        .eq('id', imageId);
+
+      if (deleteError) {
+        console.error('Error deleting image:', deleteError);
+        alert('Fehler beim Löschen des Bildes: ' + deleteError.message);
+        return;
+      }
+
+      // Redirect to home page after successful deletion
+      window.location.href = '/';
+    } catch (err) {
+      console.error('Error deleting image:', err);
+      alert('Fehler beim Löschen des Bildes');
+    }
+  }
+
   function scrollToTop() {
     if (browser) {
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -336,16 +367,17 @@
     if (currentUser && image && image.profile_id === currentUser.id) {
       editingTitle = true;
       titleEditValue = image.title || '';
-              // Focus the input after it's rendered with longer delay for mobile
-        setTimeout(() => {
-          const input = document.getElementById('title-edit-input') as HTMLInputElement;
-          if (input) {
-            input.focus();
-            input.select();
-            // Force mobile keyboard to appear
-            input.click();
-          }
-        }, 100);
+      // Focus the input after it's rendered with longer delay for mobile
+      setTimeout(() => {
+        const input = document.getElementById('title-edit-input') as HTMLInputElement;
+        if (input) {
+          input.focus();
+          // Don't select all text - just place cursor at end
+          input.setSelectionRange(input.value.length, input.value.length);
+          // Force mobile keyboard to appear
+          input.click();
+        }
+      }, 100);
     }
   }
 
@@ -398,7 +430,8 @@
         const input = document.getElementById('description-edit-input') as HTMLTextAreaElement;
         if (input) {
           input.focus();
-          input.select();
+          // Don't select all text - just place cursor at end
+          input.setSelectionRange(input.value.length, input.value.length);
           // Force mobile keyboard to appear
           input.click();
         }
@@ -449,6 +482,38 @@
   // Check if user is the creator
   $: isCreator = currentUser && image && image.profile_id === currentUser.id;
 
+  // Dynamisches Favicon aktualisieren
+  $: if (image && browser) {
+    updateFavicon();
+  }
+
+  function updateFavicon() {
+    if (!image) return;
+    
+    // Entferne alte Favicon-Links
+    const oldFavicons = document.querySelectorAll('link[rel="icon"]');
+    oldFavicons.forEach(link => link.remove());
+    
+    // Erstelle neuen Favicon-Link mit Cache-Buster
+    const faviconLink = document.createElement('link');
+    faviconLink.rel = 'icon';
+    faviconLink.type = 'image/jpeg';
+    
+    let faviconUrl = '';
+    if (image.path_64) {
+      faviconUrl = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/${image.path_64}`;
+    } else if (image.path_512) {
+      faviconUrl = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${image.path_512}`;
+    }
+    
+    if (faviconUrl) {
+      // Füge Cache-Buster hinzu
+      const timestamp = Date.now();
+      faviconLink.href = `${faviconUrl}?t=${timestamp}`;
+      document.head.appendChild(faviconLink);
+    }
+  }
+
   function formatRadius(meters: number): string {
     if (meters >= 1000) {
       return (meters / 1000).toFixed(1).replace('.', ',') + ' km';
@@ -494,12 +559,7 @@
   <meta name="twitter:description" content={image?.description || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
   <meta name="twitter:image" content={`https://culoca.com/api/og-image/${imageId}`}> 
 
-  <!-- Dynamisches Favicon (image-64, fallback image-512) -->
-  {#if image?.path_64}
-    <link rel="icon" type="image/jpeg" href={`https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/${image.path_64}`}/>
-  {:else if image?.path_512}
-    <link rel="icon" type="image/jpeg" href={`https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${image.path_512}`}/>
-  {/if}
+
 </svelte:head>
 
 <div class="page">
@@ -524,7 +584,7 @@
         
         <!-- Image Information inside Passepartout -->
         <div class="passepartout-info">
-          <h1 class="title" class:editable={isCreator} on:click={startEditTitle}>
+          <h1 class="title" class:editable={isCreator} class:editing={editingTitle}>
             {#if editingTitle}
               <div class="title-edit-container">
                 <input
@@ -547,40 +607,45 @@
                 </span>
               </div>
             {:else}
-              {image.title || image.original_name || `Bild ${image.id.substring(0, 8)}...`}
+              <span class="title-text" on:click={startEditTitle}>
+                {image.title || image.original_name || `Bild ${image.id.substring(0, 8)}...`}
+              </span>
             {/if}
           </h1>
           
-          {#if editingDescription}
-            <div class="description-edit-container">
-              <textarea
-                id="description-edit-input"
-                bind:value={descriptionEditValue}
-                maxlength="160"
-                on:keydown={handleDescriptionKeydown}
-                on:blur={saveDescription}
-                class="description-edit-input"
-                class:valid={descriptionEditValue.length >= 140}
-                placeholder="Beschreibung eingeben..."
-                rows="3"
-                autocomplete="off"
-                autocorrect="off"
-                autocapitalize="sentences"
-                inputmode="text"
-              ></textarea>
-              <span class="char-count" class:valid={descriptionEditValue.length >= 140}>
-                {descriptionEditValue.length}/160
-              </span>
-            </div>
-          {:else}
-            <p class="description" class:editable={isCreator} on:click={startEditDescription}>
-              {#if image.description}
-                {image.description}
+
+            <p class="description" class:editable={isCreator} class:editing={editingDescription}>
+              {#if editingDescription}
+                <div class="description-edit-container">
+                  <textarea
+                    id="description-edit-input"
+                    bind:value={descriptionEditValue}
+                    maxlength="160"
+                    on:keydown={handleDescriptionKeydown}
+                    on:blur={saveDescription}
+                    class="description-edit-input"
+                    class:valid={descriptionEditValue.length >= 140}
+                    placeholder="Beschreibung eingeben..."
+                    rows="3"
+                    autocomplete="off"
+                    autocorrect="off"
+                    autocapitalize="sentences"
+                    inputmode="text"
+                  ></textarea>
+                  <span class="char-count" class:valid={descriptionEditValue.length >= 140}>
+                    {descriptionEditValue.length}/160
+                  </span>
+                </div>
               {:else}
-                <span class="placeholder">Keine Beschreibung verfügbar</span>
+                <span class="description-text" on:click={startEditDescription}>
+                  {#if image.description}
+                    {image.description}
+                  {:else}
+                    <span class="placeholder">Keine Beschreibung verfügbar</span>
+                  {/if}
+                </span>
               {/if}
             </p>
-          {/if}
         </div>
       </div>
 
@@ -594,6 +659,13 @@
             <div class="action-buttons">
               <a class="gmaps-btn" href={`https://www.google.com/maps?q=${image.lat},${image.lon}`} target="_blank" rel="noopener">Google Maps</a>
               <button class="share-btn" on:click={copyLink}>Link kopieren</button>
+              {#if isCreator}
+                <button class="delete-btn" on:click={deleteImage} title="Bild löschen">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                  </svg>
+                </button>
+              {/if}
             </div>
           {/if}
 
@@ -980,6 +1052,14 @@
 
 
 
+  /* Tablet: Reduzierter Border */
+  @media (max-width: 768px) {
+    .main-image {
+      border-width: 0.5px;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+    }
+  }
+
   @media (max-width: 480px) {
     .passepartout-container {
       padding: 0; /* Randlos */
@@ -990,17 +1070,58 @@
       padding: 0 0.75rem; /* Padding nur für den Inhalt */
     }
 
+    /* Border entfernen für kleine Bildschirme */
+    .main-image {
+      border: none;
+      box-shadow: none;
+    }
+
     /* Randlose Darstellung für Justified und Grid */
     .info-section .edge-to-edge-gallery,
     .info-section .justified-wrapper,
     .info-section .grid-layout {
-      margin-left: -0.75rem;
-      margin-right: -0.75rem;
-      width: calc(100% + 1.5rem);
+      margin-left: 0;
+      margin-right: 0;
+      width: 100%;
+      padding-left: 0;
+      padding-right: 0;
+    }
+
+    /* Zusätzliche Sicherheit für sehr kleine Bildschirme */
+    .edge-to-edge-gallery {
+      overflow: hidden;
+      width: 100%;
     }
 
     .title {
       font-size: 1.2rem;
+    }
+  }
+
+  /* Sehr kleine Bildschirme */
+  @media (max-width: 360px) {
+    .info-section .edge-to-edge-gallery,
+    .info-section .justified-wrapper,
+    .info-section .grid-layout {
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      max-width: 100vw;
+    }
+
+    .creator-socials {
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .social-link {
+      width: 36px;
+      height: 36px;
+    }
+
+    .social-icon {
+      width: 22px;
+      height: 22px;
     }
   }
 
@@ -1051,7 +1172,8 @@
     background: transparent;
   }
   .gmaps-btn,
-  .share-btn {
+  .share-btn,
+  .delete-btn {
     background: var(--accent-color);
     color: #fff;
     border: none;
@@ -1067,11 +1189,21 @@
     color: var(--text-primary);
     border: 1px solid var(--border-color);
   }
+  .delete-btn {
+    background: #dc2626;
+    color: #fff;
+    border: 1px solid #dc2626;
+    padding: 0.5rem 0.75rem;
+  }
   .gmaps-btn:hover {
     background: var(--accent-hover);
   }
   .share-btn:hover { 
     background: var(--border-color);
+  }
+  .delete-btn:hover {
+    background: #b91c1c;
+    border-color: #b91c1c;
   }
   .coords { color: var(--text-secondary); margin-bottom: 0.5rem; background: transparent; }
   .keywords { display:flex; flex-wrap:wrap; gap:0.5rem; margin:0 0 2rem; background: transparent; }
@@ -1086,7 +1218,7 @@
   .map-wrapper { 
     width:100%; 
     border: none;
-    margin-bottom:1rem; 
+    margin-bottom:0;
     background: transparent; 
   }
   
@@ -1100,7 +1232,7 @@
   }
   
   .map { 
-    height:400px; 
+    height:500px; 
     width:100%; 
     background: transparent; 
     border: none;
@@ -1247,6 +1379,14 @@
     .avatar {
       margin: 0 auto 0.5rem auto;
     }
+
+    .creator-contact {
+      justify-content: center;
+      align-items: center;
+    }
+    .creator-socials {
+      justify-content: center;
+    }
   }
 
   @media (max-width: 1200px) {
@@ -1265,6 +1405,14 @@
     
     .avatar {
       margin: 0 auto 0.5rem auto;
+    }
+
+    .creator-contact {
+      justify-content: center;
+      align-items: center;
+    }
+    .creator-socials {
+      justify-content: center;
     }
   }
 
@@ -1292,6 +1440,7 @@
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+    background: transparent;
   }
   
   .creator-contact > div {
@@ -1453,6 +1602,24 @@
     background: transparent;
   }
 
+  .title-text {
+    cursor: pointer;
+    transition: color 0.2s;
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    margin: -0.25rem -0.5rem;
+  }
+
+  .title.editable:hover .title-text {
+    color: var(--accent-color);
+    background: var(--bg-tertiary);
+  }
+
+  .title.editing .title-text {
+    display: none;
+  }
+
   .title-edit-container {
     display: flex;
     align-items: center;
@@ -1462,16 +1629,16 @@
   }
 
   .title-edit-input {
-    background: #1a1a2e;
-    border: 2px solid #2d2d44;
+    background: var(--bg-secondary);
+    border: 2px solid var(--border-color);
     border-radius: 4px;
-    color: white;
+    color: var(--text-primary);
     font-size: 1.5rem;
     font-weight: bold;
     padding: 0.5rem;
     text-align: center;
     width: 100%;
-    transition: border-color 0.2s;
+    transition: border-color 0.2s, background-color 0.3s ease, color 0.3s ease;
     /* Mobile optimizations */
     -webkit-appearance: none;
     -moz-appearance: none;
@@ -1481,25 +1648,26 @@
 
   .title-edit-input:focus {
     outline: none;
-    border-color: #8ecae6;
-    background: transparent;
+    border-color: var(--accent-color);
+    background: var(--bg-tertiary);
   }
 
   .title-edit-input.valid {
-    border-color: #4ade80;
-    background: transparent;
+    border-color: var(--success-color);
+    background: var(--bg-secondary);
   }
 
   .char-count {
     font-size: 0.8rem;
-    color: #666;
+    color: var(--text-muted);
     min-width: 40px;
     text-align: right;
     background: transparent;
+    transition: color 0.3s ease;
   }
 
   .char-count.valid {
-    color: #4ade80;
+    color: var(--success-color);
     background: transparent;
   }
 
@@ -1526,6 +1694,24 @@
     background: transparent;
   }
 
+  .description-text {
+    cursor: pointer;
+    transition: color 0.2s;
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    margin: -0.25rem -0.5rem;
+  }
+
+  .description.editable:hover .description-text {
+    color: var(--accent-color);
+    background: var(--bg-tertiary);
+  }
+
+  .description.editing .description-text {
+    display: none;
+  }
+
   .description-edit-container {
     display: flex;
     flex-direction: column;
@@ -1535,16 +1721,16 @@
   }
 
   .description-edit-input {
-    background: #1a1a2e;
-    border: 2px solid #2d2d44;
+    background: var(--bg-secondary);
+    border: 2px solid var(--border-color);
     border-radius: 4px;
-    color: white;
+    color: var(--text-primary);
     font-size: 1rem;
     padding: 0.5rem;
     width: 100%;
     min-height: 100px;
     resize: vertical;
-    transition: border-color 0.2s;
+    transition: border-color 0.2s, background-color 0.3s ease, color 0.3s ease;
     /* Mobile optimizations */
     -webkit-appearance: none;
     -moz-appearance: none;
@@ -1554,13 +1740,13 @@
 
   .description-edit-input:focus {
     outline: none;
-    border-color: #8ecae6;
-    background: transparent;
+    border-color: var(--accent-color);
+    background: var(--bg-tertiary);
   }
 
   .description-edit-input.valid {
-    border-color: #4ade80;
-    background: transparent;
+    border-color: var(--success-color);
+    background: var(--bg-secondary);
   }
 
   /* Grid Layout Styles - Same as main page */

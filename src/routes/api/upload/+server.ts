@@ -95,7 +95,7 @@ export const POST = async ({ request }) => {
         const buf = Buffer.from(await file.arrayBuffer());
         const id = crypto.randomUUID();
         const filename = `${id}.jpg`;
-        const baseName = file.name.replace(/\.[^/.]+$/, '');
+        const baseName = file.name; // Vollständiger Dateiname mit Endung
 
         // Resize image to multiple sizes
         const sizes = await resizeJPG(buf);
@@ -225,6 +225,11 @@ export const POST = async ({ request }) => {
         let keywordsArray: string[] | null = null;
         if (keywords) {
           keywordsArray = keywords.split(',').map((k) => k.trim()).filter(Boolean);
+          // Begrenze Keywords auf maximal 20 Stück, um Check-Constraint-Probleme zu vermeiden
+          if (keywordsArray.length > 20) {
+            keywordsArray = keywordsArray.slice(0, 20);
+            console.log('⚠️ Keywords truncated to 20 items to avoid constraint violation');
+          }
         }
 
         // --- Fallback-Logik für title und description ---
@@ -351,8 +356,6 @@ export const POST = async ({ request }) => {
           height,
           lat,
           lon,
-          camera,
-          lens,
           original_name: baseName,
           ...(keywordsArray ? { keywords: keywordsArray } : {}),
           exif_data: Object.keys(exifData).length ? exifData : null
@@ -361,7 +364,6 @@ export const POST = async ({ request }) => {
         // Füge EXIF-Felder nur hinzu, wenn sie nicht null sind
         if (title) dbRecord.title = title;
         if (description) dbRecord.description = description;
-        if (camera) dbRecord.camera = camera;
         console.log('Inserting database record:', JSON.stringify(dbRecord, null, 2));
         
         // Versuche zuerst mit allen Feldern zu inserten

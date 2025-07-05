@@ -149,7 +149,7 @@
     padding: 0 !important;
     margin: 0 !important;
     border: none !important;
-    background: transparent !important;
+    background: var(--bg-primary) !important;
     box-shadow: none !important;
     overflow: hidden;
   }
@@ -157,9 +157,9 @@
     position: absolute;
     cursor: pointer;
     overflow: hidden;
-    transition: box-shadow 0.3s ease;
+    transition: box-shadow 0.3s ease, background-color 0.3s ease;
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    background: transparent;
+    background: var(--bg-secondary);
   }
   .pic-container:focus {
     outline: 3px solid #0066cc;
