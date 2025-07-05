@@ -3,8 +3,9 @@ import { supabase } from '$lib/supabaseClient';
 
 export const GET = async ({ url }) => {
   try {
-    // Query-Parameter: limit (default 12), user_id (optional)
+    // Query-Parameter: limit (default 12), user_id (optional), offset (optional)
     const limit = parseInt(url.searchParams.get('limit') || '12', 10);
+    const offset = parseInt(url.searchParams.get('offset') || '0', 10);
     const user_id = url.searchParams.get('user_id');
 
     // Build query for images with title, description, and GPS data
@@ -16,7 +17,7 @@ export const GET = async ({ url }) => {
       .not('lat', 'is', null)
       .not('lon', 'is', null)
       .order('created_at', { ascending: false })
-      .limit(limit);
+      .range(offset, offset + limit - 1);
 
     if (user_id) {
       imagesQuery = imagesQuery.eq('user_id', user_id);

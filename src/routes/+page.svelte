@@ -118,6 +118,23 @@
     currentSpeech.pitch = 1.0;
     currentSpeech.volume = 1.0; // Increased volume for mobile
     
+    // CarPlay and iOS specific settings
+    if (typeof window !== 'undefined' && /iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+      // Force audio session to use external speakers/Bluetooth
+      currentSpeech.volume = 1.0;
+      
+      // iOS specific: Set audio session category for external output
+      if (typeof window !== 'undefined' && 'webkitAudioContext' in window) {
+        try {
+          const audioContext = new (window as any).webkitAudioContext();
+          // This helps iOS route audio to external speakers
+          audioContext.resume();
+        } catch (e) {
+          console.log('Audio context not available:', e);
+        }
+      }
+    }
+    
     // Show autoguide bar
     autoguideText = titleToSpeak;
     autoguideBarVisible = true;
@@ -196,6 +213,20 @@
       dummy.volume = 0;
       speechSynthesis.speak(dummy);
       speechSynthesis.resume();
+      
+      // CarPlay and iOS specific audio routing
+      if (typeof window !== 'undefined' && /iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+        // Force audio to external speakers/Bluetooth
+        if ('webkitAudioContext' in window) {
+          try {
+            const audioContext = new (window as any).webkitAudioContext();
+            audioContext.resume();
+            console.log('CarPlay: Audio context activated for external routing');
+          } catch (e) {
+            console.log('CarPlay: Audio context not available:', e);
+          }
+        }
+      }
       
       // Teste die Sprachausgabe mit einem kurzen Text
       const testUtterance = new SpeechSynthesisUtterance('Sprachausgabe aktiviert');
@@ -1502,6 +1533,20 @@
 </a>
 {/if}
 
+<!-- NewsFlash-Komponente über der Galerie -->
+{#if newsFlashMode !== 'aus'}
+  <NewsFlash 
+    mode={newsFlashMode} 
+    userId={currentUser?.id} 
+    layout={useJustifiedLayout ? 'justified' : 'grid'}
+    showToggles={false}
+    showDistance={isLoggedIn && showDistance}
+    userLat={userLat}
+    userLon={userLon}
+    getDistanceFromLatLonInMeters={getDistanceFromLatLonInMeters}
+  />
+{/if}
+
 <!-- Autoguide Bar -->
 {#if autoguide}
   <div class="autoguide-bar">
@@ -1519,16 +1564,6 @@
       {/if}
     </div>
   </div>
-{/if}
-
-<!-- NewsFlash-Komponente über der Galerie -->
-{#if newsFlashMode !== 'aus'}
-  <NewsFlash 
-    mode={newsFlashMode} 
-    userId={currentUser?.id} 
-    layout="strip"
-    showToggles={false}
-  />
 {/if}
 
 <!-- Galerie bleibt erhalten -->
@@ -2356,12 +2391,12 @@
   /* Culoca Logo */
   .culoca-logo {
     position: fixed;
-    top: 15px;
+    top: 25px;
     right: 20px;
     left: auto;
     bottom: auto;
     z-index: 50;
-    width: 140px;
+    width: 200px;
     /* height: 72px; */
     transition: opacity 0.2s ease;
     object-fit: contain;
@@ -2510,9 +2545,10 @@
   }
 
   .login-logo {
-    width: 128px;
-    height: 128px;
-    margin-bottom: 1rem;
+    width: 256px;
+    height: 256px;
+    margin-bottom: 2rem;
+    margin-top: 1rem;
     object-fit: contain;
   }
 
@@ -2652,8 +2688,9 @@
     }
     
     .login-logo {
-      width: 96px;
-      height: 96px;
+      width: 120px;
+      height: 120px;
+      margin-top: 0.25rem;
     }
   }
 
@@ -2712,7 +2749,7 @@
     padding: 0.75rem 1rem;
     box-shadow: 0 2px 10px var(--shadow);
     animation: slideDown 0.3s ease-out;
-    margin-bottom: 2px;
+    border-bottom: 2px solid var(--bg-primary);
   }
 
   .autoguide-content {

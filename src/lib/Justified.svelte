@@ -179,7 +179,7 @@
     background: transparent;
   }
   .pic-container:hover .pic {
-    transform: scale(1.04);
+    transform: scale(1.02);
   }
   .debug-info {
     position: fixed;

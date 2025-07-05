@@ -8,4 +8,6 @@ export type NewsFlashImage = {
   profile_id?: string;
   title?: string;
   description?: string;
+  lat?: number;
+  lon?: number;
 }; 
