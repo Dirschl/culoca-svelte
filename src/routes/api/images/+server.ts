@@ -10,7 +10,7 @@ export const GET = async ({ url }) => {
     // Build query for images with title, description, and GPS data
     let imagesQuery = supabase
       .from('images')
-      .select('id, path_512, path_2048, original_name, created_at, user_id, profile_id, title, description, lat, lon')
+      .select('id, path_512, path_2048, path_64, original_name, created_at, user_id, profile_id, title, description, lat, lon')
       .not('title', 'is', null)
       .not('description', 'is', null)
       .not('lat', 'is', null)

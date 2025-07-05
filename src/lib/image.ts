@@ -42,9 +42,11 @@ export async function resizeJPG(buffer: Buffer) {
     jpg64: await sharp(buffer)
       .resize(64, 64, { 
         fit: 'inside', 
-        withoutEnlargement: true 
+        withoutEnlargement: true,
+        kernel: 'lanczos3' // Better interpolation for small sizes
       })
-      .jpeg({ mozjpeg: true, quality: 70 })
+      .sharpen(0.5, 1, 2) // Add sharpening for better detail
+      .jpeg({ mozjpeg: true, quality: 95 }) // Higher quality
       .toBuffer()
   };
 }

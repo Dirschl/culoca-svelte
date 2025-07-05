@@ -259,7 +259,7 @@
       // Load all images in one request
       const { data } = await supabase
         .from('images')
-        .select('id,path_512,path_2048,width,height,lat,lon,title,description,keywords')
+        .select('id,path_512,path_2048,path_64,width,height,lat,lon,title,description,keywords')
         .order('created_at', { ascending: false });
       
       if (data) {

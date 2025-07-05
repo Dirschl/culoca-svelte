@@ -14,6 +14,7 @@
   let nearby: any[] = [];
   let radius = 500; // meters, default
   let radiusLoaded = false;
+  let lastRadius = 500; // track radius changes
   let mapEl: HTMLDivElement;
   let map: any;
   let keywordsList: string[] = [];
@@ -34,12 +35,22 @@
       const { data: { user } } = await supabase.auth.getUser();
       currentUser = user;
 
-      // Radius aus localStorage laden (pro User), erst wenn currentUser gesetzt ist
-      if (browser && currentUser && !radiusLoaded) {
-        const storedRadius = localStorage.getItem(`detailRadius_${currentUser.id}`);
-        if (storedRadius) {
-          radius = parseInt(storedRadius, 10) || 500;
+      // Radius aus localStorage laden (pro User oder anonym)
+      if (browser && !radiusLoaded) {
+        if (currentUser) {
+          // Für eingeloggte User: spezifischer Radius pro User
+          const storedRadius = localStorage.getItem(`detailRadius_${currentUser.id}`);
+          if (storedRadius) {
+            radius = parseInt(storedRadius, 10) || 500;
+          }
+        } else {
+          // Für anonyme User: allgemeiner Radius
+          const storedRadius = localStorage.getItem('detailRadius_anonymous');
+          if (storedRadius) {
+            radius = parseInt(storedRadius, 10) || 500;
+          }
         }
+        lastRadius = radius; // Initialize lastRadius with loaded value
         radiusLoaded = true;
       }
 
@@ -53,6 +64,12 @@
         error = fetchError.message;
       } else {
         image = data;
+        console.log('📸 Image loaded:', { 
+          id: image.id, 
+          lat: image.lat, 
+          lon: image.lon, 
+          title: image.title 
+        });
         if (!image.exif_data) image.exif_data = {};
         titleEditValue = image.title || '';
       }
@@ -111,13 +128,18 @@
   }
 
   async function fetchNearbyImages(lat: number, lon: number, maxRadius: number) {
+    console.log('🔍 Fetching nearby images for radius:', maxRadius, 'm');
     const { data, error: nearErr } = await supabase
       .from('images')
       .select('*')
       .not('lat', 'is', null)
       .not('lon', 'is', null)
       .neq('id', imageId);
-    if (nearErr || !data) return;
+    if (nearErr || !data) {
+      console.log('❌ Error fetching nearby images:', nearErr);
+      return;
+    }
+    console.log('📸 Found', data.length, 'images with GPS data');
     const baseUrl = 'https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public';
     nearby = data.map((img: any) => {
       const dist = getDistanceInMeters(lat, lon, img.lat, img.lon);
@@ -128,12 +150,19 @@
         distance: dist,
         src: `${baseUrl}/images-512/${img.path_512}`,
         srcHD: `${baseUrl}/images-2048/${img.path_2048}`,
+        src64: img.path_64 ? `${baseUrl}/images-64/${img.path_64}` : `${baseUrl}/images-512/${img.path_512}`,
         width: img.width,
         height: img.height,
         title: img.title || null
       };
     }).filter((it: any) => it.distance <= maxRadius)
       .sort((a: any, b: any) => a.distance - b.distance);
+    console.log('✅ Nearby images loaded:', nearby.length, 'images within', maxRadius, 'm');
+    
+    // Initialize lastNearbyCount if not set yet
+    if (typeof lastNearbyCount === 'undefined') {
+      lastNearbyCount = nearby.length;
+    }
   }
 
   // Recompute nearby list whenever radius or image changes
@@ -144,6 +173,7 @@
   async function initMap() {
     if (!browser || !image || !image.lat || !image.lon) return;
     const leaflet = await import('leaflet');
+    
     // add leaflet CSS once
     if (!document.getElementById('leaflet-css')) {
       const link = document.createElement('link');
@@ -152,22 +182,113 @@
       link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
       document.head.appendChild(link);
     }
+    
     await tick();
     map = leaflet.map(mapEl).setView([image.lat, image.lon], 13);
     leaflet.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '&copy; OpenStreetMap'
     }).addTo(map);
-    leaflet.marker([image.lat, image.lon]).addTo(map);
+    
+    // Add current image marker (highlighted)
+    const baseUrl = 'https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public';
+    const thumbnailUrl = image.path_64 
+      ? `${baseUrl}/images-64/${image.path_64}`
+      : `${baseUrl}/images-512/${image.path_512}`;
+    
+    // Create custom icon for current image (highlighted with orange border)
+    const currentImageIcon = leaflet.divIcon({
+      className: 'custom-marker current-image',
+      html: `<img src="${thumbnailUrl}" alt="${image.title || 'Bild'}" style="width: 48px; height: 48px; border-radius: 50%; border: 3px solid #ff6b35; box-shadow: 0 2px 8px rgba(0,0,0,0.3); object-fit: cover;">`,
+      iconSize: [48, 48],
+      iconAnchor: [48, 48],
+      popupAnchor: [0, -48]
+    });
+    
+    // Add current image marker to map
+    const currentMarker = leaflet.marker([image.lat, image.lon], { icon: currentImageIcon }).addTo(map);
+    if (image.title) {
+      currentMarker.bindPopup(`<strong>${image.title}</strong><br><small>Aktuelles Bild</small>`);
+    }
+    
+    // Add nearby images as individual markers
+    console.log('🗺️ Adding', nearby.length, 'nearby images to map');
+    
+    if (nearby.length > 0) {
+      nearby.forEach((nearbyImage: any) => {
+        const nearbyThumbnailUrl = nearbyImage.src64 || nearbyImage.src;
+        
+        // Create custom icon for nearby images
+        const nearbyIcon = leaflet.divIcon({
+          className: 'custom-marker nearby-image',
+          html: `<img src="${nearbyThumbnailUrl}" alt="${nearbyImage.title || 'Bild'}" style="width: 48px; height: 48px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3); object-fit: cover; cursor: pointer;">`,
+          iconSize: [48, 48],
+          iconAnchor: [48, 48],
+          popupAnchor: [0, -48]
+        });
+        
+        const nearbyMarker = leaflet.marker([nearbyImage.lat, nearbyImage.lon], { icon: nearbyIcon }).addTo(map);
+        
+        // Add click handler to navigate to image
+        nearbyMarker.on('click', () => {
+          window.location.href = `/image/${nearbyImage.id}`;
+        });
+        
+        // Add popup with image info and link
+        const popupContent = `
+          <div style="text-align: center; min-width: 200px;">
+            <strong>${nearbyImage.title || 'Bild'}</strong><br>
+            <small>Entfernung: ${getDistanceFromLatLonInMeters(image.lat, image.lon, nearbyImage.lat, nearbyImage.lon)}</small><br>
+            <a href="/image/${nearbyImage.id}" style="color: #0066cc; text-decoration: none; font-weight: 500;">Bild anzeigen →</a>
+          </div>
+        `;
+        nearbyMarker.bindPopup(popupContent);
+      });
+    }
+    
+    // Fit map to show all markers if there are nearby images
+    if (nearby.length > 0) {
+      const allMarkers = [currentMarker];
+      map.eachLayer((layer: any) => {
+        if (layer !== currentMarker && layer._latlng) {
+          allMarkers.push(layer);
+        }
+      });
+      const group = leaflet.featureGroup(allMarkers);
+      map.fitBounds(group.getBounds().pad(0.1));
+    }
   }
 
   // After image fetch completed (reactively)
   $: if (image && image.profile_id) {
     fetchProfile(image.profile_id);
   }
-  $: if (image && image.lat && image.lon) {
-    initMap();
+  
+  // Initialize map when image is loaded
+  $: if (image && image.lat && image.lon && !map) {
+    setTimeout(() => initMap(), 500);
   }
+  
+  // Reinitialize map when radius changes (only if map exists and radius is different)
+  $: if (image && image.lat && image.lon && radiusLoaded && map && radius !== lastRadius) {
+    console.log('🔄 Radius changed from', lastRadius, 'to', radius, 'm, reinitializing map');
+    lastRadius = radius;
+    map.remove();
+    map = null;
+    setTimeout(() => initMap(), 100);
+  }
+  
+  // Also reinitialize map when nearby images change (for adding/removing markers)
+  let lastNearbyCount = 0;
+  $: if (image && image.lat && image.lon && map && nearby.length !== lastNearbyCount) {
+    console.log('🔄 Nearby count changed from', lastNearbyCount, 'to', nearby.length, 'reinitializing map');
+    lastNearbyCount = nearby.length;
+    map.remove();
+    map = null;
+    setTimeout(() => initMap(), 100);
+  }
+  
+
 
   $: if (image && image.keywords) {
     if (Array.isArray(image.keywords)) {
@@ -341,8 +462,14 @@
   }
 
   // Radius speichern, wenn er sich ändert und geladen wurde
-  $: if (browser && currentUser && radiusLoaded) {
-    localStorage.setItem(`detailRadius_${currentUser.id}`, String(radius));
+  $: if (browser && radiusLoaded) {
+    if (currentUser) {
+      // Für eingeloggte User: spezifischer Radius pro User
+      localStorage.setItem(`detailRadius_${currentUser.id}`, String(radius));
+    } else {
+      // Für anonyme User: allgemeiner Radius
+      localStorage.setItem('detailRadius_anonymous', String(radius));
+    }
   }
 
 
@@ -648,7 +775,16 @@
           <!-- Map -->
           {#if image.lat && image.lon}
             <div class="map-wrapper">
+              <h2 class="map-title">{image.title || 'Standort'}</h2>
               <div bind:this={mapEl} class="map"></div>
+            </div>
+          {:else}
+            <div class="map-wrapper">
+              <h2 class="map-title">Standort</h2>
+              <div style="padding: 20px; text-align: center; color: #666;">
+                GPS-Daten nicht verfügbar<br>
+                Lat: {image?.lat || 'null'}, Lon: {image?.lon || 'null'}
+              </div>
             </div>
           {/if}
         </div>
@@ -924,8 +1060,47 @@
     color: var(--text-secondary);
     border: 1px solid var(--border-color);
   }
-  .map-wrapper { height:400px; width:100%; border:1px solid var(--border-color); margin-bottom:1rem; background: transparent; }
-  .map { height:100%; width:100%; background: transparent; }
+  .map-wrapper { 
+    width:100%; 
+    border: none;
+    margin-bottom:1rem; 
+    background: transparent; 
+  }
+  
+  .map-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 1rem 0;
+    padding: 1rem 1rem 0 1rem;
+    text-align: left;
+  }
+  
+  .map { 
+    height:400px; 
+    width:100%; 
+    background: transparent; 
+    border: none;
+  }
+  
+  /* Custom marker styles */
+  .custom-marker {
+    transition: transform 0.2s ease;
+  }
+  
+  .custom-marker:hover {
+    transform: scale(1.1);
+  }
+  
+  .custom-marker.current-image {
+    z-index: 1000;
+  }
+  
+  .custom-marker.nearby-image {
+    z-index: 999;
+  }
+  
+
   .image-link {
     display: block;
     width: 100%;
@@ -1209,6 +1384,10 @@
     .scroll-to-top svg {
       width: 20px;
       height: 20px;
+    }
+    
+    .map-title {
+      text-align: center;
     }
   }
 

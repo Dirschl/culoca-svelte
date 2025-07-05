@@ -297,6 +297,28 @@ export const POST = async ({ request }) => {
           throw error(500, `Upload failed: ${errorMessage}`);
         }
 
+        // Upload 64px version for map markers
+        console.log(`Uploading 64px version: ${filename}`);
+        let upload64Error = null;
+        try {
+          const { error: error64 } = await supabase.storage
+            .from('images-64')
+            .upload(filename, sizes.jpg64, { 
+              contentType: 'image/jpeg',
+              upsert: false
+            });
+          upload64Error = error64;
+        } catch (storageError) {
+          console.error('Storage upload error (64px):', storageError);
+          upload64Error = storageError;
+        }
+
+        if (upload64Error) {
+          console.error('64px upload failed:', upload64Error);
+        } else {
+          console.log('64px upload successful');
+        }
+
         // --- Build condensed EXIF data to store as JSON ---
         const exifData: Record<string, any> = {};
         if (width && height) { exifData.ImageWidth = width; exifData.ImageHeight = height; }
@@ -317,13 +339,14 @@ export const POST = async ({ request }) => {
         // Original file size in bytes
         exifData.FileSize = file.size;
 
-        // Insert into database with both paths and EXIF data
+        // Insert into database with all paths and EXIF data
         const dbRecord: any = {
           id,
           profile_id,
           user_id: authenticatedUser.id,
           path_512: filename,
           path_2048: upload2048Error ? null : filename,
+          path_64: upload64Error ? null : filename,
           width,
           height,
           lat,
@@ -378,6 +401,7 @@ export const POST = async ({ request }) => {
             user_id: authenticatedUser.id,
             path_512: filename,
             path_2048: upload2048Error ? null : filename,
+            path_64: upload64Error ? null : filename,
             width,
             height,
             lat,
