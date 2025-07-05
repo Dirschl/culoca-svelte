@@ -1066,7 +1066,7 @@
     }
 
     .passepartout-info {
-      margin-top: 0.75rem;
+      margin-top: 1.5rem;
       padding: 0 0.75rem; /* Padding nur für den Inhalt */
     }
 
