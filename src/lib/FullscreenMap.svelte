@@ -19,10 +19,17 @@
   let isHybridView = false; // Track current view mode
   let streetLayer: any = null;
   let satelliteLayer: any = null;
-  let autoRotateEnabled = true; // New: Auto-rotate feature toggle
-  let lastPosition: [number, number] | null = null;
-  let movementBearing: number | null = null;
+  let autoRotateEnabled = false;
+  let showDistance = true; // New: Toggle between distance and title display
+  let lastPosition: { lat: number; lon: number; accuracy: number; timestamp: number } | null = null;
+  let lastPositionTime: number | null = null;
+  let currentBearing = 0;
   let watchId: number | null = null;
+  let isIOS = false;
+  
+  // Previous position for movement tracking
+  let previousPosition: { lat: number; lon: number; timestamp: number } | null = null;
+  let positionWatchId: number | null = null;
   
   // Load saved map state from localStorage
   function loadMapState() {
@@ -33,7 +40,7 @@
           const state = JSON.parse(saved);
           savedZoom = state.zoom || 18;
           savedCenter = state.center || null;
-          autoRotateEnabled = state.autoRotate !== undefined ? state.autoRotate : true;
+          autoRotateEnabled = state.autoRotate !== undefined ? state.autoRotate : false;
         } catch (e) {
           console.error('Error loading map state:', e);
         }
@@ -134,7 +141,7 @@
     }
     
     // Add image markers
-    addImageMarkers(leaflet);
+    addImageMarkers();
     
     // Save map state on zoom/move
     map.on('zoomend moveend', saveMapState);
@@ -142,73 +149,165 @@
     mapInitialized = true;
   }
   
-  function addImageMarkers(leaflet: any) {
+  function addImageMarkers() {
+    if (!map || !images.length) return;
+    
     // Clear existing markers
-    imageMarkers.forEach(marker => map.removeLayer(marker));
+    imageMarkers.forEach(marker => {
+      map.removeLayer(marker);
+    });
     imageMarkers = [];
     
-    const baseUrl = 'https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public';
-    
     images.forEach(image => {
-      if (!image.lat || !image.lon) return;
+      // Create marker element with image and label
+      const markerEl = document.createElement('div');
+      markerEl.className = 'image-marker-container';
+      markerEl.style.cssText = `
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        cursor: pointer;
+      `;
       
-      console.log('Adding image marker:', image);
-      console.log('Image path_64:', image.path_64);
+      // Create image element
+      const imageEl = document.createElement('div');
+      imageEl.className = 'image-marker';
+      imageEl.style.cssText = `
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        border: 2px solid white;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        cursor: pointer;
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        background-color: #f0f0f0;
+      `;
       
-      // Use images-64 for thumbnails on map - construct URL properly
-      let thumbnailUrl = null;
+      // Set background image - try multiple paths
+      let imageUrl = '';
       if (image.path_64) {
-        thumbnailUrl = `${baseUrl}/images-64/${image.path_64}`;
-        console.log('Using images-64 thumbnail:', thumbnailUrl);
+        imageUrl = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/${image.path_64}`;
       } else if (image.path_512) {
-        thumbnailUrl = `${baseUrl}/images-512/${image.path_512}`;
-        console.log('Fallback to images-512:', thumbnailUrl);
+        // Fallback to 512px image path
+        imageUrl = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${image.path_512}`;
       } else if (image.path) {
-        thumbnailUrl = `${baseUrl}/images/${image.path}`;
-        console.log('Fallback to images:', thumbnailUrl);
+        // Fallback to main image path
+        imageUrl = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images/${image.path}`;
       }
       
-      const distance = userLat && userLon 
-        ? getDistanceFromLatLonInMeters(userLat, userLon, image.lat, image.lon)
-        : '';
-      
-      const imageIcon = leaflet.divIcon({
-        className: 'image-marker-fullscreen',
-        html: `
-          <div style="position: relative; width: 48px; height: 48px; cursor: pointer;">
-            ${thumbnailUrl ? `
-              <img src="${thumbnailUrl}" 
-                   style="width: 48px; height: 48px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.4); object-fit: cover;" 
-                   alt="${image.title || 'Bild'}"
-                   onerror="console.error('Failed to load image:', this.src); this.style.display='none'; this.parentElement.innerHTML='<div style=&quot;background: #4CAF50; width: 48px; height: 48px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; color: white; font-size: 16px;&quot;>📷</div>'">
-            ` : `
-              <div style="background: #4CAF50; width: 48px; height: 48px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; color: white; font-size: 16px;">📷</div>
-            `}
-            ${distance ? `<div style="position: absolute; bottom: -25px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; white-space: nowrap; z-index: 1000;">${distance}</div>` : ''}
-          </div>
-        `,
-        iconSize: [48, 48],
-        iconAnchor: [24, 24]
+      console.log(`[FullscreenMap] Loading image for ${image.id}:`, {
+        path_64: image.path_64,
+        path_512: image.path_512,
+        path: image.path,
+        finalUrl: imageUrl
       });
       
-      const marker = leaflet.marker([image.lat, image.lon], { icon: imageIcon }).addTo(map);
+      if (imageUrl) {
+        // Directly set the background image
+        imageEl.style.backgroundImage = `url(${imageUrl})`;
+        
+        // Add error handling for failed image loads
+        const testImg = new Image();
+        testImg.onload = () => {
+          console.log(`[FullscreenMap] Image loaded successfully: ${imageUrl}`);
+          imageEl.style.backgroundImage = `url(${imageUrl})`;
+        };
+        testImg.onerror = () => {
+          console.warn(`[FullscreenMap] Image failed to load: ${imageUrl}`);
+          // Show fallback icon if image fails to load
+          imageEl.innerHTML = `
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="2">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+              <circle cx="8.5" cy="8.5" r="1.5"/>
+              <polyline points="21,15 16,10 5,21"/>
+            </svg>
+          `;
+          imageEl.style.backgroundColor = '#e0e0e0';
+          imageEl.style.display = 'flex';
+          imageEl.style.alignItems = 'center';
+          imageEl.style.justifyContent = 'center';
+        };
+        testImg.src = imageUrl;
+      } else {
+        console.warn(`[FullscreenMap] No image path available for image ${image.id}`);
+        // No image path available - show fallback
+        imageEl.innerHTML = `
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="2">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+            <circle cx="8.5" cy="8.5" r="1.5"/>
+            <polyline points="21,15 16,10 5,21"/>
+          </svg>
+        `;
+        imageEl.style.backgroundColor = '#e0e0e0';
+        imageEl.style.display = 'flex';
+        imageEl.style.alignItems = 'center';
+        imageEl.style.justifyContent = 'center';
+      }
       
-      // Add click handler
+      // Create label element
+      const labelEl = document.createElement('div');
+      labelEl.className = 'image-label';
+      labelEl.style.cssText = `
+        background: rgba(255, 255, 255, 0.95);
+        color: #333;
+        font-size: 12px;
+        font-weight: 600;
+        padding: 2px 6px;
+        border-radius: 8px;
+        margin-top: 2px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        white-space: nowrap;
+        text-align: center;
+        min-width: 40px;
+      `;
+      
+      // Calculate label text based on current display mode
+      let labelText = '';
+      if (userLat !== null && userLon !== null) {
+        if (showDistance) {
+          // Show distance
+          const distance = calculateDistance(userLat, userLon, image.lat, image.lon);
+          labelText = distance < 1 ? `${Math.round(distance * 1000)}m` : `${distance.toFixed(1)}km`;
+        } else {
+          // Show title (up to comma, max 60 chars)
+          if (image.title) {
+            const titleParts = image.title.split(',');
+            labelText = titleParts[0].trim();
+            // Limit to max 60 characters as specified
+            if (labelText.length > 60) {
+              labelText = labelText.substring(0, 57) + '...';
+            }
+          } else {
+            labelText = 'Unbenannt';
+          }
+        }
+      }
+      
+      labelEl.textContent = labelText;
+      
+      // Assemble marker
+      markerEl.appendChild(imageEl);
+      markerEl.appendChild(labelEl);
+      
+      // Create marker
+      const marker = new (window as any).L.marker([image.lat, image.lon], {
+        icon: (window as any).L.divIcon({
+          html: markerEl.outerHTML,
+          className: 'custom-marker',
+          iconSize: [120, 75], // Größer für längere Labels
+          iconAnchor: [60, 70] // Angepasster Ankerpunkt
+        })
+      }).addTo(map);
+      
+      // Click handler for navigation
       marker.on('click', () => {
         dispatch('imageClick', { imageId: image.id });
       });
       
-      // Add popup with image info
-      const popupContent = `
-        <div style="text-align: center; min-width: 150px;">
-          ${thumbnailUrl ? `<img src="${thumbnailUrl}" style="width: 64px; height: 64px; object-fit: cover; border-radius: 8px; margin-bottom: 8px;" onerror="this.style.display='none'" />` : ''}
-          <br><strong>${image.title || 'Bild'}</strong><br>
-          ${distance ? `<small>Entfernung: ${distance}</small><br>` : ''}
-          <small>Klicken für Details</small>
-        </div>
-      `;
-      marker.bindPopup(popupContent);
-      
+      // Store reference to image data
+      marker.image = image;
       imageMarkers.push(marker);
     });
   }
@@ -285,62 +384,160 @@
     return bearing;
   }
   
-  // Update user position and handle movement-based rotation
+  // Update user position on map
   function updateUserPosition(lat: number, lon: number) {
-    if (!map || !userMarker) return;
+    userLat = lat;
+    userLon = lon;
     
-    const newPosition: [number, number] = [lat, lon];
+    if (!userMarker || !map) return;
     
-    // Calculate movement bearing if we have a previous position
-    if (lastPosition && autoRotateEnabled) {
-      const [lastLat, lastLon] = lastPosition;
-      const distance = calculateDistance(lastLat, lastLon, lat, lon);
-      
-      // Only update bearing if movement is significant (more than 5 meters)
-      if (distance > 0.005) { // ~5 meters
-        const bearing = calculateBearing(lastLat, lastLon, lat, lon);
-        movementBearing = bearing;
-        
-        // Rotate map to movement direction
-        map.setBearing(bearing);
-        
-        // Update user marker rotation
-        if (userMarker) {
-          const markerElement = userMarker.getElement();
-          if (markerElement) {
-            markerElement.style.transform = `rotate(${bearing}deg)`;
-          }
-        }
-      }
-    }
+    const newPosition = [lon, lat];
     
-    // Update position
-    userMarker.setLngLat([lon, lat]);
-    lastPosition = newPosition;
+    // Update position without auto-rotation (handled by new toggleAutoRotate function)
+    userMarker.setLngLat(newPosition);
     
     // Save updated state
     saveMapState();
   }
   
   // Toggle auto-rotate feature
-  function toggleAutoRotate() {
-    autoRotateEnabled = !autoRotateEnabled;
-    
+  async function toggleAutoRotate() {
     if (!autoRotateEnabled) {
-      // Reset map rotation when disabling auto-rotate
+      // Request permissions first for iOS
+      const permissionGranted = await requestIOSPermissions();
+      if (!permissionGranted) {
+        alert('Für die automatische Kartenrotation werden Bewegungssensor-Berechtigungen benötigt.');
+        return;
+      }
+      
+      // Start watching position with high accuracy
+      if (navigator.geolocation) {
+        const options = {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 1000
+        };
+        
+        watchId = navigator.geolocation.watchPosition(
+          (position) => {
+            const now = Date.now();
+            const currentPos = {
+              lat: position.coords.latitude,
+              lon: position.coords.longitude,
+              accuracy: position.coords.accuracy,
+              timestamp: now
+            };
+            
+            console.log(`[FullscreenMap] GPS Position:`, {
+              lat: currentPos.lat,
+              lon: currentPos.lon,
+              accuracy: currentPos.accuracy
+            });
+            
+            if (lastPosition && lastPositionTime) {
+              const timeDiff = now - lastPositionTime;
+              const distance = calculateDistance(
+                lastPosition.lat, lastPosition.lon,
+                currentPos.lat, currentPos.lon
+              );
+              
+              // Only calculate bearing if we've moved significantly and have good accuracy
+              // Increased threshold for mobile devices and require better accuracy
+              const minDistance = isIOS ? 8 : 5; // meters
+              const maxAccuracy = isIOS ? 20 : 15; // meters
+              const minTime = 2000; // milliseconds
+              
+              console.log(`[FullscreenMap] Movement check:`, {
+                distance: distance.toFixed(2),
+                timeDiff,
+                accuracy: currentPos.accuracy,
+                minDistance,
+                maxAccuracy
+              });
+              
+              if (distance > minDistance && 
+                  timeDiff > minTime && 
+                  currentPos.accuracy <= maxAccuracy &&
+                  lastPosition.accuracy <= maxAccuracy) {
+                
+                const bearing = calculateBearing(
+                  lastPosition.lat, lastPosition.lon,
+                  currentPos.lat, currentPos.lon
+                );
+                
+                currentBearing = bearing;
+                
+                console.log(`[FullscreenMap] Updating map rotation:`, {
+                  bearing: bearing.toFixed(2),
+                  distance: distance.toFixed(2),
+                  timeDiff
+                });
+                
+                // Smooth rotation update
+                if (map) {
+                  map.setBearing(bearing);
+                }
+              }
+            }
+            
+            lastPosition = currentPos;
+            lastPositionTime = now;
+          },
+          (error) => {
+            console.error('[FullscreenMap] Geolocation error:', error);
+            // Don't disable auto-rotate on single errors, just log them
+          },
+          options
+        );
+        
+        autoRotateEnabled = true;
+        console.log('[FullscreenMap] Auto-rotation enabled');
+      } else {
+        console.error('[FullscreenMap] Geolocation not supported');
+        alert('Ihr Gerät unterstützt keine Standortbestimmung.');
+      }
+    } else {
+      // Stop watching position
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+      }
+      
+      // Reset map rotation
       if (map) {
         map.setBearing(0);
       }
-      // Reset user marker rotation
-      if (userMarker) {
-        const markerElement = userMarker.getElement();
-        if (markerElement) {
-          markerElement.style.transform = 'rotate(0deg)';
-        }
-      }
+      
+      autoRotateEnabled = false;
+      lastPosition = null;
+      lastPositionTime = null;
+      currentBearing = 0;
+      console.log('[FullscreenMap] Auto-rotation disabled');
     }
+  }
+  
+  // Toggle display mode between distance and title
+  function toggleDisplayMode() {
+    showDistance = !showDistance;
+    console.log(`[FullscreenMap] Display mode toggled: ${showDistance ? 'distance' : 'title'}`);
+    // Update all existing markers
+    updateMarkerLabels();
+  }
+  
+  // Update marker labels based on current display mode
+  function updateMarkerLabels() {
+    if (!map || !mapInitialized || !images.length) return;
     
-    saveMapState();
+    console.log(`[FullscreenMap] Updating marker labels for ${images.length} images`);
+    
+    // Clear existing markers and recreate them with new labels
+    imageMarkers.forEach(marker => {
+      map.removeLayer(marker);
+    });
+    imageMarkers = [];
+    
+    // Recreate markers with updated labels
+    addImageMarkers();
   }
   
   // Start watching position for movement-based rotation
@@ -371,6 +568,32 @@
     }
   }
   
+  // Detect iOS device
+  onMount(() => {
+    isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  });
+
+  // Request device orientation permission for iOS
+  async function requestIOSPermissions() {
+    if (isIOS && typeof DeviceOrientationEvent !== 'undefined') {
+      try {
+        // TypeScript doesn't recognize requestPermission, so we use any
+        const DeviceOrientationEventAny = DeviceOrientationEvent as any;
+        if (typeof DeviceOrientationEventAny.requestPermission === 'function') {
+          const permission = await DeviceOrientationEventAny.requestPermission();
+          if (permission !== 'granted') {
+            console.warn('[FullscreenMap] Device orientation permission denied');
+            return false;
+          }
+        }
+      } catch (error) {
+        console.warn('[FullscreenMap] Error requesting device orientation permission:', error);
+        return false;
+      }
+    }
+    return true;
+  }
+  
   onMount(() => {
     loadMapState();
     initMap();
@@ -393,14 +616,23 @@
   
   // Reactive updates
   $: if (mapInitialized && images.length > 0) {
+    console.log(`[FullscreenMap] Reactive update triggered: ${images.length} images`);
     const leaflet = (window as any).L;
     if (leaflet) {
-      addImageMarkers(leaflet);
+      addImageMarkers();
     }
   }
   
   $: if (mapInitialized && (userLat || userLon || deviceHeading !== null)) {
     updateUserMarker();
+  }
+  
+  // Track user movement for auto-rotation
+  function trackUserMovement() {
+    if (!autoRotateEnabled) return;
+    
+    // This function is now handled by the new toggleAutoRotate logic
+    // No need for separate tracking
   }
 </script>
 
@@ -430,46 +662,62 @@
           <circle cx="18" cy="12" r="1"/>
         </svg>
       {:else}
-        <!-- Satellite/Hybrid View Icon - shown when in street view -->
+        <!-- Satellite/Hybrid Icon - shown when in street view -->
         <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M3 3h18v18H3z"/>
-          <path d="M8 8h8v8H8z"/>
-          <path d="M3 8h5"/>
-          <path d="M16 8h5"/>
-          <path d="M8 3v5"/>
-          <path d="M8 16v5"/>
+          <rect x="3" y="3" width="6" height="6" rx="1"/>
+          <rect x="9" y="3" width="6" height="6" rx="1"/>
+          <rect x="15" y="3" width="6" height="6" rx="1"/>
+          <rect x="3" y="9" width="6" height="6" rx="1"/>
+          <rect x="9" y="9" width="6" height="6" rx="1"/>
+          <rect x="15" y="9" width="6" height="6" rx="1"/>
         </svg>
       {/if}
     </button>
-    
-    <!-- Auto-Rotate Toggle FAB -->
+
+    <!-- Display Mode Toggle FAB -->
+    <button 
+      class="display-toggle-fab"
+      on:click={toggleDisplayMode}
+      title={showDistance ? 'Titel anzeigen' : 'Entfernung anzeigen'}
+    >
+      {#if showDistance}
+        <!-- ABC Icon - shown when showing distance, click to show titles -->
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 7h16M4 12h16M4 17h10"/>
+          <circle cx="18" cy="17" r="2"/>
+        </svg>
+      {:else}
+        <!-- 123 Icon - shown when showing titles, click to show distance -->
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 7h6M9 12h6M9 17h6"/>
+          <circle cx="5" cy="7" r="2"/>
+          <circle cx="5" cy="12" r="2"/>
+          <circle cx="5" cy="17" r="2"/>
+        </svg>
+      {/if}
+    </button>
+
+    <!-- Auto-Rotate FAB -->
     <button 
       class="auto-rotate-fab"
       on:click={toggleAutoRotate}
-      title={autoRotateEnabled ? 'Auto-Drehung deaktivieren' : 'Auto-Drehung aktivieren'}
-      class:active={autoRotateEnabled}
+      title={autoRotateEnabled ? 'Auto-Rotation deaktivieren' : 'Auto-Rotation aktivieren'}
     >
       {#if autoRotateEnabled}
-        <!-- Compass with rotation arrows - shown when auto-rotate is enabled -->
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <!-- Active compass icon -->
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="rotating">
           <circle cx="12" cy="12" r="10"/>
           <polygon points="16.24,7.76 14.12,14.12 7.76,16.24 9.88,9.88"/>
-          <path d="M8 8l1.5 1.5"/>
-          <path d="M14.5 14.5L16 16"/>
-          <path d="M2 12h2"/>
-          <path d="M20 12h2"/>
         </svg>
       {:else}
-        <!-- Static compass - shown when auto-rotate is disabled -->
+        <!-- Inactive compass icon -->
         <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="10"/>
           <polygon points="16.24,7.76 14.12,14.12 7.76,16.24 9.88,9.88"/>
-          <path d="M12 2v4"/>
-          <path d="M12 18v4"/>
         </svg>
       {/if}
     </button>
-    
+
     <!-- Grid FAB -->
     <button 
       class="grid-fab"
@@ -532,6 +780,7 @@
   
   /* Base FAB styling for both buttons - exactly like main page */
   .view-toggle-fab,
+  .display-toggle-fab,
   .auto-rotate-fab,
   .grid-fab {
     width: 4rem;
@@ -552,6 +801,7 @@
   }
   
   .view-toggle-fab:hover,
+  .display-toggle-fab:hover,
   .auto-rotate-fab:hover,
   .grid-fab:hover {
     transform: scale(1.1);
@@ -559,44 +809,45 @@
   }
   
   .view-toggle-fab:active,
+  .display-toggle-fab:active,
   .auto-rotate-fab:active,
   .grid-fab:active {
     transform: scale(0.95);
   }
   
-  /* Special styling for active auto-rotate button */
-  .auto-rotate-fab.active {
-    background: #ff8c42; /* Slightly brighter orange when active */
-    animation: pulse 2s infinite;
+  /* Rotating animation for active compass */
+  .rotating {
+    animation: rotate 2s linear infinite;
   }
   
-  @keyframes pulse {
-    0% {
-      box-shadow: 0 4px 12px var(--shadow);
+  @keyframes rotate {
+    from {
+      transform: rotate(0deg);
     }
-    50% {
-      box-shadow: 0 4px 20px rgba(255, 107, 53, 0.6);
-    }
-    100% {
-      box-shadow: 0 4px 12px var(--shadow);
+    to {
+      transform: rotate(360deg);
     }
   }
   
-  /* Mobile responsive */
-  @media (max-width: 768px) {
+  /* Mobile responsive adjustments */
+  @media (max-width: 600px) {
     .fab-container {
-      bottom: 1rem;
-      right: 1rem;
-      gap: 0.7rem;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      gap: 0.75rem;
     }
     
     .view-toggle-fab,
+    .display-toggle-fab,
+    .auto-rotate-fab,
     .grid-fab {
       width: 3.5rem;
       height: 3.5rem;
     }
     
     .view-toggle-fab svg,
+    .display-toggle-fab svg,
+    .auto-rotate-fab svg,
     .grid-fab svg {
       width: 36px;
       height: 36px;
