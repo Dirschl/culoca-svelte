@@ -14,6 +14,7 @@ export let showDistance: boolean = false;
 export let userLat: number | null = null;
 export let userLon: number | null = null;
 export let getDistanceFromLatLonInMeters: ((lat1: number, lon1: number, lat2: number, lon2: number) => string) | null = null;
+export let displayedImageCount: number = 0; // Anzahl der tatsächlich angezeigten Bilder
 
 let images: NewsFlashImage[] = [];
 let loading = true;
@@ -191,7 +192,7 @@ function handleScroll(event: Event) {
     {:else}
       {#if layout === 'strip' || layout === 'justified'}
         <div class="newsflash-strip" tabindex="0" on:scroll={handleScroll}>
-          <div class="newsflash-time">{lastUpdate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} {$galleryStats.loadedCount}/{$galleryStats.totalCount}</div>
+          <div class="newsflash-time">{lastUpdate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} {displayedImageCount}/{$galleryStats.totalCount}</div>
           {#each images as img (img.id)}
             <div class="newsflash-thumb" on:click={() => handleImageClick(img)} tabindex="0" role="button" aria-label={img.title || img.original_name || 'Bild'}>
               <img src={"https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/" + img.path_512} alt={img.title || img.original_name || 'Bild'} />
@@ -208,7 +209,7 @@ function handleScroll(event: Event) {
         </div>
       {:else if layout === 'grid'}
         <div class="newsflash-grid" tabindex="0" on:scroll={handleScroll}>
-          <div class="newsflash-time">{lastUpdate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} {$galleryStats.loadedCount}/{$galleryStats.totalCount}</div>
+          <div class="newsflash-time">{lastUpdate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} {displayedImageCount}/{$galleryStats.totalCount}</div>
           {#each images as img (img.id)}
             <div class="newsflash-thumb" on:click={() => handleImageClick(img)} tabindex="0" role="button" aria-label={img.title || img.original_name || 'Bild'}>
               <img src={"https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/" + img.path_512} alt={img.title || img.original_name || 'Bild'} />

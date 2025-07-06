@@ -731,6 +731,10 @@
             <div class="filename">
               {image.original_name || 'Unbekannt'}
             </div>
+            <h2>Aktueller Link</h2>
+            <div class="filename">
+              {imageSource}
+            </div>
           </div>
           <!-- Column 2: All EXIF/Meta -->
           <div class="meta-column">

@@ -5,10 +5,52 @@
   import Justified from '$lib/Justified.svelte';
   import NewsFlash from '$lib/NewsFlash.svelte';
   import { beforeNavigate, afterNavigate } from '$app/navigation';
-  import { updateGalleryStats } from '$lib/galleryStats';
+  import { updateGalleryStats, galleryStats } from '$lib/galleryStats';
+
 
   const pics = writable<any[]>([]);
   let page = 0, size = 50, loading = false, hasMoreImages = true;
+  let displayedImageCount = 0; // Zähler für tatsächlich angezeigte Bilder
+  let removedDuplicatesList: any[] = []; // Liste der entfernten Duplikate
+  let showRemovedDuplicates = false; // Flag zum Anzeigen der entfernten Duplikate
+  
+
+  
+  // Reaktive Funktion: Update displayed count whenever pics store changes
+  $: if ($pics) {
+    const newCount = $pics.length;
+    if (newCount !== displayedImageCount) {
+      displayedImageCount = newCount;
+      console.log(`📊 Angezeigte Bilder: ${displayedImageCount}/${$galleryStats.totalCount}`);
+      
+      // Event für NewsFlash-Komponente
+      window.dispatchEvent(new CustomEvent('displayedImageCountChanged', {
+        detail: { displayedCount: displayedImageCount, totalCount: $galleryStats.totalCount }
+      }));
+    }
+  }
+  
+  // Funktion zum Entfernen von Duplikaten aus der Galerie
+  function removeDuplicates() {
+    const currentPics = get(pics);
+    const uniquePics = currentPics.filter((pic, index, self) => 
+      index === self.findIndex(p => p.id === pic.id)
+    );
+    
+    if (uniquePics.length !== currentPics.length) {
+      const removedDuplicates = currentPics.filter((pic, index, self) => 
+        index !== self.findIndex(p => p.id === pic.id)
+      );
+      
+      console.log(`🧹 Removed ${removedDuplicates.length} duplicate images from gallery:`, removedDuplicates);
+      
+      // Store removed duplicates for display
+      removedDuplicatesList = removedDuplicates;
+      showRemovedDuplicates = true;
+      
+              pics.set(uniquePics);
+    }
+  }
   let useJustifiedLayout = true;
   let profileAvatar: string | null = null;
   let showDistance = false;
@@ -50,6 +92,11 @@
   const RADIUS_CHECK_INTERVAL = 10000; // 10 seconds - check if we need more images
   let radiusCheckInterval: number | null = null;
 
+  // GPS Simulation support
+  let gpsSimulationActive = false;
+  let simulatedLat: number | null = null;
+  let simulatedLon: number | null = null;
+
   // Speech synthesis for autoguide
   let speechSynthesis: SpeechSynthesis | null = null;
   let currentSpeech: SpeechSynthesisUtterance | null = null;
@@ -59,13 +106,18 @@
 
   let audioActivated = false;
 
+  // Global variable to track speech state
+  let speechRetryCount = 0;
+  let lastSpeechText = '';
+  let currentImageId = ''; // Track current image ID to know when to update text
+  
   // Autoguide functions
   function initSpeechSynthesis() {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       speechSynthesis = window.speechSynthesis;
       
       // On mobile, we need to resume speech synthesis if it was paused
-      if (speechSynthesis.paused) {
+      if (speechSynthesis && speechSynthesis.paused) {
         speechSynthesis.resume();
       }
       
@@ -74,149 +126,241 @@
       console.log('Speech synthesis speaking:', speechSynthesis.speaking);
       console.log('Speech synthesis paused:', speechSynthesis.paused);
       
-      // On mobile, we need user interaction to enable speech
-      if (speechSynthesis && autoguide) {
-        // Add a one-time click handler to enable speech
+      // Enhanced user interaction handling for speech synthesis
+      if (speechSynthesis && autoguide && speechSynthesis) {
+        // Add event listeners to enable speech synthesis on user interaction
         const enableSpeech = () => {
           console.log('User interaction detected - enabling speech synthesis');
-          speechSynthesis.resume();
+          try {
+            if (speechSynthesis) {
+              speechSynthesis.resume();
+              
+              // Test speech synthesis with a silent utterance
+              const testUtterance = new SpeechSynthesisUtterance('');
+              testUtterance.volume = 0;
+              testUtterance.onend = () => {
+                console.log('Speech synthesis test completed successfully');
+              };
+              testUtterance.onerror = (event) => {
+                console.log('Speech synthesis test error (expected):', event.error);
+              };
+              speechSynthesis.speak(testUtterance);
+            }
+          } catch (error) {
+            console.error('Error enabling speech synthesis:', error);
+          }
+        };
+        
+        // Listen for various user interactions
+        document.addEventListener('click', enableSpeech, { once: true });
+        document.addEventListener('touchstart', enableSpeech, { once: true });
+        document.addEventListener('keydown', enableSpeech, { once: true });
+        document.addEventListener('scroll', enableSpeech, { once: true });
+      }
+    }
+  }
+  
+  function speakTitle(text: string, imageId?: string) {
+    if (!autoguide || !speechSynthesis) return;
+    
+    // Don't speak the same text twice in a row for the same image
+    if (text === lastSpeechText && imageId === currentImageId) {
+      console.log('🎤 Skipping duplicate speech for same image:', text);
+      return;
+    }
+    
+    lastSpeechText = text;
+    currentImageId = imageId || '';
+    speechRetryCount = 0;
+    
+    console.log('🎤 Speaking:', text, 'for image:', imageId);
+    autoguideText = text;
+    
+    // Cancel any ongoing speech
+    if (speechSynthesis) {
+      speechSynthesis.cancel();
+    }
+    
+    const currentSpeech = new SpeechSynthesisUtterance(text);
+    currentSpeech.lang = 'de-DE';
+    currentSpeech.volume = 1.0;
+    
+    // Platform-specific optimizations
+    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const isAndroid = /Android/i.test(navigator.userAgent);
+    const isCarPlay = isIOS && (navigator.userAgent.includes('CarPlay') || window.innerWidth > 800);
+    
+    if (isCarPlay) {
+      currentSpeech.rate = 0.85;
+      currentSpeech.pitch = 1.1;
+    } else if (isAndroid) {
+      currentSpeech.rate = 0.9;
+    }
+    
+    currentSpeech.onstart = () => {
+      console.log('🎤 Speech started:', text);
+    };
+    
+    currentSpeech.onend = () => {
+      console.log('🎤 Speech ended:', text);
+      // Don't clear the text automatically - it should stay until image changes
+    };
+    
+    currentSpeech.onerror = (event) => {
+      console.error('🎤 Speech error:', event.error);
+      
+      // Handle specific error types
+      if (event.error === 'canceled') {
+        console.log('🎤 Speech was canceled (expected behavior)');
+        return;
+      }
+      
+      if (event.error === 'not-allowed') {
+        console.log('🎤 Speech not allowed - user interaction required');
+        // Try to enable speech synthesis with user interaction
+        const enableSpeech = () => {
+          console.log('🎤 User interaction detected - retrying speech');
+          try {
+            if (speechSynthesis) {
+              speechSynthesis.resume();
+              speechSynthesis.speak(currentSpeech);
+            }
+          } catch (error) {
+            console.error('🎤 Retry after user interaction failed:', error);
+          }
           document.removeEventListener('click', enableSpeech);
           document.removeEventListener('touchstart', enableSpeech);
         };
         
         document.addEventListener('click', enableSpeech, { once: true });
         document.addEventListener('touchstart', enableSpeech, { once: true });
+        return;
       }
-    }
-  }
-
-  function speakTitle(title: string) {
-    if (!autoguide || !speechSynthesis) {
-      console.log('Autoguide or speech synthesis not available');
-      return;
-    }
-    
-    // Stop any current speech
-    if (currentSpeech) {
-      speechSynthesis.cancel();
-    }
-    
-    // Extract title up to first comma
-    const titleToSpeak = title.split(',')[0].trim();
-    
-    // Verhindere doppelte Ansage
-    if (titleToSpeak === lastSpokenText) {
-      console.log('Audioguide: Text wurde bereits angesagt, keine Wiederholung.');
-      return;
-    }
-    lastSpokenText = titleToSpeak;
-    
-    // Create new speech utterance
-    currentSpeech = new SpeechSynthesisUtterance(titleToSpeak);
-    currentSpeech.lang = 'de-DE';
-    currentSpeech.rate = 0.9;
-    currentSpeech.pitch = 1.0;
-    currentSpeech.volume = 1.0; // Increased volume for mobile
-    
-    // CarPlay and iOS specific settings
-    if (typeof window !== 'undefined' && /iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-      // Force audio session to use external speakers/Bluetooth
-      currentSpeech.volume = 1.0;
       
-      // iOS specific: Set audio session category for external output
-      if (typeof window !== 'undefined' && 'webkitAudioContext' in window) {
-        try {
-          const audioContext = new (window as any).webkitAudioContext();
-          // This helps iOS route audio to external speakers
-          audioContext.resume();
-        } catch (e) {
-          console.log('Audio context not available:', e);
+      // For other errors, try to recover with retry logic
+      console.log('🎤 Speech error occurred, attempting to recover...');
+      
+      // Clear any pending speech
+      if (speechSynthesis) {
+        speechSynthesis.cancel();
+        
+        // Resume if paused (common on mobile)
+        if (speechSynthesis.paused) {
+          speechSynthesis.resume();
         }
       }
-    }
-    
-    // Show autoguide bar
-    autoguideText = titleToSpeak;
-    autoguideBarVisible = true;
-    
-    // Add event listeners for debugging
-    currentSpeech.onstart = () => {
-      console.log('Speech started:', titleToSpeak);
+      
+      // Retry logic (max 3 attempts)
+      if (speechRetryCount < 3) {
+        speechRetryCount++;
+        console.log(`🎤 Retrying speech (attempt ${speechRetryCount}/3):`, text);
+        
+        setTimeout(() => {
+          try {
+            if (speechSynthesis) {
+              speechSynthesis.speak(currentSpeech);
+            }
+          } catch (error) {
+            console.error('🎤 Retry failed:', error);
+          }
+        }, 1000);
+      } else {
+        console.log('🎤 Max retry attempts reached, giving up');
+      }
     };
     
-    currentSpeech.onend = () => {
-      console.log('Speech ended:', titleToSpeak);
-      // Keep the bar visible, just clear the text after a delay
-      setTimeout(() => {
-        autoguideText = '';
-      }, 2000);
-    };
-    
-    currentSpeech.onerror = (event) => {
-      console.error('Speech error:', event.error);
-      // Keep the bar visible, just clear the text after a delay
-      setTimeout(() => {
-        autoguideText = '';
-      }, 3000);
-    };
-    
-    // Mobile-specific handling
+    // Enhanced mobile and CarPlay handling
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     
     if (isMobile) {
-      console.log('Mobile device detected - using mobile speech handling');
+      console.log('🎤 Mobile/CarPlay device detected - using enhanced speech handling');
+      
+      // Android-specific optimizations
+      if (isAndroid) {
+        console.log('🎤 Android device detected - applying Android-specific optimizations');
+        currentSpeech.rate = 0.9; // Slightly slower for Android
+        currentSpeech.volume = 1.0; // Full volume for Android
+      }
       
       // On mobile, we need to resume speech synthesis if it was paused
-      if (speechSynthesis.paused) {
-        console.log('Mobile: Resuming paused speech synthesis');
+      if (speechSynthesis && speechSynthesis.paused) {
+        console.log('🎤 Mobile: Resuming paused speech synthesis');
         speechSynthesis.resume();
       }
       
-      // Add a small delay for mobile devices
+      // Enhanced delay for mobile devices and CarPlay
+      const delay = isCarPlay ? 300 : (isAndroid ? 250 : 200);
       setTimeout(() => {
         try {
-          speechSynthesis.speak(currentSpeech);
-          console.log('Mobile: Speech synthesis speak called');
+          if (speechSynthesis) {
+            speechSynthesis.speak(currentSpeech);
+            console.log('🎤 Mobile/CarPlay: Speech synthesis speak called');
+          }
         } catch (error) {
-          console.error('Mobile: Error calling speech synthesis:', error);
+          console.error('🎤 Mobile/CarPlay: Error calling speech synthesis:', error);
         }
-      }, 100);
+      }, delay);
     } else {
       // Desktop handling
       try {
-        speechSynthesis.speak(currentSpeech);
-        console.log('Desktop: Speech synthesis speak called');
+        if (speechSynthesis) {
+          speechSynthesis.speak(currentSpeech);
+          console.log('🎤 Desktop: Speech synthesis speak called');
+        }
       } catch (error) {
-        console.error('Desktop: Error calling speech synthesis:', error);
+        console.error('🎤 Desktop: Error calling speech synthesis:', error);
       }
     }
   }
 
   function announceFirstImage() {
-    if (!autoguide) return;
+    if (!autoguide) {
+      console.log('Autoguide not enabled, skipping announcement');
+      return;
+    }
+    
+    // Only announce if audio has been activated by user interaction
+    if (!audioActivated) {
+      console.log('🎤 Audio not activated by user yet, skipping announcement');
+      return;
+    }
     
     const currentPics = get(pics);
     if (currentPics.length > 0) {
       const firstImage = currentPics[0];
+      console.log('🎤 Announcing first image:', firstImage);
+      
       if (firstImage.title) {
-        speakTitle(firstImage.title);
+        console.log('🎤 First image has title:', firstImage.title);
+        speakTitle(firstImage.title, firstImage.id);
+      } else {
+        console.log('🎤 First image has no title, using fallback');
+        // Fallback: Verwende den Dateinamen oder eine Standardnachricht
+        const fallbackText = firstImage.original_name || 'Bild ohne Titel';
+        speakTitle(fallbackText, firstImage.id);
       }
+    } else {
+      console.log('🎤 No images available for announcement');
     }
   }
 
   function activateAudioGuide() {
     if (!speechSynthesis) initSpeechSynthesis();
     if (speechSynthesis) {
-      // iOS: Einmal Dummy sprechen, um zu aktivieren
-      const dummy = new SpeechSynthesisUtterance(' ');
-      dummy.lang = 'de-DE';
-      dummy.volume = 0;
-      speechSynthesis.speak(dummy);
-      speechSynthesis.resume();
+      console.log('🎤 Activating audio guide with user interaction...');
       
-      // CarPlay and iOS specific audio routing
-      if (typeof window !== 'undefined' && /iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-        // Force audio to external speakers/Bluetooth
+      // Enhanced iOS/CarPlay activation
+      const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+      
+      if (isIOS) {
+        // iOS: Einmal Dummy sprechen, um zu aktivieren
+        const dummy = new SpeechSynthesisUtterance(' ');
+        dummy.lang = 'de-DE';
+        dummy.volume = 0;
+        speechSynthesis.speak(dummy);
+        speechSynthesis.resume();
+        
+        // Enhanced CarPlay and iOS specific audio routing
         if ('webkitAudioContext' in window) {
           try {
             const audioContext = new (window as any).webkitAudioContext();
@@ -226,16 +370,84 @@
             console.log('CarPlay: Audio context not available:', e);
           }
         }
+        
+        // Additional iOS audio session setup for CarPlay
+        if ('webkitAudioContext' in window) {
+          try {
+            const audioContext = new (window as any).webkitAudioContext();
+            if (audioContext.state === 'suspended') {
+              audioContext.resume();
+            }
+            console.log('CarPlay: Additional audio context setup completed');
+          } catch (e) {
+            console.log('CarPlay: Additional audio context setup failed:', e);
+          }
+        }
+      } else {
+        // Non-iOS devices
+        speechSynthesis.resume();
       }
       
-      // Teste die Sprachausgabe mit einem kurzen Text
+      // Teste die Sprachausgabe mit einem kurzen Text - nur nach direkter Benutzerinteraktion
       const testUtterance = new SpeechSynthesisUtterance('Sprachausgabe aktiviert');
       testUtterance.lang = 'de-DE';
       testUtterance.volume = 1.0;
       testUtterance.onend = () => {
-        console.log('Audio guide activated');
+        console.log('🎤 Audio guide activated successfully');
+        // Don't clear autoguideText - let it show the activation message briefly
+        setTimeout(() => {
+          if (autoguideText === 'Sprachausgabe aktiviert') {
+            autoguideText = '';
+          }
+        }, 2000);
       };
-      speechSynthesis.speak(testUtterance);
+      testUtterance.onerror = (event) => {
+        console.error('🎤 Audio guide activation error:', event.error);
+        if (event.error === 'not-allowed') {
+          console.log('🎤 Speech not allowed - user interaction required');
+          // Wait for user interaction and retry
+          const retryActivation = () => {
+            console.log('🎤 User interaction detected - retrying audio guide activation');
+            try {
+              if (speechSynthesis) {
+                speechSynthesis.resume();
+                speechSynthesis.speak(testUtterance);
+              }
+            } catch (error) {
+              console.error('🎤 Retry activation failed:', error);
+            }
+            document.removeEventListener('click', retryActivation);
+            document.removeEventListener('touchstart', retryActivation);
+          };
+          document.addEventListener('click', retryActivation, { once: true });
+          document.addEventListener('touchstart', retryActivation, { once: true });
+        }
+      };
+      
+      // Enhanced delay for mobile/CarPlay devices
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      if (isMobile) {
+        setTimeout(() => {
+          try {
+            if (speechSynthesis) {
+              speechSynthesis.speak(testUtterance);
+              console.log('🎤 Mobile/CarPlay: Audio guide activation test spoken');
+            }
+          } catch (error) {
+            console.error('🎤 Mobile/CarPlay: Audio guide activation failed:', error);
+          }
+        }, 200);
+      } else {
+        try {
+          if (speechSynthesis) {
+            speechSynthesis.speak(testUtterance);
+            console.log('🎤 Desktop: Audio guide activation test spoken');
+          }
+        } catch (error) {
+          console.error('🎤 Desktop: Audio guide activation failed:', error);
+        }
+      }
+      
       audioActivated = true;
     }
   }
@@ -247,16 +459,31 @@
       const testUtterance = new SpeechSynthesisUtterance('Test der Sprachausgabe');
       testUtterance.lang = 'de-DE';
       testUtterance.volume = 1.0;
+      
+      // Platform-specific optimizations for test
+      const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+      const isAndroid = /Android/i.test(navigator.userAgent);
+      const isCarPlay = isIOS && (navigator.userAgent.includes('CarPlay') || window.innerWidth > 800);
+      
+      if (isCarPlay) {
+        testUtterance.rate = 0.85;
+        testUtterance.pitch = 1.1;
+      } else if (isAndroid) {
+        testUtterance.rate = 0.9;
+      }
+      
       testUtterance.onstart = () => console.log('Test speech started');
       testUtterance.onend = () => console.log('Test speech ended');
       testUtterance.onerror = (e) => console.error('Test speech error:', e.error);
       
       // Resume if paused (common on mobile)
-      if (speechSynthesis.paused) {
+      if (speechSynthesis && speechSynthesis.paused) {
         speechSynthesis.resume();
       }
       
-      speechSynthesis.speak(testUtterance);
+      if (speechSynthesis && testUtterance) {
+        speechSynthesis.speak(testUtterance);
+      }
     } else {
       console.log('Speech synthesis not available');
     }
@@ -268,6 +495,217 @@
       speechSynthesis.resume();
       console.log('Mobile speech synthesis activated');
     }
+  }
+
+  // GPS Simulation functions
+  function setupGPSSimulation() {
+    console.log('Setting up GPS simulation...');
+    
+    // Handle GPS simulation updates
+    let lastGPSUpdate = 0;
+    const GPS_UPDATE_THROTTLE = 500; // 0.5 second throttle
+    let lastLoadMoreCheck = 0;
+    const LOAD_MORE_CHECK_INTERVAL = 2000; // Check every 2 seconds
+    
+        async function updateGPSFromSimulation(lat: number, lon: number) {
+      const now = Date.now();
+      
+      // Throttle GPS updates to prevent excessive updates
+      if (now - lastGPSUpdate < GPS_UPDATE_THROTTLE) {
+        return;
+      }
+      
+      // Check if the change is significant enough to warrant an update
+      const distanceChange = userLat && userLon ? 
+        Math.abs(lat - userLat) + Math.abs(lon - userLon) : 1;
+      
+      if (distanceChange < 0.0005) { // Less than ~50m change
+        return;
+      }
+      
+      lastGPSUpdate = now;
+      gpsSimulationActive = true;
+      simulatedLat = lat;
+      simulatedLon = lon;
+      
+      // Update user coordinates with simulated values
+      userLat = simulatedLat;
+      userLon = simulatedLon;
+      
+      console.log('GPS Simulation active:', { lat: userLat, lon: userLon });
+      
+      // Only resort existing images, don't reload from server
+      if ($pics.length > 0) {
+        const sortedPics = [...$pics].sort((a, b) => {
+          const distA = a.lat && a.lon ? getDistanceInMeters(userLat!, userLon!, a.lat, a.lon) : Number.MAX_VALUE;
+          const distB = b.lat && b.lon ? getDistanceInMeters(userLat!, userLon!, b.lat, b.lon) : Number.MAX_VALUE;
+          return distA - distB;
+        });
+        
+        // Only update if the order actually changed
+        const currentPics = get(pics);
+        let orderChanged = false;
+        
+        if (sortedPics.length !== currentPics.length) {
+          orderChanged = true;
+        } else {
+          // Check if the first few images changed order
+          for (let i = 0; i < Math.min(5, sortedPics.length); i++) {
+            if (sortedPics[i].id !== currentPics[i].id) {
+              orderChanged = true;
+              break;
+            }
+          }
+        }
+        
+        if (orderChanged) {
+          pics.set(sortedPics);
+          console.log('Resorted existing images by distance (order changed)');
+          
+          // Announce first image if autoguide is enabled and order changed
+          if (autoguide && sortedPics.length > 0) {
+            setTimeout(() => announceFirstImage(), 500);
+          }
+          
+          // Update gallery stats after resorting
+          const totalCount = await getTotalImageCount();
+          updateGalleryStats(sortedPics.length, totalCount);
+        } else {
+          console.log('GPS update received but order unchanged, skipping resort');
+        }
+        
+        // Check if we need to load more images (throttled)
+        if (now - lastLoadMoreCheck > LOAD_MORE_CHECK_INTERVAL) {
+          lastLoadMoreCheck = now;
+          checkAndLoadMoreImages();
+        }
+      } else {
+        // Only load from server if no images are cached
+        pics.set([]);
+        page = 0;
+        hasMoreImages = true;
+        loadMore('gps simulation - no cached images');
+      }
+    }
+    
+    // Check if we need to load more images based on current position
+    async function checkAndLoadMoreImages() {
+      if (!userLat || !userLon || !hasMoreImages || loading) {
+        return;
+      }
+      
+      const currentPics = get(pics);
+      
+      // Check coverage in all 8 directions (N, NO, O, SO, S, SW, W, NW)
+      const directions = [
+        { name: 'N', lat: 1, lon: 0 },   // North
+        { name: 'NO', lat: 1, lon: 1 },  // Northeast
+        { name: 'O', lat: 0, lon: 1 },   // East
+        { name: 'SO', lat: -1, lon: 1 }, // Southeast
+        { name: 'S', lat: -1, lon: 0 },  // South
+        { name: 'SW', lat: -1, lon: -1 }, // Southwest
+        { name: 'W', lat: 0, lon: -1 },  // West
+        { name: 'NW', lat: 1, lon: -1 }  // Northwest
+      ];
+      
+      const coverageRadius = 5000; // 5km radius
+      const checkDistance = 3000; // 3km from center to check each direction
+      let uncoveredDirections: string[] = [];
+      
+      // Check each direction for coverage
+      for (const direction of directions) {
+        const checkLat = userLat + (direction.lat * checkDistance / 111000); // ~111km per degree
+        const checkLon = userLon + (direction.lon * checkDistance / (111000 * Math.cos(userLat * Math.PI / 180)));
+        
+        // Check if there are any images within coverageRadius of this check point
+        const imagesInDirection = currentPics.filter((pic: any) => {
+          if (!pic.lat || !pic.lon) return false;
+          const distance = getDistanceInMeters(checkLat, checkLon, pic.lat, pic.lon);
+          return distance <= coverageRadius;
+        });
+        
+        if (imagesInDirection.length === 0) {
+          uncoveredDirections.push(direction.name);
+        }
+      }
+      
+      // Check if we have enough nearby images at current position
+      const nearbyImages = currentPics.filter((pic: any) => {
+        if (!pic.lat || !pic.lon) return false;
+        const distance = getDistanceInMeters(userLat as number, userLon as number, pic.lat, pic.lon);
+        return distance <= 5000; // 5km radius
+      });
+      
+      // Find the nearest image to check if we're too far from any cached images
+      const imagesWithGPS = currentPics.filter((pic: any) => pic.lat && pic.lon);
+      let nearestDistance = Infinity;
+      if (imagesWithGPS.length > 0) {
+        nearestDistance = Math.min(...imagesWithGPS.map((pic: any) => 
+          getDistanceInMeters(userLat as number, userLon as number, pic.lat, pic.lon)
+        ));
+      }
+      
+      console.log(`[Auto-Load] Current position: ${userLat}, ${userLon}`);
+      console.log(`[Auto-Load] Nearby images (5km): ${nearbyImages.length}`);
+      console.log(`[Auto-Load] Total loaded images: ${currentPics.length}`);
+      console.log(`[Auto-Load] Nearest image distance: ${nearestDistance.toFixed(0)}m`);
+      console.log(`[Auto-Load] Coverage check - Uncovered directions: ${uncoveredDirections.join(', ') || 'All covered'}`);
+      
+      // If we have no nearby images at all, reset and load from new position
+      if (nearbyImages.length === 0 && currentPics.length > 0) {
+        console.log(`[Auto-Load] No nearby images found, resetting and loading from new position...`);
+        pics.set([]);
+        page = 0;
+        hasMoreImages = true;
+        await loadMore('auto-load-new-position');
+        return;
+      }
+      
+      // If the nearest image is more than 10km away, we're probably outside the cached area
+      if (nearestDistance > 10000 && currentPics.length > 0) {
+        console.log(`[Auto-Load] Nearest image is ${nearestDistance.toFixed(0)}m away (>10km), resetting and loading from new position...`);
+        pics.set([]);
+        page = 0;
+        hasMoreImages = true;
+        await loadMore('auto-load-outside-cached-area');
+        return;
+      }
+      
+      // If we have uncovered directions, load more to fill the gaps
+      if (uncoveredDirections.length > 0 && hasMoreImages) {
+        console.log(`[Auto-Load] Uncovered directions detected: ${uncoveredDirections.join(', ')}, loading more to fill gaps...`);
+        await loadMore('auto-load-fill-coverage-gaps');
+        return;
+      }
+      
+      // If we have less than 10 nearby images, load more
+      if (nearbyImages.length < 10 && hasMoreImages) {
+        console.log(`[Auto-Load] Only ${nearbyImages.length} nearby images, loading more...`);
+        await loadMore('auto-load-nearby');
+      }
+    }
+    
+    // Listen for postMessage events from parent window
+    function handlePostMessage(event: MessageEvent) {
+      if (event.data && event.data.type === 'gps-simulation') {
+        console.log('Received GPS simulation data via postMessage:', event.data);
+        updateGPSFromSimulation(event.data.lat, event.data.lon);
+      } else if (event.data && event.data.type === 'gps-simulation-stop') {
+        console.log('GPS simulation stopped, re-enabling real GPS tracking');
+        gpsSimulationActive = false;
+      } else if (event.data && event.data.type === 'request-gallery-data') {
+        console.log('Received request for gallery data');
+        // Send current gallery data to parent window
+        const currentPics = get(pics);
+        window.parent.postMessage({
+          type: 'gallery-data',
+          images: currentPics
+        }, '*');
+      }
+    }
+    
+    // Listen for postMessage events
+    window.addEventListener('message', handlePostMessage);
   }
 
   function startGalleryPreload() {
@@ -291,6 +729,8 @@
       const { data } = await supabase
         .from('images')
         .select('id,path_512,path_2048,path_64,width,height,lat,lon,title,description,keywords')
+        .not('lat', 'is', null)
+        .not('lon', 'is', null)
         .order('created_at', { ascending: false });
       
       if (data) {
@@ -319,6 +759,11 @@
         pics.set(allPics);
         hasMoreImages = false;
         
+        // Announce first image if autoguide is enabled
+        if (autoguide && allPics.length > 0) {
+          setTimeout(() => announceFirstImage(), 500);
+        }
+        
         // Update gallery stats
         const totalCount = await getTotalImageCount();
         updateGalleryStats(allPics.length, totalCount);
@@ -336,7 +781,9 @@
     try {
       const { count, error } = await supabase
         .from('images')
-        .select('id', { count: 'exact' });
+        .select('id', { count: 'exact' })
+        .not('lat', 'is', null)
+        .not('lon', 'is', null);
       
       if (error) {
         console.error('Error getting total image count:', error);
@@ -355,6 +802,19 @@
     if (loading || !hasMoreImages) return; 
     loading = true;
 
+    // Debug: Check if specific image exists in database
+    const specificImageCheck = await supabase
+      .from('images')
+      .select('id, lat, lon, path_512, title')
+      .eq('id', '2c6407f6-1ca5-4e82-afb1-0e0fe37db0ea')
+      .single();
+    
+    if (specificImageCheck.data) {
+      console.log('🔍 Specific image found in database:', specificImageCheck.data);
+    } else {
+      console.log('❌ Specific image not found in database');
+    }
+
     if (userLat !== null && userLon !== null) {
       // Lade die nächste Seite nach Entfernung sortiert per RPC
       const { data, error } = await supabase
@@ -371,7 +831,14 @@
         return;
       }
       if (data && data.length > 0) {
-        const newPics = data.map((d: any) => ({
+        // Filter out images without GPS coordinates
+        const imagesWithGPS = data.filter((d: any) => d.lat && d.lon);
+        
+        if (imagesWithGPS.length !== data.length) {
+          console.log(`[Gallery] RPC returned ${data.length} images, but only ${imagesWithGPS.length} have GPS coordinates`);
+        }
+        
+        const newPics = imagesWithGPS.map((d: any) => ({
           id: d.id,
           src: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${d.path_512}`,
           srcHD: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${d.path_2048}`,
@@ -383,76 +850,43 @@
           description: d.description,
           keywords: d.keywords
         }));
-        pics.update((p: any[]) => [...p, ...newPics]);
+        // Prüfe auf Duplikate vor dem Hinzufügen
+        const currentPics = get(pics);
+        const existingIds = new Set(currentPics.map(p => p.id));
+        const uniqueNewPics = newPics.filter(pic => !existingIds.has(pic.id));
+        
+        if (uniqueNewPics.length !== newPics.length) {
+          console.log(`[Gallery] Filtered out ${newPics.length - uniqueNewPics.length} duplicate images`);
+        }
+        
+        pics.update((p: any[]) => [...p, ...uniqueNewPics]);
         
         // Update gallery stats
         const totalCount = await getTotalImageCount();
         updateGalleryStats($pics.length, totalCount);
         
-        console.log(`[Gallery] RPC loaded ${data.length} images, total now: ${$pics.length}`);
+        console.log(`[Gallery] RPC loaded ${uniqueNewPics.length} unique images with GPS, total now: ${$pics.length}`);
         
-        // Wenn RPC weniger Bilder zurückgibt als erwartet, lade den Rest mit normaler Pagination
-        if (data.length < size) {
-          console.log(`[Gallery] RPC returned ${data.length} images, expected ${size}. Loading remaining with normal pagination.`);
-          
-          // Lade die restlichen Bilder mit normaler Pagination
-          const remainingSize = size - data.length;
-          const normalPage = Math.floor($pics.length / size);
-          console.log(`[Gallery] Loading remaining ${remainingSize} images with normal pagination, page: ${normalPage}`);
-          
-          const { data: remainingData } = await supabase
-            .from('images')
-            .select('id,path_512,path_2048,width,height,lat,lon,title,description,keywords')
-            .order('created_at', { ascending: false })
-            .range(normalPage * size + data.length, normalPage * size + size - 1);
-          
-          if (remainingData && remainingData.length > 0) {
-            const remainingPics = remainingData.map((d: any) => ({
-              id: d.id,
-              src: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${d.path_512}`,
-              srcHD: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${d.path_2048}`,
-              width: d.width,
-              height: d.height,
-              lat: d.lat,
-              lon: d.lon,
-              title: d.title,
-              description: d.description,
-              keywords: d.keywords
-            }));
-            pics.update((p: any[]) => [...p, ...remainingPics]);
-            console.log(`[Gallery] Normal pagination loaded ${remainingData.length} additional images, total now: ${$pics.length}`);
-          }
-          
-          // Prüfe, ob es noch mehr Bilder gibt
-          const totalImages = await supabase
-            .from('images')
-            .select('id', { count: 'exact' });
-          
-          if (totalImages.count && $pics.length >= totalImages.count) {
-            hasMoreImages = false;
-            console.log(`[Gallery] All ${totalImages.count} images loaded, hasMoreImages set to false`);
-          }
-          
-          // Nach dem Laden aller Bilder eine globale Neusortierung durchführen
-          if (userLat !== null && userLon !== null) {
-            console.log(`[Gallery] Performing global resort after loading all images...`);
-            const currentPics = get(pics);
-            const sortedPics = [...currentPics].sort((a: any, b: any) => {
-              const distA = a.lat && a.lon ? getDistanceInMeters(userLat!, userLon!, a.lat, a.lon) : Number.MAX_VALUE;
-              const distB = b.lat && b.lon ? getDistanceInMeters(userLat!, userLon!, b.lat, b.lon) : Number.MAX_VALUE;
-              return distA - distB;
-            });
-            pics.set(sortedPics);
-            console.log(`[Gallery] Global resort completed: ${sortedPics.length} images sorted by distance`);
-            
-            // Update gallery stats after resort
-            const totalCount = await getTotalImageCount();
-            updateGalleryStats(sortedPics.length, totalCount);
-          }
+        // Announce first image if autoguide is enabled and new images were loaded
+        if (autoguide && uniqueNewPics.length > 0) {
+          setTimeout(() => announceFirstImage(), 500);
         }
         
-        if (autoguide && page === 0 && newPics.length > 0) {
-          setTimeout(() => announceFirstImage(), 500);
+        // Wenn weniger Bilder geladen wurden als erwartet, könnte das bedeuten, dass wir am Ende sind
+        if (imagesWithGPS.length < size) {
+          console.log(`[Gallery] RPC returned ${imagesWithGPS.length} images with GPS, expected ${size}. This might be the end.`);
+          
+          // Prüfe, ob es noch mehr Bilder mit GPS gibt
+          const totalImagesWithGPS = await supabase
+            .from('images')
+            .select('id', { count: 'exact' })
+            .not('lat', 'is', null)
+            .not('lon', 'is', null);
+          
+          if (totalImagesWithGPS.count && $pics.length >= totalImagesWithGPS.count) {
+            hasMoreImages = false;
+            console.log(`[Gallery] All ${totalImagesWithGPS.count} images with GPS loaded, hasMoreImages set to false`);
+          }
         }
       } else {
         hasMoreImages = false;
@@ -468,6 +902,8 @@
     const { data } = await supabase
       .from('images')
       .select('id,path_512,path_2048,width,height,lat,lon,title,description,keywords')
+      .not('lat', 'is', null)
+      .not('lon', 'is', null)
       .order('created_at', { ascending: false })
       .range(page * size, page * size + size - 1);
 
@@ -489,14 +925,26 @@
         description: d.description,
         keywords: d.keywords
       }));
-      pics.update((p: any[]) => [...p, ...newPics]);
+      
+      // Prüfe auf Duplikate vor dem Hinzufügen
+      const currentPics = get(pics);
+      const existingIds = new Set(currentPics.map((p: any) => p.id));
+      const uniqueNewPics = newPics.filter((pic: any) => !existingIds.has(pic.id));
+      
+      if (uniqueNewPics.length !== newPics.length) {
+        console.log(`[Gallery] Normal pagination: Filtered out ${newPics.length - uniqueNewPics.length} duplicate images`);
+      }
+      
+      pics.update((p: any[]) => [...p, ...uniqueNewPics]);
       
       // Update gallery stats
       const totalCount = await getTotalImageCount();
       updateGalleryStats($pics.length, totalCount);
       
       console.log(`[Gallery] Total images now: ${$pics.length}`);
-      if (autoguide && page === 0 && newPics.length > 0) {
+      
+      // Announce first image if autoguide is enabled and new images were loaded
+      if (autoguide && uniqueNewPics.length > 0) {
         setTimeout(() => announceFirstImage(), 500);
       }
     } else {
@@ -988,6 +1436,12 @@
   }
 
   function handlePositionUpdate(pos: GeolocationPosition) {
+    // Ignore real GPS updates if GPS simulation is active
+    if (gpsSimulationActive) {
+      console.log('GPS simulation active, ignoring real GPS update');
+      return;
+    }
+    
     const newLat = pos.coords.latitude;
     const newLon = pos.coords.longitude;
     saveLastKnownLocation(newLat, newLon);
@@ -1124,7 +1578,9 @@
       // Now reload gallery with fresh position
       const { data } = await supabase
         .from('images')
-        .select('id,path_512,path_2048,width,height,lat,lon,title,description,keywords');
+        .select('id,path_512,path_2048,width,height,lat,lon,title,description,keywords')
+        .not('lat', 'is', null)
+        .not('lon', 'is', null);
       
       if (data) {
         const allPics = data.map((d: any) => ({
@@ -1165,7 +1621,9 @@
         try {
           const { data } = await supabase
             .from('images')
-            .select('id,path_512,path_2048,width,height,lat,lon,title,description,keywords');
+            .select('id,path_512,path_2048,width,height,lat,lon,title,description,keywords')
+            .not('lat', 'is', null)
+            .not('lon', 'is', null);
           
           if (data) {
             const allPics = data.map((d: any) => ({
@@ -1223,6 +1681,38 @@
       showCompass = false;
       autoguide = false;
       newsFlashMode = 'alle';
+    }
+
+    // Check for GPS simulation parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const simulation = urlParams.get('simulation');
+    if (simulation === 'true') {
+      console.log('GPS Simulation mode detected');
+      setupGPSSimulation();
+      
+      // Set simulation-specific settings
+      const autoguideParam = urlParams.get('autoguide');
+      const showDistanceParam = urlParams.get('showDistance');
+      const showCompassParam = urlParams.get('showCompass');
+      
+      if (autoguideParam === 'true') {
+        autoguide = true;
+        console.log('Autoguide enabled for simulation');
+      }
+      
+      if (showDistanceParam === 'true') {
+        showDistance = true;
+        console.log('Distance display enabled for simulation');
+      }
+      
+      if (showCompassParam === 'true') {
+        showCompass = true;
+        console.log('Compass enabled for simulation');
+      }
+    } else {
+      // Always setup GPS simulation for hash-based communication
+      console.log('Setting up GPS simulation for hash-based communication');
+      setupGPSSimulation();
     }
 
     // Initialize speech synthesis for autoguide
@@ -1310,6 +1800,157 @@
       stopGPSTracking();
     };
   });
+
+  // Hilfsfunktion: Grid-Zelle berechnen
+  function getGridCell(lat: number, lon: number, cellSize = 0.4) {
+    return {
+      lat: Math.floor(lat / cellSize) * cellSize,
+      lon: Math.floor(lon / cellSize) * cellSize
+    };
+  }
+
+  // Hilfsfunktion: Abgedeckte Zellen bestimmen
+  function getCoveredCells(pics: any[], cellSize = 0.4) {
+    const covered = new Set<string>();
+    for (const pic of pics) {
+      if (pic.lat && pic.lon) {
+        const cell = getGridCell(pic.lat, pic.lon, cellSize);
+        covered.add(`${cell.lat},${cell.lon}`);
+      }
+    }
+    return covered;
+  }
+
+  // Grid Coverage Check & Nachladen
+  async function fillCoverageGaps(userLat: number, userLon: number, pics: any[], cellSize = 0.4, radius = 0.5) {
+    const covered = getCoveredCells(pics, cellSize);
+    const currentCell = getGridCell(userLat, userLon, cellSize);
+    let gaps: {lat: number, lon: number}[] = [];
+    // Prüfe aktuelle und 8 Nachbarzellen (3x3 Grid)
+    for (let dLat = -1; dLat <= 1; dLat++) {
+      for (let dLon = -1; dLon <= 1; dLon++) {
+        const cellLat = currentCell.lat + dLat * cellSize;
+        const cellLon = currentCell.lon + dLon * cellSize;
+        const key = `${cellLat},${cellLon}`;
+        if (!covered.has(key)) {
+          gaps.push({ lat: cellLat + cellSize/2, lon: cellLon + cellSize/2 });
+        }
+      }
+    }
+    if (gaps.length > 0) {
+      for (const gap of gaps) {
+        console.log(`[Coverage] Lücke erkannt bei ${gap.lat},${gap.lon}, lade gezielt nach...`);
+        // Temporär userLat/userLon setzen und nachladen
+        const oldLat = userLat;
+        const oldLon = userLon;
+        userLat = gap.lat;
+        userLon = gap.lon;
+        await loadMore('coverage-gap');
+        userLat = oldLat;
+        userLon = oldLon;
+      }
+      return true;
+    }
+    return false;
+  }
+
+  // Integration: Nach jedem Nachladen und bei Bewegung Coverage prüfen
+  // Beispielhafte Integration in checkAndLoadMoreImages:
+  async function checkAndLoadMoreImages() {
+    if (!userLat || !userLon || !hasMoreImages || loading) {
+      return;
+    }
+    
+    const currentPics = get(pics);
+    
+    // Check coverage in all 8 directions (N, NO, O, SO, S, SW, W, NW)
+    const directions = [
+      { name: 'N', lat: 1, lon: 0 },   // North
+      { name: 'NO', lat: 1, lon: 1 },  // Northeast
+      { name: 'O', lat: 0, lon: 1 },   // East
+      { name: 'SO', lat: -1, lon: 1 }, // Southeast
+      { name: 'S', lat: -1, lon: 0 },  // South
+      { name: 'SW', lat: -1, lon: -1 }, // Southwest
+      { name: 'W', lat: 0, lon: -1 },  // West
+      { name: 'NW', lat: 1, lon: -1 }  // Northwest
+    ];
+    
+    const coverageRadius = 5000; // 5km radius
+    const checkDistance = 3000; // 3km from center to check each direction
+    let uncoveredDirections: string[] = [];
+    
+    // Check each direction for coverage
+    for (const direction of directions) {
+      const checkLat = userLat + (direction.lat * checkDistance / 111000); // ~111km per degree
+      const checkLon = userLon + (direction.lon * checkDistance / (111000 * Math.cos(userLat * Math.PI / 180)));
+      
+      // Check if there are any images within coverageRadius of this check point
+      const imagesInDirection = currentPics.filter((pic: any) => {
+        if (!pic.lat || !pic.lon) return false;
+        const distance = getDistanceInMeters(checkLat, checkLon, pic.lat, pic.lon);
+        return distance <= coverageRadius;
+      });
+      
+      if (imagesInDirection.length === 0) {
+        uncoveredDirections.push(direction.name);
+      }
+    }
+    
+    // Check if we have enough nearby images at current position
+    const nearbyImages = currentPics.filter((pic: any) => {
+      if (!pic.lat || !pic.lon) return false;
+      const distance = getDistanceInMeters(userLat as number, userLon as number, pic.lat, pic.lon);
+      return distance <= 5000; // 5km radius
+    });
+    
+    // Find the nearest image to check if we're too far from any cached images
+    const imagesWithGPS = currentPics.filter((pic: any) => pic.lat && pic.lon);
+    let nearestDistance = Infinity;
+    if (imagesWithGPS.length > 0) {
+      nearestDistance = Math.min(...imagesWithGPS.map((pic: any) => 
+        getDistanceInMeters(userLat as number, userLon as number, pic.lat, pic.lon)
+      ));
+    }
+    
+    console.log(`[Auto-Load] Current position: ${userLat}, ${userLon}`);
+    console.log(`[Auto-Load] Nearby images (5km): ${nearbyImages.length}`);
+    console.log(`[Auto-Load] Total loaded images: ${currentPics.length}`);
+    console.log(`[Auto-Load] Nearest image distance: ${nearestDistance.toFixed(0)}m`);
+    console.log(`[Auto-Load] Coverage check - Uncovered directions: ${uncoveredDirections.join(', ') || 'All covered'}`);
+    
+    // If we have no nearby images at all, reset and load from new position
+    if (nearbyImages.length === 0 && currentPics.length > 0) {
+      console.log(`[Auto-Load] No nearby images found, resetting and loading from new position...`);
+      pics.set([]);
+      page = 0;
+      hasMoreImages = true;
+      await loadMore('auto-load-new-position');
+      return;
+    }
+    
+    // If the nearest image is more than 10km away, we're probably outside the cached area
+    if (nearestDistance > 10000 && currentPics.length > 0) {
+      console.log(`[Auto-Load] Nearest image is ${nearestDistance.toFixed(0)}m away (>10km), resetting and loading from new position...`);
+      pics.set([]);
+      page = 0;
+      hasMoreImages = true;
+      await loadMore('auto-load-outside-cached-area');
+      return;
+    }
+    
+    // If we have uncovered directions, load more to fill the gaps
+    if (uncoveredDirections.length > 0 && hasMoreImages) {
+      console.log(`[Auto-Load] Uncovered directions detected: ${uncoveredDirections.join(', ')}, loading more to fill gaps...`);
+      await loadMore('auto-load-fill-coverage-gaps');
+      return;
+    }
+    
+    // If we have less than 10 nearby images, load more
+    if (nearbyImages.length < 10 && hasMoreImages) {
+      console.log(`[Auto-Load] Only ${nearbyImages.length} nearby images, loading more...`);
+      await loadMore('auto-load-nearby');
+    }
+  }
 </script>
 
 <!-- Dialoge für Upload und EXIF Upload -->
@@ -1495,6 +2136,17 @@
 </a>
 {/if}
 
+<!-- Floating Simulation Button -->
+{#if isLoggedIn}
+<a href="/simulation" class="simulation-fab" title="GPS Simulation">
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+    <path d="M2 17l10 5 10-5"/>
+    <path d="M2 12l10 5 10-5"/>
+  </svg>
+</a>
+{/if}
+
 <!-- Culoca Logo -->
 <img src="/culoca-logo-512px.png" alt="Culoca" class="culoca-logo" />
 
@@ -1544,6 +2196,7 @@
     userLat={userLat}
     userLon={userLon}
     getDistanceFromLatLonInMeters={getDistanceFromLatLonInMeters}
+    displayedImageCount={displayedImageCount}
   />
 {/if}
 
@@ -1554,6 +2207,15 @@
       <span class="autoguide-text">{autoguideText || 'Audioguide aktiv'}</span>
       {#if !audioActivated}
         <button class="speaker-btn" on:click={activateAudioGuide} title="Sprachausgabe aktivieren">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+            <line x1="12" y1="19" x2="12" y2="23"/>
+            <line x1="8" y1="23" x2="16" y2="23"/>
+          </svg>
+        </button>
+      {:else}
+        <button class="speaker-btn" on:click={testSpeech} title="Sprachausgabe testen">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
             <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
@@ -1627,9 +2289,33 @@
       <div class="spinner"></div>
       <span>Lade weitere Bilder...</span>
     </div>
-  
+  {:else if $pics.length > 0}
     <div class="end-indicator">
-      <span>✅ Alle {$pics.length} Bilder geladen</span>
+      <span>✅ {displayedImageCount} Bilder angezeigt</span>
+      <button class="remove-duplicates-btn" on:click={removeDuplicates} title="Duplikate entfernen">
+        🧹 Duplikate entfernen
+      </button>
+      
+      {#if showRemovedDuplicates && removedDuplicatesList.length > 0}
+        <div class="removed-duplicates-section">
+          <h4>🗑️ Entfernte Duplikate ({removedDuplicatesList.length})</h4>
+          <div class="removed-duplicates-grid">
+            {#each removedDuplicatesList as duplicate}
+              <div class="removed-duplicate-item">
+                <img src={duplicate.src} alt={duplicate.title || 'Bild'} />
+                <div class="duplicate-info">
+                  <strong>ID:</strong> {duplicate.id}<br>
+                  <strong>Titel:</strong> {duplicate.title || 'Kein Titel'}<br>
+                  <strong>GPS:</strong> {duplicate.lat && duplicate.lon ? `${duplicate.lat.toFixed(6)}, ${duplicate.lon.toFixed(6)}` : 'Keine GPS-Daten'}
+                </div>
+              </div>
+            {/each}
+          </div>
+          <button class="hide-duplicates-btn" on:click={() => showRemovedDuplicates = false}>
+            Liste ausblenden
+          </button>
+        </div>
+      {/if}
     </div>
   {/if}
   
@@ -2473,6 +3159,35 @@
     transform: scale(1.08);
   }
 
+  /* Floating Simulation Button */
+  .simulation-fab {
+    position: fixed;
+    right: 1.5rem;
+    bottom: 9rem;
+    z-index: 50;
+    width: 56px;
+    height: 56px;
+    background: #ff6b35;
+    color: #fff;
+    border-radius: 50%;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s, box-shadow 0.2s, transform 0.1s;
+    border: none;
+    outline: none;
+    cursor: pointer;
+    font-size: 1.5rem;
+    text-decoration: none;
+  }
+  .simulation-fab:hover {
+    background: #e55a2b;
+    color: #fff;
+    box-shadow: 0 8px 24px rgba(255,107,53,0.18);
+    transform: scale(1.08);
+  }
+
   /* Floating Profile Button */
   .profile-fab {
     position: fixed;
@@ -2815,5 +3530,92 @@
       font-size: 0.9rem;
     }
   }
+
+  /* End indicator and duplicate removal */
+  .end-indicator {
+    text-align: center;
+    padding: 20px;
+    color: var(--text-secondary);
+    font-size: 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  .remove-duplicates-btn {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  
+  .remove-duplicates-btn:hover {
+    background: var(--accent-color);
+    color: white;
+  }
+
+  /* Removed duplicates section */
+  .removed-duplicates-section {
+    margin-top: 20px;
+    padding: 20px;
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+  }
+
+  .removed-duplicates-section h4 {
+    margin: 0 0 15px 0;
+    color: var(--text-primary);
+    font-size: 1.1em;
+  }
+
+  .removed-duplicates-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 15px;
+  }
+
+  .removed-duplicate-item {
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-tertiary);
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+  }
+
+  .removed-duplicate-item img {
+    width: 100%;
+    height: 120px;
+    object-fit: cover;
+  }
+
+  .duplicate-info {
+    padding: 10px;
+    font-size: 0.8em;
+    color: var(--text-secondary);
+    line-height: 1.4;
+  }
+
+  .hide-duplicates-btn {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .hide-duplicates-btn:hover {
+    background: var(--border-color);
+  }
+
+
 
 </style>
