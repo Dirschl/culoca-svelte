@@ -1123,23 +1123,36 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
         // Update progress
         uploadProgress = Math.round(((i + 1) / totalFiles) * 100);
         
-        // Add new images immediately to gallery
+        // Add new images to gallery with proper sorting
         if (result.images) {
-          pics.update(p => [
-            ...result.images.map((img: any) => ({
-              id: img.id,
-              src: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${img.path_512}`,
-              srcHD: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${img.path_2048}`,
-              width: img.width,
-              height: img.height,
-              lat: img.lat,
-              lon: img.lon,
-              title: img.title,
-              description: img.description,
-              keywords: img.keywords
-            })),
-            ...p
-          ]);
+          const newImages = result.images.map((img: any) => ({
+            id: img.id,
+            src: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${img.path_512}`,
+            srcHD: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${img.path_2048}`,
+            width: img.width,
+            height: img.height,
+            lat: img.lat,
+            lon: img.lon,
+            title: img.title,
+            description: img.description,
+            keywords: img.keywords
+          }));
+
+          pics.update(p => {
+            const combined = [...p, ...newImages];
+            
+            // Sort by distance if user is logged in, has distance enabled, and has GPS coordinates
+            if (isLoggedIn && showDistance && userLat !== null && userLon !== null) {
+              return combined.sort((a, b) => {
+                const distA = a.lat && a.lon ? getDistanceInMeters(userLat!, userLon!, a.lat, a.lon) : Number.MAX_VALUE;
+                const distB = b.lat && b.lon ? getDistanceInMeters(userLat!, userLon!, b.lat, b.lon) : Number.MAX_VALUE;
+                return distA - distB;
+              });
+            } else {
+              // For non-distance mode, add new images at the beginning (newest first)
+              return [...newImages, ...p];
+            }
+          });
           
           // Update gallery stats after upload
           const totalCount = await getTotalImageCount();
@@ -2139,6 +2152,7 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
     showTestMode={true}
     {isLoggedIn}
     {simulationMode}
+    {profileAvatar}
     on:upload={() => showUploadDialog = true}
     on:publicContent={() => showPublicContentModal.set(true)}
     on:profile={() => location.href = '/profile'}

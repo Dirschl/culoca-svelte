@@ -5,6 +5,7 @@
   export let showTestMode = false;
   export let isLoggedIn = false;
   export let simulationMode = false;
+  export let profileAvatar: string | null = null;
   
   const dispatch = createEventDispatcher();
   
@@ -15,8 +16,6 @@
   function handleUpload() {
     dispatch('upload');
   }
-  
-
   
   function handleProfile() {
     dispatch('profile');
@@ -82,8 +81,6 @@
     </svg>
   </button>
   
-
-  
   <!-- Public Content button -->
   <button 
     class="fab-button public-content"
@@ -108,10 +105,18 @@
       aria-label="Profil"
       title="Profil"
     >
-      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-        <circle cx="12" cy="7" r="4"/>
-      </svg>
+      {#if profileAvatar}
+        <img 
+          src={profileAvatar} 
+          alt="Profilbild" 
+          class="profile-avatar"
+        />
+      {:else}
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+          <circle cx="12" cy="7" r="4"/>
+        </svg>
+      {/if}
     </button>
   {/if}
   
@@ -170,6 +175,7 @@
     backdrop-filter: blur(10px);
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
+    overflow: hidden;
   }
   
   .fab-button:hover {
@@ -180,6 +186,19 @@
   
   .fab-button:active {
     transform: scale(0.95);
+  }
+  
+  /* Profile avatar styling */
+  .profile-avatar {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+    border: 2px solid var(--border-color);
+  }
+  
+  .fab-button.profile:hover .profile-avatar {
+    border-color: var(--accent-color);
   }
   
   /* Button specific colors - using theme variables for consistent dark/light mode */
@@ -194,8 +213,6 @@
   .profile {
     background: var(--bg-secondary);
   }
-  
-
   
   .public-content {
     background: var(--bg-secondary);
