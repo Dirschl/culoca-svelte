@@ -44,6 +44,11 @@
   let showNoGPSList = false;
   let showIncompleteList = false;
 
+  // Store lists for quick access from details sections
+  let noGpsImagesList: any[] = [];
+  let incompleteImagesList: any[] = [];
+  let showWithoutGpsList = false;
+
   onMount(async () => {
     await loadAllImages();
     initializeMap();
@@ -145,6 +150,10 @@
       imagesWithoutGPS = noGpsImages.length;
       imagesWithIncompleteData = incompleteImages.length;
 
+      // Save lists for displaying in details sections
+      noGpsImagesList = noGpsImages;
+      incompleteImagesList = incompleteImages;
+
       console.log(`📊 Statistics (after duplicate filtering):`);
       console.log(`  Total unique images: ${totalImages}`);
       console.log(`  With GPS: ${imagesWithGPS}`);
@@ -240,8 +249,12 @@
   function createMap() {
     if (!mapEl || mapInitialized) return;
 
+    const initialLat = userLat ?? simulatedLat;
+    const initialLon = userLon ?? simulatedLon;
+
+    // Use user's current position if available to avoid initial flicker
     // @ts-ignore
-    map = L.map(mapEl).setView([simulatedLat, simulatedLon], 13);
+    map = L.map(mapEl).setView([initialLat, initialLon], 13);
 
     // @ts-ignore
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -250,7 +263,7 @@
 
     // Add user marker (draggable and in front)
     // @ts-ignore
-    userMarker = L.marker([simulatedLat, simulatedLon], {
+    userMarker = L.marker([initialLat, initialLon], {
       draggable: true,
       zIndexOffset: 1000, // Keep in front
       // @ts-ignore
@@ -608,6 +621,48 @@
       map.fitBounds(group.getBounds().pad(0.1));
     }
   }
+
+  function exitSimulation() {
+    // Stop simulation in iframe
+    const iframe = document.querySelector('.app-iframe');
+    if (iframe && iframe.contentWindow) {
+      iframe.contentWindow.postMessage({
+        type: 'gps-simulation-stop'
+      }, '*');
+    }
+    // Navigate back to main page
+    location.href = '/';
+  }
+
+  function stopSimulationViaIframe() {
+    // Update iframe src with stop parameter to trigger simulation stop
+    const iframe = document.querySelector('.app-iframe');
+    if (iframe && iframe.tagName === 'IFRAME') {
+      const iframeElement = iframe as HTMLIFrameElement;
+      iframeElement.src = '/?stop=simulation';
+    }
+  }
+
+  // Function to remove duplicates from the gallery
+  function removeDuplicates() {
+    const currentPics = get(pics);
+    const uniquePics = currentPics.filter((pic, index, self) => 
+      index === self.findIndex(p => p.id === pic.id)
+    );
+    
+    if (uniquePics.length !== currentPics.length) {
+      const removedDuplicates = currentPics.filter((pic, index, self) => 
+        index !== self.findIndex(p => p.id === pic.id)
+      );
+      
+      console.log(`🧹 Removed ${removedDuplicates.length} duplicate images from gallery:`, removedDuplicates);
+      
+      pics.set(uniquePics);
+      
+      // Update duplicate count
+      duplicateCount += removedDuplicates.length;
+    }
+  }
 </script>
 
 <svelte:head>
@@ -617,71 +672,25 @@
 </svelte:head>
 
 <div class="simulation-container" class:dark={$darkMode}>
-  <!-- Header -->
-  <header class="simulation-header">
-    <div class="position-info">
-      {#if userLat && userLon}
-        <span>📍 {userLat.toFixed(6)}, {userLon.toFixed(6)}</span>
-      {/if}
-    </div>
-  </header>
-
   <!-- Split Screen -->
   <div class="split-screen">
     <!-- Left Side - Map -->
     <div class="map-side">
       <div bind:this={mapEl} class="map-container"></div>
       <div class="map-info">
-        <p>📊 {imagesWithGPS} von {totalImages} eindeutigen Bildern haben GPS-Daten ({imagesWithoutGPS} ohne GPS, {imagesWithIncompleteData} unvollständig, {duplicateCount} Duplikate entfernt)</p>
-        <div class="no-gps-toggle" style="margin-top: 12px; cursor: pointer; color: #1976d2; font-weight: 500;" on:click={() => showNoGPSList = !showNoGPSList}>
-          <span>({imagesWithoutGPS} ohne GPS)</span>
-        </div>
-        <div class="incomplete-toggle" style="margin-top: 8px; cursor: pointer; color: #ff9800; font-weight: 500;" on:click={() => showIncompleteList = !showIncompleteList}>
-          <span>({imagesWithIncompleteData} unvollständig)</span>
-        </div>
-        {#if showNoGPSList}
-          <div class="no-gps-list" style="margin: 12px 0 24px 0; padding: 12px; background: #f8f8f8; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
-            <h3 style="margin-bottom: 8px; font-size: 1.1em;">Bilder ohne GPS-Koordinaten ({imagesWithoutGPS})</h3>
-            <div style="display: flex; flex-wrap: wrap; gap: 16px;">
-              {#each allImages.filter(img => !img.lat || !img.lon) as img}
-                <a href={`/image/${img.id}`} target="_blank" style="display: flex; flex-direction: column; align-items: center; text-decoration: none; color: inherit;">
-                  <div style="width: 64px; height: 64px; border-radius: 50%; overflow: hidden; border: 2px solid #ccc; background: #eee; display: flex; align-items: center; justify-content: center; margin-bottom: 4px;">
-                    {#if img.path_64 || img.path_512}
-                      <img src={`https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/${img.path_64 || img.path_512}`} alt={img.title || 'Bild'} style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;" />
-                    {:else}
-                      <span style="font-size: 2em; color: #aaa;">📷</span>
-                    {/if}
-                  </div>
-                  <span style="font-size: 0.9em; text-align: center; max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{img.title || img.original_name || 'Bild'}</span>
-                </a>
-              {/each}
-            </div>
-          </div>
+        {#if userLat && userLon}
+          <p style="margin:4px 0;">📍 {userLat.toFixed(6)}, {userLon.toFixed(6)}</p>
         {/if}
-        {#if showIncompleteList}
-          <div class="incomplete-list" style="margin: 12px 0 24px 0; padding: 12px; background: #fff3cd; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); border: 1px solid #ffeaa7;">
-            <h3 style="margin-bottom: 8px; font-size: 1.1em; color: #856404;">Bilder mit unvollständigen Daten ({imagesWithIncompleteData})</h3>
-            <div style="display: flex; flex-wrap: wrap; gap: 16px;">
-              {#each allImages.filter(img => !img.title || !img.description || !img.keywords || img.keywords.length === 0) as img}
-                <a href={`/image/${img.id}`} target="_blank" style="display: flex; flex-direction: column; align-items: center; text-decoration: none; color: inherit;">
-                  <div style="width: 64px; height: 64px; border-radius: 50%; overflow: hidden; border: 2px solid #ffc107; background: #fff3cd; display: flex; align-items: center; justify-content: center; margin-bottom: 4px;">
-                    {#if img.path_64 || img.path_512}
-                      <img src={`https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/${img.path_64 || img.path_512}`} alt={img.title || 'Bild'} style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;" />
-                    {:else}
-                      <span style="font-size: 2em; color: #ffc107;">📷</span>
-                    {/if}
-                  </div>
-                  <span style="font-size: 0.9em; text-align: center; max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{img.title || img.original_name || 'Bild'}</span>
-                  <div style="font-size: 0.7em; color: #856404; text-align: center; max-width: 80px;">
-                    {#if !img.title}❌ Titel{/if}
-                    {#if !img.description}❌ Beschreibung{/if}
-                    {#if !img.keywords || img.keywords.length === 0}❌ Keywords{/if}
-                  </div>
-                </a>
-              {/each}
-            </div>
-          </div>
-        {/if}
+        <p style="margin:4px 0;">📊 {imagesWithGPS} / {totalImages} Bilder mit GPS&nbsp;– (
+          <span class="stat-link" on:click={() => showWithoutGpsList = !showWithoutGpsList}>
+            {imagesWithoutGPS} ohne GPS
+          </span>, 
+          <span class="stat-link" on:click={() => showIncompleteList = !showIncompleteList}>
+            {imagesWithIncompleteData} unvollständig
+          </span>, {duplicateCount} Duplikate entfernt 
+          <button class="remove-duplicates-btn" on:click={removeDuplicates} title="Duplikate entfernen">
+            🧹
+          </button>)</p>
       </div>
     </div>
 
@@ -694,6 +703,66 @@
       ></iframe>
     </div>
   </div>
+
+  <!-- Compact Lists with 48px Thumbnails -->
+  {#if showWithoutGpsList && noGpsImagesList.length > 0}
+    <div class="compact-list-container">
+      <div class="compact-list-header">
+        <h4>🚫 Bilder ohne GPS ({noGpsImagesList.length})</h4>
+        <button class="close-btn" on:click={() => showWithoutGpsList = false}>×</button>
+      </div>
+      <div class="compact-list">
+        {#each noGpsImagesList as img}
+          <div class="compact-item" on:click={() => window.open(`/image/${img.id}`, '_blank')}>
+            <img 
+              src="https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/{img.path_64 || img.path_512}"
+              alt={img.title || 'Bild'}
+              class="compact-thumbnail"
+              loading="lazy"
+              onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+            />
+            <div class="compact-placeholder" style="display: none;">📷</div>
+            <div class="compact-info">
+              <div class="compact-title">{img.title || `Bild ${img.id}`}</div>
+              <div class="compact-missing">❌ Keine GPS-Koordinaten gespeichert</div>
+              <div class="compact-note">→ Bild kann nicht in Karte angezeigt werden</div>
+            </div>
+          </div>
+        {/each}
+      </div>
+    </div>
+  {/if}
+
+  {#if showIncompleteList && incompleteImagesList.length > 0}
+    <div class="compact-list-container">
+      <div class="compact-list-header">
+        <h4>⚠️ Unvollständige Bilder ({incompleteImagesList.length})</h4>
+        <button class="close-btn" on:click={() => showIncompleteList = false}>×</button>
+      </div>
+      <div class="compact-list">
+        {#each incompleteImagesList as img}
+          <div class="compact-item" on:click={() => window.open(`/image/${img.id}`, '_blank')}>
+            <img 
+              src="https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/{img.path_64 || img.path_512}"
+              alt={img.title || 'Bild'}
+              class="compact-thumbnail"
+              loading="lazy"
+              onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+            />
+            <div class="compact-placeholder" style="display: none;">📷</div>
+            <div class="compact-info">
+              <div class="compact-title">{img.title || `Bild ${img.id}`}</div>
+              <div class="compact-missing">
+                {#if !img.title}❌ Kein Titel{/if}
+                {#if !img.description}❌ Keine Beschreibung{/if}
+                {#if !img.keywords || img.keywords.length === 0}❌ Keine Keywords{/if}
+              </div>
+            </div>
+          </div>
+        {/each}
+      </div>
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -703,53 +772,6 @@
     flex-direction: column;
     background: var(--bg-primary);
     color: var(--text-primary);
-  }
-
-  .simulation-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 1rem;
-    background: var(--bg-secondary);
-    border-bottom: 1px solid var(--border-color);
-    flex-shrink: 0;
-  }
-
-  .simulation-header h1 {
-    margin: 0;
-    font-size: 1.5rem;
-    color: var(--accent-color);
-  }
-
-  .simulation-controls {
-    display: flex;
-    gap: 0.5rem;
-  }
-
-  .control-btn {
-    padding: 0.5rem 1rem;
-    border: 1px solid var(--border-color);
-    border-radius: 0.5rem;
-    background: var(--bg-tertiary);
-    color: var(--text-primary);
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-
-  .control-btn:hover {
-    background: var(--accent-color);
-    color: white;
-  }
-
-  .control-btn.active {
-    background: var(--accent-color);
-    color: white;
-  }
-
-  .position-info {
-    font-family: monospace;
-    font-size: 0.9rem;
-    color: var(--text-secondary);
   }
 
   .split-screen {
@@ -818,15 +840,26 @@
   }
 
   .gallery-container {
-    flex: 1;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 40vh;
+    background: var(--bg-primary);
+    border-top: 2px solid var(--border-color);
+    z-index: 1000;
     overflow-y: auto;
-    padding: 1rem;
+    display: flex;
+    flex-direction: column;
   }
 
   .grid-layout {
+    flex: 1;
+    padding: 1rem;
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     gap: 0.5rem;
+    overflow-y: auto;
   }
 
   .grid-item {
@@ -903,15 +936,219 @@
       flex: none;
       height: 50vh;
     }
-    
-    .simulation-header {
-      flex-direction: column;
-      gap: 1rem;
-      align-items: stretch;
-    }
-    
-    .simulation-controls {
-      justify-content: center;
-    }
+  }
+
+  /* Styling for inline stat links */
+  .stat-link {
+    color: var(--accent-color);
+    cursor: pointer;
+    text-decoration: underline;
+  }
+
+  .stat-link:hover {
+    color: var(--accent-color-hover, #45a049);
+  }
+
+  .gallery-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .gallery-header h3 {
+    margin: 0;
+    color: var(--text-primary);
+  }
+
+  .close-btn {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--text-secondary);
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: background-color 0.2s;
+  }
+
+  .close-btn:hover {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+  }
+
+  .placeholder-icon {
+    width: 100%;
+    height: 150px;
+    background: var(--bg-tertiary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    color: var(--text-secondary);
+  }
+
+  .image-info {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(transparent, rgba(0,0,0,0.8));
+    color: white;
+    padding: 1rem 0.5rem 0.5rem;
+  }
+
+  .image-title {
+    font-size: 0.9rem;
+    font-weight: 500;
+    margin-bottom: 0.25rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Compact Lists Styling */
+  .compact-list-container {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    max-height: 50vh;
+    background: var(--bg-primary);
+    border-top: 2px solid var(--border-color);
+    z-index: 1000;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .compact-list-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
+  }
+
+  .compact-list-header h4 {
+    margin: 0;
+    font-size: 1.1rem;
+    color: var(--text-primary);
+  }
+
+  .close-btn {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 50%;
+    transition: background-color 0.2s;
+  }
+
+  .close-btn:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+  }
+
+  .compact-list {
+    flex: 1;
+    padding: 1rem;
+    overflow-y: auto;
+  }
+
+  .compact-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    background: var(--bg-secondary);
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: background-color 0.2s, transform 0.2s;
+  }
+
+  .compact-item:hover {
+    background: var(--bg-tertiary);
+    transform: translateX(4px);
+  }
+
+  .compact-thumbnail {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    border: 2px solid var(--border-color);
+  }
+
+  .compact-placeholder {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--bg-tertiary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    flex-shrink: 0;
+    border: 2px solid var(--border-color);
+  }
+
+  .compact-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .compact-title {
+    font-weight: 600;
+    font-size: 1rem;
+    color: var(--text-primary);
+    margin-bottom: 0.25rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .compact-missing {
+    font-size: 0.85rem;
+    color: #ff6b6b;
+    margin-bottom: 0.25rem;
+  }
+
+  .compact-note {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    font-style: italic;
+  }
+
+  /* Remove duplicates button */
+  .remove-duplicates-btn {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-left: 4px;
+    color: var(--text-secondary);
+  }
+  
+  .remove-duplicates-btn:hover {
+    background: var(--accent-color);
+    color: white;
+    border-color: var(--accent-color);
   }
 </style> 

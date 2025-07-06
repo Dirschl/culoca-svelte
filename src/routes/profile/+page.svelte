@@ -203,28 +203,30 @@
   <title>Mein Profil - Culoca</title>
 </svelte:head>
 
-{#if loading}
-  <div class="profile-loading">
-    <div class="spinner"></div>
-    <span>Lade Profil...</span>
-  </div>
-{:else}
-  <div class="page-container">
-    <!-- Zurück zur Startseite Button -->
-    <div class="back-button-container">
-      <a href="/" class="back-home-btn" on:click={goHome}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
-        </svg>
-        Zurück zur Startseite
-      </a>
+<div class="profile-page">
+  {#if loading}
+    <div class="loading-container">
+      <div class="spinner"></div>
+      <span>Lade Profil...</span>
     </div>
-
-    <!-- Profil Card -->
-    <div class="profile-card">
+  {:else}
+    <div class="profile-container">
+      <!-- Header mit Zurück-Button -->
       <div class="profile-header">
+        <button class="back-btn" on:click={goHome} aria-label="Zurück zur Startseite">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
+          </svg>
+          Zurück
+        </button>
+        <h1 class="page-title">Mein Profil</h1>
+      </div>
+
+      <!-- Hauptinhalt -->
+      <div class="profile-content">
+        <!-- Avatar-Sektion -->
         <div class="avatar-section">
-          <div class="avatar-wrapper">
+          <div class="avatar-container">
             {#if getAvatarUrl()}
               <img src={getAvatarUrl()} alt="Profilbild" class="profile-avatar" />
             {:else}
@@ -235,12 +237,23 @@
                 </svg>
               </div>
             {/if}
-            <label for="avatar-input" class="avatar-upload-btn">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
-              </svg>
-              {getAvatarUrl() ? 'Ändern' : 'Hochladen'}
-            </label>
+            <div class="avatar-actions">
+              <label for="avatar-input" class="avatar-btn primary">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
+                </svg>
+                {getAvatarUrl() ? 'Ändern' : 'Hochladen'}
+              </label>
+              {#if getAvatarUrl()}
+                <button type="button" class="avatar-btn secondary" on:click={() => {
+                  avatarFile = null;
+                  avatarPreview = null;
+                  profile.avatar_url = null;
+                }}>
+                  Entfernen
+                </button>
+              {/if}
+            </div>
             <input 
               id="avatar-input" 
               type="file" 
@@ -248,242 +261,326 @@
               on:change={handleAvatarChange}
               class="hidden"
             />
-            {#if getAvatarUrl()}
-              <button type="button" class="remove-avatar-btn" on:click={() => {
-                avatarFile = null;
-                avatarPreview = null;
-                profile.avatar_url = null;
-              }}>
-                Entfernen
-              </button>
-            {/if}
           </div>
-        </div>
-        
-        <div class="profile-info">
-          <h1 class="profile-title">Mein Profil</h1>
-          <div class="profile-email">{user.email}</div>
-        </div>
-      </div>
-
-      <form class="profile-form" on:submit|preventDefault={saveProfile}>
-        <!-- Persönliche Informationen -->
-        <div class="form-section">
-          <h2 class="section-title">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-            </svg>
-            Persönliche Informationen
-          </h2>
-          <div class="form-group">
-            <label for="fullName">Vollständiger Name</label>
-            <input id="fullName" type="text" bind:value={name} placeholder="Dein vollständiger Name" />
+          <div class="user-info">
+            <h2 class="user-name">{name || 'Unbekannter Benutzer'}</h2>
+            <p class="user-email">{user.email}</p>
           </div>
         </div>
 
-        <!-- Kontakt & Info -->
-        <div class="form-section">
-          <h2 class="section-title">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-            </svg>
-            Kontakt & Info
-          </h2>
-          <div class="form-group">
-            <label for="address">Adresse</label>
-            <textarea id="address" bind:value={address} placeholder="Deine Adresse" rows="2"></textarea>
-            <label class="checkbox-label">
-              <input type="checkbox" bind:checked={show_address} />
-              <span class="checkmark"></span>
-              Adresse öffentlich anzeigen
-            </label>
-          </div>
-          <div class="form-group">
-            <label for="phone">Telefonnummer</label>
-            <input id="phone" type="tel" bind:value={phone} placeholder="Deine Telefonnummer" />
-            <label class="checkbox-label">
-              <input type="checkbox" bind:checked={show_phone} />
-              <span class="checkmark"></span>
-              Telefonnummer öffentlich anzeigen
-            </label>
-          </div>
-          <div class="form-group">
-            <label for="email">E-Mail</label>
-            <input id="email" type="email" bind:value={email} placeholder="Deine E-Mail-Adresse" />
-            <label class="checkbox-label">
-              <input type="checkbox" bind:checked={show_email} />
-              <span class="checkmark"></span>
-              E-Mail öffentlich anzeigen
-            </label>
-          </div>
-          <div class="form-group">
-            <label for="website">Webseite</label>
-            <input id="website" type="url" bind:value={website} placeholder="https://deine-website.de" />
-            <label class="checkbox-label">
-              <input type="checkbox" bind:checked={show_website} />
-              <span class="checkmark"></span>
-              Webseite öffentlich anzeigen
-            </label>
-          </div>
-        </div>
-
-        <!-- Social Media -->
-        <div class="form-section">
-          <h2 class="section-title">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2.04C6.5 2.04 2 6.53 2 12.06C2 17.06 5.66 21.21 10.44 21.96V14.96H7.9V12.06H10.44V9.85C10.44 7.34 11.93 5.96 14.22 5.96C15.31 5.96 16.45 6.15 16.45 6.15V8.62H15.19C13.95 8.62 13.56 9.39 13.56 10.18V12.06H16.34L15.89 14.96H13.56V21.96A10 10 0 0 0 22 12.06C22 6.53 17.5 2.04 12 2.04Z"/>
-            </svg>
-            Social Media
-          </h2>
-          <div class="form-group">
-            <label for="facebook">Facebook</label>
-            <input id="facebook" type="url" bind:value={facebook} placeholder="https://facebook.com/dein-profil" />
-          </div>
-          <div class="form-group">
-            <label for="instagram">Instagram</label>
-            <input id="instagram" type="url" bind:value={instagram} placeholder="https://instagram.com/dein-profil" />
-          </div>
-          <div class="form-group">
-            <label for="twitter">Twitter/X</label>
-            <input id="twitter" type="url" bind:value={twitter} placeholder="https://twitter.com/dein-profil" />
-          </div>
-          <label class="checkbox-label">
-            <input type="checkbox" bind:checked={show_social} />
-            <span class="checkmark"></span>
-            Social Media Links öffentlich anzeigen
-          </label>
-        </div>
-
-        <!-- Speichern Button -->
-        <div class="form-actions">
-          <button type="submit" class="save-btn" disabled={saving}>
-            {#if saving}
-              <div class="spinner-small"></div>
-              Speichern...
-            {:else}
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+        <!-- Profil-Formular -->
+        <form class="profile-form" on:submit|preventDefault={saveProfile}>
+          <!-- Persönliche Informationen -->
+          <div class="card">
+            <h3 class="section-title">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
               </svg>
-              Profil speichern
-            {/if}
-          </button>
-        </div>
+              Persönliche Informationen
+            </h3>
+            <div class="form-group">
+              <label for="fullName">Vollständiger Name</label>
+              <input 
+                id="fullName" 
+                type="text" 
+                bind:value={name} 
+                placeholder="Dein vollständiger Name"
+                class:valid={nameValid}
+                class:invalid={name.length > 0 && !nameValid}
+              />
+              {#if name.length > 0 && !nameValid}
+                <span class="error-text">Name muss zwischen 2 und 60 Zeichen lang sein</span>
+              {/if}
+            </div>
+          </div>
 
-        {#if message}
-          <div class="message" class:success={messageType === 'success'} class:error={messageType === 'error'}>
-            {message}
+          <!-- Kontakt & Info -->
+          <div class="card">
+            <h3 class="section-title">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+              </svg>
+              Kontakt & Info
+            </h3>
+            
+            <div class="form-group">
+              <label for="address">Adresse</label>
+              <textarea 
+                id="address" 
+                bind:value={address} 
+                placeholder="Deine Adresse" 
+                rows="2"
+              ></textarea>
+              <label class="toggle-label">
+                <input type="checkbox" bind:checked={show_address} />
+                <span class="toggle-switch"></span>
+                <span class="toggle-text">Adresse öffentlich anzeigen</span>
+              </label>
+            </div>
+
+            <div class="form-group">
+              <label for="phone">Telefonnummer</label>
+              <input 
+                id="phone" 
+                type="tel" 
+                bind:value={phone} 
+                placeholder="Deine Telefonnummer"
+                class:valid={phoneValid}
+                class:invalid={phone.length > 0 && !phoneValid}
+              />
+              {#if phone.length > 0 && !phoneValid}
+                <span class="error-text">Ungültige Telefonnummer</span>
+              {/if}
+              <label class="toggle-label">
+                <input type="checkbox" bind:checked={show_phone} />
+                <span class="toggle-switch"></span>
+                <span class="toggle-text">Telefonnummer öffentlich anzeigen</span>
+              </label>
+            </div>
+
+            <div class="form-group">
+              <label for="email">E-Mail</label>
+              <input 
+                id="email" 
+                type="email" 
+                bind:value={email} 
+                placeholder="Deine E-Mail-Adresse"
+              />
+              <label class="toggle-label">
+                <input type="checkbox" bind:checked={show_email} />
+                <span class="toggle-switch"></span>
+                <span class="toggle-text">E-Mail öffentlich anzeigen</span>
+              </label>
+            </div>
+
+            <div class="form-group">
+              <label for="website">Webseite</label>
+              <input 
+                id="website" 
+                type="url" 
+                bind:value={website} 
+                placeholder="https://deine-website.de"
+                class:valid={websiteValid}
+                class:invalid={website.length > 0 && !websiteValid}
+              />
+              {#if website.length > 0 && !websiteValid}
+                <span class="error-text">URL muss mit http:// oder https:// beginnen</span>
+              {/if}
+              <label class="toggle-label">
+                <input type="checkbox" bind:checked={show_website} />
+                <span class="toggle-switch"></span>
+                <span class="toggle-text">Webseite öffentlich anzeigen</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Social Media -->
+          <div class="card">
+            <h3 class="section-title">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2.04C6.5 2.04 2 6.53 2 12.06C2 17.06 5.66 21.21 10.44 21.96V14.96H7.9V12.06H10.44V9.85C10.44 7.34 11.93 5.96 14.22 5.96C15.31 5.96 16.45 6.15 16.45 6.15V8.62H15.19C13.95 8.62 13.56 9.39 13.56 10.18V12.06H16.34L15.89 14.96H13.56V21.96A10 10 0 0 0 22 12.06C22 6.53 17.5 2.04 12 2.04Z"/>
+              </svg>
+              Social Media
+            </h3>
+            
+            <div class="form-group">
+              <label for="facebook">Facebook</label>
+              <input 
+                id="facebook" 
+                type="url" 
+                bind:value={facebook} 
+                placeholder="https://facebook.com/dein-profil"
+                class:valid={facebookValid}
+                class:invalid={facebook.length > 0 && !facebookValid}
+              />
+              {#if facebook.length > 0 && !facebookValid}
+                <span class="error-text">URL muss mit https:// beginnen</span>
+              {/if}
+            </div>
+
+            <div class="form-group">
+              <label for="instagram">Instagram</label>
+              <input 
+                id="instagram" 
+                type="url" 
+                bind:value={instagram} 
+                placeholder="https://instagram.com/dein-profil"
+                class:valid={instagramValid}
+                class:invalid={instagram.length > 0 && !instagramValid}
+              />
+              {#if instagram.length > 0 && !instagramValid}
+                <span class="error-text">URL muss mit https:// beginnen</span>
+              {/if}
+            </div>
+
+            <div class="form-group">
+              <label for="twitter">Twitter/X</label>
+              <input 
+                id="twitter" 
+                type="url" 
+                bind:value={twitter} 
+                placeholder="https://twitter.com/dein-profil"
+                class:valid={twitterValid}
+                class:invalid={twitter.length > 0 && !twitterValid}
+              />
+              {#if twitter.length > 0 && !twitterValid}
+                <span class="error-text">URL muss mit https:// beginnen</span>
+              {/if}
+            </div>
+
+            <label class="toggle-label">
+              <input type="checkbox" bind:checked={show_social} />
+              <span class="toggle-switch"></span>
+              <span class="toggle-text">Social Media Links öffentlich anzeigen</span>
+            </label>
+          </div>
+
+          <!-- Speichern Button -->
+          <div class="form-actions">
+            <button type="submit" class="btn" disabled={saving}>
+              {#if saving}
+                <div class="spinner-small"></div>
+                Speichern...
+              {:else}
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                </svg>
+                Profil speichern
+              {/if}
+            </button>
+          </div>
+
+          {#if message}
+            <div class="message" class:success={messageType === 'success'} class:error={messageType === 'error'}>
+              {message}
+            </div>
+          {/if}
+        </form>
+
+        <!-- Error Log Sektion -->
+        {#if errorLogExists}
+          <div class="card errorlog-section">
+            <h3 class="section-title">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2L13.09 8.26L22 9L13.09 9.74L12 16L10.91 9.74L2 9L10.91 8.26L12 2Z"/>
+              </svg>
+              Fehlerprotokoll
+            </h3>
+            <p class="errorlog-info">Es liegen abgelehnte Uploads vor.</p>
+            <div class="errorlog-actions">
+              <button class="btn-secondary" on:click={downloadErrorLog}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
+                </svg>
+                Fehlerlog herunterladen
+              </button>
+              <button class="btn-danger" on:click={deleteErrorLog}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z"/>
+                </svg>
+                Fehlerlog löschen
+              </button>
+            </div>
           </div>
         {/if}
-      </form>
-    </div>
-
-    <div class="profile-actions">
-      <button on:click={goHome}>Zurück zur Hauptseite</button>
-      {#if errorLogExists}
-        <div class="errorlog-info">Es liegen abgelehnte Uploads vor.</div>
-        <button on:click={downloadErrorLog}>Fehlerlog herunterladen</button>
-        <button on:click={deleteErrorLog}>Fehlerlog löschen</button>
-      {/if}
-      <div class="debug-errorlog-files">
-        <b>Debug: errorlogs im Storage:</b>
-        <ul>
-          {#each errorLogFiles as file}
-            <li>{file}</li>
-          {/each}
-        </ul>
       </div>
     </div>
-  </div>
-{/if}
+  {/if}
+</div>
 
 <style>
-  .profile-loading {
+  .profile-page {
+    min-height: 100vh;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+  }
+
+  .loading-container {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     min-height: 60vh;
-    color: #ccc;
     gap: 1rem;
+    color: var(--text-secondary);
   }
-  
+
   .spinner {
     width: 32px;
     height: 32px;
-    border: 3px solid #2d2d44;
-    border-top: 3px solid #0066cc;
+    border: 3px solid var(--border-color);
+    border-top: 3px solid var(--accent-color);
     border-radius: 50%;
     animation: spin 1s linear infinite;
   }
-  
+
   @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
   }
 
-  /* Page Container */
-  .page-container {
+  .profile-container {
     max-width: 800px;
     margin: 0 auto;
     padding: 2rem 1rem;
   }
 
-  /* Back Button */
-  .back-button-container {
-    margin-bottom: 2rem;
-  }
-
-  .back-home-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.75rem 1.5rem;
-    background: #1a1a2e;
-    color: #fff;
-    border-radius: 8px;
-    text-decoration: none;
-    font-weight: 600;
-    font-size: 1rem;
-    transition: all 0.2s ease;
-    border: 2px solid #2d2d44;
-  }
-
-  .back-home-btn:hover {
-    background: #23234a;
-    border-color: #0066cc;
-    transform: translateY(-1px);
-  }
-
-  /* Profile Card */
-  .profile-card {
-    background: #181828;
-    border-radius: 16px;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-    padding: 2.5rem;
-    color: #fff;
-    border: 1px solid #2d2d44;
-  }
-
-  /* Profile Header */
   .profile-header {
     display: flex;
     align-items: center;
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .back-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    background: var(--bg-secondary);
+    color: var(--accent-color);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+  }
+
+  .back-btn:hover {
+    background: var(--border-color);
+    transform: translateY(-1px);
+  }
+
+  .page-title {
+    font-size: 1.875rem;
+    font-weight: 700;
+    margin: 0;
+    color: var(--text-primary);
+  }
+
+  .profile-content {
+    display: flex;
+    flex-direction: column;
     gap: 2rem;
-    margin-bottom: 3rem;
-    padding-bottom: 2rem;
-    border-bottom: 1px solid #2d2d44;
   }
 
   .avatar-section {
-    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+    padding: 2rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    box-shadow: 0 2px 8px var(--shadow);
   }
 
-  .avatar-wrapper {
-    position: relative;
+  .avatar-container {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.75rem;
+    gap: 1rem;
   }
 
   .profile-avatar {
@@ -491,98 +588,111 @@
     height: 120px;
     border-radius: 50%;
     object-fit: cover;
-    border: 4px solid #2d2d44;
-    background: #222b45;
-    transition: border-color 0.2s;
+    border: 4px solid var(--border-color);
+    transition: all 0.2s ease;
   }
 
   .profile-avatar:hover {
-    border-color: #0066cc;
+    transform: scale(1.05);
   }
 
   .avatar-placeholder {
     width: 120px;
     height: 120px;
     border-radius: 50%;
-    background: #2d2d44;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #666;
-    border: 4px solid #2d2d44;
+    background: var(--bg-tertiary);
+    border: 4px solid var(--border-color);
+    color: var(--text-muted);
   }
 
-  .avatar-upload-btn {
+  .avatar-actions {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .avatar-btn {
     display: flex;
     align-items: center;
     gap: 0.5rem;
     padding: 0.5rem 1rem;
-    background: #0066cc;
-    color: #fff;
+    border: none;
     border-radius: 6px;
-    font-size: 0.9rem;
+    font-size: 0.875rem;
     font-weight: 500;
     cursor: pointer;
-    transition: background 0.2s;
+    transition: all 0.2s ease;
   }
 
-  .avatar-upload-btn:hover {
-    background: #0052a3;
+  .avatar-btn.primary {
+    background: var(--accent-color);
+    color: white;
   }
 
-  .remove-avatar-btn {
-    padding: 0.25rem 0.75rem;
-    background: #dc3545;
-    color: #fff;
-    border: none;
-    border-radius: 4px;
-    font-size: 0.8rem;
-    cursor: pointer;
-    transition: background 0.2s;
+  .avatar-btn.primary:hover {
+    background: var(--accent-hover);
+    transform: translateY(-1px);
   }
 
-  .remove-avatar-btn:hover {
-    background: #c82333;
+  .avatar-btn.secondary {
+    background: var(--error-color);
+    color: white;
   }
 
-  .profile-info {
+  .avatar-btn.secondary:hover {
+    background: #dc2626;
+    transform: translateY(-1px);
+  }
+
+  .user-info {
     flex: 1;
   }
 
-  .profile-title {
-    font-size: 2rem;
-    font-weight: 700;
+  .user-name {
+    font-size: 1.5rem;
+    font-weight: 600;
     margin: 0 0 0.5rem 0;
-    color: #fff;
+    color: var(--text-primary);
   }
 
-  .profile-email {
-    color: #aaa;
-    font-size: 1.1rem;
+  .user-email {
+    margin: 0;
+    color: var(--text-secondary);
   }
 
-  /* Form Sections */
-  .form-section {
-    margin-bottom: 2.5rem;
+  .card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 2rem;
+    box-shadow: 0 2px 8px var(--shadow);
   }
 
   .section-title {
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    font-size: 1.3rem;
+    font-size: 1.25rem;
     font-weight: 600;
-    color: #fff;
-    margin-bottom: 1.5rem;
+    color: var(--text-primary);
+    margin: 0 0 1.5rem 0;
     padding-bottom: 0.75rem;
-    border-bottom: 1px solid #2d2d44;
+    border-bottom: 1px solid var(--border-color);
   }
 
   .form-group {
     margin-bottom: 1.5rem;
   }
 
-  /* Form Inputs */
+  label {
+    display: block;
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+    color: var(--text-primary);
+  }
+
   input[type="text"],
   input[type="tel"],
   input[type="url"],
@@ -590,93 +700,124 @@
   textarea {
     width: 100%;
     padding: 0.75rem 1rem;
-    border: 2px solid #2d2d44;
+    border: 2px solid var(--border-color);
     border-radius: 8px;
-    background: #23242a;
-    color: #fff;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
     font-size: 1rem;
-    margin-bottom: 0.5rem;
     transition: all 0.2s ease;
     outline: none;
     box-sizing: border-box;
   }
 
-  input[type="text"]:focus,
-  input[type="tel"]:focus,
-  input[type="url"]:focus,
-  input[type="email"]:focus,
+  input:focus,
   textarea:focus {
-    border-color: #0066cc;
-    box-shadow: 0 0 0 3px #0066cc33;
-    background: #232b3a;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
   }
 
-  label {
-    font-size: 1rem;
-    font-weight: 500;
-    color: #fff;
-    margin-bottom: 0.5rem;
-    display: block;
+  input.valid,
+  textarea.valid {
+    border-color: var(--success-color);
   }
 
-  /* Checkboxes */
-  .checkbox-label {
+  input.invalid,
+  textarea.invalid {
+    border-color: var(--error-color);
+  }
+
+  .error-text {
+    font-size: 0.875rem;
+    color: var(--error-color);
+    margin-top: 0.25rem;
+  }
+
+  .toggle-label {
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    font-size: 0.95rem;
-    color: #ccc;
-    margin-top: 0.5rem;
+    margin-top: 0.75rem;
     cursor: pointer;
     padding: 0.5rem;
     border-radius: 6px;
     transition: background 0.2s;
   }
 
-  .checkbox-label:hover {
-    background: #2d2d44;
+  .toggle-label:hover {
+    background: var(--bg-tertiary);
   }
 
-  .checkbox-label input[type="checkbox"] {
-    accent-color: #0066cc;
-    width: 1.2em;
-    height: 1.2em;
-    margin: 0;
+  .toggle-label input[type="checkbox"] {
+    display: none;
   }
 
-  /* Form Actions */
+  .toggle-switch {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    background: var(--border-color);
+    border-radius: 12px;
+    transition: all 0.2s ease;
+  }
+
+  .toggle-switch::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 20px;
+    height: 20px;
+    background: white;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+  }
+
+  .toggle-label input:checked + .toggle-switch {
+    background: var(--accent-color);
+  }
+
+  .toggle-label input:checked + .toggle-switch::after {
+    transform: translateX(20px);
+  }
+
+  .toggle-text {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+  }
+
   .form-actions {
     display: flex;
     justify-content: center;
-    margin-top: 3rem;
+    margin-top: 2rem;
     padding-top: 2rem;
-    border-top: 1px solid #2d2d44;
+    border-top: 1px solid var(--border-color);
   }
 
-  .save-btn {
+  .btn {
     display: flex;
     align-items: center;
     gap: 0.75rem;
     padding: 1rem 2rem;
-    background: #0066cc;
-    color: #fff;
+    background: var(--accent-color);
+    color: white;
     border: none;
     border-radius: 8px;
     font-weight: 600;
-    font-size: 1.1rem;
+    font-size: 1rem;
     cursor: pointer;
     transition: all 0.2s ease;
     min-width: 200px;
     justify-content: center;
   }
 
-  .save-btn:hover:not(:disabled) {
-    background: #0052a3;
+  .btn:hover:not(:disabled) {
+    background: var(--accent-hover);
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 102, 204, 0.3);
+    box-shadow: 0 4px 12px var(--shadow);
   }
 
-  .save-btn:disabled {
+  .btn:disabled {
     opacity: 0.7;
     cursor: not-allowed;
   }
@@ -684,13 +825,12 @@
   .spinner-small {
     width: 16px;
     height: 16px;
-    border: 2px solid #ffffff33;
-    border-top: 2px solid #fff;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top: 2px solid white;
     border-radius: 50%;
     animation: spin 1s linear infinite;
   }
 
-  /* Messages */
   .message {
     margin-top: 1.5rem;
     padding: 1rem 1.5rem;
@@ -700,15 +840,66 @@
   }
 
   .message.success {
-    background: #d4edda;
-    color: #155724;
-    border: 1px solid #c3e6cb;
+    background: var(--success-color);
+    color: white;
   }
 
   .message.error {
-    background: #f8d7da;
-    color: #721c24;
-    border: 1px solid #f5c6cb;
+    background: var(--error-color);
+    color: white;
+  }
+
+  .errorlog-section {
+    border-color: var(--error-color);
+  }
+
+  .errorlog-info {
+    margin: 0 0 1rem 0;
+    color: var(--text-secondary);
+  }
+
+  .errorlog-actions {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .btn-secondary {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .btn-secondary:hover {
+    background: var(--border-color);
+    transform: translateY(-1px);
+  }
+
+  .btn-danger {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    background: var(--error-color);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .btn-danger:hover {
+    background: #dc2626;
+    transform: translateY(-1px);
   }
 
   .hidden {
@@ -717,18 +908,14 @@
 
   /* Responsive Design */
   @media (max-width: 768px) {
-    .page-container {
+    .profile-container {
       padding: 1rem 0.5rem;
     }
 
-    .profile-card {
-      padding: 1.5rem;
-    }
-
-    .profile-header {
+    .avatar-section {
       flex-direction: column;
-      gap: 1.5rem;
       text-align: center;
+      gap: 1.5rem;
     }
 
     .profile-avatar,
@@ -737,50 +924,42 @@
       height: 100px;
     }
 
-    .profile-title {
-      font-size: 1.5rem;
+    .avatar-actions {
+      justify-content: center;
     }
 
-    .section-title {
-      font-size: 1.1rem;
+    .card {
+      padding: 1.5rem;
     }
 
-    .save-btn {
-      width: 100%;
-      min-width: auto;
+    .errorlog-actions {
+      flex-direction: column;
+    }
+
+    .btn-secondary,
+    .btn-danger {
+      justify-content: center;
     }
   }
 
   @media (max-width: 480px) {
-    .profile-card {
+    .profile-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 1rem;
+    }
+
+    .page-title {
+      font-size: 1.5rem;
+    }
+
+    .card {
       padding: 1rem;
     }
 
-    .profile-avatar,
-    .avatar-placeholder {
-      width: 80px;
-      height: 80px;
+    .btn {
+      width: 100%;
+      min-width: auto;
     }
-
-    .profile-title {
-      font-size: 1.3rem;
-    }
-
-    .back-home-btn {
-      padding: 0.5rem 1rem;
-      font-size: 0.9rem;
-    }
-  }
-
-  .profile-actions {
-    margin-top: 2rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-
-  .errorlog-info {
-    color: #aaa;
-    font-size: 0.9rem;
   }
 </style> 

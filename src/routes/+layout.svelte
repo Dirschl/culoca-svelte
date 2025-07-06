@@ -4,11 +4,9 @@
 	import { writable } from 'svelte/store';
 	import { page } from '$app/stores';
 	import { supabase } from '$lib/supabaseClient';
+	import { showPublicContentModal } from '$lib/modalStore';
 
 	// Kein $props, keine runes
-
-	// Modal-Store
-	export const showUploadModal = writable(false);
 
 	// Login-Status
 	let isLoggedIn = false;
@@ -40,24 +38,15 @@
 	});
 </script>
 
-<!-- Floating Action Button (+) nur auf der Startseite UND nur für eingeloggte User anzeigen -->
-{#if $page.url.pathname === '/' && isLoggedIn}
-<button class="fab-upload" on:click={() => showUploadModal.set(true)} title="Neuen Content hinzufügen">
-	<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-		<circle cx="12" cy="12" r="10"/>
-		<line x1="12" y1="8" x2="12" y2="16"/>
-		<line x1="8" y1="12" x2="16" y2="12"/>
-	</svg>
-</button>
-{/if}
+
 
 <!-- Upload Modal -->
-{#if $showUploadModal}
-	<div class="modal-backdrop" on:click={() => showUploadModal.set(false)}></div>
+{#if $showPublicContentModal}
+	<div class="modal-backdrop" on:click={() => showPublicContentModal.set(false)}></div>
 	<div class="upload-modal">
 		<div class="modal-header">
 			<h2>Öffentlichen Content hinzufügen</h2>
-			<button class="close-btn" on:click={() => showUploadModal.set(false)}>&times;</button>
+			<button class="close-btn" on:click={() => showPublicContentModal.set(false)}>&times;</button>
 		</div>
 		<div class="modal-body">
 			<!-- Content-Typ Dropdown -->
@@ -128,29 +117,7 @@
 {/if}
 
 <style>
-	.fab-upload {
-		position: fixed;
-		right: 1.5rem;
-		bottom: 17.5rem;
-		z-index: 100;
-		width: 56px;
-		height: 56px;
-		background: #0066cc;
-		color: #fff;
-		border-radius: 50%;
-		border: none;
-		box-shadow: 0 4px 16px rgba(0,0,0,0.18);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		font-size: 2rem;
-		cursor: pointer;
-		transition: background 0.2s, box-shadow 0.2s, transform 0.1s;
-	}
-	.fab-upload:hover {
-		background: #0052a3;
-		transform: scale(1.08);
-	}
+
 	.modal-backdrop {
 		position: fixed;
 		top: 0; left: 0; right: 0; bottom: 0;
@@ -186,13 +153,7 @@
 			left: 0;
 			transform: none;
 		}
-		.fab-upload {
-			right: 1rem;
-			bottom: 13.5rem;
-			width: 48px;
-			height: 48px;
-			font-size: 1.2rem;
-		}
+
 	}
 	.modal-header {
 		display: flex;

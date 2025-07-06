@@ -4,7 +4,10 @@
   import { writable, get } from 'svelte/store';
   import Justified from '$lib/Justified.svelte';
   import NewsFlash from '$lib/NewsFlash.svelte';
-  import { beforeNavigate, afterNavigate } from '$app/navigation';
+  import FloatingActionButtons from '$lib/FloatingActionButtons.svelte';
+import { beforeNavigate, afterNavigate } from '$app/navigation';
+  import { showPublicContentModal } from '$lib/modalStore';
+
   import { updateGalleryStats, galleryStats } from '$lib/galleryStats';
 
 
@@ -61,7 +64,7 @@
   let userLon: number | null = null;
   let deviceHeading: number | null = null;
   let showUploadDialog = false;
-  let showExifDialog = false;
+
   let isLoggedIn = false;
   let currentUser: any = null;
 
@@ -75,9 +78,7 @@
   let authChecked = false; // Prüft, ob der Login-Status bereits geladen wurde
 
   // EXIF Upload Variablen
-  let exifFiles: FileList | null = null;
-  let exifUploading = false;
-  let exifMessage = '';
+
 
   // Preload gallery in background when on detail page
   let preloadInterval: number | null = null;
@@ -94,6 +95,7 @@
 
   // GPS Simulation support
   let gpsSimulationActive = false;
+  let simulationMode = false; // Track if we're in simulation mode
   let simulatedLat: number | null = null;
   let simulatedLon: number | null = null;
 
@@ -176,8 +178,8 @@
     console.log('🎤 Speaking:', text, 'for image:', imageId);
     autoguideText = text;
     
-    // Cancel any ongoing speech
-    if (speechSynthesis) {
+    // Cancel any ongoing speech, but only if we're not already speaking the same text
+    if (speechSynthesis && lastSpeechText !== text) {
       speechSynthesis.cancel();
     }
     
@@ -207,13 +209,12 @@
     };
     
     currentSpeech.onerror = (event) => {
-      console.error('🎤 Speech error:', event.error);
-      
-      // Handle specific error types
       if (event.error === 'canceled') {
         console.log('🎤 Speech was canceled (expected behavior)');
         return;
       }
+      
+      console.error('🎤 Speech error:', event.error);
       
       if (event.error === 'not-allowed') {
         console.log('🎤 Speech not allowed - user interaction required');
@@ -269,8 +270,9 @@
       }
     };
     
-    // Enhanced mobile and CarPlay handling
+    // Chrome and cross-platform handling
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const isChrome = /Chrome/.test(navigator.userAgent);
     
     if (isMobile) {
       console.log('🎤 Mobile/CarPlay device detected - using enhanced speech handling');
@@ -301,21 +303,41 @@
         }
       }, delay);
     } else {
-      // Desktop handling
-      try {
-        if (speechSynthesis) {
-          speechSynthesis.speak(currentSpeech);
-          console.log('🎤 Desktop: Speech synthesis speak called');
+      // Desktop handling with Chrome-specific fixes
+      if (isChrome) {
+        console.log('🎤 Chrome detected - using Chrome-specific speech handling');
+        // Chrome fix: Small delay to ensure speech synthesis is ready
+        setTimeout(() => {
+          try {
+            if (speechSynthesis) {
+              speechSynthesis.speak(currentSpeech);
+              console.log('🎤 Chrome: Speech synthesis speak called');
+            }
+          } catch (error) {
+            console.error('🎤 Chrome: Error calling speech synthesis:', error);
+          }
+        }, 50);
+      } else {
+        // Other desktop browsers
+        try {
+          if (speechSynthesis) {
+            speechSynthesis.speak(currentSpeech);
+            console.log('🎤 Desktop: Speech synthesis speak called');
+          }
+        } catch (error) {
+          console.error('🎤 Desktop: Error calling speech synthesis:', error);
         }
-      } catch (error) {
-        console.error('🎤 Desktop: Error calling speech synthesis:', error);
       }
     }
   }
 
   function announceFirstImage() {
+    console.log('🎤 announceFirstImage called');
+    console.log('🎤 autoguide:', autoguide);
+    console.log('🎤 audioActivated:', audioActivated);
+    
     if (!autoguide) {
-      console.log('Autoguide not enabled, skipping announcement');
+      console.log('🎤 Autoguide not enabled, skipping announcement');
       return;
     }
     
@@ -326,9 +348,12 @@
     }
     
     const currentPics = get(pics);
+    console.log('🎤 Current pics length:', currentPics.length);
+    
     if (currentPics.length > 0) {
       const firstImage = currentPics[0];
-      console.log('🎤 Announcing first image:', firstImage);
+      console.log('🎤 First image:', firstImage);
+      console.log('🎤 First image title:', firstImage.title);
       
       if (firstImage.title) {
         console.log('🎤 First image has title:', firstImage.title);
@@ -348,6 +373,9 @@
     if (!speechSynthesis) initSpeechSynthesis();
     if (speechSynthesis) {
       console.log('🎤 Activating audio guide with user interaction...');
+      
+      // Chrome-specific fix: Cancel any existing speech first
+      speechSynthesis.cancel();
       
       // Enhanced iOS/CarPlay activation
       const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
@@ -384,25 +412,46 @@
           }
         }
       } else {
-        // Non-iOS devices
+        // Non-iOS devices - Chrome fix
         speechSynthesis.resume();
       }
       
       // Teste die Sprachausgabe mit einem kurzen Text - nur nach direkter Benutzerinteraktion
-      const testUtterance = new SpeechSynthesisUtterance('Sprachausgabe aktiviert');
+      const testUtterance = new SpeechSynthesisUtterance('Audio aktiviert');
       testUtterance.lang = 'de-DE';
       testUtterance.volume = 1.0;
+      testUtterance.rate = 0.9; // Slightly slower for better clarity
+      
+      testUtterance.onstart = () => {
+        console.log('🎤 Audio guide activation started');
+        audioActivated = true;
+      };
+      
+      // Set audioActivated immediately for better reactivity
+      audioActivated = true;
+      
       testUtterance.onend = () => {
         console.log('🎤 Audio guide activated successfully');
-        // Don't clear autoguideText - let it show the activation message briefly
+        // Announce first image after activation
         setTimeout(() => {
-          if (autoguideText === 'Sprachausgabe aktiviert') {
-            autoguideText = '';
-          }
-        }, 2000);
+          announceFirstImage();
+        }, 500);
       };
+      
+      // Also announce immediately if audio is activated
+      setTimeout(() => {
+        announceFirstImage();
+      }, 200);
+      
+      // Don't log canceled errors as errors - they're expected
       testUtterance.onerror = (event) => {
+        if (event.error === 'canceled') {
+          console.log('🎤 Speech was canceled (expected behavior)');
+          return;
+        }
+        
         console.error('🎤 Audio guide activation error:', event.error);
+        
         if (event.error === 'not-allowed') {
           console.log('🎤 Speech not allowed - user interaction required');
           // Wait for user interaction and retry
@@ -424,31 +473,19 @@
         }
       };
       
-      // Enhanced delay for mobile/CarPlay devices
-      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-      if (isMobile) {
-        setTimeout(() => {
-          try {
-            if (speechSynthesis) {
-              speechSynthesis.speak(testUtterance);
-              console.log('🎤 Mobile/CarPlay: Audio guide activation test spoken');
-            }
-          } catch (error) {
-            console.error('🎤 Mobile/CarPlay: Audio guide activation failed:', error);
-          }
-        }, 200);
-      } else {
+
+      
+      // Chrome fix: Small delay to ensure speech synthesis is ready
+      setTimeout(() => {
         try {
           if (speechSynthesis) {
             speechSynthesis.speak(testUtterance);
-            console.log('🎤 Desktop: Audio guide activation test spoken');
+            console.log('🎤 Audio guide activation test spoken');
           }
         } catch (error) {
-          console.error('🎤 Desktop: Audio guide activation failed:', error);
+          console.error('🎤 Audio guide activation failed:', error);
         }
-      }
-      
-      audioActivated = true;
+      }, 100);
     }
   }
 
@@ -693,6 +730,7 @@
       } else if (event.data && event.data.type === 'gps-simulation-stop') {
         console.log('GPS simulation stopped, re-enabling real GPS tracking');
         gpsSimulationActive = false;
+        simulationMode = false;
       } else if (event.data && event.data.type === 'request-gallery-data') {
         console.log('Received request for gallery data');
         // Send current gallery data to parent window
@@ -707,6 +745,8 @@
     // Listen for postMessage events
     window.addEventListener('message', handlePostMessage);
   }
+
+
 
   function startGalleryPreload() {
     // Only preload if we're not already on the main page
@@ -761,6 +801,7 @@
         
         // Announce first image if autoguide is enabled
         if (autoguide && allPics.length > 0) {
+          console.log('🎤 Autoguide enabled and images loaded, announcing first image...');
           setTimeout(() => announceFirstImage(), 500);
         }
         
@@ -852,8 +893,8 @@
         }));
         // Prüfe auf Duplikate vor dem Hinzufügen
         const currentPics = get(pics);
-        const existingIds = new Set(currentPics.map(p => p.id));
-        const uniqueNewPics = newPics.filter(pic => !existingIds.has(pic.id));
+        const existingIds = new Set(currentPics.map((p: any) => p.id));
+        const uniqueNewPics = newPics.filter((pic: any) => !existingIds.has(pic.id));
         
         if (uniqueNewPics.length !== newPics.length) {
           console.log(`[Gallery] Filtered out ${newPics.length - uniqueNewPics.length} duplicate images`);
@@ -869,6 +910,7 @@
         
         // Announce first image if autoguide is enabled and new images were loaded
         if (autoguide && uniqueNewPics.length > 0) {
+          console.log('🎤 Autoguide enabled and new images loaded, announcing first image...');
           setTimeout(() => announceFirstImage(), 500);
         }
         
@@ -1058,7 +1100,9 @@
         const formData = new FormData();
         formData.append('files', file);
         // Attach profile_id so that the server can persist it
-        const { data: { user: currentUser }, data: { session } } = await supabase.auth.getSession();
+        const sessionResult = await supabase.auth.getSession();
+        const currentUser = sessionResult.data.user;
+        const session = sessionResult.data.session;
         if (currentUser) {
           formData.append('profile_id', currentUser.id);
         }
@@ -1138,10 +1182,13 @@
   // Infinite scroll handler
   function handleScroll() {
     if (loading || !hasMoreImages) return;
-    
+
+    // Scroll-to-top-Button nur zeigen, wenn gescrollt wurde
+    showScrollToTop = window.scrollY > 100;
+
     const { scrollTop, scrollHeight, clientHeight } = document.documentElement;
     const scrolledToBottom = scrollTop + clientHeight >= scrollHeight - 1000;
-    
+
     if (scrolledToBottom) {
       loadMore();
     }
@@ -1199,6 +1246,19 @@
     } else {
       stopGPSTracking();
     }
+    
+    // Activate autoguide if enabled
+    if (autoguide && !audioActivated) {
+      console.log('🎤 Autoguide enabled in settings, activating audio...');
+      setTimeout(() => {
+        activateAudioGuide();
+        // Also announce first image after a delay
+        setTimeout(() => {
+          console.log('🎤 Announcing first image after autoguide activation...');
+          announceFirstImage();
+        }, 1500);
+      }, 1000);
+    }
   }
 
   function getDistanceFromLatLonInMeters(lat1: number, lon1: number, lat2: number, lon2: number): string {
@@ -1244,90 +1304,10 @@
     return brng;
   }
 
-  async function uploadExifFiles() {
-    console.log('uploadExifFiles called');
-    console.log('exifFiles:', exifFiles);
-    
-    if (!exifFiles || exifFiles.length === 0) {
-      exifMessage = 'Bitte Bilder auswählen';
-      console.log('No files selected');
-      return;
-    }
 
-    exifUploading = true;
-    exifMessage = 'Upload wird gestartet...';
-    console.log(`Starting upload of ${exifFiles.length} files`);
-
-    try {
-      const formData = new FormData();
-      Array.from(exifFiles).forEach((file) => {
-        formData.append('files', file);
-      });
-      const { data: { user: batchUser }, data: { session } } = await supabase.auth.getSession();
-      if (batchUser) {
-        formData.append('profile_id', batchUser.id);
-      }
-      const access_token = session?.access_token;
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        headers: {
-          ...(access_token ? { 'Authorization': `Bearer ${access_token}` } : {})
-        },
-        body: formData
-      });
-      console.log('Response received:', response.status, response.statusText);
-      
-      const result = await response.json();
-      console.log('Response JSON:', result);
-      
-      if (result.status === 'success') {
-        exifMessage = `✅ ${exifFiles.length} Bild(er) erfolgreich hochgeladen!`;
-        
-        // Add new images to gallery
-        if (result.images) {
-          pics.update(p => [
-            ...result.images.map((img: any) => ({
-              id: img.id,
-              src: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${img.path_512}`,
-              srcHD: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${img.path_2048}`,
-              width: img.width,
-              height: img.height,
-              lat: img.lat,
-              lon: img.lon,
-              title: img.title || null,
-              description: img.description || null,
-              keywords: img.keywords || null
-            })),
-            ...p
-          ]);
-          
-          // Update gallery stats after EXIF upload
-          const totalCount = await getTotalImageCount();
-          updateGalleryStats($pics.length, totalCount);
-        }
-        
-        // Close dialog after success
-        setTimeout(() => {
-          showExifDialog = false;
-          exifMessage = '';
-        }, 2000);
-      } else {
-        throw new Error(result.message);
-      }
-    } catch (error) {
-      const err = error as Error;
-      console.error('Upload error:', err);
-      exifMessage = `❌ Upload fehlgeschlagen: ${err.message}`;
-    } finally {
-      exifUploading = false;
-      console.log('Upload finished');
-    }
-  }
 
   function closeDialogs() {
     showUploadDialog = false;
-    showExifDialog = false;
-    exifMessage = '';
   }
 
   // Login-Funktionen
@@ -1388,8 +1368,8 @@
     }
   }
 
-  function saveLastKnownLocation(lat, lon) {
-    if (typeof localStorage !== 'undefined') {
+  function saveLastKnownLocation(lat: number | null, lon: number | null) {
+    if (typeof localStorage !== 'undefined' && lat !== null && lon !== null) {
       localStorage.setItem('lastLat', lat.toString());
       localStorage.setItem('lastLon', lon.toString());
     }
@@ -1686,8 +1666,23 @@
     // Check for GPS simulation parameters
     const urlParams = new URLSearchParams(window.location.search);
     const simulation = urlParams.get('simulation');
-    if (simulation === 'true') {
+    const stopSimulation = urlParams.get('stop');
+    
+    if (stopSimulation === 'simulation') {
+      console.log('Stopping simulation mode');
+      simulationMode = false;
+      gpsSimulationActive = false;
+      // Clear URL parameters
+      const url = new URL(window.location.href);
+      url.searchParams.delete('stop');
+      url.searchParams.delete('simulation');
+      url.searchParams.delete('autoguide');
+      url.searchParams.delete('showDistance');
+      url.searchParams.delete('showCompass');
+      window.history.replaceState({}, '', url.toString());
+    } else if (simulation === 'true') {
       console.log('GPS Simulation mode detected');
+      simulationMode = true;
       setupGPSSimulation();
       
       // Set simulation-specific settings
@@ -1775,10 +1770,26 @@
       window.addEventListener('deviceorientation', handleOrientation, true);
     }
 
+    // Listen for messages from simulation iframe
+    window.addEventListener('message', (event) => {
+      if (event.data && event.data.type === 'gps-simulation-stop') {
+        console.log('Received GPS simulation stop message');
+        // Clear simulation parameters from URL
+        const url = new URL(window.location.href);
+        url.searchParams.delete('simulation');
+        url.searchParams.delete('autoguide');
+        url.searchParams.delete('showDistance');
+        url.searchParams.delete('showCompass');
+        window.history.replaceState({}, '', url.toString());
+        simulationMode = false;
+        gpsSimulationActive = false;
+      }
+    });
+
     // Vor dem ersten GPS-Fix: Letzte bekannte Koordinaten verwenden
     if (showDistance && (userLat === null || userLon === null)) {
       const lastLocation = loadLastKnownLocation();
-      if (lastLocation) {
+      if (lastLocation && lastLocation.lat !== null && lastLocation.lon !== null) {
         userLat = lastLocation.lat;
         userLon = lastLocation.lon;
         // Galerie mit diesen Koordinaten laden
@@ -1951,6 +1962,19 @@
       await loadMore('auto-load-nearby');
     }
   }
+
+  let showScrollToTop = false;
+
+  // Helper to exit simulation across frames
+  function exitSimulation() {
+    if (typeof window !== 'undefined') {
+      if (window.top && window.top !== window) {
+        window.top.location.href = '/?stop=simulation';
+      } else {
+        window.location.href = '/?stop=simulation';
+      }
+    }
+  }
 </script>
 
 <!-- Dialoge für Upload und EXIF Upload -->
@@ -2056,176 +2080,78 @@
   </div>
 {/if}
 
-{#if showExifDialog}
-  <div class="dialog-overlay" on:click={closeDialogs}>
-    <div class="dialog-content" on:click|stopPropagation>
-      <div class="dialog-header">
-        <h2>EXIF Upload</h2>
-        <button class="close-btn" on:click={closeDialogs}>×</button>
-      </div>
-      
-      <div class="exif-upload-section">
-        <p class="exif-description">
-          Wähle Bilder mit EXIF-Daten aus, um sie hochzuladen. 
-          Diese Funktion ist nur auf Desktop verfügbar.
-        </p>
-        
-        <div class="file-input-section">
-          <input 
-            type="file" 
-            bind:files={exifFiles} 
-            multiple 
-            accept="image/*" 
-            disabled={exifUploading}
-            class="exif-file-input"
-          />
-          <label for="exif-file-input" class="exif-file-label">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-              <polyline points="7,10 12,15 17,10"/>
-              <line x1="12" y1="15" x2="12" y2="3"/>
-            </svg>
-            Dateien auswählen
-          </label>
-        </div>
-        
-        {#if exifFiles && exifFiles.length > 0}
-          <div class="selected-files">
-            <h4>Ausgewählte Dateien ({exifFiles.length}):</h4>
-            <ul>
-              {#each Array.from(exifFiles) as file}
-                <li>{file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)</li>
-              {/each}
-            </ul>
-          </div>
-        {/if}
-        
-        <div class="exif-actions">
-          <button 
-            on:click={() => console.log('Button clicked!')} 
-            class="exif-upload-btn"
-          >
-            Test Button
-          </button>
-          <button 
-            on:click={uploadExifFiles} 
-            disabled={exifUploading || !exifFiles || exifFiles.length === 0}
-            class="exif-upload-btn"
-          >
-            {exifUploading ? 'Uploading...' : 'Hochladen'}
-          </button>
-        </div>
-        
-        {#if exifMessage}
-          <div class="exif-message" class:success={exifMessage.includes('✅')} class:error={exifMessage.includes('❌')}>
-            {exifMessage}
-          </div>
-        {/if}
-      </div>
-    </div>
-  </div>
-{/if}
 
-<!-- Floating Settings Button -->
-{#if isLoggedIn}
-<a href="/settings" class="settings-fab" title="Einstellungen">
-  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <circle cx="12" cy="12" r="3"/>
-    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 8 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 8a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 8 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09A1.65 1.65 0 0 0 16 4.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 8c.14.31.22.65.22 1v.09A1.65 1.65 0 0 0 21 12c0 .35-.08.69-.22 1z"/>
-  </svg>
-</a>
-{/if}
-
-<!-- Floating Simulation Button -->
-{#if isLoggedIn}
-<a href="/simulation" class="simulation-fab" title="GPS Simulation">
-  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-    <path d="M2 17l10 5 10-5"/>
-    <path d="M2 12l10 5 10-5"/>
-  </svg>
-</a>
-{/if}
 
 <!-- Culoca Logo -->
 <img src="/culoca-logo-512px.png" alt="Culoca" class="culoca-logo" />
 
-<!-- Floating EXIF Upload Button (nur Desktop) -->
-{#if isLoggedIn}
-<button class="exif-fab" on:click={() => showExifDialog = true} title="EXIF Upload">
-  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <rect x="3" y="3" width="18" height="18" rx="2"/>
-    <path d="M9 9h6v6H9z"/>
-  </svg>
-</button>
-{/if}
-
-<!-- Floating + Button (Upload) -->
-{#if isLoggedIn}
-<button class="plus-fab" on:click={() => showUploadDialog = true} title="Bild hochladen">
-  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <circle cx="12" cy="12" r="10"/>
-    <line x1="12" y1="8" x2="12" y2="16"/>
-    <line x1="8" y1="12" x2="16" y2="12"/>
-  </svg>
-</button>
-{/if}
-
-<!-- Floating Profile Button -->
-{#if isLoggedIn}
-<a href="/profile" class="profile-fab" title="Profil">
-  {#if profileAvatar}
-    <img src={profileAvatar || ''} alt="Profilbild" class="profile-avatar-btn" />
-  {:else}
-    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <circle cx="12" cy="8" r="4"/>
-      <path d="M2 20c0-4 8-6 10-6s10 2 10 6"/>
-    </svg>
-  {/if}
-</a>
-{/if}
-
-<!-- NewsFlash-Komponente über der Galerie -->
-{#if newsFlashMode !== 'aus'}
+<!-- NewsFlash Component -->
+{#if isLoggedIn && newsFlashMode !== 'aus'}
   <NewsFlash 
-    mode={newsFlashMode} 
-    userId={currentUser?.id} 
-    layout={useJustifiedLayout ? 'justified' : 'grid'}
+    mode={newsFlashMode}
+    userId={currentUser?.id}
+    layout="strip"
+    limit={15}
     showToggles={false}
-    showDistance={isLoggedIn && showDistance}
+    showDistance={showDistance}
     userLat={userLat}
     userLon={userLon}
     getDistanceFromLatLonInMeters={getDistanceFromLatLonInMeters}
-    displayedImageCount={displayedImageCount}
+    {displayedImageCount}
   />
 {/if}
 
 <!-- Autoguide Bar -->
-{#if autoguide}
+{#if isLoggedIn && autoguide}
   <div class="autoguide-bar">
     <div class="autoguide-content">
-      <span class="autoguide-text">{autoguideText || 'Audioguide aktiv'}</span>
-      {#if !audioActivated}
-        <button class="speaker-btn" on:click={activateAudioGuide} title="Sprachausgabe aktivieren">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
-            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-            <line x1="12" y1="19" x2="12" y2="23"/>
-            <line x1="8" y1="23" x2="16" y2="23"/>
-          </svg>
-        </button>
-      {:else}
-        <button class="speaker-btn" on:click={testSpeech} title="Sprachausgabe testen">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
-            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-            <line x1="12" y1="19" x2="12" y2="23"/>
-            <line x1="8" y1="23" x2="16" y2="23"/>
-          </svg>
-        </button>
-      {/if}
+      <div class="autoguide-text">
+        {audioActivated ? 'Audio aktiviert - Bildtitel werden vorgelesen' : 'Audio deaktiviert - Klicke auf den Lautsprecher'}
+      </div>
+      <button class="speaker-btn" on:click={() => {
+        console.log('🎤 Speaker button clicked, audioActivated:', audioActivated);
+        if (audioActivated) {
+          console.log('🎤 Deactivating audio...');
+          speechSynthesis?.cancel();
+          audioActivated = false;
+        } else {
+          console.log('🎤 Activating audio...');
+          activateAudioGuide();
+          // Also announce first image after activation
+          setTimeout(() => {
+            console.log('🎤 Announcing first image after manual activation...');
+            announceFirstImage();
+          }, 1500);
+        }
+      }}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+        </svg>
+      </button>
     </div>
   </div>
+{/if}
+
+<!-- Floating Action Buttons -->
+{#if isLoggedIn}
+  <FloatingActionButtons 
+    {showScrollToTop}
+    showTestMode={true}
+    {isLoggedIn}
+    {simulationMode}
+    on:upload={() => showUploadDialog = true}
+    on:publicContent={() => showPublicContentModal.set(true)}
+    on:profile={() => location.href = '/profile'}
+    on:settings={() => location.href = '/settings'}
+    on:testMode={() => {
+      if (simulationMode) {
+        exitSimulation();
+      } else {
+        // Enter simulation mode
+        location.href = '/simulation';
+      }
+    }}
+  />
 {/if}
 
 <!-- Galerie bleibt erhalten -->
@@ -2264,6 +2190,8 @@
               style="cursor: default; pointer-events: none;"
             />
           {/if}
+          
+
           {#if isLoggedIn && showDistance && userLat !== null && userLon !== null && pic.lat && pic.lon}
             <div class="distance-label">
               {getDistanceFromLatLonInMeters(userLat, userLon, pic.lat, pic.lon)}
@@ -2292,9 +2220,6 @@
   {:else if $pics.length > 0}
     <div class="end-indicator">
       <span>✅ {displayedImageCount} Bilder angezeigt</span>
-      <button class="remove-duplicates-btn" on:click={removeDuplicates} title="Duplikate entfernen">
-        🧹 Duplikate entfernen
-      </button>
       
       {#if showRemovedDuplicates && removedDuplicatesList.length > 0}
         <div class="removed-duplicates-section">
@@ -2799,87 +2724,7 @@
     }
   }
 
-  /* FAB Styles */
-  .plus-fab {
-    background: #28a745;
-    color: #fff;
-    position: fixed;
-    right: 1.5rem;
-    bottom: 9.5rem;
-    z-index: 52;
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.18);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 0.2s, box-shadow 0.2s, transform 0.1s;
-    border: none;
-    outline: none;
-    cursor: pointer;
-    font-size: 1.8rem;
-    text-decoration: none;
-  }
-  .plus-fab:hover {
-    background: #218838;
-  }
-  .exif-fab {
-    background: #ff9800;
-    color: #fff;
-    position: fixed;
-    right: 1.5rem;
-    bottom: 13.5rem;
-    z-index: 53;
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.18);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 0.2s, box-shadow 0.2s, transform 0.1s;
-    border: none;
-    outline: none;
-    cursor: pointer;
-    font-size: 1.5rem;
-    text-decoration: none;
-  }
-  .exif-fab:hover {
-    background: #e65100;
-  }
-  @media (max-width: 768px) {
-    .exif-fab {
-      display: none !important;
-    }
-  }
 
-  /* Mobile FAB alignment */
-  @media (max-width: 600px) {
-    .plus-fab {
-      right: 1rem;
-      bottom: 12rem;
-      width: 48px;
-      height: 48px;
-      font-size: 1.2rem;
-    }
-    
-    .settings-fab {
-      right: 1rem;
-      bottom: 1rem;
-      width: 48px;
-      height: 48px;
-      font-size: 1.2rem;
-    }
-    
-    .profile-fab {
-      right: 1rem;
-      bottom: 6.5rem;
-      width: 48px;
-      height: 48px;
-      font-size: 1.2rem;
-    }
-  }
 
   /* Dialog Styles */
   .dialog-overlay {
@@ -3105,134 +2950,6 @@
     color: #fff;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
   }
-  .plus-fab {
-    background: #28a745;
-    color: #fff;
-    position: fixed;
-    right: 1.5rem;
-    bottom: 9.5rem;
-    z-index: 52;
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.18);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 0.2s, box-shadow 0.2s, transform 0.1s;
-    border: none;
-    outline: none;
-    cursor: pointer;
-    font-size: 1.8rem;
-    text-decoration: none;
-  }
-  .plus-fab:hover {
-    background: #218838;
-  }
-
-  /* Floating Settings Button */
-  .settings-fab {
-    position: fixed;
-    right: 1.5rem;
-    bottom: 1.5rem;
-    z-index: 50;
-    width: 56px;
-    height: 56px;
-    background: #222b45;
-    color: #fff;
-    border-radius: 50%;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.18);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 0.2s, box-shadow 0.2s, transform 0.1s;
-    border: none;
-    outline: none;
-    cursor: pointer;
-    font-size: 1.5rem;
-    text-decoration: none;
-  }
-  .settings-fab:hover {
-    background: #0066cc;
-    color: #fff;
-    box-shadow: 0 8px 24px rgba(0,102,204,0.18);
-    transform: scale(1.08);
-  }
-
-  /* Floating Simulation Button */
-  .simulation-fab {
-    position: fixed;
-    right: 1.5rem;
-    bottom: 9rem;
-    z-index: 50;
-    width: 56px;
-    height: 56px;
-    background: #ff6b35;
-    color: #fff;
-    border-radius: 50%;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.18);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 0.2s, box-shadow 0.2s, transform 0.1s;
-    border: none;
-    outline: none;
-    cursor: pointer;
-    font-size: 1.5rem;
-    text-decoration: none;
-  }
-  .simulation-fab:hover {
-    background: #e55a2b;
-    color: #fff;
-    box-shadow: 0 8px 24px rgba(255,107,53,0.18);
-    transform: scale(1.08);
-  }
-
-  /* Floating Profile Button */
-  .profile-fab {
-    position: fixed;
-    right: 1.5rem;
-    bottom: 5.5rem;
-    z-index: 51;
-    width: 56px;
-    height: 56px;
-    background: #444;
-    color: #fff;
-    border-radius: 50%;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.18);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 0.2s, box-shadow 0.2s, transform 0.1s;
-    border: none;
-    outline: none;
-    cursor: pointer;
-    font-size: 1.5rem;
-    text-decoration: none;
-    overflow: hidden;
-  }
-  .profile-fab:hover {
-    background: #0066cc;
-    color: #fff;
-    box-shadow: 0 8px 24px rgba(0,102,204,0.18);
-    transform: scale(1.08);
-  }
-  .profile-avatar-btn {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    border-radius: 50%;
-    display: block;
-  }
-  @media (max-width: 600px) {
-    .profile-fab {
-      right: 1rem;
-      bottom: 4.5rem;
-      width: 48px;
-      height: 48px;
-      font-size: 1.2rem;
-    }
-  }
 
   /* Login Overlay */
   .login-overlay {
@@ -3409,53 +3126,6 @@
     }
   }
 
-  .fab-stack {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    position: fixed;
-    right: 1.5rem;
-    bottom: 1.5rem;
-    z-index: 100;
-    gap: 1.1rem;
-  }
-  @media (max-width: 600px) {
-    .fab-stack {
-      right: 1rem;
-      bottom: 1rem;
-      gap: 0.7rem;
-    }
-    .fab-stack .plus-fab,
-    .fab-stack .profile-fab,
-    .fab-stack .settings-fab {
-      width: 3rem !important;
-      height: 3rem !important;
-      min-width: 3rem !important;
-      min-height: 3rem !important;
-      max-width: 3rem !important;
-      max-height: 3rem !important;
-      font-size: 1.2rem !important;
-      margin: 0 !important;
-      position: static !important;
-      border-radius: 50% !important;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 0 !important;
-    }
-    .fab-stack .plus-fab svg,
-    .fab-stack .profile-fab svg,
-    .fab-stack .settings-fab svg,
-    .fab-stack .profile-fab img {
-      width: 100% !important;
-      height: 100% !important;
-      max-width: 100% !important;
-      max-height: 100% !important;
-      object-fit: cover;
-      display: block;
-    }
-  }
-
   /* Autoguide Bar */
   .autoguide-bar {
     position: static;
@@ -3615,6 +3285,8 @@
   .hide-duplicates-btn:hover {
     background: var(--border-color);
   }
+
+
 
 
 
