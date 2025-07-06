@@ -173,14 +173,14 @@
     transition: all 0.3s ease;
     box-shadow: 0 4px 12px var(--shadow);
     backdrop-filter: blur(10px);
-    background: var(--bg-secondary);
+    background: transparent;
     overflow: hidden;
   }
   
   .fab-button:hover {
     transform: scale(1.1);
     box-shadow: 0 6px 20px var(--shadow);
-    background: var(--bg-tertiary);
+    background: rgba(255, 255, 255, 0.1);
   }
   
   .fab-button:active {
@@ -195,30 +195,7 @@
     border-radius: 50%;
   }
   
-  /* Button specific colors - using theme variables for consistent dark/light mode */
-  .scroll-to-top {
-    background: var(--bg-secondary);
-  }
-  
-  .settings {
-    background: var(--bg-secondary);
-  }
-  
-  .profile {
-    background: var(--bg-secondary);
-  }
-  
-  .public-content {
-    background: var(--bg-secondary);
-  }
-  
-  .upload {
-    background: var(--bg-secondary);
-  }
-  
-  .test-mode {
-    background: var(--bg-secondary);
-  }
+  /* Button specific colors - all transparent now */
   
   /* Mobile responsive */
   @media (max-width: 768px) {
