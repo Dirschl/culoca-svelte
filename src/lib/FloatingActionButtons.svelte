@@ -174,7 +174,6 @@
     box-shadow: 0 4px 12px var(--shadow);
     backdrop-filter: blur(10px);
     background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
     overflow: hidden;
   }
   
@@ -194,11 +193,6 @@
     height: 100%;
     object-fit: cover;
     border-radius: 50%;
-    border: 2px solid var(--border-color);
-  }
-  
-  .fab-button.profile:hover .profile-avatar {
-    border-color: var(--accent-color);
   }
   
   /* Button specific colors - using theme variables for consistent dark/light mode */
