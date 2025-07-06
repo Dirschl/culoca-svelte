@@ -2936,10 +2936,10 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
   /* Culoca Logo */
   .culoca-logo {
     position: fixed;
-    top: 25px;
-    right: 20px;
-    left: auto;
-    bottom: auto;
+    bottom: 25px;
+    left: 20px;
+    top: auto;
+    right: auto;
     z-index: 50;
     width: 200px;
     /* height: 72px; */
@@ -2951,9 +2951,10 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
   }
   @media (max-width: 600px) {
     .culoca-logo {
-      top: 0.5rem;
-      right: 0.5rem;
-      left: auto;
+      bottom: 7rem;
+      left: 0.5rem;
+      top: auto;
+      right: auto;
       width: 6rem;
       height: 6rem;
     }
