@@ -168,7 +168,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--text-primary);
+    color: white;
     font-weight: bold;
     transition: all 0.3s ease;
     box-shadow: 0 4px 12px var(--shadow);
