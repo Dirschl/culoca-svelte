@@ -5,6 +5,7 @@
   import Justified from '$lib/Justified.svelte';
   import NewsFlash from '$lib/NewsFlash.svelte';
   import FloatingActionButtons from '$lib/FloatingActionButtons.svelte';
+  import FullscreenMap from '$lib/FullscreenMap.svelte';
 import { beforeNavigate, afterNavigate } from '$app/navigation';
   import { showPublicContentModal } from '$lib/modalStore';
 
@@ -115,6 +116,9 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
   let currentImageId = ''; // Track current image ID to know when to update text
   let lastAnnouncedImageId = ''; // Track last announced image to prevent duplicates
   let scrollTimeout: number | null = null;
+  
+  // Fullscreen map mode
+  let showFullscreenMap = false;
   
   // Function to get currently visible image
   function getCurrentlyVisibleImage(): any | null {
@@ -944,7 +948,10 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
           lon: d.lon,
           title: d.title,
           description: d.description,
-          keywords: d.keywords
+          keywords: d.keywords,
+          path_64: d.path_64,
+          path_512: d.path_512,
+          path_2048: d.path_2048
         }));
 
         // Sort by distance if user is logged in and distance is enabled
@@ -1049,7 +1056,10 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
           lon: d.lon,
           title: d.title,
           description: d.description,
-          keywords: d.keywords
+          keywords: d.keywords,
+          path_64: d.path_64,
+          path_512: d.path_512,
+          path_2048: d.path_2048
         }));
         // Prüfe auf Duplikate vor dem Hinzufügen
         const currentPics = get(pics);
@@ -1103,7 +1113,7 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
     console.log(`[Gallery] Using normal pagination, range: ${page * size} to ${page * size + size - 1}`);
     const { data } = await supabase
       .from('images')
-      .select('id,path_512,path_2048,width,height,lat,lon,title,description,keywords')
+      .select('id,path_512,path_2048,path_64,width,height,lat,lon,title,description,keywords')
       .not('lat', 'is', null)
       .not('lon', 'is', null)
       .order('created_at', { ascending: false })
@@ -1125,7 +1135,10 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
         lon: d.lon,
         title: d.title,
         description: d.description,
-        keywords: d.keywords
+        keywords: d.keywords,
+        path_64: d.path_64,
+        path_512: d.path_512,
+        path_2048: d.path_2048
       }));
       
       // Prüfe auf Duplikate vor dem Hinzufügen
@@ -2317,6 +2330,7 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
   <FloatingActionButtons 
     {showScrollToTop}
     showTestMode={true}
+    showMapButton={$pics.some(pic => pic.lat && pic.lon)}
     {isLoggedIn}
     {simulationMode}
     {profileAvatar}
@@ -2324,6 +2338,7 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
     on:publicContent={() => showPublicContentModal.set(true)}
     on:profile={() => location.href = '/profile'}
     on:settings={() => location.href = '/settings'}
+    on:map={() => showFullscreenMap = true}
     on:testMode={() => {
       if (simulationMode) {
         exitSimulation();
@@ -3467,9 +3482,19 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
   .hide-duplicates-btn:hover {
     background: var(--border-color);
   }
-
-
-
-
-
 </style>
+
+<!-- Fullscreen Map -->
+{#if showFullscreenMap}
+  <FullscreenMap 
+    images={$pics}
+    {userLat}
+    {userLon}
+    {deviceHeading}
+    on:close={() => showFullscreenMap = false}
+    on:imageClick={(event) => {
+      showFullscreenMap = false;
+      location.href = `/image/${event.detail.imageId}`;
+    }}
+  />
+{/if}
