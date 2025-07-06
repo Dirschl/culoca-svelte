@@ -107,11 +107,145 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
   let lastSpokenText = '';
 
   let audioActivated = false;
+  let currentImageTitle = ''; // Track current image title for display
 
   // Global variable to track speech state
   let speechRetryCount = 0;
   let lastSpeechText = '';
   let currentImageId = ''; // Track current image ID to know when to update text
+  let lastAnnouncedImageId = ''; // Track last announced image to prevent duplicates
+  let scrollTimeout: number | null = null;
+  
+  // Function to get currently visible image
+  function getCurrentlyVisibleImage(): any | null {
+    const currentPics = get(pics);
+    if (currentPics.length === 0) return null;
+    
+    const viewportHeight = window.innerHeight;
+    const scrollTop = window.scrollY;
+    const viewportCenter = scrollTop + (viewportHeight / 2);
+    
+    // Find all image elements in the gallery
+    const imageElements = document.querySelectorAll('.pic-container, .grid-item');
+    let closestImage: any | null = null;
+    let closestDistance = Infinity;
+    
+    imageElements.forEach((element, index) => {
+      const rect = element.getBoundingClientRect();
+      const elementTop = rect.top + scrollTop;
+      const elementCenter = elementTop + (rect.height / 2);
+      const distance = Math.abs(elementCenter - viewportCenter);
+      
+      if (distance < closestDistance && index < currentPics.length) {
+        closestDistance = distance;
+        closestImage = currentPics[index];
+      }
+    });
+    
+    return closestImage;
+  }
+  
+  // Function to announce current visible image
+  function announceCurrentImage() {
+    console.log('🎤 announceCurrentImage called');
+    
+    if (!autoguide || !audioActivated) {
+      console.log('🎤 Autoguide not enabled or audio not activated');
+      return;
+    }
+    
+    const currentImage: any = getCurrentlyVisibleImage();
+    if (!currentImage) {
+      console.log('🎤 No current image found');
+      return;
+    }
+    
+    // Don't announce the same image twice
+    if (currentImage.id === lastAnnouncedImageId) {
+      console.log('🎤 Same image as last announced, skipping');
+      return;
+    }
+    
+    console.log('🎤 Current visible image:', currentImage);
+    console.log('🎤 Current visible image title:', currentImage.title);
+    
+    if (currentImage.title) {
+      console.log('🎤 Current image has title:', currentImage.title);
+      speakTitle(currentImage.title, currentImage.id);
+      lastAnnouncedImageId = currentImage.id;
+    } else {
+      console.log('🎤 Current image has no title, using fallback');
+      const fallbackText = currentImage.original_name || 'Bild ohne Titel';
+      speakTitle(fallbackText, currentImage.id);
+      lastAnnouncedImageId = currentImage.id;
+    }
+  }
+
+  // Function to update current image title (even when audio is disabled)
+  function updateCurrentImageTitle() {
+    console.log('🎤 updateCurrentImageTitle called');
+    
+    // Always update the title, even when autoguide is disabled
+    const currentImage: any = getCurrentlyVisibleImage();
+    if (!currentImage) {
+      console.log('🎤 No current image found');
+      return;
+    }
+    
+    // Don't update if it's the same image
+    if (currentImage.id === lastAnnouncedImageId) {
+      console.log('🎤 Same image as last updated, skipping');
+      return;
+    }
+    
+    console.log('🎤 Current visible image:', currentImage);
+    console.log('🎤 Current visible image title:', currentImage.title);
+    
+    let displayTitle = '';
+    if (currentImage.title) {
+      displayTitle = currentImage.title;
+    } else {
+      displayTitle = currentImage.original_name || 'Bild ohne Titel';
+    }
+    
+    // Only display text up to first comma
+    const commaIndex = displayTitle.indexOf(',');
+    if (commaIndex !== -1) {
+      displayTitle = displayTitle.substring(0, commaIndex);
+    }
+    
+    // Clean the text
+    displayTitle = displayTitle
+      .replace(/;/g, ' - ')  // Replace semicolons with dashes
+      .replace(/\s+/g, ' ')  // Replace multiple spaces with single space
+      .trim();               // Remove leading/trailing whitespace
+    
+    console.log('🎤 Display title (up to first comma):', displayTitle);
+    
+    // Update the display title
+    currentImageTitle = displayTitle;
+    lastAnnouncedImageId = currentImage.id;
+    
+    // If autoguide and audio are activated, also speak it
+    if (autoguide && audioActivated) {
+      speakTitle(currentImage.title || currentImage.original_name || 'Bild ohne Titel', currentImage.id);
+    }
+  }
+  
+  // Function to handle scroll events for audioguide
+  function handleScrollForAudioguide() {
+    // Always handle scroll events to update image title, even when autoguide is disabled
+    
+    // Clear existing timeout
+    if (scrollTimeout) {
+      clearTimeout(scrollTimeout);
+    }
+    
+    // Set new timeout to update image title after scrolling stops
+    scrollTimeout = window.setTimeout(() => {
+      updateCurrentImageTitle(); // This handles both audio and non-audio cases
+    }, 1000); // Wait 1 second after scrolling stops
+  }
   
   // Autoguide functions
   function initSpeechSynthesis() {
@@ -165,25 +299,44 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
   function speakTitle(text: string, imageId?: string) {
     if (!autoguide || !speechSynthesis) return;
     
+    // Clean and prepare text for speech synthesis
+    let cleanText = text;
+    
+    // Only speak text up to first comma (as requested)
+    const commaIndex = cleanText.indexOf(',');
+    if (commaIndex !== -1) {
+      cleanText = cleanText.substring(0, commaIndex);
+    }
+    
+    // Replace other problematic characters that might cause speech issues
+    cleanText = cleanText
+      .replace(/;/g, ' - ')  // Replace semicolons with dashes
+      .replace(/\s+/g, ' ')  // Replace multiple spaces with single space
+      .trim();               // Remove leading/trailing whitespace
+    
+    console.log('🎤 Original text:', text);
+    console.log('🎤 Cleaned text (up to first comma):', cleanText);
+    
     // Don't speak the same text twice in a row for the same image
-    if (text === lastSpeechText && imageId === currentImageId) {
-      console.log('🎤 Skipping duplicate speech for same image:', text);
+    if (cleanText === lastSpeechText && imageId === currentImageId) {
+      console.log('🎤 Skipping duplicate speech for same image:', cleanText);
       return;
     }
     
-    lastSpeechText = text;
+    lastSpeechText = cleanText;
     currentImageId = imageId || '';
     speechRetryCount = 0;
     
-    console.log('🎤 Speaking:', text, 'for image:', imageId);
-    autoguideText = text;
+    console.log('🎤 Speaking:', cleanText, 'for image:', imageId);
+    autoguideText = cleanText; // Show cleaned text in the UI too
+    currentImageTitle = cleanText; // Update current image title for display
     
     // Cancel any ongoing speech, but only if we're not already speaking the same text
-    if (speechSynthesis && lastSpeechText !== text) {
+    if (speechSynthesis && lastSpeechText !== cleanText) {
       speechSynthesis.cancel();
     }
     
-    const currentSpeech = new SpeechSynthesisUtterance(text);
+    const currentSpeech = new SpeechSynthesisUtterance(cleanText);
     currentSpeech.lang = 'de-DE';
     currentSpeech.volume = 1.0;
     
@@ -333,39 +486,46 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
 
   function announceFirstImage() {
     console.log('🎤 announceFirstImage called');
-    console.log('🎤 autoguide:', autoguide);
-    console.log('🎤 audioActivated:', audioActivated);
     
-    if (!autoguide) {
-      console.log('🎤 Autoguide not enabled, skipping announcement');
-      return;
-    }
-    
-    // Only announce if audio has been activated by user interaction
-    if (!audioActivated) {
-      console.log('🎤 Audio not activated by user yet, skipping announcement');
-      return;
-    }
-    
+    // Always update the first image title, even when autoguide is disabled
     const currentPics = get(pics);
-    console.log('🎤 Current pics length:', currentPics.length);
-    
-    if (currentPics.length > 0) {
-      const firstImage = currentPics[0];
-      console.log('🎤 First image:', firstImage);
-      console.log('🎤 First image title:', firstImage.title);
-      
-      if (firstImage.title) {
-        console.log('🎤 First image has title:', firstImage.title);
-        speakTitle(firstImage.title, firstImage.id);
-      } else {
-        console.log('🎤 First image has no title, using fallback');
-        // Fallback: Verwende den Dateinamen oder eine Standardnachricht
-        const fallbackText = firstImage.original_name || 'Bild ohne Titel';
-        speakTitle(fallbackText, firstImage.id);
-      }
-    } else {
+    if (currentPics.length === 0) {
       console.log('🎤 No images available for announcement');
+      return;
+    }
+    
+    const firstImage = currentPics[0];
+    console.log('🎤 First image:', firstImage);
+    console.log('🎤 First image title:', firstImage.title);
+    
+    let displayTitle = '';
+    if (firstImage.title) {
+      displayTitle = firstImage.title;
+    } else {
+      displayTitle = firstImage.original_name || 'Bild ohne Titel';
+    }
+    
+    // Only display text up to first comma
+    const commaIndex = displayTitle.indexOf(',');
+    if (commaIndex !== -1) {
+      displayTitle = displayTitle.substring(0, commaIndex);
+    }
+    
+    // Clean the text
+    displayTitle = displayTitle
+      .replace(/;/g, ' - ')  // Replace semicolons with dashes
+      .replace(/\s+/g, ' ')  // Replace multiple spaces with single space
+      .trim();               // Remove leading/trailing whitespace
+    
+    console.log('🎤 Display title (up to first comma):', displayTitle);
+    
+    // Update the display title
+    currentImageTitle = displayTitle;
+    lastAnnouncedImageId = firstImage.id;
+    
+    // If autoguide and audio are activated, also speak it
+    if (autoguide && audioActivated) {
+      speakTitle(firstImage.title || firstImage.original_name || 'Bild ohne Titel', firstImage.id);
     }
   }
 
@@ -1775,6 +1935,7 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
     }
 
     window.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('scroll', handleScrollForAudioguide, { passive: true });
     window.addEventListener('galleryLayoutChanged', updateLayoutFromStorage);
     window.addEventListener('profileSaved', loadProfileAvatar);
     window.addEventListener('keydown', handleKeydown);
@@ -1815,6 +1976,7 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
 
     return () => {
       window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('scroll', handleScrollForAudioguide);
       window.removeEventListener('galleryLayoutChanged', updateLayoutFromStorage);
       window.removeEventListener('profileSaved', loadProfileAvatar);
       window.removeEventListener('keydown', handleKeydown);
@@ -1822,6 +1984,11 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
       window.removeEventListener('deviceorientation', handleOrientation, true);
       subscription?.unsubscribe();
       stopGPSTracking();
+      
+      // Cleanup scroll timeout
+      if (scrollTimeout) {
+        clearTimeout(scrollTimeout);
+      }
     };
   });
 
@@ -2116,10 +2283,10 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
 
 <!-- Autoguide Bar -->
 {#if isLoggedIn && autoguide}
-  <div class="autoguide-bar">
+  <div class="autoguide-bar {audioActivated ? 'audio-active' : 'audio-inactive'}">
     <div class="autoguide-content">
       <div class="autoguide-text">
-        {audioActivated ? 'Audio aktiviert - Bildtitel werden vorgelesen' : 'Audio deaktiviert - Klicke auf den Lautsprecher'}
+        {currentImageTitle || (audioActivated ? 'Bildtitel werden vorgelesen' : 'Audio deaktiviert - Klicke auf den Lautsprecher')}
       </div>
       <button class="speaker-btn" on:click={() => {
         console.log('🎤 Speaker button clicked, audioActivated:', audioActivated);
@@ -3137,12 +3304,19 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
   /* Autoguide Bar */
   .autoguide-bar {
     position: static;
-    background: linear-gradient(135deg, var(--accent-color), var(--accent-hover));
     color: white;
     padding: 0.75rem 1rem;
     box-shadow: 0 2px 10px var(--shadow);
     animation: slideDown 0.3s ease-out;
     border-bottom: 2px solid var(--bg-primary);
+  }
+
+  .autoguide-bar.audio-active {
+    background: linear-gradient(135deg, var(--accent-color), var(--accent-hover));
+  }
+
+  .autoguide-bar.audio-inactive {
+    background: #4b5563;
   }
 
   .autoguide-content {
