@@ -3,7 +3,10 @@
   "outputDirectory": "build",
   "framework": "sveltekit",
   "functions": {
-    "src/routes/api/**/+server.ts": {
+    "src/routes/api/*/+server.ts": {
+      "maxDuration": 30
+    },
+    "src/routes/api/*/*/+server.ts": {
       "maxDuration": 30
     }
   },
