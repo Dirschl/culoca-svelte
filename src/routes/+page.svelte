@@ -2936,13 +2936,11 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
   /* Culoca Logo */
   .culoca-logo {
     position: fixed;
-    bottom: 25px;
-    left: 20px;
-    top: auto;
+    bottom: 1.8rem;
+    left: 1.8rem;
     right: auto;
     z-index: 50;
-    width: 200px;
-    /* height: 72px; */
+    width: 15rem;
     transition: opacity 0.2s ease;
     object-fit: contain;
   }
