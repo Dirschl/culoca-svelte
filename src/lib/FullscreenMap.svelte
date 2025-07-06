@@ -26,6 +26,9 @@
   let currentBearing = 0;
   let watchId: number | null = null;
   let isIOS = false;
+  let compassHeading: number | null = null;
+  let orientationListener: ((event: DeviceOrientationEvent) => void) | null = null;
+  let useCompass = false; // Toggle between GPS and compass mode
   
   // Previous position for movement tracking
   let previousPosition: { lat: number; lon: number; timestamp: number } | null = null;
@@ -400,119 +403,198 @@
     saveMapState();
   }
   
-  // Toggle auto-rotate feature
-  async function toggleAutoRotate() {
-    if (!autoRotateEnabled) {
-      // Request permissions first for iOS
-      const permissionGranted = await requestIOSPermissions();
-      if (!permissionGranted) {
-        alert('Für die automatische Kartenrotation werden Bewegungssensor-Berechtigungen benötigt.');
-        return;
+  // Detect iOS device
+  onMount(() => {
+    isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    console.log(`[FullscreenMap] Device detected: ${isIOS ? 'iOS' : 'Other'}`);
+  });
+
+  // Request device orientation permission for iOS
+  async function requestIOSPermissions() {
+    if (isIOS && typeof DeviceOrientationEvent !== 'undefined') {
+      try {
+        // TypeScript doesn't recognize requestPermission, so we use any
+        const DeviceOrientationEventAny = DeviceOrientationEvent as any;
+        if (typeof DeviceOrientationEventAny.requestPermission === 'function') {
+          const permission = await DeviceOrientationEventAny.requestPermission();
+          console.log(`[FullscreenMap] Device orientation permission: ${permission}`);
+          return permission === 'granted';
+        }
+      } catch (error) {
+        console.warn('[FullscreenMap] Error requesting device orientation permission:', error);
       }
-      
-      // Start watching position with high accuracy
-      if (navigator.geolocation) {
-        const options = {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 1000
-        };
+    }
+    return true; // Non-iOS or no permission needed
+  }
+  
+  // Setup compass orientation listener
+  function setupCompassListener() {
+    if (orientationListener) return; // Already setup
+    
+    orientationListener = (event: DeviceOrientationEvent) => {
+      if (event.alpha !== null) {
+        // Convert compass heading to map bearing
+        // alpha gives us the compass heading (0-360°)
+        let heading = event.alpha;
         
-        watchId = navigator.geolocation.watchPosition(
-          (position) => {
-            const now = Date.now();
-            const currentPos = {
-              lat: position.coords.latitude,
-              lon: position.coords.longitude,
-              accuracy: position.coords.accuracy,
-              timestamp: now
-            };
-            
-            console.log(`[FullscreenMap] GPS Position:`, {
-              lat: currentPos.lat,
-              lon: currentPos.lon,
-              accuracy: currentPos.accuracy
-            });
-            
-            if (lastPosition && lastPositionTime) {
-              const timeDiff = now - lastPositionTime;
-              const distance = calculateDistance(
-                lastPosition.lat, lastPosition.lon,
-                currentPos.lat, currentPos.lon
-              );
-              
-              // Only calculate bearing if we've moved significantly and have good accuracy
-              // Increased threshold for mobile devices and require better accuracy
-              const minDistance = isIOS ? 8 : 5; // meters
-              const maxAccuracy = isIOS ? 20 : 15; // meters
-              const minTime = 2000; // milliseconds
-              
-              console.log(`[FullscreenMap] Movement check:`, {
-                distance: distance.toFixed(2),
-                timeDiff,
-                accuracy: currentPos.accuracy,
-                minDistance,
-                maxAccuracy
-              });
-              
-              if (distance > minDistance && 
-                  timeDiff > minTime && 
-                  currentPos.accuracy <= maxAccuracy &&
-                  lastPosition.accuracy <= maxAccuracy) {
-                
-                const bearing = calculateBearing(
-                  lastPosition.lat, lastPosition.lon,
-                  currentPos.lat, currentPos.lon
-                );
-                
-                currentBearing = bearing;
-                
-                console.log(`[FullscreenMap] Updating map rotation:`, {
-                  bearing: bearing.toFixed(2),
-                  distance: distance.toFixed(2),
-                  timeDiff
-                });
-                
-                // Smooth rotation update
-                if (map) {
-                  map.setBearing(bearing);
-                }
-              }
+        // For iOS, we might need to adjust the heading
+        const eventAny = event as any;
+        if (isIOS && eventAny.webkitCompassHeading !== undefined) {
+          heading = eventAny.webkitCompassHeading;
+        }
+        
+        compassHeading = heading;
+        
+        if (autoRotateEnabled && useCompass && map) {
+          // Smooth rotation update
+          const targetBearing = -heading; // Negative because map rotation is opposite
+          
+          if (Math.abs(targetBearing - currentBearing) > 180) {
+            // Handle 360° wrap-around
+            if (targetBearing > currentBearing) {
+              currentBearing += 360;
+            } else {
+              currentBearing -= 360;
             }
+          }
+          
+          // Smooth interpolation
+          const diff = targetBearing - currentBearing;
+          if (Math.abs(diff) > 2) { // Only update if significant change
+            currentBearing += diff * 0.1; // Smooth interpolation
+            map.setBearing(currentBearing);
+            console.log(`[FullscreenMap] Compass rotation: ${heading.toFixed(1)}° → map bearing: ${currentBearing.toFixed(1)}°`);
+          }
+        }
+      }
+    };
+    
+    window.addEventListener('deviceorientation', orientationListener);
+    console.log('[FullscreenMap] Compass listener setup complete');
+  }
+
+  // Remove compass listener
+  function removeCompassListener() {
+    if (orientationListener) {
+      window.removeEventListener('deviceorientation', orientationListener);
+      orientationListener = null;
+      console.log('[FullscreenMap] Compass listener removed');
+    }
+  }
+
+  // Setup GPS-based direction tracking
+  function setupGPSTracking() {
+    if (!navigator.geolocation) {
+      console.warn('[FullscreenMap] Geolocation not available');
+      return;
+    }
+
+    const options: PositionOptions = {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 1000
+    };
+
+    watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        const newPos = {
+          lat: position.coords.latitude,
+          lon: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+          timestamp: Date.now()
+        };
+
+        if (autoRotateEnabled && !useCompass && lastPosition) {
+          // Calculate bearing between two GPS points
+          const bearing = calculateBearing(
+            lastPosition.lat, lastPosition.lon,
+            newPos.lat, newPos.lon
+          );
+
+          // Check if we've moved enough and with good accuracy
+          const distance = calculateDistance(
+            lastPosition.lat, lastPosition.lon,
+            newPos.lat, newPos.lon
+          );
+
+          const minDistance = isIOS ? 8 : 5; // Higher threshold for iOS
+          const maxAccuracy = isIOS ? 25 : 20; // More lenient for iOS
+          const minTimeDiff = 2000; // 2 seconds minimum
+
+          if (distance > minDistance && 
+              newPos.accuracy < maxAccuracy && 
+              lastPosition.accuracy < maxAccuracy &&
+              (newPos.timestamp - lastPosition.timestamp) > minTimeDiff) {
             
-            lastPosition = currentPos;
-            lastPositionTime = now;
-          },
-          (error) => {
-            console.error('[FullscreenMap] Geolocation error:', error);
-            // Don't disable auto-rotate on single errors, just log them
-          },
-          options
-        );
-        
-        autoRotateEnabled = true;
-        console.log('[FullscreenMap] Auto-rotation enabled');
+            if (map) {
+              currentBearing = bearing;
+              map.setBearing(bearing);
+              console.log(`[FullscreenMap] GPS rotation: distance=${distance.toFixed(1)}m, bearing=${bearing.toFixed(1)}°, accuracy=${newPos.accuracy.toFixed(1)}m`);
+            }
+          }
+        }
+
+        lastPosition = newPos;
+      },
+      (error) => {
+        console.warn('[FullscreenMap] GPS tracking error:', error.message);
+      },
+      options
+    );
+
+    console.log('[FullscreenMap] GPS tracking setup complete');
+  }
+
+  // Stop GPS tracking
+  function stopGPSTracking() {
+    if (watchId !== null) {
+      navigator.geolocation.clearWatch(watchId);
+      watchId = null;
+      console.log('[FullscreenMap] GPS tracking stopped');
+    }
+  }
+
+  // Toggle auto-rotation with hybrid approach
+  async function toggleAutoRotate() {
+    autoRotateEnabled = !autoRotateEnabled;
+    console.log(`[FullscreenMap] Auto-rotation ${autoRotateEnabled ? 'enabled' : 'disabled'}`);
+    
+    if (autoRotateEnabled) {
+      // Request permissions for iOS
+      const hasPermission = await requestIOSPermissions();
+      
+      if (hasPermission) {
+        // Try compass first on iOS, GPS as fallback
+        if (isIOS) {
+          useCompass = true;
+          setupCompassListener();
+          // Also setup GPS as backup
+          setupGPSTracking();
+          
+          // Check if compass is working after 3 seconds
+          setTimeout(() => {
+            if (compassHeading === null) {
+              console.log('[FullscreenMap] Compass not working, switching to GPS mode');
+              useCompass = false;
+            }
+          }, 3000);
+        } else {
+          // Non-iOS: prefer GPS
+          useCompass = false;
+          setupGPSTracking();
+          setupCompassListener(); // Setup compass as backup
+        }
       } else {
-        console.error('[FullscreenMap] Geolocation not supported');
-        alert('Ihr Gerät unterstützt keine Standortbestimmung.');
+        console.warn('[FullscreenMap] Permissions denied, using GPS only');
+        useCompass = false;
+        setupGPSTracking();
       }
     } else {
-      // Stop watching position
-      if (watchId !== null) {
-        navigator.geolocation.clearWatch(watchId);
-        watchId = null;
-      }
-      
-      // Reset map rotation
-      if (map) {
-        map.setBearing(0);
-      }
-      
-      autoRotateEnabled = false;
+      // Disable both tracking methods
+      removeCompassListener();
+      stopGPSTracking();
+      compassHeading = null;
       lastPosition = null;
-      lastPositionTime = null;
-      currentBearing = 0;
-      console.log('[FullscreenMap] Auto-rotation disabled');
     }
   }
   
@@ -566,32 +648,6 @@
       navigator.geolocation.clearWatch(watchId);
       watchId = null;
     }
-  }
-  
-  // Detect iOS device
-  onMount(() => {
-    isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-  });
-
-  // Request device orientation permission for iOS
-  async function requestIOSPermissions() {
-    if (isIOS && typeof DeviceOrientationEvent !== 'undefined') {
-      try {
-        // TypeScript doesn't recognize requestPermission, so we use any
-        const DeviceOrientationEventAny = DeviceOrientationEvent as any;
-        if (typeof DeviceOrientationEventAny.requestPermission === 'function') {
-          const permission = await DeviceOrientationEventAny.requestPermission();
-          if (permission !== 'granted') {
-            console.warn('[FullscreenMap] Device orientation permission denied');
-            return false;
-          }
-        }
-      } catch (error) {
-        console.warn('[FullscreenMap] Error requesting device orientation permission:', error);
-        return false;
-      }
-    }
-    return true;
   }
   
   onMount(() => {
@@ -700,21 +756,43 @@
     <!-- Auto-Rotate FAB -->
     <button 
       class="auto-rotate-fab"
+      class:active={autoRotateEnabled}
       on:click={toggleAutoRotate}
-      title={autoRotateEnabled ? 'Auto-Rotation deaktivieren' : 'Auto-Rotation aktivieren'}
+      title={autoRotateEnabled 
+        ? (useCompass ? 'Kompass-Rotation deaktivieren' : 'GPS-Rotation deaktivieren')
+        : (isIOS ? 'Kompass-Rotation aktivieren' : 'GPS-Rotation aktivieren')
+      }
     >
       {#if autoRotateEnabled}
-        <!-- Active compass icon -->
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="rotating">
-          <circle cx="12" cy="12" r="10"/>
-          <polygon points="16.24,7.76 14.12,14.12 7.76,16.24 9.88,9.88"/>
-        </svg>
+        {#if useCompass}
+          <!-- Active Compass Icon -->
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="animate-spin">
+            <circle cx="12" cy="12" r="10"/>
+            <polygon points="16.24,7.76 14.12,14.12 7.76,16.24 9.88,9.88"/>
+            <circle cx="12" cy="12" r="2"/>
+          </svg>
+        {:else}
+          <!-- Active GPS Icon -->
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="animate-pulse">
+            <path d="M12 2L13.09 8.26L22 9L13.09 15.74L12 22L10.91 15.74L2 9L10.91 8.26L12 2Z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+        {/if}
       {:else}
-        <!-- Inactive compass icon -->
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="10"/>
-          <polygon points="16.24,7.76 14.12,14.12 7.76,16.24 9.88,9.88"/>
-        </svg>
+        {#if isIOS}
+          <!-- Inactive Compass Icon for iOS -->
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <polygon points="16.24,7.76 14.12,14.12 7.76,16.24 9.88,9.88"/>
+            <circle cx="12" cy="12" r="2"/>
+          </svg>
+        {:else}
+          <!-- Inactive GPS Icon for other devices -->
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2L13.09 8.26L22 9L13.09 15.74L12 22L10.91 15.74L2 9L10.91 8.26L12 2Z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+        {/if}
       {/if}
     </button>
 
@@ -863,5 +941,24 @@
   :global(.image-marker-fullscreen) {
     background: transparent !important;
     border: none !important;
+  }
+  
+  /* Auto-rotate animation */
+  .auto-rotate-fab .animate-spin {
+    animation: spin 2s linear infinite;
+  }
+  
+  .auto-rotate-fab .animate-pulse {
+    animation: pulse 2s ease-in-out infinite;
+  }
+  
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+  
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
   }
 </style> 
