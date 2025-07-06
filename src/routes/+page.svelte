@@ -2951,12 +2951,7 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
   }
   @media (max-width: 600px) {
     .culoca-logo {
-      bottom: 7rem;
-      left: 0.5rem;
-      top: auto;
-      right: auto;
-      width: 6rem;
-      height: 6rem;
+      width: 10rem;
     }
   }
   .distance-label {
