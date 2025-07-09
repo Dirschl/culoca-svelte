@@ -108,6 +108,9 @@ export const POST = async ({ request }) => {
 
         // Load user's save_originals setting from database
         let saveOriginals = true;
+        let originalSupabasePath = null;
+        let originalUrl = null;
+        let exif: any = null;
         
         // Get settings from FormData (sent by frontend) - legacy support
         const formImageFormat = form.get('user_image_format') as string;
@@ -169,28 +172,42 @@ export const POST = async ({ request }) => {
           // Default bleibt true
         }
 
-        // 2. Original ggf. in Supabase 'originals' speichern
-        let originalSupabasePath = null;
+        // 2. Original-Upload-Flow (umgeht Vercel-Limit)
+        
+        // 2a. Original zuerst in Supabase originals speichern (umgeht Vercel-Limit)
         if (saveOriginals) {
           try {
-            const { error: origError } = await supabase.storage
+            originalSupabasePath = `${id}.jpg`;
+            console.log('📤 Uploading original to Supabase originals:', originalSupabasePath);
+            
+            const { error: originalUploadError } = await supabase.storage
               .from('originals')
-              .upload(`${id}.jpg`, buf, {
-                contentType: file.type || 'image/jpeg',
+              .upload(originalSupabasePath, buf, { 
+                contentType: 'image/jpeg',
                 upsert: false
               });
-            if (!origError) {
-              originalSupabasePath = `${id}.jpg`;
-              console.log('✅ Original erfolgreich in Supabase gespeichert:', originalSupabasePath);
+            
+            if (originalUploadError) {
+              console.error('❌ Original upload to Supabase failed:', originalUploadError);
             } else {
-              console.error('❌ Fehler beim Upload des Originals zu Supabase:', origError);
+              console.log('✅ Original uploaded to Supabase originals');
             }
           } catch (e) {
-            console.error('❌ Fehler beim Upload des Originals zu Supabase:', e);
+            console.error('❌ Original upload process failed:', e);
           }
+        } else {
+          console.log('ℹ️ saveOriginals disabled, skipping original upload');
         }
 
-        // Resize image to multiple sizes with environment-based settings
+        // 2b. EXIF aus Original extrahieren (vor dem Resize)
+        try {
+          exif = await exifr.parse(buf, { iptc: true });
+          console.log('✅ EXIF data extracted from original');
+        } catch (exifErr) {
+          console.warn('EXIF parsing failed:', exifErr);
+        }
+
+        // 2c. Resize nur für Vercel-kompatible Versionen (klein genug für 4,5MB Limit)
         console.log('🔍 DEBUG: About to call resizeJPG with environment-based settings');
         
         const sizes = await resizeJPG(buf);
@@ -238,9 +255,7 @@ export const POST = async ({ request }) => {
           lon = parseFloat(formLon);
         }
 
-        let exif: any = null;
         try {
-          exif = await exifr.parse(buf, { iptc: true });
           if (exif) {
             // GPS coordinates
             if (exif.latitude && exif.longitude) {
@@ -522,7 +537,6 @@ export const POST = async ({ request }) => {
         if (exif?.SubjectDistanceRange) exifData.SubjectDistanceRange = exif.SubjectDistanceRange;
 
         // 3. Original-Upload-Flow (umgeht Vercel-Limit)
-        let originalUrl = null;
         
         if (saveOriginals) {
           try {
