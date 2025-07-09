@@ -12,7 +12,7 @@ async function fixImageDimensions() {
   
   // Get all images from database
   const { data: images, error } = await supabase
-    .from('images')
+    .from('items')
     .select('id, path_512, width, height');
     
   if (error) {
@@ -58,7 +58,7 @@ async function fixImageDimensions() {
       
       // Update database with correct dimensions
       const { error: updateError } = await supabase
-        .from('images')
+        .from('items')
         .update({ 
           width: actualWidth, 
           height: actualHeight 

@@ -12,7 +12,7 @@ async function recreate64pxThumbnails() {
   
   // Step 1: Get all images that have path_64 (existing 64px thumbnails)
   const { data: existingImages, error: fetchError } = await supabase
-    .from('images')
+    .from('items')
     .select('id, path_512, path_64')
     .not('path_64', 'is', null);
     
@@ -64,7 +64,7 @@ async function recreate64pxThumbnails() {
   // Step 3: Reset path_64 field in database
   console.log('🔄 Resetting path_64 field in database...');
   const { error: updateError } = await supabase
-    .from('images')
+    .from('items')
     .update({ path_64: null })
     .not('path_64', 'is', null);
     
@@ -125,7 +125,7 @@ async function recreate64pxThumbnails() {
       
       // Update database with path_64
       const { error: updateError } = await supabase
-        .from('images')
+        .from('items')
         .update({ path_64: image.path_512 })
         .eq('id', image.id);
         

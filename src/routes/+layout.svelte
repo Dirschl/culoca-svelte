@@ -42,7 +42,19 @@
 
 <!-- Upload Modal -->
 {#if $showPublicContentModal}
-	<div class="modal-backdrop" on:click={() => showPublicContentModal.set(false)}></div>
+	<div 
+		class="modal-backdrop" 
+		role="button"
+		tabindex="0"
+		on:click={() => showPublicContentModal.set(false)}
+		on:keydown={(e) => {
+			if (e.key === 'Enter' || e.key === 'Escape' || e.key === ' ') {
+				e.preventDefault();
+				showPublicContentModal.set(false);
+			}
+		}}
+		aria-label="Modal schließen"
+	></div>
 	<div class="upload-modal">
 		<div class="modal-header">
 			<h2>Öffentlichen Content hinzufügen</h2>
@@ -123,6 +135,11 @@
 		top: 0; left: 0; right: 0; bottom: 0;
 		background: rgba(0,0,0,0.5);
 		z-index: 101;
+		cursor: pointer;
+	}
+	.modal-backdrop:focus {
+		outline: 2px solid #0066cc;
+		outline-offset: -2px;
 	}
 	.upload-modal {
 		position: fixed;

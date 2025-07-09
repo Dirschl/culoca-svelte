@@ -61,6 +61,7 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
   let showCompass = false;
   let autoguide = false;
   let newsFlashMode: 'aus' | 'eigene' | 'alle' = 'alle';
+  let enableSearch = false;
   let userLat: number | null = null;
   let userLon: number | null = null;
   let deviceHeading: number | null = null;
@@ -68,6 +69,13 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
 
   let isLoggedIn = false;
   let currentUser: any = null;
+  
+  // Search functionality
+  let searchQuery = '';
+  let searchResults: any[] = [];
+  let isSearching = false;
+  let searchTimeout: ReturnType<typeof setTimeout> | null = null;
+  let searchInput: HTMLInputElement;
 
   // Login-Overlay Variablen
   let loginEmail = '';
@@ -931,7 +939,7 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
     try {
       // Load all images in one request
       const { data } = await supabase
-        .from('images')
+        .from('items')
         .select('id,path_512,path_2048,path_64,width,height,lat,lon,title,description,keywords')
         .not('lat', 'is', null)
         .not('lon', 'is', null)
@@ -940,8 +948,8 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
       if (data) {
         const allPics = data.map((d: any) => ({
           id: d.id,
-          src: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${d.path_512}`,
-          srcHD: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${d.path_2048}`,
+          src: d.path_512 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${d.path_512}` : '',
+          srcHD: d.path_2048 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${d.path_2048}` : '',
           width: d.width,
           height: d.height,
           lat: d.lat,
@@ -952,7 +960,7 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
           path_64: d.path_64,
           path_512: d.path_512,
           path_2048: d.path_2048
-        }));
+        })).filter((pic: any) => pic.path_512); // Filter out images without path_512
 
         // Sort by distance if user is logged in and distance is enabled
         if (isLoggedIn && showDistance && userLat !== null && userLon !== null) {
@@ -988,10 +996,8 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
   async function getTotalImageCount() {
     try {
       const { count, error } = await supabase
-        .from('images')
-        .select('id', { count: 'exact' })
-        .not('lat', 'is', null)
-        .not('lon', 'is', null);
+        .from('items')
+        .select('id', { count: 'exact' });
       
       if (error) {
         console.error('Error getting total image count:', error);
@@ -1008,11 +1014,18 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
   async function loadMore(reason = 'default') {
     console.log(`[Gallery] loadMore called, reason: ${reason}, page: ${page}, size: ${size}, hasMoreImages: ${hasMoreImages}, loading: ${loading}`);
     if (loading || !hasMoreImages) return; 
+    
+    // Don't load more images if a search is active
+    if (searchQuery.trim() || searchResults.length > 0) {
+      console.log(`[Gallery] Skipping loadMore because search is active: "${searchQuery}"`);
+      return;
+    }
+    
     loading = true;
 
     // Debug: Check if specific image exists in database
     const specificImageCheck = await supabase
-      .from('images')
+      .from('items')
       .select('id, lat, lon, path_512, title')
       .eq('id', '2c6407f6-1ca5-4e82-afb1-0e0fe37db0ea')
       .single();
@@ -1025,6 +1038,7 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
 
     if (userLat !== null && userLon !== null) {
       // Lade die nächste Seite nach Entfernung sortiert per RPC
+      console.log(`[Gallery] Loading images sorted by distance via RPC...`);
       const { data, error } = await supabase
         .rpc('images_by_distance', {
           user_lat: userLat,
@@ -1039,17 +1053,10 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
         return;
       }
       if (data && data.length > 0) {
-        // Filter out images without GPS coordinates
-        const imagesWithGPS = data.filter((d: any) => d.lat && d.lon);
-        
-        if (imagesWithGPS.length !== data.length) {
-          console.log(`[Gallery] RPC returned ${data.length} images, but only ${imagesWithGPS.length} have GPS coordinates`);
-        }
-        
-        const newPics = imagesWithGPS.map((d: any) => ({
+        const newPics = data.map((d: any) => ({
           id: d.id,
-          src: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${d.path_512}`,
-          srcHD: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${d.path_2048}`,
+          src: d.path_512 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${d.path_512}` : '',
+          srcHD: d.path_2048 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${d.path_2048}` : '',
           width: d.width,
           height: d.height,
           lat: d.lat,
@@ -1060,7 +1067,8 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
           path_64: d.path_64,
           path_512: d.path_512,
           path_2048: d.path_2048
-        }));
+        })).filter((pic: any) => pic.path_512); // Filter out images without path_512
+        
         // Prüfe auf Duplikate vor dem Hinzufügen
         const currentPics = get(pics);
         const existingIds = new Set(currentPics.map((p: any) => p.id));
@@ -1076,7 +1084,7 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
         const totalCount = await getTotalImageCount();
         updateGalleryStats($pics.length, totalCount);
         
-        console.log(`[Gallery] RPC loaded ${uniqueNewPics.length} unique images with GPS, total now: ${$pics.length}`);
+        console.log(`[Gallery] RPC loaded ${uniqueNewPics.length} unique images sorted by distance, total now: ${$pics.length}`);
         
         // Announce first image if autoguide is enabled and new images were loaded
         if (autoguide && uniqueNewPics.length > 0) {
@@ -1085,19 +1093,17 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
         }
         
         // Wenn weniger Bilder geladen wurden als erwartet, könnte das bedeuten, dass wir am Ende sind
-        if (imagesWithGPS.length < size) {
-          console.log(`[Gallery] RPC returned ${imagesWithGPS.length} images with GPS, expected ${size}. This might be the end.`);
+        if (data.length < size) {
+          console.log(`[Gallery] RPC returned ${data.length} images, expected ${size}. This might be the end.`);
           
-          // Prüfe, ob es noch mehr Bilder mit GPS gibt
-          const totalImagesWithGPS = await supabase
-            .from('images')
-            .select('id', { count: 'exact' })
-            .not('lat', 'is', null)
-            .not('lon', 'is', null);
+          // Prüfe, ob es noch mehr Bilder gibt
+          const totalImages = await supabase
+            .from('items')
+            .select('id', { count: 'exact' });
           
-          if (totalImagesWithGPS.count && $pics.length >= totalImagesWithGPS.count) {
+          if (totalImages.count && $pics.length >= totalImages.count) {
             hasMoreImages = false;
-            console.log(`[Gallery] All ${totalImagesWithGPS.count} images with GPS loaded, hasMoreImages set to false`);
+            console.log(`[Gallery] All ${totalImages.count} images loaded, hasMoreImages set to false`);
           }
         }
       } else {
@@ -1112,10 +1118,9 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
     // Normale Pagination für nicht eingeloggte User oder wenn Distanz deaktiviert ist
     console.log(`[Gallery] Using normal pagination, range: ${page * size} to ${page * size + size - 1}`);
     const { data } = await supabase
-      .from('images')
+      .from('items')
       .select('id,path_512,path_2048,path_64,width,height,lat,lon,title,description,keywords')
-      .not('lat', 'is', null)
-      .not('lon', 'is', null)
+      .not('path_512', 'is', null) // Only load images with valid path_512
       .order('created_at', { ascending: false })
       .range(page * size, page * size + size - 1);
 
@@ -1127,8 +1132,8 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
       }
       const newPics = data.map((d: any) => ({
         id: d.id,
-        src: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${d.path_512}`,
-        srcHD: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${d.path_2048}`,
+        src: d.path_512 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${d.path_512}` : '',
+        srcHD: d.path_2048 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${d.path_2048}` : '',
         width: d.width,
         height: d.height,
         lat: d.lat,
@@ -1139,7 +1144,7 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
         path_64: d.path_64,
         path_512: d.path_512,
         path_2048: d.path_2048
-      }));
+      })).filter((pic: any) => pic.path_512); // Filter out images without path_512
       
       // Prüfe auf Duplikate vor dem Hinzufügen
       const currentPics = get(pics);
@@ -1234,14 +1239,25 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
   }
 
   async function processFiles(files: FileList) {
+    console.log('🔍 Frontend: processFiles called with', files.length, 'files');
+    alert('🔍 Frontend: processFiles called with ' + files.length + ' files');
     if (!files || files.length === 0) {
       uploadMessage = 'Bitte Bilder auswählen';
       return;
     }
 
+    // Check if user is authenticated
+    const sessionResult = await supabase.auth.getSession();
+    const currentUser = sessionResult.data.session?.user;
+    
+    if (!currentUser) {
+      uploadMessage = '❌ Bitte zuerst einloggen, um Bilder hochzuladen';
+      return;
+    }
+
     // Validate file types
     const validFiles = Array.from(files).filter(file => 
-      file.type === 'image/jpeg' || file.type === 'image/jpg'
+      file.type === 'image/jpeg' || file.type === 'image/jpg' || file.type === 'image/webp'
     );
 
     if (validFiles.length === 0) {
@@ -1272,13 +1288,58 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
 
         const formData = new FormData();
         formData.append('files', file);
-        // Attach profile_id so that the server can persist it
+        
+        // Load user settings and attach them to the request
+        console.log('🔍 Frontend: Starting to load user settings...');
         const sessionResult = await supabase.auth.getSession();
-        const currentUser = sessionResult.data.user;
+        const currentUser = sessionResult.data.session?.user;
         const session = sessionResult.data.session;
+        
+        console.log('🔍 Frontend: Session result:', { 
+          hasUser: !!currentUser, 
+          userId: currentUser?.id,
+          hasSession: !!session 
+        });
+        
         if (currentUser) {
           formData.append('profile_id', currentUser.id);
+          
+          // Load user's image format settings
+          console.log('🔍 Frontend: Loading profile data for user:', currentUser.id);
+          try {
+            const { data: profileData, error: profileError } = await supabase
+              .from('profiles')
+              .select('image_format, image_quality')
+              .eq('id', currentUser.id)
+              .single();
+            
+            console.log('🔍 Frontend: Profile query result:', { data: profileData, error: profileError });
+            
+            if (profileData) {
+              console.log('🔍 Frontend: User settings loaded:', profileData);
+              const format = profileData.image_format || 'jpg';
+              const quality = (profileData.image_quality || 85).toString();
+              console.log('🔍 Frontend: Appending to FormData:', { format, quality });
+              formData.append('user_image_format', format);
+              formData.append('user_image_quality', quality);
+            } else {
+              console.log('🔍 Frontend: No profile data found, using defaults');
+              formData.append('user_image_format', 'jpg');
+              formData.append('user_image_quality', '85');
+            }
+          } catch (profileError) {
+            console.log('🔍 Frontend: Could not load user profile settings:', profileError);
+            formData.append('user_image_format', 'jpg');
+            formData.append('user_image_quality', '85');
+          }
         }
+        
+        // Debug: Log FormData contents
+        console.log('🔍 Frontend: FormData contents before sending:');
+        for (const [key, value] of formData.entries()) {
+          console.log(`  ${key}: ${value}`);
+        }
+        
         const access_token = session?.access_token;
         const response = await fetch('/api/upload', {
           method: 'POST',
@@ -1417,12 +1478,13 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
     currentUser = user;
     const { data } = await supabase
       .from('profiles')
-      .select('show_distance, show_compass, autoguide, use_justified_layout, newsflash_mode')
+      .select('show_distance, show_compass, autoguide, enable_search, use_justified_layout, newsflash_mode')
       .eq('id', user.id)
       .single();
     showDistance = data?.show_distance ?? false;
     showCompass = data?.show_compass ?? false;
     autoguide = data?.autoguide ?? false;
+    enableSearch = data?.enable_search ?? false;
     useJustifiedLayout = data?.use_justified_layout ?? true;
     newsFlashMode = data?.newsflash_mode ?? 'alle';
     
@@ -1583,7 +1645,8 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
         userLon = pos.coords.longitude;
         saveLastKnownLocation(userLat, userLon);
         // Wenn GPS-Koordinaten verfügbar sind, lade Bilder nach Entfernung sortiert
-        if (userLat !== null && userLon !== null) {
+        // Aber nur wenn keine Suche aktiv ist
+        if (userLat !== null && userLon !== null && !searchQuery.trim()) {
           pics.set([]);
           page = 0;
           hasMoreImages = true;
@@ -1674,8 +1737,8 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
     const sortedPics = [...$pics].sort((a: any, b: any) => {
       if (!a.lat || !a.lon || !b.lat || !b.lon) return 0;
       
-      const distA = getDistanceInMeters(userLat, userLon, a.lat, a.lon);
-      const distB = getDistanceInMeters(userLat, userLon, b.lat, b.lon);
+                const distA = a.lat && a.lon && userLat && userLon ? getDistanceInMeters(userLat, userLon, a.lat, a.lon) : Number.MAX_VALUE;
+          const distB = b.lat && b.lon && userLat && userLon ? getDistanceInMeters(userLat, userLon, b.lat, b.lon) : Number.MAX_VALUE;
       
       return distA - distB;
     });
@@ -1685,12 +1748,17 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
 
   function checkRadiusForNewImages() {
     if (!userLat || !userLon || !hasMoreImages || loading) return;
+    
+    // Don't load more images if a search is active
+    if (searchQuery.trim() || searchResults.length > 0) {
+      return;
+    }
 
     // Sicherstellen, dass $pics ein Array ist
     const currentPics = Array.isArray($pics) ? $pics : [];
 
     const visibleImages = currentPics.filter((pic: any) => {
-      if (!pic.lat || !pic.lon) return false;
+      if (!pic.lat || !pic.lon || !userLat || !userLon) return false;
       const distance = getDistanceInMeters(userLat, userLon, pic.lat, pic.lon);
       return distance <= 5000; // 5km radius
     });
@@ -1716,6 +1784,11 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
   
   async function reloadGalleryWithNewPosition() {
     if (!isLoggedIn || !showDistance) return;
+    
+    // Don't reload gallery if a search is active
+    if (searchQuery.trim() || searchResults.length > 0) {
+      return;
+    }
     
     console.log('Reloading gallery with fresh GPS position...');
     
@@ -1743,7 +1816,7 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
       
       // Now reload gallery with fresh position
       const { data } = await supabase
-        .from('images')
+        .from('items')
         .select('id,path_512,path_2048,width,height,lat,lon,title,description,keywords')
         .not('lat', 'is', null)
         .not('lon', 'is', null);
@@ -1751,8 +1824,8 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
       if (data) {
         const allPics = data.map((d: any) => ({
           id: d.id,
-          src: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${d.path_512}`,
-          srcHD: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${d.path_2048}`,
+          src: d.path_512 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${d.path_512}` : '',
+          srcHD: d.path_2048 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${d.path_2048}` : '',
           width: d.width,
           height: d.height,
           lat: d.lat,
@@ -1760,7 +1833,7 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
           title: d.title,
           description: d.description,
           keywords: d.keywords
-        }));
+        })).filter((pic: any) => pic.path_512); // Filter out images without path_512
 
         // Sort by distance to fresh position
         const sortedPics = allPics.sort((a, b) => {
@@ -1786,7 +1859,7 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
         // Use existing reloadGalleryWithNewPosition logic with current position
         try {
           const { data } = await supabase
-            .from('images')
+            .from('items')
             .select('id,path_512,path_2048,width,height,lat,lon,title,description,keywords')
             .not('lat', 'is', null)
             .not('lon', 'is', null);
@@ -1794,8 +1867,8 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
           if (data) {
             const allPics = data.map((d: any) => ({
               id: d.id,
-              src: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${d.path_512}`,
-              srcHD: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${d.path_2048}`,
+              src: d.path_512 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${d.path_512}` : '',
+              srcHD: d.path_2048 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${d.path_2048}` : '',
               width: d.width,
               height: d.height,
               lat: d.lat,
@@ -1803,7 +1876,7 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
               title: d.title,
               description: d.description,
               keywords: d.keywords
-            }));
+            })).filter((pic: any) => pic.path_512); // Filter out images without path_512
 
             const sortedPics = allPics.sort((a, b) => {
               const distA = a.lat && a.lon ? getDistanceInMeters(userLat!, userLon!, a.lat, a.lon) : Number.MAX_VALUE;
@@ -1824,7 +1897,7 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
 
   // Navigation-Handler direkt im Komponenten-Scope (nicht im onMount!)
   beforeNavigate(({ to }) => {
-    if (to?.url.pathname.startsWith('/image/')) {
+    if (to?.url.pathname.startsWith('/item/')) {
       console.log('Navigating to detail page, starting gallery preload...');
       startGalleryPreload();
     }
@@ -1836,7 +1909,8 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
     }
   });
 
-  onMount(async () => {
+  onMount(() => {
+    (async () => {
     const { data: { user } } = await supabase.auth.getUser();
     isLoggedIn = !!user;
     currentUser = user;
@@ -1849,10 +1923,20 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
       newsFlashMode = 'alle';
     }
 
-    // Check for GPS simulation parameters
+    // Check for URL parameters
     const urlParams = new URLSearchParams(window.location.search);
     const simulation = urlParams.get('simulation');
     const stopSimulation = urlParams.get('stop');
+    const searchParam = urlParams.get('s');
+    
+    // Handle search parameter from URL
+    if (searchParam && searchParam.trim()) {
+      searchQuery = searchParam.trim();
+      // Perform search immediately if search parameter is present
+      setTimeout(() => {
+        performSearch(searchQuery, false); // Don't update URL since it's already there
+      }, 100);
+    }
     
     if (stopSimulation === 'simulation') {
       console.log('Stopping simulation mode');
@@ -1941,7 +2025,8 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
       pics.set(JSON.parse(sessionPics));
     } else {
       // Galerie erst laden, nachdem alle Einstellungen geladen sind
-      if (!showDistance) {
+      // Aber nur wenn keine Suche aktiv ist
+      if (!showDistance && !searchParam) {
         loadMore('initial mount');
       }
       // Wenn showDistance aktiv ist, wird loadMore im GPS-Callback von startGPSTracking aufgerufen
@@ -2003,6 +2088,7 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
         clearTimeout(scrollTimeout);
       }
     };
+    })();
   });
 
   // Hilfsfunktion: Grid-Zelle berechnen
@@ -2158,6 +2244,193 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
 
   let showScrollToTop = false;
 
+  // Search functions
+  async function performSearch(query: string = searchQuery, updateURL: boolean = false) {
+    if (!query.trim()) {
+      searchResults = [];
+      if (updateURL) {
+        // Clear search from URL
+        const url = new URL(window.location.href);
+        url.searchParams.delete('s');
+        window.history.replaceState({}, '', url.toString());
+      }
+      return;
+    }
+    
+    isSearching = true;
+    console.log('🔍 Performing search for:', query);
+    
+    // Update URL if requested
+    if (updateURL) {
+      const url = new URL(window.location.href);
+      url.searchParams.set('s', query);
+      window.history.replaceState({}, '', url.toString());
+    }
+    
+    try {
+      console.log('🔍 Search query:', query);
+      
+      // First, let's see what's in the database
+      const { data: allData, error: allError } = await supabase
+        .from('items')
+        .select('id,title,description,keywords')
+        .limit(5);
+      
+      console.log('🔍 Sample data from database:', allData);
+      
+      // Split query into individual terms for multi-term search
+      const searchTerms = query.trim().split(/\s+/).filter(term => term.length > 0);
+      console.log('🔍 Search terms:', searchTerms);
+      
+      // Build the search query with proper Supabase syntax
+      // Search in title and description first
+      let { data, error } = await supabase
+        .from('items')
+        .select('id,path_512,path_2048,path_64,width,height,lat,lon,title,description,keywords')
+        .limit(1000); // Get more data for client-side filtering
+      
+      if (error) {
+        console.error('🔍 Supabase error:', error);
+        throw error;
+      }
+      
+      // Filter results client-side for multi-term search
+      if (data && searchTerms.length > 0) {
+        data = data.filter((img: any) => {
+          const searchText = `${img.title || ''} ${img.description || ''}`.toLowerCase();
+          
+          // All search terms must be present (AND logic)
+          return searchTerms.every(term => 
+            searchText.includes(term.toLowerCase())
+          );
+        });
+        
+        console.log(`🔍 Title/description search found ${data.length} results for terms:`, searchTerms);
+             }
+      
+            // If no results from title/description search, try searching in keywords
+      if (!data || data.length === 0) {
+        console.log('🔍 No results from title/description search, trying keywords...');
+        
+        // Get all images and filter by keywords on client side
+        const { data: allImages, error: allError } = await supabase
+          .from('items')
+          .select('id,path_512,path_2048,path_64,width,height,lat,lon,title,description,keywords')
+          .limit(1000);
+        
+        if (allError) {
+          console.error('🔍 Error fetching all images for keyword search:', allError);
+          throw allError;
+        }
+        
+        if (allImages) {
+          // Filter images that have ALL search terms in their keywords (AND logic)
+          data = allImages.filter((img: any) => {
+            if (!img.keywords) return false;
+            
+            // Handle both array and string formats
+            let keywords: string[] = [];
+            if (Array.isArray(img.keywords)) {
+              keywords = img.keywords;
+            } else if (typeof img.keywords === 'string') {
+              keywords = img.keywords.split(',').map((k: string) => k.trim());
+            }
+            
+            // Check if ALL search terms are present in keywords (case insensitive)
+            return searchTerms.every(searchTerm => 
+              keywords.some((keyword: string) => 
+                keyword.toLowerCase().includes(searchTerm.toLowerCase())
+              )
+            );
+          });
+          
+          console.log(`🔍 Keyword search found ${data.length} results for terms:`, searchTerms);
+        }
+      }
+      
+      console.log('🔍 Raw search results:', data);
+      
+      if (data) {
+        const searchPics = data.map((d: any) => ({
+          id: d.id,
+          src: d.path_512 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${d.path_512}` : '',
+          srcHD: d.path_2048 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${d.path_2048}` : '',
+          width: d.width,
+          height: d.height,
+          lat: d.lat,
+          lon: d.lon,
+          title: d.title,
+          description: d.description,
+          keywords: d.keywords,
+          path_64: d.path_64,
+          path_512: d.path_512,
+          path_2048: d.path_2048
+        })).filter((pic: any) => pic.path_512); // Filter out images without path_512
+        
+        // If user is logged in and has GPS coordinates, sort by distance
+        if (isLoggedIn && userLat !== null && userLon !== null) {
+          searchPics.sort((a: any, b: any) => {
+            const distA = a.lat && a.lon && userLat && userLon ? getDistanceInMeters(userLat, userLon, a.lat, a.lon) : Number.MAX_VALUE;
+            const distB = b.lat && b.lon && userLat && userLon ? getDistanceInMeters(userLat, userLon, b.lat, b.lon) : Number.MAX_VALUE;
+            return distA - distB;
+          });
+        }
+        
+        searchResults = searchPics;
+        pics.set(searchPics);
+        
+        // Update gallery stats
+        const totalCount = await getTotalImageCount();
+        updateGalleryStats(searchPics.length, totalCount);
+        
+        console.log(`🔍 Search found ${searchPics.length} results`);
+        
+        // Update placeholder with result count
+        updateSearchPlaceholder();
+      }
+    } catch (error) {
+      console.error('🔍 Search error:', error);
+    } finally {
+      isSearching = false;
+    }
+  }
+  
+  function clearSearch() {
+    searchQuery = '';
+    searchResults = [];
+    
+    // Clear search from URL
+    const url = new URL(window.location.href);
+    url.searchParams.delete('s');
+    window.history.replaceState({}, '', url.toString());
+    
+    // Reset placeholder
+    updateSearchPlaceholder();
+    
+    // Reload original gallery
+    pics.set([]);
+    page = 0;
+    hasMoreImages = true;
+    loadMore('clear search');
+  }
+  
+  function handleSearchKeydown(event: KeyboardEvent) {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      performSearch(searchQuery, true); // URL aktualisieren
+    }
+  }
+  
+  function updateSearchPlaceholder() {
+    if (searchResults.length > 0) {
+      searchInput.placeholder = `${searchResults.length} Ergebnis${searchResults.length !== 1 ? 'se' : ''} gefunden`;
+    } else if (searchQuery.trim()) {
+      searchInput.placeholder = 'Keine Ergebnisse gefunden';
+    } else {
+      searchInput.placeholder = '';
+    }
+  }
+
   // Helper to exit simulation across frames
   function exitSimulation() {
     if (typeof window !== 'undefined') {
@@ -2168,6 +2441,9 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
       }
     }
   }
+
+  let showImpressum = false;
+  let showDatenschutz = false;
 </script>
 
 <!-- Dialoge für Upload und EXIF Upload -->
@@ -2207,7 +2483,7 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
                 </div>
                 <h3>Bilder hier hinziehen</h3>
                 <p>oder <span class="link-text">Dateien auswählen</span></p>
-                <small>Nur JPEG-Dateien erlaubt</small>
+                <small>Nur JPEG- und WebP-Dateien erlaubt</small>
               {/if}
             </div>
             
@@ -2215,7 +2491,7 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
               type="file" 
               name="files" 
               multiple 
-              accept="image/jpeg,image/jpg" 
+              accept="image/jpeg,image/jpg,image/webp" 
               disabled={uploading}
               class="file-input"
             />
@@ -2275,15 +2551,45 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
 
 
 
-<!-- Culoca Logo -->
-<img src="/culoca-logo-512px.png" alt="Culoca" class="culoca-logo" />
+<!-- Search Bar or Culoca Logo -->
+{#if isLoggedIn && enableSearch}
+  <div class="search-container">
+    <div class="search-box">
+      <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+      </svg>
+      <input 
+        type="text" 
+        placeholder=""
+        bind:value={searchQuery}
+        on:keydown={handleSearchKeydown}
+        class="search-input"
+        disabled={isSearching}
+        bind:this={searchInput}
+      />
+      {#if searchQuery}
+        <button class="clear-search-btn" on:click={clearSearch} disabled={isSearching}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+          </svg>
+        </button>
+      {/if}
+      {#if isSearching}
+        <div class="search-spinner"></div>
+      {/if}
+    </div>
+
+  </div>
+{:else}
+  <img src="/culoca-logo-512px.png" alt="Culoca" class="culoca-logo" />
+{/if}
 
 <!-- NewsFlash Component -->
 {#if isLoggedIn && newsFlashMode !== 'aus'}
   <NewsFlash 
     mode={newsFlashMode}
     userId={currentUser?.id}
-    layout="strip"
+    layout={useJustifiedLayout ? 'justified' : 'grid'}
     limit={15}
     showToggles={false}
     showDistance={showDistance}
@@ -2334,8 +2640,9 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
     {isLoggedIn}
     {simulationMode}
     {profileAvatar}
-    on:upload={() => showUploadDialog = true}
+    on:upload={() => location.href = '/bulk-upload'}
     on:publicContent={() => showPublicContentModal.set(true)}
+    on:bulkUpload={() => location.href = '/bulk-upload'}
     on:profile={() => location.href = '/profile'}
     on:settings={() => location.href = '/settings'}
     on:map={() => showFullscreenMap = true}
@@ -2373,8 +2680,8 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
             <img 
               src={pic.src} 
               alt="Gallery image {pic.id}"
-              on:click={() => location.href = `/image/${pic.id}`}
-              on:keydown={(e) => e.key === 'Enter' && (location.href = `/image/${pic.id}`)}
+              on:click={() => location.href = `/item/${pic.id}`}
+              on:keydown={(e) => e.key === 'Enter' && (location.href = `/item/${pic.id}`)}
               tabindex="0"
               role="button"
               aria-label="View image {pic.id}"
@@ -3115,6 +3422,106 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
     }
   }
 
+  /* Search Container */
+  .search-container {
+    position: fixed;
+    bottom: 1.8rem;
+    left: 1.8rem;
+    right: auto;
+    z-index: 50;
+    max-width: 300px;
+    width: 15.8rem;
+  }
+
+  .search-box {
+    position: relative;
+    display: flex;
+    align-items: center;
+    background: var(--bg-secondary);
+    border: 2px solid var(--border-color);
+    border-radius: 50px;
+    padding: 0.5rem 0.75rem;
+    box-shadow: 0 4px 20px var(--shadow);
+    transition: all 0.3s ease;
+  }
+
+  .search-box:focus-within {
+    border-color: var(--accent-color);
+    box-shadow: 0 4px 25px var(--shadow);
+  }
+
+  .search-icon {
+    color: var(--text-secondary);
+    margin-right: 0.75rem;
+    flex-shrink: 0;
+  }
+
+  .search-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    font-weight: 500;
+    padding: 0;
+  }
+
+  .search-input::placeholder {
+    color: var(--text-secondary);
+  }
+
+  .search-input:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .clear-search-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+    margin-left: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .clear-search-btn:hover:not(:disabled) {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+  }
+
+  .clear-search-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .search-spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--border-color);
+    border-top: 2px solid var(--accent-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-left: 0.5rem;
+  }
+
+  .search-results-info {
+    margin-top: 0.5rem;
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    font-weight: 500;
+    background: var(--bg-secondary);
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    border: 1px solid var(--border-color);
+  }
+
   /* Culoca Logo */
   .culoca-logo {
     position: fixed;
@@ -3132,6 +3539,9 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
   @media (max-width: 600px) {
     .culoca-logo {
       width: 10rem;
+    }
+    .search-container {
+      max-width: 250px;
     }
   }
   .distance-label {
@@ -3482,6 +3892,126 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
   .hide-duplicates-btn:hover {
     background: var(--border-color);
   }
+
+  .impressum-link, .datenschutz-link {
+    position: fixed;
+    bottom: 0.3rem;
+    font-size: 0.95rem;
+    color: #ffffff;
+  }
+  
+  .impressum-link {
+    left: 2.7rem;
+  }
+  
+  .datenschutz-link {
+    left: 11.2rem;
+  }
+  .impressum-link:hover, .datenschutz-link:hover {
+    opacity: 1;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+  }
+  
+  .impressum-modal-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.45);
+    z-index: 3000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+  }
+  
+  .impressum-modal {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    border-radius: 12px;
+    max-width: 720px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 8px 32px var(--shadow);
+    padding: 2.5rem 2rem 2rem 2rem;
+    position: relative;
+  }
+  
+  .impressum-modal h2 {
+    margin: 0 0 2rem 0;
+    font-size: 1.8rem;
+    color: var(--text-primary);
+  }
+  
+  .impressum-modal h3 {
+    margin: 2.5rem 0 1rem 0;
+    font-size: 1.3rem;
+    color: var(--text-primary);
+  }
+  
+  .impressum-modal p {
+    margin: 0 0 1.5rem 0;
+    line-height: 1.6;
+    color: var(--text-secondary);
+  }
+  
+  .impressum-modal a {
+    color: var(--accent-color);
+    text-decoration: none;
+  }
+  
+  .impressum-modal a:hover {
+    text-decoration: underline;
+  }
+  
+  .impressum-close {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    background: none;
+    border: none;
+    font-size: 2rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+  }
+  
+  .impressum-close:hover {
+    opacity: 1;
+    color: var(--accent-color);
+  }
+  
+  @media (max-width: 600px) {
+    .impressum-modal {
+      max-width: 98vw;
+      padding: 1.5rem 1rem 1rem 1rem;
+    }
+    
+    .impressum-modal h2 {
+      font-size: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    
+    .impressum-modal h3 {
+      font-size: 1.2rem;
+      margin: 2rem 0 0.8rem 0;
+    }
+    
+          .impressum-link {
+        left: 0.7rem;
+        bottom: 0.7rem;
+        font-size: 0.85rem;
+        padding: 0.18rem 0.7rem;
+      }
+      
+      .datenschutz-link {
+        left: 6.5rem;
+        bottom: 0.7rem;
+        font-size: 0.85rem;
+        padding: 0.18rem 0.7rem;
+      }
+  }
 </style>
 
 <!-- Fullscreen Map -->
@@ -3494,7 +4024,182 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
     on:close={() => showFullscreenMap = false}
     on:imageClick={(event) => {
       showFullscreenMap = false;
-      location.href = `/image/${event.detail.imageId}`;
+      location.href = `/item/${event.detail.imageId}`;
     }}
   />
+{/if}
+
+<!-- Impressum-Link links unten -->
+<a class="impressum-link" href="#" on:click|preventDefault={() => showImpressum = true}>Impressum</a>
+<a class="datenschutz-link" href="#" on:click|preventDefault={() => showDatenschutz = true}>Datenschutz</a>
+
+{#if showImpressum}
+  <div class="impressum-modal-overlay" on:click={() => showImpressum = false}>
+    <div class="impressum-modal" on:click|stopPropagation>
+      <button class="impressum-close" on:click={() => showImpressum = false} title="Schließen">×</button>
+      <section id="impressum">
+        <h2>Impressum</h2>
+        <p><strong>Autor, Herausgeber, Design und technische Umsetzung</strong><br>
+        DIRSCHL.com GmbH<br>
+        Waldberg 84<br>
+        84571 Reischach<br>
+        Deutschland</p>
+        <p><strong>Geschäftsführer:</strong><br>
+        Johann Dirschl</p>
+        <p><strong>Kontakt:</strong><br>
+        Mobil: 0179 9766666<br>
+        Festnetz: 08670 5590127<br>
+        E-Mail: <a href="mailto:johann.dirschl@gmx.de">johann.dirschl@gmx.de</a></p>
+        <p><strong>Handelsregister:</strong><br>
+        Amtsgericht Traunstein, HRB 18130</p>
+        <p><strong>USt-IdNr.:</strong><br>
+        DE258218256</p>
+        <p><strong>Steuernummer:</strong><br>
+        141/124/50220</p>
+        <p><strong>Verantwortlich für den Inhalt gemäß § 55 Abs. 2 RStV:</strong><br>
+        Johann Dirschl<br>
+        Waldberg 84<br>
+        84571 Reischach</p>
+        <p><strong>Social Media:</strong><br>
+        <a href="https://www.facebook.com/johann.dirschl" target="_blank" rel="noopener noreferrer">Facebook – DIRSCHL.com GmbH</a></p>
+        <h3>Haftungsausschluss</h3>
+        <p>Die Inhalte dieser Website wurden mit größter Sorgfalt erstellt. Für die Richtigkeit, Vollständigkeit und Aktualität der Inhalte übernehmen wir jedoch keine Gewähr. Als Diensteanbieter sind wir gemäß § 7 Abs. 1 TMG für eigene Inhalte verantwortlich. Für Links auf externe Webseiten übernehmen wir keine Haftung – für deren Inhalte sind ausschließlich deren Betreiber verantwortlich.</p>
+        <h3>Datenschutzerklärung</h3>
+        <p>Bitte beachten Sie unsere <a href="#" on:click|preventDefault={() => { showImpressum = false; showDatenschutz = true; }}>Datenschutzerklärung</a>.</p>
+        <h3>Allgemeine Geschäftsbedingungen (AGB)</h3>
+        <p>Unsere vollständigen AGB finden Sie <a href="/agb">hier</a>.</p>
+      </section>
+    </div>
+  </div>
+{/if}
+
+{#if showDatenschutz}
+  <div class="impressum-modal-overlay" on:click={() => showDatenschutz = false}>
+    <div class="impressum-modal" on:click|stopPropagation>
+      <button class="impressum-close" on:click={() => showDatenschutz = false} title="Schließen">×</button>
+      <section id="datenschutz">
+        <h2>Datenschutzerklärung</h2>
+        
+        <h3>1. Datenschutz auf einen Blick</h3>
+        
+        <h4>Allgemeine Hinweise</h4>
+        <p>Die folgenden Hinweise geben einen einfachen Überblick darüber, was mit Ihren personenbezogenen Daten passiert, wenn Sie diese Website besuchen. Personenbezogene Daten sind alle Daten, mit denen Sie persönlich identifiziert werden können. Ausführliche Informationen zum Thema Datenschutz entnehmen Sie unserer unter diesem Text aufgeführten Datenschutzerklärung.</p>
+        
+        <h4>Datenerfassung auf dieser Website</h4>
+        <p><strong>Wer ist verantwortlich für die Datenerfassung auf dieser Website?</strong><br>
+        Die Datenverarbeitung auf dieser Website erfolgt durch den Websitebetreiber. Dessen Kontaktdaten können Sie dem Abschnitt „Hinweis zur Verantwortlichen Stelle" in dieser Datenschutzerklärung entnehmen.</p>
+        
+        <p><strong>Wie erfassen wir Ihre Daten?</strong><br>
+        Ihre Daten werden zum einen dadurch erhoben, dass Sie uns diese mitteilen. Hierbei kann es sich z. B. um Daten handeln, die Sie in ein Kontaktformular eingeben. Andere Daten werden automatisch oder nach Ihrer Einwilligung beim Besuch der Website durch unsere IT-Systeme erfasst. Das sind vor allem technische Daten (z. B. Internetbrowser, Betriebssystem oder Uhrzeit des Seitenaufrufs). Die Erfassung dieser Daten erfolgt automatisch, sobald Sie diese Website betreten.</p>
+        
+        <p><strong>Wofür nutzen wir Ihre Daten?</strong><br>
+        Ein Teil der Daten wird erhoben, um eine fehlerfreie Bereitstellung der Website zu gewährleisten. Andere Daten können zur Analyse Ihres Nutzerverhaltens verwendet werden.</p>
+        
+        <p><strong>Welche Rechte haben Sie bezüglich Ihrer Daten?</strong><br>
+        Sie haben jederzeit das Recht, unentgeltlich Auskunft über Herkunft, Empfänger und Zweck Ihrer gespeicherten personenbezogenen Daten zu erhalten. Sie haben außerdem ein Recht, die Berichtigung oder Löschung dieser Daten zu verlangen. Wenn Sie eine Einwilligung zur Datenverarbeitung erteilt haben, können Sie diese Einwilligung jederzeit für die Zukunft widerrufen. Außerdem haben Sie das Recht, unter bestimmten Umständen die Einschränkung der Verarbeitung Ihrer personenbezogenen Daten zu verlangen. Des Weiteren steht Ihnen ein Beschwerderecht bei der zuständigen Aufsichtsbehörde zu. Hierzu sowie zu weiteren Fragen zum Thema Datenschutz können Sie sich jederzeit an uns wenden.</p>
+        
+        <h3>2. Hosting</h3>
+        <p>Wir hosten unsere Website bei Vercel Inc., 340 S Lemon Ave #4133, Walnut, CA 91789, USA. Vercel verarbeitet Daten im Auftrag und ist durch Standardvertragsklauseln der EU-Kommission zur Einhaltung europäischer Datenschutzstandards verpflichtet.</p>
+        
+        <h3>3. Allgemeine Hinweise und Pflichtinformationen</h3>
+        
+        <h4>Datenschutz</h4>
+        <p>Die Betreiber dieser Seiten nehmen den Schutz Ihrer persönlichen Daten sehr ernst. Wir behandeln Ihre personenbezogenen Daten vertraulich und entsprechend den gesetzlichen Datenschutzvorschriften sowie dieser Datenschutzerklärung. Wenn Sie diese Website benutzen, werden verschiedene personenbezogene Daten erhoben. Personenbezogene Daten sind Daten, mit denen Sie persönlich identifiziert werden können. Die vorliegende Datenschutzerklärung erläutert, welche Daten wir erheben und wofür wir sie nutzen. Sie erläutert auch, wie und zu welchem Zweck das geschieht. Wir weisen darauf hin, dass die Datenübertragung im Internet (z. B. bei der Kommunikation per E-Mail) Sicherheitslücken aufweisen kann. Ein lückenloser Schutz der Daten vor dem Zugriff durch Dritte ist nicht möglich.</p>
+        
+        <h4>Hinweis zur verantwortlichen Stelle</h4>
+        <p>Die verantwortliche Stelle für die Datenverarbeitung auf dieser Website ist:</p>
+        <p>DIRSCHL.com GmbH<br>
+        Waldberg 84<br>
+        84571 Reischach<br>
+        Deutschland</p>
+        <p>Telefon: 0179 9766666<br>
+        E-Mail: johann.dirschl@gmx.de</p>
+        <p>Verantwortliche Stelle ist die natürliche oder juristische Person, die allein oder gemeinsam mit anderen über die Zwecke und Mittel der Verarbeitung von personenbezogenen Daten (z. B. Namen, E-Mail-Adressen o. Ä.) entscheidet.</p>
+        
+        <h4>Speicherdauer</h4>
+        <p>Soweit innerhalb dieser Datenschutzerklärung keine speziellere Speicherdauer genannt wurde, verbleiben Ihre personenbezogenen Daten bei uns, bis der Zweck für die Datenverarbeitung entfällt. Wenn Sie ein berechtigtes Löschersuchen geltend machen oder eine Einwilligung zur Datenverarbeitung widerrufen, werden Ihre Daten gelöscht, sofern wir keine anderen rechtlich zulässigen Gründe für die Speicherung Ihrer personenbezogenen Daten haben (z. B. steuer- oder handelsrechtliche Aufbewahrungsfristen); im letztgenannten Fall erfolgt die Löschung nach Fortfall dieser Gründe.</p>
+        
+        <h4>Allgemeine Hinweise zu den Rechtsgrundlagen der Datenverarbeitung auf dieser Website</h4>
+        <p>Sofern Sie in die Datenverarbeitung eingewilligt haben, verarbeiten wir Ihre personenbezogenen Daten auf Grundlage von Art. 6 Abs. 1 lit. a DSGVO bzw. Art. 9 Abs. 2 lit. a DSGVO, sofern besondere Datenkategorien nach Art. 9 Abs. 1 DSGVO verarbeitet werden. Im Falle einer ausdrücklichen Einwilligung in die Übertragung personenbezogener Daten in Drittstaaten erfolgt die Datenverarbeitung außerdem auf Grundlage von Art. 49 Abs. 1 lit. a DSGVO. Sofern Sie in die Speicherung von Cookies oder in den Zugriff auf Informationen in Ihr Endgerät (z. B. via Device Fingerprinting) eingewilligt haben, erfolgt die Datenverarbeitung außerdem auf Grundlage von § 25 Abs. 1 TTDSG. Die Einwilligung ist jederzeit widerrufbar. Sind Ihre Daten zur Vertragserfüllung oder zur Durchführung vorvertraglicher Maßnahmen erforderlich, verarbeiten wir Ihre Daten auf Grundlage von Art. 6 Abs. 1 lit. b DSGVO. Des Weiteren verarbeiten wir Ihre Daten, sofern diese zur Erfüllung einer rechtlichen Verpflichtung erforderlich sind auf Grundlage von Art. 6 Abs. 1 lit. c DSGVO. Die Datenverarbeitung kann ferner auf Grundlage unseres berechtigten Interesses nach Art. 6 Abs. 1 lit. f DSGVO erfolgen. Über die jeweils im Einzelfall einschlägigen Rechtsgrundlagen wird in den folgenden Absätzen dieser Datenschutzerklärung informiert.</p>
+        
+        <h4>Hinweis zur Datenweitergabe in die USA und andere Drittstaaten</h4>
+        <p>Wir verwenden unter anderem Tools von Unternehmen mit Sitz in den USA oder anderen datenschutzrechtlich nicht sicheren Drittstaaten. Wenn diese Tools aktiv sind, können Ihre personenbezogenen Daten in diese Drittstaaten übertragen und dort verarbeitet werden. Wir weisen darauf hin, dass in diesen Ländern kein mit der EU vergleichbares Datenschutzniveau garantiert werden kann. Beispielsweise sind US-Unternehmen dazu verpflichtet, personenbezogene Daten an Sicherheitsbehörden herauszugeben, ohne dass Sie als Betroffener hiergegen gerichtlich vorgehen könnten. Es kann daher nicht ausgeschlossen werden, dass US-Behörden (z. B. Geheimdienste) Ihre auf US-Servern befindlichen Daten zu Überwachungszwecken verarbeiten, auswerten und dauerhaft speichern. Wir haben auf diese Verarbeitungstätigkeiten keinen Einfluss.</p>
+        
+        <h4>Widerruf Ihrer Einwilligung zur Datenverarbeitung</h4>
+        <p>Viele Datenverarbeitungsvorgänge sind nur mit Ihrer ausdrücklichen Einwilligung möglich. Sie können eine bereits erteilte Einwilligung jederzeit widerrufen. Die Rechtmäßigkeit der bis zum Widerruf erfolgten Datenverarbeitung bleibt vom Widerruf unberührt.</p>
+        
+        <h4>Widerspruchsrecht gegen die Datenerhebung in besonderen Fällen sowie gegen Direktwerbung (Art. 21 DSGVO)</h4>
+        <p>WENN DIE DATENVERARBEITUNG AUF GRUNDLAGE VON ART. 6 ABS. 1 LIT. E ODER F DSGVO ERFOLGT, HABEN SIE JEDERZEIT DAS RECHT, AUS GRÜNDEN, DIE SICH AUS IHRER BESONDEREN SITUATION ERGEBEN, GEGEN DIE VERARBEITUNG IHRER PERSONENBEZOGENEN DATEN WIDERSPRUCH EINZULEGEN; DIES GILT AUCH FÜR EIN AUF DIESE BESTIMMUNGEN GESTÜTZTES PROFILING. DIE JEWEILIGE RECHTSGRUNDLAGE, AUF DENEN EINE VERARBEITUNG BERUHT, ENTNEHMEN SIE DIESER DATENSCHUTZERKLÄRUNG. WENN SIE WIDERSPRUCH EINLEGEN, WERDEN WIR IHRE BETROFFENEN PERSONENBEZOGENEN DATEN NICHT MEHR VERARBEITEN, ES SEI DENN, WIR KÖNNEN ZWINGENDE SCHUTZWÜRDIGE GRÜNDE FÜR DIE VERARBEITUNG NACHWEISEN, DIE IHRE INTERESSEN, RECHTE UND FREIHEITEN ÜBERWIEGEN ODER DIE VERARBEITUNG DIENT DER GELTENDMACHUNG, AUSÜBUNG ODER VERTEIDIGUNG VON RECHTSANSPRÜCHEN (WIDERSPRUCH NACH ART. 21 ABS. 1 DSGVO). WENN IHRE PERSONENBEZOGENEN DATEN VERARBEITET WERDEN, UM DIREKTWERBUNG ZU BETREIBEN, HABEN SIE DAS RECHT, JEDERZEIT WIDERSPRUCH GEGEN DIE VERARBEITUNG SIE BETREFFENDER PERSONENBEZOGENER DATEN ZUM ZWECKE DERARTIGER WERBUNG EINZULEGEN; DIES GILT AUCH FÜR DAS PROFILING, SOWEIT ES MIT SOLCHER DIREKTWERBUNG IN VERBINDUNG STEHT. WENN SIE WIDERSPRECHEN, WERDEN IHRE PERSONENBEZOGENEN DATEN ANSCHLIESSEND NICHT MEHR ZUM ZWECKE DER DIREKTWERBUNG VERWENDET (WIDERSPRUCH NACH ART. 21 ABS. 2 DSGVO).</p>
+        
+        <h4>Beschwerderecht bei der zuständigen Aufsichtsbehörde</h4>
+        <p>Im Falle von Verstößen gegen die DSGVO steht den Betroffenen ein Beschwerderecht bei einer Aufsichtsbehörde, insbesondere in dem Mitgliedstaat ihres gewöhnlichen Aufenthalts, ihres Arbeitsplatzes oder des Orts des mutmaßlichen Verstoßes zu. Das Beschwerderecht besteht unbeschadet anderweitiger verwaltungsrechtlicher oder gerichtlicher Rechtsbehelfe.</p>
+        
+        <h4>Recht auf Datenübertragbarkeit</h4>
+        <p>Sie haben das Recht, Daten, die wir auf Grundlage Ihrer Einwilligung oder in Erfüllung eines Vertrags automatisiert verarbeiten, an sich oder an einen Dritten in einem gängigen, maschinenlesbaren Format aushändigen zu lassen. Sofern Sie die direkte Übertragung der Daten an einen anderen Verantwortlichen verlangen, erfolgt dies nur, soweit es technisch machbar ist.</p>
+        
+        <h4>Auskunft, Löschung und Berichtigung</h4>
+        <p>Sie haben im Rahmen der geltenden gesetzlichen Bestimmungen jederzeit das Recht auf unentgeltliche Auskunft über Ihre gespeicherten personenbezogenen Daten, deren Herkunft und Empfänger und den Zweck der Datenverarbeitung sowie ein Recht auf Berichtigung oder Löschung dieser Daten. Hierzu sowie zu weiteren Fragen zum Thema personenbezogene Daten können Sie sich jederzeit an uns wenden.</p>
+        
+        <h4>Recht auf Einschränkung der Verarbeitung</h4>
+        <p>Sie haben das Recht, die Einschränkung der Verarbeitung Ihrer personenbezogenen Daten zu verlangen. Hierzu können Sie sich jederzeit an uns wenden. Das Recht auf Einschränkung der Verarbeitung besteht in folgenden Fällen:</p>
+        <ul>
+          <li>Wenn Sie die Richtigkeit Ihrer bei uns gespeicherten personenbezogenen Daten bestreiten, benötigen wir in der Regel Zeit, um dies zu überprüfen. Für die Dauer der Prüfung haben Sie das Recht, die Einschränkung der Verarbeitung Ihrer personenbezogenen Daten zu verlangen.</li>
+          <li>Wenn die Verarbeitung Ihrer personenbezogenen Daten unrechtmäßig geschah/geschieht, können Sie statt der Löschung die Einschränkung der Datenverarbeitung verlangen.</li>
+          <li>Wenn wir Ihre personenbezogenen Daten nicht mehr benötigen, Sie sie jedoch zur Ausübung, Verteidigung oder Geltendmachung von Rechtsansprüchen benötigen, haben Sie das Recht, statt der Löschung die Einschränkung der Verarbeitung Ihrer personenbezogenen Daten zu verlangen.</li>
+          <li>Wenn Sie einen Widerspruch nach Art. 21 Abs. 1 DSGVO eingelegt haben, muss eine Abwägung zwischen Ihren und unseren Interessen vorgenommen werden. Solange noch nicht feststeht, wessen Interessen überwiegen, haben Sie das Recht, die Einschränkung der Verarbeitung Ihrer personenbezogenen Daten zu verlangen.</li>
+        </ul>
+        
+        <h4>SSL- bzw. TLS-Verschlüsselung</h4>
+        <p>Diese Seite nutzt aus Sicherheitsgründen und zum Schutz der Übertragung vertraulicher Inhalte, wie zum Beispiel der Anfragen, die Sie an uns als Seitenbetreiber senden, eine SSL- bzw. TLS-Verschlüsselung. Eine verschlüsselte Verbindung erkennen Sie daran, dass die Adresszeile des Browsers von „http://" auf „https://" wechselt und an dem Schloss-Symbol in Ihrer Browserzeile. Wenn die SSL- bzw. TLS-Verschlüsselung aktiviert ist, können die Daten, die Sie an uns übermitteln, nicht von Dritten mitgelesen werden.</p>
+        
+        <h3>4. Datenerfassung auf dieser Website</h3>
+        
+        <h4>Cookies</h4>
+        <p>Die Internetseiten verwenden teilweise so genannte Cookies. Cookies richten auf Ihrem Rechner keinen Schaden an und enthalten keine Viren. Cookies dienen dazu, unser Angebot nutzerfreundlicher, effektiver und sicherer zu machen. Cookies sind kleine Textdateien, die auf Ihrem Rechner abgelegt werden und die Ihr Browser speichert. Die meisten der von uns verwendeten Cookies sind so genannte „Session-Cookies". Sie werden nach Ende Ihres Besuchs automatisch gelöscht. Andere Cookies bleiben auf Ihrem Endgerät gespeichert, bis Sie diese löschen. Diese Cookies ermöglichen es uns, Ihren Browser beim nächsten Besuch wiederzuerkennen. Sie können Ihren Browser so einstellen, dass Sie über das Setzen von Cookies informiert werden und Cookies nur im Einzelfall erlauben, die Annahme von Cookies für bestimmte Fälle oder generell ausschließen sowie das automatische Löschen der Cookies beim Schließen des Browsers aktivieren. Bei der Deaktivierung von Cookies kann die Funktionalität dieser Website eingeschränkt sein.</p>
+        
+        <h4>Server-Log-Dateien</h4>
+        <p>Der Provider der Seiten erhebt und speichert automatisch Informationen in so genannten Server-Log-Dateien, die Ihr Browser automatisch an uns übermittelt. Dies sind:</p>
+        <ul>
+          <li>Browsertyp und Browserversion</li>
+          <li>verwendetes Betriebssystem</li>
+          <li>Referrer URL</li>
+          <li>Hostname des zugreifenden Rechners</li>
+          <li>Uhrzeit der Serveranfrage</li>
+          <li>IP-Adresse</li>
+        </ul>
+        <p>Eine Zusammenführung dieser Daten mit anderen Datenquellen wird nicht vorgenommen. Die Erfassung dieser Daten erfolgt auf Grundlage von Art. 6 Abs. 1 lit. f DSGVO. Der Websitebetreiber hat ein berechtigtes Interesse an der technisch fehlerfreien Darstellung und der Optimierung seiner Website – hierzu müssen die Server-Log-Dateien erfasst werden.</p>
+        
+        <h4>Kontaktformular</h4>
+        <p>Wenn Sie uns per Kontaktformular Anfragen zukommen lassen, werden Ihre Angaben aus dem Anfrageformular inklusive der von Ihnen dort angegebenen Kontaktdaten zwecks Bearbeitung der Anfrage und für den Fall von Anschlussfragen bei uns gespeichert. Diese Daten geben wir nicht ohne Ihre Einwilligung weiter. Die Verarbeitung dieser Daten erfolgt auf Grundlage von Art. 6 Abs. 1 lit. b DSGVO, sofern Ihre Anfrage mit der Erfüllung eines Vertrags zusammenhängt oder zur Durchführung vorvertraglicher Maßnahmen erforderlich ist. In allen übrigen Fällen beruht die Verarbeitung auf unserem berechtigten Interesse an der effektiven Bearbeitung der an uns gerichteten Anfragen (Art. 6 Abs. 1 lit. f DSGVO) oder auf Ihrer Einwilligung (Art. 6 Abs. 1 lit. a DSGVO), sofern diese abgefragt wurde; die Einwilligung ist jederzeit widerrufbar. Die von Ihnen im Kontaktformular eingegebenen Daten verbleiben bei uns, bis Sie uns zur Löschung auffordern, Ihre Einwilligung zur Speicherung widerrufen oder der Zweck für die Datenspeicherung entfällt (z. B. nach abgeschlossener Bearbeitung Ihrer Anfrage). Zwingende gesetzliche Bestimmungen – insbesondere Aufbewahrungsfristen – bleiben unberührt.</p>
+        
+        <h4>Anfrage per E-Mail, Telefon oder Telefax</h4>
+        <p>Wenn Sie uns per E-Mail, Telefon oder Telefax kontaktieren, wird Ihre Anfrage inklusive aller daraus abgeleiteten personenbezogenen Daten (Name, Anfrage) zum Zwecke der Bearbeitung Ihres Anliegens bei uns gespeichert und verarbeitet. Diese Daten geben wir nicht ohne Ihre Einwilligung weiter. Die Verarbeitung dieser Daten erfolgt auf Grundlage von Art. 6 Abs. 1 lit. b DSGVO, sofern Ihre Anfrage mit der Erfüllung eines Vertrags zusammenhängt oder zur Durchführung vorvertraglicher Maßnahmen erforderlich ist. In allen übrigen Fällen beruht die Verarbeitung auf unserem berechtigten Interesse an der effektiven Bearbeitung der an uns gerichteten Anfragen (Art. 6 Abs. 1 lit. f DSGVO) oder auf Ihrer Einwilligung (Art. 6 Abs. 1 lit. a DSGVO), sofern diese abgefragt wurde; die Einwilligung ist jederzeit widerrufbar. Die von Ihnen an uns übermittelten Daten verbleiben bei uns, bis Sie uns zur Löschung auffordern, Ihre Einwilligung zur Speicherung widerrufen oder der Zweck für die Datenspeicherung entfällt (z. B. nach abgeschlossener Bearbeitung Ihres Anliegens). Zwingende gesetzliche Bestimmungen – insbesondere gesetzliche Aufbewahrungsfristen – bleiben unberührt.</p>
+        
+        <h3>5. Analyse-Tools und Tools von Drittanbietern</h3>
+        <p>Beim Besuch dieser Website kann Ihr Surf-Verhalten statistisch ausgewertet werden. Das geschieht vor allem mit sogenannten Analyseprogrammen. Detaillierte Informationen zu diesen Analyseprogrammen finden Sie in der folgenden Datenschutzerklärung.</p>
+        
+        <h3>6. Newsletter</h3>
+        <p>Falls Sie den auf der Website angebotenen Newsletter beziehen möchten, benötigen wir von Ihnen eine E-Mail-Adresse sowie Informationen, welche uns die Überprüfung gestatten, dass Sie der Inhaber der angegebenen E-Mail-Adresse sind und mit dem Empfang des Newsletters einverstanden sind (sog. Double-Opt-In). Weitere Daten werden nicht bzw. nur auf freiwilliger Basis erhoben. Diese Daten verwenden wir ausschließlich für den Versand der angeforderten Informationen und geben diese nicht an Dritte weiter. Die Verarbeitung der in das Newsletter-Anmeldeformular eingegebenen Daten erfolgt ausschließlich auf Grundlage Ihrer Einwilligung (Art. 6 Abs. 1 lit. a DSGVO). Die erteilte Einwilligung zur Speicherung der Daten, der E-Mail-Adresse sowie deren Nutzung zum Versand des Newsletters können Sie jederzeit widerrufen, etwa über den „Austragen"-Link im Newsletter. Die Rechtmäßigkeit der bereits erfolgten Datenverarbeitungsvorgänge bleibt vom Widerruf unberührt. Die von Ihnen zum Zwecke des Newsletter-Bezugs bei uns hinterlegten Daten werden von uns bis zu Ihrer Austragung gespeichert und nach der Abmeldung des Newsletters sowohl von unseren Servern als auch von den Servern des Newsletter-Dienstleisters gelöscht. Sofern wir Ihnen Newsletter-Dienstleister mitteilen, erfolgt dies nur, wenn dies gesetzlich erforderlich ist oder eine gerichtliche Anordnung vorliegt.</p>
+        
+        <h3>7. Plugins und Tools</h3>
+        
+        <h4>Google Fonts (lokales Hosting)</h4>
+        <p>Diese Seite nutzt zur einheitlichen Darstellung von Schriftarten so genannte Google Fonts, die von Google bereitgestellt werden. Die Google Fonts sind lokal installiert. Eine Verbindung zu Servern von Google findet dabei nicht statt. Weitere Informationen zu Google Fonts finden Sie unter <a href="https://developers.google.com/fonts/faq" target="_blank" rel="noopener noreferrer">https://developers.google.com/fonts/faq</a> und in der Datenschutzerklärung von Google: <a href="https://policies.google.com/privacy?hl=de" target="_blank" rel="noopener noreferrer">https://policies.google.com/privacy?hl=de</a>.</p>
+        
+        <h4>Google Maps</h4>
+        <p>Diese Seite nutzt den Kartendienst Google Maps. Anbieter ist die Google Ireland Limited, Gordon House, Barrow Street, Dublin 4, Irland. Zur Nutzung der Funktionen von Google Maps ist es notwendig, Ihre IP-Adresse zu speichern. Diese Informationen werden in der Regel an einen Server von Google in den USA übertragen und dort gespeichert. Der Anbieter dieser Seite hat keinen Einfluss auf diese Datenübertragung. Die Nutzung von Google Maps erfolgt im Interesse einer ansprechenden Darstellung unserer Online-Angebote und an einer leichten Auffindbarkeit der von uns auf der Website angegebenen Orte. Dies stellt ein berechtigtes Interesse im Sinne von Art. 6 Abs. 1 lit. f DSGVO dar. Sofern eine entsprechende Einwilligung abgefragt wurde, erfolgt die Verarbeitung ausschließlich auf Grundlage von Art. 6 Abs. 1 lit. a DSGVO und § 25 Abs. 1 TTDSG, soweit die Einwilligung die Speicherung von Cookies oder den Zugriff auf Informationen im Endgerät des Nutzers (z. B. Device Fingerprinting) umfasst. Die Einwilligung ist jederzeit widerrufbar. Mehr Informationen zum Umgang mit Nutzerdaten finden Sie in der Datenschutzerklärung von Google: <a href="https://policies.google.com/privacy?hl=de" target="_blank" rel="noopener noreferrer">https://policies.google.com/privacy?hl=de</a>.</p>
+        
+        <h3>8. Eigene Dienste</h3>
+        
+        <h4>Bewerbung und Bewerbungsverfahren</h4>
+        <p>Wir erheben und verarbeiten personenbezogene Daten von Bewerbern zum Zwecke der Bewerbungsabwicklung. Die Verarbeitung kann auch auf elektronischem Wege erfolgen. Dies ist insbesondere dann der Fall, wenn ein Bewerber entsprechende Bewerbungsunterlagen auf elektronischem Wege, etwa per E-Mail oder über ein auf der Website befindliches Webformular, an uns übermittelt. Schließen wir einen Anstellungsvertrag mit einem Bewerber, werden die übermittelten Daten zum Zwecke der Abwicklung des Beschäftigungsverhältnisses unter Beachtung der gesetzlichen Vorschriften gespeichert. Wird von uns kein Anstellungsvertrag mit dem Bewerber geschlossen, so werden die Bewerbungsunterlagen zwei Monate nach Bekanntgabe der Ablehnungsentscheidung automatisch gelöscht, sofern einer Löschung keine sonstigen berechtigten Interessen unsererseits entgegenstehen. Ein sonstiges berechtigtes Interesse liegt in diesem Sinne zum Beispiel in einem Beweisverfahren in einem Verfahren nach dem Allgemeinen Gleichbehandlungsgesetz (AGG).</p>
+        
+        <h3>9. Datenschutz für Bewerbungen und im Bewerbungsverfahren</h3>
+        <p>Wir erheben und verarbeiten personenbezogene Daten von Bewerbern zum Zwecke der Bewerbungsabwicklung. Die Verarbeitung kann auch auf elektronischem Wege erfolgen. Dies ist insbesondere dann der Fall, wenn ein Bewerber entsprechende Bewerbungsunterlagen auf elektronischem Wege, etwa per E-Mail oder über ein auf der Website befindliches Webformular, an uns übermittelt. Schließen wir einen Anstellungsvertrag mit einem Bewerber, werden die übermittelten Daten zum Zwecke der Abwicklung des Beschäftigungsverhältnisses unter Beachtung der gesetzlichen Vorschriften gespeichert. Wird von uns kein Anstellungsvertrag mit dem Bewerber geschlossen, so werden die Bewerbungsunterlagen zwei Monate nach Bekanntgabe der Ablehnungsentscheidung automatisch gelöscht, sofern einer Löschung keine sonstigen berechtigten Interessen unsererseits entgegenstehen. Ein sonstiges berechtigtes Interesse liegt in diesem Sinne zum Beispiel in einem Beweisverfahren in einem Verfahren nach dem Allgemeinen Gleichbehandlungsgesetz (AGG).</p>
+        
+        <h3>10. Datenschutz für Bewerbungen und im Bewerbungsverfahren</h3>
+        <p>Wir erheben und verarbeiten personenbezogene Daten von Bewerbern zum Zwecke der Bewerbungsabwicklung. Die Verarbeitung kann auch auf elektronischem Wege erfolgen. Dies ist insbesondere dann der Fall, wenn ein Bewerber entsprechende Bewerbungsunterlagen auf elektronischem Wege, etwa per E-Mail oder über ein auf der Website befindliches Webformular, an uns übermittelt. Schließen wir einen Anstellungsvertrag mit einem Bewerber, werden die übermittelten Daten zum Zwecke der Abwicklung des Beschäftigungsverhältnisses unter Beachtung der gesetzlichen Vorschriften gespeichert. Wird von uns kein Anstellungsvertrag mit dem Bewerber geschlossen, so werden die Bewerbungsunterlagen zwei Monate nach Bekanntgabe der Ablehnungsentscheidung automatisch gelöscht, sofern einer Löschung keine sonstigen berechtigten Interessen unsererseits entgegenstehen. Ein sonstiges berechtigtes Interesse liegt in diesem Sinne zum Beispiel in einem Beweisverfahren in einem Verfahren nach dem Allgemeinen Gleichbehandlungsgesetz (AGG).</p>
+      </section>
+    </div>
+  </div>
 {/if}

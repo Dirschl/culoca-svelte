@@ -25,7 +25,24 @@
   let editingDescription = false;
   let descriptionEditValue = '';
   let showScrollToTop = false;
+  
+  // Keywords editing
+  let editingKeywords = false;
+  let keywordsEditValue = '';
 
+  // 1. State für Map-Picker und Map-Type
+  let showMapPicker = false;
+  let mapPickerLat: number | null = null;
+  let mapPickerLon: number | null = null;
+  let mapPickerType: 'standard' | 'hybrid' = 'standard';
+  let mapPickerMap: any = null;
+  let mapPickerContainer: HTMLElement;
+  let mapPickerSearch = '';
+  let mapPickerSearchResults: any[] = [];
+  let isGettingUserLocation = false;
+
+  // State für Map-Type in der Hauptkarte
+  let mapType: 'standard' | 'hybrid' = 'standard';
 
   $: imageId = $page.params.id;
 
@@ -55,7 +72,7 @@
       }
 
       const { data, error: fetchError } = await supabase
-        .from('images')
+        .from('items')
         .select('*')
         .eq('id', imageId)
         .single();
@@ -77,6 +94,8 @@
         if (browser) {
           updateFavicon();
         }
+
+
       }
     } catch (err) {
       error = 'Failed to load image';
@@ -123,6 +142,93 @@
     return getDistanceInMeters(lat1, lon1, lat2, lon2);
   }
 
+  async function downloadOriginal(imageId: string, originalName: string) {
+    try {
+      // Show loading state
+      const downloadBtn = document.querySelector(`[data-download-id="${imageId}"]`) as HTMLButtonElement;
+      if (downloadBtn) {
+        downloadBtn.disabled = true;
+        downloadBtn.innerHTML = `
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" class="animate-spin">
+            <circle cx="12" cy="12" r="10" fill="white" fill-opacity="0.15"/>
+            <path d="M12 6v7m0 0l-3-3m3 3l3-3M6 18h12" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        `;
+      }
+
+      // Get current session token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        alert('Bitte zuerst einloggen');
+        return;
+      }
+
+      const response = await fetch(`/api/download/${imageId}`, {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          alert('Nicht angemeldet. Bitte zuerst einloggen.');
+        } else if (response.status === 403) {
+          alert('Kein Zugriff auf diese Datei.');
+        } else {
+          alert('Download fehlgeschlagen.');
+        }
+        return;
+      }
+
+      // Create blob and download
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = originalName || `image-${imageId}.jpg`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      // Show success feedback
+      if (downloadBtn) {
+        downloadBtn.innerHTML = `
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="10" fill="white" fill-opacity="0.15"/>
+            <path d="M5 13l4 4L19 7" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        `;
+        setTimeout(() => {
+          downloadBtn.disabled = false;
+          downloadBtn.innerHTML = `
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="10" fill="white" fill-opacity="0.15"/>
+              <path d="M12 6v7m0 0l-3-3m3 3l3-3M6 18h12" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          `;
+        }, 2000);
+      }
+    } catch (error) {
+      console.error('Download error:', error);
+      alert('Download fehlgeschlagen.');
+      
+      // Reset button on error
+      const downloadBtn = document.querySelector(`[data-download-id="${imageId}"]`) as HTMLButtonElement;
+      if (downloadBtn) {
+        downloadBtn.disabled = false;
+        downloadBtn.innerHTML = `
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="10" fill="white" fill-opacity="0.15"/>
+            <path d="M12 6v7m0 0l-3-3m3 3l3-3M6 18h12" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        `;
+      }
+    }
+  }
+
+
+
   async function fetchProfile(profileId: string) {
     const { data, error: profileErr } = await supabase
       .from('profiles')
@@ -135,7 +241,7 @@
   async function fetchNearbyImages(lat: number, lon: number, maxRadius: number) {
     console.log('🔍 Fetching nearby images for radius:', maxRadius, 'm');
     const { data, error: nearErr } = await supabase
-      .from('images')
+      .from('items')
       .select('*')
       .not('lat', 'is', null)
       .not('lon', 'is', null)
@@ -178,8 +284,6 @@
   async function initMap() {
     if (!browser || !image || !image.lat || !image.lon) return;
     const leaflet = await import('leaflet');
-    
-    // add leaflet CSS once
     if (!document.getElementById('leaflet-css')) {
       const link = document.createElement('link');
       link.id = 'leaflet-css';
@@ -187,21 +291,30 @@
       link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
       document.head.appendChild(link);
     }
-    
     await tick();
     map = leaflet.map(mapEl).setView([image.lat, image.lon], 13);
-    leaflet.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '&copy; OpenStreetMap'
-    }).addTo(map);
-    
-    // Add current image marker (highlighted)
+    // Standard- und Hybrid-Layer
+    const standardLayer = leaflet.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    });
+    const hybridLayer = leaflet.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      attribution: '© Esri, DigitalGlobe, GeoEye, Earthstar Geographics, CNES/Airbus DS, USDA, USGS, AeroGRID, IGN, and the GIS User Community'
+    });
+    if (mapType === 'standard') {
+      standardLayer.addTo(map);
+      map.currentLayer = standardLayer;
+    } else {
+      hybridLayer.addTo(map);
+      map.currentLayer = hybridLayer;
+    }
+    map.standardLayer = standardLayer;
+    map.hybridLayer = hybridLayer;
+
+    // Add current image marker (orange, mit Thumbnail)
     const baseUrl = 'https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public';
     const thumbnailUrl = image.path_64 
       ? `${baseUrl}/images-64/${image.path_64}`
       : `${baseUrl}/images-512/${image.path_512}`;
-    
-    // Create custom icon for current image (highlighted with orange border)
     const currentImageIcon = leaflet.divIcon({
       className: 'custom-marker current-image',
       html: `<img src="${thumbnailUrl}" alt="${image.title || 'Bild'}" style="width: 48px; height: 48px; border-radius: 50%; border: 3px solid #ff6b35; box-shadow: 0 2px 8px rgba(0,0,0,0.3); object-fit: cover;">`,
@@ -209,21 +322,15 @@
       iconAnchor: [48, 48],
       popupAnchor: [0, -48]
     });
-    
-    // Add current image marker to map
     const currentMarker = leaflet.marker([image.lat, image.lon], { icon: currentImageIcon }).addTo(map);
     if (image.title) {
       currentMarker.bindPopup(`<strong>${image.title}</strong><br><small>Aktuelles Bild</small>`);
     }
-    
+
     // Add nearby images as individual markers
-    console.log('🗺️ Adding', nearby.length, 'nearby images to map');
-    
     if (nearby.length > 0) {
       nearby.forEach((nearbyImage: any) => {
         const nearbyThumbnailUrl = nearbyImage.src64 || nearbyImage.src;
-        
-        // Create custom icon for nearby images
         const nearbyIcon = leaflet.divIcon({
           className: 'custom-marker nearby-image',
           html: `<img src="${nearbyThumbnailUrl}" alt="${nearbyImage.title || 'Bild'}" style="width: 48px; height: 48px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3); object-fit: cover; cursor: pointer;">`,
@@ -231,26 +338,21 @@
           iconAnchor: [48, 48],
           popupAnchor: [0, -48]
         });
-        
         const nearbyMarker = leaflet.marker([nearbyImage.lat, nearbyImage.lon], { icon: nearbyIcon }).addTo(map);
-        
-        // Add click handler to navigate to image
         nearbyMarker.on('click', () => {
-          window.location.href = `/image/${nearbyImage.id}`;
+          window.location.href = `/item/${nearbyImage.id}`;
         });
-        
-        // Add popup with image info and link
         const popupContent = `
           <div style="text-align: center; min-width: 200px;">
             <strong>${nearbyImage.title || 'Bild'}</strong><br>
             <small>Entfernung: ${getDistanceFromLatLonInMeters(image.lat, image.lon, nearbyImage.lat, nearbyImage.lon)}</small><br>
-            <a href="/image/${nearbyImage.id}" style="color: #0066cc; text-decoration: none; font-weight: 500;">Bild anzeigen →</a>
+            <a href="/item/${nearbyImage.id}" style="color: #0066cc; text-decoration: none; font-weight: 500;">Bild anzeigen →</a>
           </div>
         `;
         nearbyMarker.bindPopup(popupContent);
       });
     }
-    
+
     // Fit map to show all markers if there are nearby images
     if (nearby.length > 0) {
       const allMarkers = [currentMarker];
@@ -318,23 +420,16 @@
     }
 
     try {
-      // Delete image from database
-      const { error: deleteError } = await supabase
-        .from('images')
-        .delete()
-        .eq('id', imageId);
-
-      if (deleteError) {
-        console.error('Error deleting image:', deleteError);
-        alert('Fehler beim Löschen des Bildes: ' + deleteError.message);
+      const res = await fetch(`/api/item/${imageId}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert('Fehler beim Löschen des Bildes: ' + (data?.message || res.status));
         return;
       }
-
-      // Redirect to home page after successful deletion
       window.location.href = '/';
     } catch (err) {
-      console.error('Error deleting image:', err);
       alert('Fehler beim Löschen des Bildes');
+      console.error(err);
     }
   }
 
@@ -346,8 +441,13 @@
 
   function formatFileSize(bytes: number): string {
     if (!bytes) return '';
+    const kb = bytes / 1024;
     const mb = bytes / (1024 * 1024);
-    return mb.toFixed(1).replace('.', ',') + ' MB';
+    if (mb >= 1) {
+      return mb.toFixed(1).replace('.', ',') + ' MB';
+    } else {
+      return kb.toFixed(0) + ' KB';
+    }
   }
 
   function formatExposureTime(value: any): string {
@@ -389,7 +489,7 @@
     
     try {
       const { error: updateError } = await supabase
-        .from('images')
+        .from('items')
         .update({ title: newTitle })
         .eq('id', image.id);
       
@@ -447,7 +547,7 @@
     
     try {
       const { error: updateError } = await supabase
-        .from('images')
+        .from('items')
         .update({ description: newDescription })
         .eq('id', image.id);
       
@@ -478,6 +578,77 @@
       cancelEditDescription();
     }
   }
+
+  // Keywords editing functions
+  function startEditKeywords() {
+    if (currentUser && image && image.profile_id === currentUser.id) {
+      editingKeywords = true;
+      // Convert keywords array to comma-separated string
+      keywordsEditValue = keywordsList.join(', ');
+      
+      // Focus the input after it's rendered
+      setTimeout(() => {
+        const input = document.getElementById('keywords-edit-input') as HTMLInputElement;
+        if (input) {
+          input.focus();
+          input.setSelectionRange(input.value.length, input.value.length);
+          input.click();
+        }
+      }, 100);
+    }
+  }
+
+  async function saveKeywords() {
+    if (!editingKeywords || !currentUser || !image || image.profile_id !== currentUser.id) return;
+    
+    const newKeywords = keywordsEditValue.trim();
+    if (newKeywords.length > 500) return; // Don't save if too long
+    
+    try {
+      // Parse keywords from comma-separated string
+      const keywordsArray = newKeywords
+        .split(',')
+        .map(k => k.trim())
+        .filter(k => k.length > 0);
+      
+      const { error: updateError } = await supabase
+        .from('items')
+        .update({ keywords: keywordsArray })
+        .eq('id', image.id);
+      
+      if (updateError) {
+        console.error('Error updating keywords:', updateError);
+        return;
+      }
+      
+      // Update local state
+      image.keywords = keywordsArray;
+      keywordsList = keywordsArray;
+      editingKeywords = false;
+    } catch (err) {
+      console.error('Failed to save keywords:', err);
+    }
+  }
+
+  function cancelEditKeywords() {
+    editingKeywords = false;
+    keywordsEditValue = keywordsList.join(', ');
+  }
+
+  function handleKeywordsKeydown(event: KeyboardEvent) {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      saveKeywords();
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      cancelEditKeywords();
+    }
+  }
+
+  // Count keywords for validation
+  $: keywordsCount = keywordsEditValue ? keywordsEditValue.split(',').filter(k => k.trim().length > 0).length : 0;
+  $: keywordsValid = keywordsCount >= 10 && keywordsCount <= 50;
+  $: keywordsTooMany = keywordsCount > 50;
 
   // Check if user is the creator
   $: isCreator = currentUser && image && image.profile_id === currentUser.id;
@@ -537,7 +708,198 @@
     }
   }
 
+  // 2. Map-Picker öffnen (optional Startkoordinaten)
+  async function openMapPicker(startLat: number | null, startLon: number | null) {
+    showMapPicker = true;
+    mapPickerType = 'standard';
+    mapPickerSearch = '';
+    mapPickerSearchResults = [];
+    // Default: aktuelle User-Position holen
+    if (navigator.geolocation) {
+      isGettingUserLocation = true;
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          mapPickerLat = pos.coords.latitude;
+          mapPickerLon = pos.coords.longitude;
+          isGettingUserLocation = false;
+          setTimeout(() => initMapPicker(), 100);
+        },
+        () => {
+          // Fallback: München
+          mapPickerLat = startLat ?? 48.1351;
+          mapPickerLon = startLon ?? 11.5820;
+          isGettingUserLocation = false;
+          setTimeout(() => initMapPicker(), 100);
+        },
+        { enableHighAccuracy: true, timeout: 5000 }
+      );
+    } else {
+      mapPickerLat = startLat ?? 48.1351;
+      mapPickerLon = startLon ?? 11.5820;
+      setTimeout(() => initMapPicker(), 100);
+    }
+  }
 
+  // 3. Map-Picker initialisieren
+  async function initMapPicker() {
+    const leaflet = await import('leaflet');
+    if (!mapPickerContainer || mapPickerMap) return;
+    const initialLat = mapPickerLat ?? 48.1351;
+    const initialLon = mapPickerLon ?? 11.5820;
+    mapPickerMap = leaflet.map(mapPickerContainer, { zoomControl: true }).setView([initialLat, initialLon], 13);
+    // Standard- und Hybrid-Layer
+    const standardLayer = leaflet.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    });
+    const hybridLayer = leaflet.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      attribution: '© Esri, DigitalGlobe, GeoEye, Earthstar Geographics, CNES/Airbus DS, USDA, USGS, AeroGRID, IGN, and the GIS User Community'
+    });
+    if (mapPickerType === 'standard') {
+      standardLayer.addTo(mapPickerMap);
+      mapPickerMap.currentLayer = standardLayer;
+    } else {
+      hybridLayer.addTo(mapPickerMap);
+      mapPickerMap.currentLayer = hybridLayer;
+    }
+    mapPickerMap.standardLayer = standardLayer;
+    mapPickerMap.hybridLayer = hybridLayer;
+    // Karte verschiebbar, Pin bleibt in der Mitte
+    mapPickerMap.on('move', () => {
+      const center = mapPickerMap.getCenter();
+      mapPickerLat = center.lat;
+      mapPickerLon = center.lng;
+    });
+  }
+
+  // 4. Map-Type-Toggle
+  function toggleMapPickerType() {
+    if (!mapPickerMap) return;
+    mapPickerType = mapPickerType === 'standard' ? 'hybrid' : 'standard';
+    const currentLayer = mapPickerMap.currentLayer;
+    const newLayer = mapPickerType === 'standard' ? mapPickerMap.standardLayer : mapPickerMap.hybridLayer;
+    if (currentLayer) mapPickerMap.removeLayer(currentLayer);
+    newLayer.addTo(mapPickerMap);
+    mapPickerMap.currentLayer = newLayer;
+  }
+
+  // 5. Map-Picker schließen
+  function closeMapPicker() {
+    showMapPicker = false;
+    if (mapPickerMap) {
+      mapPickerMap.remove();
+      mapPickerMap = null;
+    }
+  }
+
+  // 6. Koordinaten speichern
+  async function saveMapPickerCoords() {
+    if (!mapPickerLat || !mapPickerLon || !image) return;
+    const { error: updateError } = await supabase
+      .from('items')
+      .update({ lat: mapPickerLat, lon: mapPickerLon })
+      .eq('id', image.id);
+    if (!updateError) {
+      image.lat = mapPickerLat;
+      image.lon = mapPickerLon;
+      closeMapPicker();
+      map = null; // Karte neu initialisieren
+      setTimeout(() => initMap(), 200);
+    } else {
+      alert('Fehler beim Speichern der Koordinaten: ' + updateError.message);
+    }
+  }
+
+  // 7. Suche (Nominatim)
+  async function searchLocation() {
+    if (!mapPickerSearch.trim()) return;
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(mapPickerSearch)}&limit=5&addressdetails=1`
+      );
+      if (response.ok) {
+        mapPickerSearchResults = await response.json();
+      }
+    } catch (e) {
+      mapPickerSearchResults = [];
+    }
+  }
+  function selectSearchResult(result: any) {
+    const lat = parseFloat(result.lat);
+    const lon = parseFloat(result.lon);
+    if (!isNaN(lat) && !isNaN(lon) && mapPickerMap) {
+      mapPickerMap.setView([lat, lon], 15);
+      mapPickerLat = lat;
+      mapPickerLon = lon;
+      mapPickerSearchResults = [];
+      mapPickerSearch = '';
+    }
+  }
+  function handleSearchKeydown(event: KeyboardEvent) {
+    if (event.key === 'Enter') {
+      searchLocation();
+    }
+  }
+
+  // Toggle für Map-Type in der Hauptkarte
+  function toggleMapType() {
+    mapType = mapType === 'standard' ? 'hybrid' : 'standard';
+    if (map) {
+      const leaflet = map.constructor;
+      const standardLayer = map.standardLayer;
+      const hybridLayer = map.hybridLayer;
+      const currentLayer = map.currentLayer;
+      const newLayer = mapType === 'standard' ? standardLayer : hybridLayer;
+      if (currentLayer && newLayer && currentLayer !== newLayer) {
+        map.removeLayer(currentLayer);
+        newLayer.addTo(map);
+        map.currentLayer = newLayer;
+      }
+    }
+  }
+
+  // File size fetching from loaded images
+  let fileSizes = {
+    size64: null,
+    size512: null,
+    size2048: null
+  };
+
+  async function fetchFileSizes() {
+    if (!image) return;
+    
+    try {
+      // Get file sizes from the actual loaded images
+      const img64 = document.querySelector('img[src*="images-64"]') as HTMLImageElement;
+      const img512 = document.querySelector('img[src*="images-512"]') as HTMLImageElement;
+      const img2048 = document.querySelector('img[src*="images-2048"]') as HTMLImageElement;
+
+      if (img64) {
+        const response = await fetch(img64.src);
+        const blob = await response.blob();
+        fileSizes.size64 = blob.size;
+      }
+
+      if (img512) {
+        const response = await fetch(img512.src);
+        const blob = await response.blob();
+        fileSizes.size512 = blob.size;
+      }
+
+      if (img2048) {
+        const response = await fetch(img2048.src);
+        const blob = await response.blob();
+        fileSizes.size2048 = blob.size;
+      }
+    } catch (error) {
+      console.error('Error fetching file sizes:', error);
+    }
+  }
+
+  // Fetch file sizes when image loads
+  $: if (image) {
+    // Wait a bit for images to load
+    setTimeout(fetchFileSizes, 1000);
+  }
 </script>
 
 <svelte:head>
@@ -548,7 +910,7 @@
   <meta property="og:type" content="article">
   <meta property="og:title" content={image?.title || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
   <meta property="og:description" content={image?.description || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
-  <meta property="og:url" content={`https://culoca.com/image/${imageId}`}> 
+  <meta property="og:url" content={`https://culoca.com/item/${imageId}`}> 
   <meta property="og:image" content={`https://culoca.com/api/og-image/${imageId}`}> 
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
@@ -666,6 +1028,14 @@
                   </svg>
                 </button>
               {/if}
+              {#if isCreator}
+                <button class="gmaps-btn" data-download-id={image.id} on:click={() => downloadOriginal(image.id, image.original_name)} title="Original herunterladen">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" fill="white" fill-opacity="0.15"/>
+                    <path d="M12 6v7m0 0l-3-3m3 3l3-3M6 18h12" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </button>
+              {/if}
             </div>
           {/if}
 
@@ -699,7 +1069,7 @@
               {:else}
                 <div class="grid-layout">
                   {#each nearby as img}
-                    <div class="grid-item" on:click={() => window.location.href = `/image/${img.id}` } tabindex="0" role="button" aria-label={`Bild ${img.title || img.id}` }>
+                    <div class="grid-item" on:click={() => window.location.href = `/item/${img.id}` } tabindex="0" role="button" aria-label={`Bild ${img.title || img.id}` }>
                       <img src={img.src} alt={img.title || 'Bild'} />
                       <div class="distance-label">
                         {getDistanceFromLatLonInMeters(image.lat, image.lon, img.lat, img.lon)}
@@ -718,22 +1088,54 @@
         <div class="meta-section single-exif">
           <!-- Column 1: Keywords -->
           <div class="keywords-column">
-            <h2>Keywords</h2>
-            {#if keywordsList.length}
-              <div class="keywords">
-                {#each keywordsList as kw}
-                  <span class="chip">{kw}</span>
-                {/each}
+            <h2 class="keywords-title" class:editable={isCreator} class:editing={editingKeywords} on:click={startEditKeywords}>
+              Keywords
+            </h2>
+            
+            {#if editingKeywords}
+              <div class="keywords-edit-container">
+                <textarea
+                  id="keywords-edit-input"
+                  bind:value={keywordsEditValue}
+                  maxlength="500"
+                  on:keydown={handleKeywordsKeydown}
+                  on:blur={saveKeywords}
+                  class="keywords-edit-input"
+                  class:valid={keywordsValid}
+                  class:too-many={keywordsTooMany}
+                  placeholder="Keywords durch Kommas getrennt eingeben..."
+                  rows="8"
+                  autocomplete="off"
+                  autocorrect="off"
+                  autocapitalize="sentences"
+                ></textarea>
+                <span class="char-count" class:valid={keywordsValid} class:too-many={keywordsTooMany}>
+                  {keywordsCount}/50
+                </span>
               </div>
+            {:else}
+              {#if keywordsList.length}
+                <div class="keywords">
+                  {#each keywordsList as kw}
+                    <a href="/?s={encodeURIComponent(kw)}" class="chip keyword-link">{kw}</a>
+                  {/each}
+                </div>
+              {:else}
+                <div class="keywords-placeholder">
+                  {isCreator ? 'Klicke auf "Keywords" um welche hinzuzufügen' : 'Keine Keywords verfügbar'}
+                </div>
+              {/if}
             {/if}
             
-            <h2>Original Filename</h2>
+            <h2>File Details</h2>
             <div class="filename">
               {image.original_name || 'Unbekannt'}
             </div>
-            <h2>Aktueller Link</h2>
             <div class="filename">
-              {imageSource}
+              {browser ? window.location.href : ''}
+            </div>
+            <div class="filename">
+              64px: {fileSizes.size64 ? formatFileSize(fileSizes.size64) : 'unbekannt'}  |  512px: {fileSizes.size512 ? formatFileSize(fileSizes.size512) : 'unbekannt'}  |  2048px: {fileSizes.size2048 ? formatFileSize(fileSizes.size2048) : 'unbekannt'}
             </div>
           </div>
           <!-- Column 2: All EXIF/Meta -->
@@ -874,15 +1276,88 @@
           <!-- Map -->
           {#if image.lat && image.lon}
             <div class="map-wrapper">
-              <h2 class="map-title">{image.title || 'Standort'}</h2>
+                              <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.7rem;">
+                  {#if isCreator}
+                    <button class="map-pin-btn" on:click={() => openMapPicker(image.lat, image.lon)} title="GPS ändern">
+                      <!-- Culoca O SVG, Farbe per CSS -->
+                      <svg width="28" height="34" viewBox="0 0 83.86 100.88" fill="none" xmlns="http://www.w3.org/2000/svg" class="culoca-o-edit">
+                        <path d="M0,41.35c0-5.67,1.1-11.03,3.29-16.07,2.19-5.04,5.19-9.43,8.98-13.17,3.79-3.74,8.25-6.69,13.36-8.86,5.11-2.17,10.54-3.25,16.29-3.25s11.18,1.08,16.29,3.25c5.11,2.17,9.56,5.12,13.36,8.86,3.79,3.74,6.79,8.13,8.98,13.17,2.19,5.04,3.29,10.4,3.29,16.07s-1.1,11.03-3.29,16.07c-2.2,5.04-5.19,9.43-8.98,13.17-3.8,3.74-8.25,6.7-13.36,8.86-5.11,2.17-9.49,21.42-15.25,21.42s-12.23-19.25-17.34-21.42c-5.11-2.17-9.56-5.12-13.36-8.86-3.79-3.74-6.79-8.13-8.98-13.17-2.2-5.04-3.29-10.4-3.29-16.07ZM25.16,41.35c0,2.29.44,4.43,1.32,6.44.88,2.01,2.07,3.76,3.59,5.26,1.52,1.5,3.29,2.68,5.33,3.55,2.04.87,4.21,1.3,6.53,1.3s4.49-.43,6.53-1.3c2.04-.87,3.81-2.05,5.33-3.55,1.52-1.5,2.71-3.25,3.59-5.26.88-2.01,1.32-4.15,1.32-6.44s-.44-4.43-1.32-6.44c-.88-2.01-2.08-3.76-3.59-5.26-1.52-1.5-3.29-2.68-5.33-3.55-2.03-.87-4.21-1.3-6.53-1.3s-4.49.43-6.53,1.3c-2.04.87-3.81,2.05-5.33,3.55-1.52,1.5-2.72,3.25-3.59,5.26-.88,2.01-1.32,4.16-1.32,6.44Z"/>
+                      </svg>
+                    </button>
+                  {/if}
+                  <h2 class="map-title">{image.title || 'Standort'}</h2>
+                <button class="map-type-btn" on:click={toggleMapType} title={mapType === 'standard' ? 'Satellit' : 'Standard'}>
+                  {#if mapType === 'standard'}
+                    <!-- Satelliten-Icon (zeigt: zur Satellitenansicht wechseln) -->
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="11" y="3" width="2" height="7" rx="1"/><rect x="11" y="14" width="2" height="7" rx="1"/><rect x="3" y="11" width="7" height="2" rx="1"/><rect x="14" y="11" width="7" height="2" rx="1"/><circle cx="12" cy="12" r="3"/><path d="M7 7l3 3"/><path d="M17 17l-3-3"/></svg>
+                  {:else}
+                    <!-- Karten-Icon (zeigt: zur Kartenansicht wechseln, FAB-Style) -->
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2"/>
+                      <line x1="8" y1="2" x2="8" y2="18"/>
+                      <line x1="16" y1="6" x2="16" y2="22"/>
+                    </svg>
+                  {/if}
+                </button>
+              </div>
               <div bind:this={mapEl} class="map"></div>
             </div>
           {:else}
             <div class="map-wrapper">
-              <h2 class="map-title">Standort</h2>
+              <div style="display: flex; align-items: center; justify-content: space-between;">
+                <h2 class="map-title">Standort</h2>
+                <button class="map-pin-btn" on:click={() => openMapPicker(null, null)} title="GPS setzen">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21c-4.418 0-8-4.03-8-9 0-4.418 3.582-8 8-8s8 3.582 8 8c0 4.97-3.582 9-8 9zm0-13a4 4 0 100 8 4 4 0 000-8z"/></svg>
+                </button>
+              </div>
               <div style="padding: 20px; text-align: center; color: #666;">
                 GPS-Daten nicht verfügbar<br>
                 Lat: {image?.lat || 'null'}, Lon: {image?.lon || 'null'}
+              </div>
+            </div>
+          {/if}
+
+          <!-- Map-Picker Fullscreen Modal -->
+          {#if showMapPicker}
+            <div class="map-modal-fullscreen">
+              <div class="map-modal-content-fullscreen">
+                <div class="map-modal-header-fullscreen">
+                  <input class="map-search-input" type="text" placeholder="Ort suchen..." bind:value={mapPickerSearch} on:keydown={handleSearchKeydown} />
+                  <button class="map-type-btn" on:click={toggleMapPickerType} title={mapPickerType === 'standard' ? 'Satellit' : 'Standard'}>
+                    {#if mapPickerType === 'standard'}
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+                    {:else}
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="11" y="3" width="2" height="7" rx="1"/><rect x="11" y="14" width="2" height="7" rx="1"/><rect x="3" y="11" width="7" height="2" rx="1"/><rect x="14" y="11" width="7" height="2" rx="1"/><circle cx="12" cy="12" r="3"/><path d="M7 7l3 3"/><path d="M17 17l-3-3"/></svg>
+                    {/if}
+                  </button>
+                </div>
+                {#if mapPickerSearchResults.length > 0}
+                  <div class="map-search-results">
+                    {#each mapPickerSearchResults as result}
+                      <div class="map-search-result" on:click={() => selectSearchResult(result)}>{result.display_name}</div>
+                    {/each}
+                  </div>
+                {/if}
+                <div class="map-picker-container-fullscreen">
+                  <div class="map-picker-pin">
+                    <!-- Culoca O SVG -->
+                    <svg width="38" height="46" viewBox="0 0 83.86 100.88" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path fill="#ee7221" d="M0,41.35c0-5.67,1.1-11.03,3.29-16.07,2.19-5.04,5.19-9.43,8.98-13.17,3.79-3.74,8.25-6.69,13.36-8.86,5.11-2.17,10.54-3.25,16.29-3.25s11.18,1.08,16.29,3.25c5.11,2.17,9.56,5.12,13.36,8.86,3.79,3.74,6.79,8.13,8.98,13.17,2.19,5.04,3.29,10.4,3.29,16.07s-1.1,11.03-3.29,16.07c-2.2,5.04-5.19,9.43-8.98,13.17-3.8,3.74-8.25,6.7-13.36,8.86-5.11,2.17-9.49,21.42-15.25,21.42s-12.23-19.25-17.34-21.42c-5.11-2.17-9.56-5.12-13.36-8.86-3.79-3.74-6.79-8.13-8.98-13.17-2.2-5.04-3.29-10.4-3.29-16.07ZM25.16,41.35c0,2.29.44,4.43,1.32,6.44.88,2.01,2.07,3.76,3.59,5.26,1.52,1.5,3.29,2.68,5.33,3.55,2.04.87,4.21,1.3,6.53,1.3s4.49-.43,6.53-1.3c2.04-.87,3.81-2.05,5.33-3.55,1.52-1.5,2.71-3.25,3.59-5.26.88-2.01,1.32-4.15,1.32-6.44s-.44-4.43-1.32-6.44c-.88-2.01-2.08-3.76-3.59-5.26-1.52-1.5-3.29-2.68-5.33-3.55-2.03-.87-4.21-1.3-6.53-1.3s-4.49.43-6.53,1.3c-2.04.87-3.81,2.05-5.33,3.55-1.52,1.5-2.72,3.25-3.59,5.26-.88,2.01-1.32,4.16-1.32,6.44Z"/>
+                    </svg>
+                  </div>
+                  <div bind:this={mapPickerContainer} class="map-picker-leaflet-fullscreen"></div>
+                </div>
+                <div class="map-coords-fullscreen">
+                  {#if isGettingUserLocation}
+                    <span>Standort wird ermittelt...</span>
+                  {:else}
+                    <span>Lat: {mapPickerLat?.toFixed(6)}, Lon: {mapPickerLon?.toFixed(6)}</span>
+                  {/if}
+                </div>
+                <div class="map-modal-footer-fullscreen">
+                  <button class="map-cancel-btn" on:click={closeMapPicker}>Abbrechen</button>
+                  <button class="map-confirm-btn" on:click={saveMapPickerCoords}>Speichern</button>
+                </div>
               </div>
             </div>
           {/if}
@@ -1876,6 +2351,375 @@
   .passepartout-container:not(.dark) .justified-wrapper,
   .passepartout-container:not(.dark) .grid-layout {
     background: var(--bg-primary);
+  }
+
+  /* Keyword Links */
+  .keyword-link {
+    text-decoration: none;
+    color: inherit;
+    transition: all 0.2s ease;
+    display: inline-block;
+  }
+
+  .keyword-link:hover {
+    color: var(--accent-color);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px var(--shadow);
+  }
+
+  .keyword-link:active {
+    transform: translateY(0);
+  }
+
+  /* Keywords editing styles */
+  .keywords-title.editable {
+    cursor: pointer;
+    transition: color 0.2s;
+    background: transparent;
+  }
+
+  .keywords-title.editable:hover {
+    color: #ee731f;
+    background: transparent;
+  }
+
+  .keywords-title.editing {
+    color: var(--accent-color);
+  }
+
+  .keywords-placeholder {
+    color: var(--text-secondary);
+    font-style: italic;
+    margin-top: 0.5rem;
+  }
+
+  .keywords-edit-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin: 1rem 0;
+    background: transparent;
+  }
+
+  .keywords-edit-input {
+    background: var(--bg-secondary);
+    border: 2px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-primary);
+    font-size: 1rem;
+    padding: 0.5rem;
+    width: 100%;
+    min-height: 200px; /* Ensure minimum height for 8 rows */
+    resize: vertical;
+    transition: border-color 0.2s, background-color 0.3s ease, color 0.3s ease;
+    /* Mobile optimizations */
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    font-size: 16px; /* Prevents zoom on iOS */
+    font-family: inherit;
+    line-height: 1.4;
+  }
+
+  .keywords-edit-input:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    background: var(--bg-tertiary);
+  }
+
+  .keywords-edit-input.valid {
+    border-color: #28a745; /* Green for valid (10-50 keywords) */
+    background: var(--bg-secondary);
+  }
+
+  .keywords-edit-input.too-many {
+    border-color: #dc3545; /* Red for too many (>50 keywords) */
+    background: var(--bg-secondary);
+  }
+
+  .char-count {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    text-align: right;
+    font-weight: 500;
+  }
+
+  .char-count.valid {
+    color: #28a745; /* Green for valid count */
+  }
+
+  .char-count.too-many {
+    color: #dc3545; /* Red for too many */
+  }
+
+  /* CSS für Map-Picker und Buttons (an Bulk-Upload orientieren) */
+  .map-edit-btn {
+    background: linear-gradient(135deg, #ff9800, #ffc107);
+    color: #222;
+    border: none;
+    border-radius: 8px;
+    padding: 0.3rem 1.1rem;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    margin-left: 1rem;
+    transition: background 0.2s, color 0.2s;
+  }
+  .map-edit-btn:hover {
+    background: linear-gradient(135deg, #ffc107, #ff9800);
+    color: #000;
+  }
+  .map-type-btn {
+    background: none;
+    color: #888;
+    border: none;
+    border-radius: 8px;
+    padding: 0.2rem 0.7rem;
+    font-size: 1.5rem;
+    cursor: pointer;
+    margin-left: 0.5rem;
+    transition: background 0.2s, color 0.2s;
+  }
+  .map-type-btn:hover {
+    background: #eee;
+    color: #222;
+  }
+  .map-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0,0,0,0.45);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .map-modal-content {
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+    padding: 1.5rem 2rem 1.2rem 2rem;
+    min-width: 350px;
+    max-width: 95vw;
+    min-height: 350px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    gap: 1.2rem;
+  }
+  .map-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+  }
+  .map-close-btn {
+    background: none;
+    border: none;
+    font-size: 1.7rem;
+    color: #888;
+    cursor: pointer;
+    padding: 0.2rem 0.7rem;
+    border-radius: 8px;
+    transition: background 0.2s, color 0.2s;
+  }
+  .map-close-btn:hover {
+    background: #eee;
+    color: #222;
+  }
+  .map-container {
+    width: 100%;
+    height: 320px;
+    border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    margin-bottom: 0.7rem;
+  }
+  .map-modal-footer {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.7rem;
+  }
+  .map-actions {
+    display: flex;
+    gap: 1.2rem;
+    margin-top: 0.5rem;
+  }
+  .map-cancel-btn, .map-confirm-btn {
+    background: linear-gradient(135deg, #007bff, #0056b3);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 0.5rem 1.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+  }
+  .map-cancel-btn:hover, .map-confirm-btn:hover {
+    background: linear-gradient(135deg, #0056b3, #004085);
+    color: #fff;
+  }
+
+  /* CSS für Map-Picker Fullscreen und Buttons */
+  .map-pin-btn {
+    background: none;
+    box-shadow: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    outline: none;
+    cursor: pointer;
+  }
+  .map-pin-btn:focus {
+    outline: none;
+  }
+  .map-modal-fullscreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0,0,0,0.55);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .map-modal-content-fullscreen {
+    background: #fff;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 0;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    position: relative;
+  }
+  .map-modal-header-fullscreen {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 1rem;
+    padding: 1.2rem 1.2rem 0.5rem 1.2rem;
+    background: #fff;
+    z-index: 2;
+  }
+  .map-search-input {
+    flex: 1;
+    font-size: 1.1rem;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    margin-right: 1rem;
+  }
+  .map-search-results {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    margin: 0 1.2rem 0.5rem 1.2rem;
+    max-height: 180px;
+    overflow-y: auto;
+    z-index: 3;
+    position: relative;
+  }
+  .map-search-result {
+    padding: 0.6rem 1rem;
+    cursor: pointer;
+    border-bottom: 1px solid #eee;
+    font-size: 1rem;
+  }
+  .map-search-result:last-child {
+    border-bottom: none;
+  }
+  .map-search-result:hover {
+    background: #f5f5f5;
+  }
+  .map-picker-container-fullscreen {
+    position: relative;
+    flex: 1;
+    width: 100vw;
+    height: 100%;
+    background: #eee;
+    overflow: hidden;
+  }
+  .map-picker-leaflet-fullscreen {
+    width: 100vw;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 1;
+  }
+  .map-picker-pin {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    z-index: 2;
+    transform: translate(-50%, -100%);
+    pointer-events: none;
+  }
+  .map-coords-fullscreen {
+    padding: 0.7rem 1.2rem 0.5rem 1.2rem;
+    font-size: 1.1rem;
+    color: #333;
+    background: #fff;
+    z-index: 2;
+  }
+  .map-modal-footer-fullscreen {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1.2rem;
+    padding: 1.2rem;
+    background: #fff;
+    z-index: 2;
+  }
+
+  /* CSS für das Culoca O Editier-Icon */
+  .culoca-o-edit path {
+    fill: var(--text-primary);
+    transition: fill 0.2s;
+  }
+  .culoca-o-edit:hover path {
+    fill: #ee7221;
+  }
+  .culoca-o-edit {
+    display: block;
+    margin-left: 1rem;
+    vertical-align: middle;
+  }
+
+  .download-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #2196f3, #1565c0);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 0.5rem 1.2rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+    box-shadow: 0 2px 8px rgba(33, 150, 243, 0.08);
+    margin-left: 0.5rem;
+    text-decoration: none;
+    gap: 0.5rem;
+  }
+  .download-btn svg {
+    fill: #fff;
+    margin-right: 0.2rem;
+  }
+  .download-btn:hover, .download-btn:focus {
+    background: linear-gradient(135deg, #1565c0, #0d47a1);
+    color: #fff;
+    text-decoration: none;
+    box-shadow: 0 4px 16px rgba(33, 150, 243, 0.15);
   }
 
 </style> 

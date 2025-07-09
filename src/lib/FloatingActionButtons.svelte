@@ -1,5 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
+  import { onMount } from 'svelte';
   
   export let showScrollToTop = false;
   export let showTestMode = false;
@@ -7,6 +8,9 @@
   export let simulationMode = false;
   export let profileAvatar: string | null = null;
   export let showMapButton = false;
+  
+  // Fullscreen state
+  let isFullscreen = false;
   
   const dispatch = createEventDispatcher();
   
@@ -34,9 +38,62 @@
     dispatch('publicContent');
   }
   
+  function handleBulkUpload() {
+    dispatch('bulkUpload');
+  }
+  
   function handleMap() {
     dispatch('map');
   }
+  
+  function handleFullscreenToggle() {
+    if (!document.fullscreenElement) {
+      // Enter fullscreen
+      if (document.documentElement.requestFullscreen) {
+        document.documentElement.requestFullscreen();
+      } else if ((document.documentElement as any).webkitRequestFullscreen) {
+        (document.documentElement as any).webkitRequestFullscreen();
+      } else if ((document.documentElement as any).mozRequestFullScreen) {
+        (document.documentElement as any).mozRequestFullScreen();
+      } else if ((document.documentElement as any).msRequestFullscreen) {
+        (document.documentElement as any).msRequestFullscreen();
+      }
+    } else {
+      // Exit fullscreen
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      } else if ((document as any).webkitExitFullscreen) {
+        (document as any).webkitExitFullscreen();
+      } else if ((document as any).mozCancelFullScreen) {
+        (document as any).mozCancelFullScreen();
+      } else if ((document as any).msExitFullscreen) {
+        (document as any).msExitFullscreen();
+      }
+    }
+  }
+  
+  // Listen for fullscreen changes
+  function updateFullscreenState() {
+    isFullscreen = !!document.fullscreenElement || 
+                   !!(document as any).webkitFullscreenElement || 
+                   !!(document as any).mozFullScreenElement || 
+                   !!(document as any).msFullscreenElement;
+  }
+  
+  // Add event listeners for fullscreen changes
+  onMount(() => {
+    document.addEventListener('fullscreenchange', updateFullscreenState);
+    document.addEventListener('webkitfullscreenchange', updateFullscreenState);
+    document.addEventListener('mozfullscreenchange', updateFullscreenState);
+    document.addEventListener('MSFullscreenChange', updateFullscreenState);
+    
+    return () => {
+      document.removeEventListener('fullscreenchange', updateFullscreenState);
+      document.removeEventListener('webkitfullscreenchange', updateFullscreenState);
+      document.removeEventListener('mozfullscreenchange', updateFullscreenState);
+      document.removeEventListener('MSFullscreenChange', updateFullscreenState);
+    };
+  });
 </script>
 
 <div class="fab-container">
@@ -55,19 +112,14 @@
           <polyline points="9,22 9,12 15,12 15,22"/>
         </svg>
       {:else}
-        <!-- Pirate wheel icon when simulation is not active -->
+        <!-- Competition Pro Joystick icon for simulation mode -->
         <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"/>
-          <circle cx="12" cy="12" r="8"/>
-          <circle cx="12" cy="12" r="6"/>
-          <path d="M12 2v20"/>
-          <path d="M2 12h20"/>
-          <path d="M4.5 4.5l15 15"/>
-          <path d="M19.5 4.5l-15 15"/>
-          <circle cx="12" cy="12" r="2"/>
-          <!-- Add diagonal lines for more pirate wheel detail -->
-          <path d="M6 6l12 12"/>
-          <path d="M18 6l-12 12"/>
+          <!-- Competition Pro base (wider rectangular) -->
+          <rect x="4" y="14" width="16" height="6" rx="1"/>
+          <!-- Competition Pro stick -->
+          <line x1="12" y1="14" x2="12" y2="6"/>
+          <!-- Competition Pro handle (filled, larger) -->
+          <circle cx="12" cy="6" r="3" fill="currentColor"/>
         </svg>
       {/if}
     </button>
@@ -81,11 +133,11 @@
       aria-label="Karte anzeigen"
       title="Karte anzeigen"
     >
-      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2"/>
-        <line x1="8" y1="2" x2="8" y2="18"/>
-        <line x1="16" y1="6" x2="16" y2="22"/>
-      </svg>
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2"/>
+      <line x1="8" y1="2" x2="8" y2="18"/>
+      <line x1="16" y1="6" x2="16" y2="22"/>
+    </svg>
     </button>
   {/if}
 
@@ -134,8 +186,11 @@
         />
       {:else}
         <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-          <circle cx="12" cy="7" r="4"/>
+          <circle cx="12" cy="8" r="3"/>
+          <circle cx="6" cy="16" r="3"/>
+          <circle cx="18" cy="16" r="3"/>
+          <path d="M12 11v3"/>
+          <path d="M9 16h6"/>
         </svg>
       {/if}
     </button>
@@ -154,8 +209,34 @@
     </svg>
   </button>
   
-  <!-- Scroll to top button (bottom) -->
-  {#if showScrollToTop}
+  <!-- Fullscreen toggle button (bottom) - shows when not scrolled -->
+  {#if !showScrollToTop}
+    <button 
+      class="fab-button fullscreen-toggle"
+      on:click={handleFullscreenToggle}
+      aria-label={isFullscreen ? "Vollbildmodus beenden" : "Vollbildmodus aktivieren"}
+      title={isFullscreen ? "Vollbildmodus beenden" : "Vollbildmodus aktivieren"}
+    >
+      {#if isFullscreen}
+        <!-- Exit fullscreen icon -->
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M8 3H5a2 2 0 0 0-2 2v3"/>
+          <path d="M21 8V5a2 2 0 0 0-2-2h-3"/>
+          <path d="M3 16v3a2 2 0 0 0 2 2h3"/>
+          <path d="M16 21h3a2 2 0 0 0 2-2v-3"/>
+        </svg>
+      {:else}
+        <!-- Enter fullscreen icon -->
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M8 3H5a2 2 0 0 0-2 2v3"/>
+          <path d="M21 8V5a2 2 0 0 0-2-2h-3"/>
+          <path d="M3 16v3a2 2 0 0 0 2 2h3"/>
+          <path d="M16 21h3a2 2 0 0 0 2-2v-3"/>
+        </svg>
+      {/if}
+    </button>
+  {:else}
+    <!-- Scroll to top button (bottom) - shows when scrolled -->
     <button 
       class="fab-button scroll-to-top"
       on:click={handleScrollToTop}
@@ -217,6 +298,16 @@
   }
   
   /* Button specific colors - all transparent now */
+  
+  /* Fullscreen toggle specific styling - same as scroll-to-top */
+  .fab-button.fullscreen-toggle {
+    background: transparent;
+    border: none;
+  }
+  
+  .fab-button.fullscreen-toggle:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
   
   /* Mobile responsive */
   @media (max-width: 768px) {

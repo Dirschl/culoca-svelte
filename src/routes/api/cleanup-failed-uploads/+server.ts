@@ -21,7 +21,7 @@ export const POST = async () => {
       try {
         // Get image info from database
         const { data: image, error: fetchError } = await supabase
-          .from('images')
+          .from('items')
           .select('path_512, path_2048')
           .eq('id', imageId)
           .single();
@@ -71,7 +71,7 @@ export const POST = async () => {
         
         // Delete from database
         const { error: deleteDbError } = await supabase
-          .from('images')
+          .from('items')
           .delete()
           .eq('id', imageId);
         

@@ -12,7 +12,7 @@ async function create64pxThumbnails() {
   
   // Get all images from database that don't have path_64 yet
   const { data: images, error } = await supabase
-    .from('images')
+    .from('items')
     .select('id, path_512, path_64')
     .is('path_64', null);
     
@@ -73,7 +73,7 @@ async function create64pxThumbnails() {
       
       // Update database with path_64
       const { error: updateError } = await supabase
-        .from('images')
+        .from('items')
         .update({ path_64: image.path_512 })
         .eq('id', image.id);
         

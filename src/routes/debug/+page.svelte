@@ -4,41 +4,76 @@
 
   let imagesWithGPS: any[] = [];
   let imagesWithoutGPS: any[] = [];
+  let allImages: any[] = [];
   let loading = true;
   let cleanupLoading = false;
   let cleanupResults: any[] = [];
+  let debugInfo: any = {};
 
   onMount(async () => {
     try {
+      console.log('🔍 Starting debug page data load...');
+      
+      // First, let's get ALL images to see what's in the database
+      const { data: allData, error: allError } = await supabase
+        .from('items')
+        .select('*');
+
+      if (allError) {
+        console.error('Error fetching all images:', allError);
+        debugInfo.allImagesError = allError;
+      } else {
+        allImages = allData || [];
+        debugInfo.totalImages = allImages.length;
+        console.log('🔍 Total images in database:', allImages.length);
+        console.log('🔍 Sample image:', allImages[0]);
+      }
+
       // Get images with GPS data
       const { data: withGPS, error: error1 } = await supabase
-        .from('images')
-        .select('id, title, lat, lon')
+        .from('items')
+        .select('id, title, lat, lon, created_at, original_name, user_id, profile_id')
         .not('lat', 'is', null)
-        .not('lon', 'is', null);
+        .not('lon', 'is', null)
+        .order('created_at', { ascending: false });
 
       if (error1) {
         console.error('Error fetching images with GPS:', error1);
+        debugInfo.gpsError = error1;
       } else {
         imagesWithGPS = withGPS || [];
+        debugInfo.imagesWithGPS = imagesWithGPS.length;
+        console.log('🔍 Images with GPS:', imagesWithGPS.length);
+        console.log('🔍 Sample GPS image:', imagesWithGPS[0]);
       }
 
       // Get images without GPS data
       const { data: withoutGPS, error: error2 } = await supabase
-        .from('images')
-        .select('id, title, lat, lon')
-        .or('lat.is.null,lon.is.null');
+        .from('items')
+        .select('id, title, lat, lon, created_at, original_name, user_id, profile_id')
+        .or('lat.is.null,lon.is.null')
+        .order('created_at', { ascending: false });
 
       if (error2) {
         console.error('Error fetching images without GPS:', error2);
+        debugInfo.noGpsError = error2;
       } else {
         imagesWithoutGPS = withoutGPS || [];
+        debugInfo.imagesWithoutGPS = imagesWithoutGPS.length;
+        console.log('🔍 Images without GPS:', imagesWithoutGPS.length);
       }
 
-      console.log('Images with GPS:', imagesWithGPS);
-      console.log('Images without GPS:', imagesWithoutGPS);
+      // Check authentication status
+      const { data: { user } } = await supabase.auth.getUser();
+      debugInfo.user = user ? { id: user.id, email: user.email } : null;
+      console.log('🔍 User authentication:', debugInfo.user);
+
+      console.log('🔍 Debug info:', debugInfo);
+      console.log('🔍 Images with GPS:', imagesWithGPS);
+      console.log('🔍 Images without GPS:', imagesWithoutGPS);
     } catch (error) {
       console.error('Error:', error);
+      debugInfo.generalError = error;
     } finally {
       loading = false;
     }
@@ -71,29 +106,35 @@
 
   async function loadData() {
     try {
+      console.log('🔄 Reloading data...');
+      
       // Get images with GPS data
       const { data: withGPS, error: error1 } = await supabase
-        .from('images')
-        .select('id, title, lat, lon')
+        .from('items')
+        .select('id, title, lat, lon, created_at, original_name, user_id, profile_id')
         .not('lat', 'is', null)
-        .not('lon', 'is', null);
+        .not('lon', 'is', null)
+        .order('created_at', { ascending: false });
 
       if (error1) {
         console.error('Error fetching images with GPS:', error1);
       } else {
         imagesWithGPS = withGPS || [];
+        console.log('✅ Loaded', imagesWithGPS.length, 'images with GPS');
       }
 
       // Get images without GPS data
       const { data: withoutGPS, error: error2 } = await supabase
-        .from('images')
-        .select('id, title, lat, lon')
-        .or('lat.is.null,lon.is.null');
+        .from('items')
+        .select('id, title, lat, lon, created_at, original_name, user_id, profile_id')
+        .or('lat.is.null,lon.is.null')
+        .order('created_at', { ascending: false });
 
       if (error2) {
         console.error('Error fetching images without GPS:', error2);
       } else {
         imagesWithoutGPS = withoutGPS || [];
+        console.log('✅ Loaded', imagesWithoutGPS.length, 'images without GPS');
       }
 
       console.log('Images with GPS:', imagesWithGPS);
@@ -108,8 +149,31 @@
   <title>Debug - GPS Data</title>
 </svelte:head>
 
-<div class="debug-container">
-  <h1>GPS Data Debug</h1>
+  <div class="debug-container">
+    <h1>GPS Data Debug</h1>
+    
+    <!-- Debug Information Section -->
+    <div class="debug-section">
+      <h2>Debug Information</h2>
+      <div class="debug-info">
+        <p><strong>Total images in database:</strong> {debugInfo.totalImages || 'Loading...'}</p>
+        <p><strong>Images with GPS:</strong> {debugInfo.imagesWithGPS || 'Loading...'}</p>
+        <p><strong>Images without GPS:</strong> {debugInfo.imagesWithoutGPS || 'Loading...'}</p>
+        <p><strong>User:</strong> {debugInfo.user ? `${debugInfo.user.email} (${debugInfo.user.id})` : 'Not authenticated'}</p>
+        {#if debugInfo.allImagesError}
+          <p><strong>Error fetching all images:</strong> {debugInfo.allImagesError.message}</p>
+        {/if}
+        {#if debugInfo.gpsError}
+          <p><strong>Error fetching GPS images:</strong> {debugInfo.gpsError.message}</p>
+        {/if}
+        {#if debugInfo.noGpsError}
+          <p><strong>Error fetching non-GPS images:</strong> {debugInfo.noGpsError.message}</p>
+        {/if}
+      </div>
+      <button on:click={loadData} class="refresh-button">
+        🔄 Refresh Data
+      </button>
+    </div>
   
   <div class="cleanup-section">
     <h2>Cleanup Failed Uploads</h2>
@@ -144,11 +208,17 @@
       <h2>Images with GPS Data ({imagesWithGPS.length})</h2>
       {#each imagesWithGPS as image}
         <div class="image-item">
-          <strong>{image.title || 'No title'}</strong>
+          <strong>{image.title || image.original_name || 'No title'}</strong>
           <br>
           ID: {image.id}
           <br>
           GPS: {image.lat}, {image.lon}
+          <br>
+          Created: {image.created_at ? new Date(image.created_at).toLocaleDateString() : 'Unknown'}
+          <br>
+          User: {image.user_id}
+          <br>
+          Profile: {image.profile_id}
         </div>
       {/each}
     </div>
@@ -157,11 +227,17 @@
       <h2>Images without GPS Data ({imagesWithoutGPS.length})</h2>
       {#each imagesWithoutGPS as image}
         <div class="image-item">
-          <strong>{image.title || 'No title'}</strong>
+          <strong>{image.title || image.original_name || 'No title'}</strong>
           <br>
           ID: {image.id}
           <br>
           GPS: {image.lat}, {image.lon}
+          <br>
+          Created: {image.created_at ? new Date(image.created_at).toLocaleDateString() : 'Unknown'}
+          <br>
+          User: {image.user_id}
+          <br>
+          Profile: {image.profile_id}
         </div>
       {/each}
     </div>
@@ -227,5 +303,31 @@
   .result-item {
     margin-bottom: 0.5rem;
     padding: 0.25rem 0;
+  }
+
+  .debug-info {
+    background: #f8f9fa;
+    padding: 1rem;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+  }
+
+  .debug-info p {
+    margin: 0.5rem 0;
+  }
+
+  .refresh-button {
+    background: #007bff;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+    margin-top: 1rem;
+  }
+
+  .refresh-button:hover {
+    background: #0056b3;
   }
 </style> 

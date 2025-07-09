@@ -10,7 +10,7 @@ export const GET = async ({ url }) => {
 
     // Build query for images with title, description, and GPS data
     let imagesQuery = supabase
-      .from('images')
+      .from('items')
       .select('id, path_512, path_2048, path_64, original_name, created_at, user_id, profile_id, title, description, lat, lon')
       .not('title', 'is', null)
       .not('description', 'is', null)
@@ -25,7 +25,7 @@ export const GET = async ({ url }) => {
 
     // Get total count of images with title, description, and GPS data
     let totalQuery = supabase
-      .from('images')
+      .from('items')
       .select('id', { count: 'exact' })
       .not('title', 'is', null)
       .not('description', 'is', null)

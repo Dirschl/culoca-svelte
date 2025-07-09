@@ -85,7 +85,7 @@
     try {
       // First, get all images to see the total count
       const { data: allData, error: allError } = await supabase
-        .from('images')
+        .from('items')
         .select('id, path_512, path_2048, path_64, width, height, lat, lon, title, description, keywords');
 
       if (allError) throw allError;
@@ -329,7 +329,7 @@
 
         marker.on('click', () => {
           // Navigate to image detail page
-          window.open(`/image/${img.id}`, '_blank');
+          window.open(`/item/${img.id}`, '_blank');
         });
 
         mapMarkers.push(marker);
@@ -713,7 +713,7 @@
       </div>
       <div class="compact-list">
         {#each noGpsImagesList as img}
-          <div class="compact-item" on:click={() => window.open(`/image/${img.id}`, '_blank')}>
+          <div class="compact-item" on:click={() => window.open(`/item/${img.id}`, '_blank')}>
             <img 
               src="https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/{img.path_64 || img.path_512}"
               alt={img.title || 'Bild'}
@@ -741,7 +741,7 @@
       </div>
       <div class="compact-list">
         {#each incompleteImagesList as img}
-          <div class="compact-item" on:click={() => window.open(`/image/${img.id}`, '_blank')}>
+          <div class="compact-item" on:click={() => window.open(`/item/${img.id}`, '_blank')}>
             <img 
               src="https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/{img.path_64 || img.path_512}"
               alt={img.title || 'Bild'}

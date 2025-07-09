@@ -7,7 +7,7 @@ export const POST = async () => {
 
     // Get all images first
     const { data: images, error: fetchError } = await supabase
-      .from('images')
+      .from('items')
       .select('id, path_512');
 
     if (fetchError) {
@@ -43,7 +43,7 @@ export const POST = async () => {
 
     // Delete from database
     const { error: deleteError } = await supabase
-      .from('images')
+      .from('items')
       .delete()
       .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all (using impossible condition)
 

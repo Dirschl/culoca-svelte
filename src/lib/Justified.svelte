@@ -63,7 +63,7 @@
       
       boxes = layout.boxes || [];
       
-      console.log('Adobe Stock-style layout calculated:', {
+      console.log('Stock-style layout calculated:', {
         itemCount: items.length,
         containerWidth,
         targetRowHeight: responsiveTargetRowHeight,
@@ -120,7 +120,7 @@
   });
 
   function handleImageClick(itemId: string) {
-    location.href = `/image/${itemId}`;
+    location.href = `/item/${itemId}`;
   }
 
   function handleKeydown(event: KeyboardEvent, itemId: string) {
@@ -288,7 +288,7 @@
     {/each}
   {:else}
     <div style="padding: 40px; text-align: center; color: #666; font-size: 16px;">
-      {items.length === 0 ? '📷 No images to display' : '⚙️ Calculating Adobe Stock-style layout...'}
+      {items.length === 0 ? '📷 No images to display' : '⚙️ Calculating Stock-style layout...'}
     </div>
   {/if}
 </div>

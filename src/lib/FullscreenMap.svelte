@@ -14,6 +14,7 @@
   let mapInitialized = false;
   let userMarker: any = null;
   let imageMarkers: any[] = [];
+  let markerClusterGroup: any = null;
   let savedZoom = 18; // Default to max zoom
   let savedCenter: [number, number] | null = null;
   let isHybridView = false; // Track current view mode
@@ -29,10 +30,18 @@
   let compassHeading: number | null = null;
   let orientationListener: ((event: DeviceOrientationEvent) => void) | null = null;
   let useCompass = false; // Toggle between GPS and compass mode
+  let simulationActive = false; // Track if GPS simulation is active
+  let lastSimulatedPosition: { lat: number; lon: number; timestamp: number } | null = null;
   
   // Previous position for movement tracking
   let previousPosition: { lat: number; lon: number; timestamp: number } | null = null;
   let positionWatchId: number | null = null;
+  
+  // Import supabase client for loading all images
+  import { supabase } from './supabaseClient';
+  
+  // Internal images array for clustering
+  let allImages: any[] = [];
   
   // Load saved map state from localStorage
   function loadMapState() {
@@ -44,6 +53,8 @@
           savedZoom = state.zoom || 18;
           savedCenter = state.center || null;
           autoRotateEnabled = state.autoRotate !== undefined ? state.autoRotate : false;
+          isHybridView = state.isHybridView !== undefined ? state.isHybridView : false;
+          showDistance = state.showDistance !== undefined ? state.showDistance : true;
         } catch (e) {
           console.error('Error loading map state:', e);
         }
@@ -57,7 +68,9 @@
       const state = {
         zoom: map.getZoom(),
         center: [map.getCenter().lat, map.getCenter().lng],
-        autoRotate: autoRotateEnabled
+        autoRotate: autoRotateEnabled,
+        isHybridView: isHybridView,
+        showDistance: showDistance
       };
       localStorage.setItem('culoca-map-state', JSON.stringify(state));
     }
@@ -92,6 +105,19 @@
     
     // Load Leaflet JS dynamically
     const leaflet = await import('leaflet');
+    
+    // Load MarkerCluster CSS
+    if (!document.querySelector('link[href*="markercluster"]')) {
+      const clusterLink = document.createElement('link');
+      clusterLink.rel = 'stylesheet';
+      clusterLink.href = 'https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css';
+      document.head.appendChild(clusterLink);
+    }
+    
+    // Load MarkerCluster JS
+    if (typeof (window as any).L.markerClusterGroup === 'undefined') {
+      await import('leaflet.markercluster');
+    }
     
     // Determine initial position and zoom
     let initialLat = userLat || 52.5200;
@@ -131,6 +157,34 @@
       streetLayer.addTo(map);
     }
     
+    // Initialize marker cluster group
+    markerClusterGroup = (window as any).L.markerClusterGroup({
+      chunkedLoading: true,
+      maxClusterRadius: 60,
+      spiderfyOnMaxZoom: true,
+      showCoverageOnHover: true,
+      zoomToBoundsOnClick: true,
+      disableClusteringAtZoom: 16, // Ab Zoom 16 keine Clustering mehr
+      iconCreateFunction: function(cluster: any) {
+        const count = cluster.getChildCount();
+        let className = 'marker-cluster-small';
+        if (count > 100) {
+          className = 'marker-cluster-large';
+        } else if (count > 10) {
+          className = 'marker-cluster-medium';
+        }
+        
+        return (window as any).L.divIcon({
+          html: `<div><span>${count}</span></div>`,
+          className: `marker-cluster ${className}`,
+          iconSize: (window as any).L.point(40, 40)
+        });
+      }
+    });
+    
+    // Add cluster group to map
+    map.addLayer(markerClusterGroup);
+    
     // Add user marker if position available
     if (userLat && userLon) {
       const userIcon = leaflet.divIcon({
@@ -150,18 +204,33 @@
     map.on('zoomend moveend', saveMapState);
     
     mapInitialized = true;
+    
+    // Load all images for clustering
+    loadAllImagesForMap();
   }
   
   function addImageMarkers() {
-    if (!map || !images.length) return;
+    console.log(`[FullscreenMap] addImageMarkers called with ${allImages.length} images`);
+    if (!map || !markerClusterGroup || !allImages.length) {
+      console.log(`[FullscreenMap] Skipping addImageMarkers - map: ${!!map}, clusterGroup: ${!!markerClusterGroup}, allImages.length: ${allImages.length}`);
+      return;
+    }
     
-    // Clear existing markers
-    imageMarkers.forEach(marker => {
-      map.removeLayer(marker);
-    });
+    // Clear existing markers from cluster group
+    markerClusterGroup.clearLayers();
     imageMarkers = [];
     
-    images.forEach(image => {
+    console.log(`[FullscreenMap] Processing ${allImages.length} images for markers`);
+    allImages.forEach((image, index) => {
+      console.log(`[FullscreenMap] Processing image ${index + 1}/${allImages.length}:`, {
+        id: image.id,
+        lat: image.lat,
+        lon: image.lon,
+        title: image.title,
+        path_64: image.path_64,
+        path_512: image.path_512
+      });
+      
       // Create marker element with image and label
       const markerEl = document.createElement('div');
       markerEl.className = 'image-marker-container';
@@ -251,7 +320,7 @@
       
       // Create label element
       const labelEl = document.createElement('div');
-      labelEl.className = 'image-label';
+      labelEl.className = 'image-label marker-text';
       labelEl.style.cssText = `
         background: rgba(255, 255, 255, 0.95);
         color: #333;
@@ -272,7 +341,7 @@
         if (showDistance) {
           // Show distance
           const distance = calculateDistance(userLat, userLon, image.lat, image.lon);
-          labelText = distance < 1 ? `${Math.round(distance * 1000)}m` : `${distance.toFixed(1)}km`;
+          labelText = formatDistance(distance);
         } else {
           // Show title (up to comma, max 60 chars)
           if (image.title) {
@@ -295,14 +364,17 @@
       markerEl.appendChild(labelEl);
       
       // Create marker
+      console.log(`[FullscreenMap] Creating marker for image ${image.id} at [${image.lat}, ${image.lon}]`);
       const marker = new (window as any).L.marker([image.lat, image.lon], {
         icon: (window as any).L.divIcon({
           html: markerEl.outerHTML,
           className: 'custom-marker',
           iconSize: [120, 75], // Größer für längere Labels
-          iconAnchor: [60, 70] // Angepasster Ankerpunkt
+          iconAnchor: [60, 24] // Zentriert auf dem Bild: Mitte horizontal (60), Mitte des Bildes vertikal (24px = 48px/2)
         })
-      }).addTo(map);
+      });
+      
+      console.log(`[FullscreenMap] Marker created for image ${image.id}`);
       
       // Click handler for navigation
       marker.on('click', () => {
@@ -312,7 +384,13 @@
       // Store reference to image data
       marker.image = image;
       imageMarkers.push(marker);
+      
+      // Add marker to cluster group instead of directly to map
+      markerClusterGroup.addLayer(marker);
+      console.log(`[FullscreenMap] Marker added to cluster group for image ${image.id}`);
     });
+    
+    console.log(`[FullscreenMap] Finished adding ${imageMarkers.length} markers to cluster group`);
   }
   
   function updateUserMarker() {
@@ -361,13 +439,12 @@
   
   // Calculate distance between two points in kilometers
   function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
-    const R = 6371; // Earth's radius in kilometers
+    const R = 6371; // Earth's radius in kilometers (not meters!)
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon/2) * Math.sin(dLon/2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     return R * c;
   }
@@ -379,12 +456,23 @@
     const lat2Rad = lat2 * Math.PI / 180;
     
     const y = Math.sin(dLon) * Math.cos(lat2Rad);
-    const x = Math.cos(lat1Rad) * Math.sin(lat2Rad) - Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLon);
+    const x = Math.cos(lat1Rad) * Math.sin(lat2Rad) - 
+              Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLon);
     
     let bearing = Math.atan2(y, x) * 180 / Math.PI;
-    bearing = (bearing + 360) % 360; // Normalize to 0-360
-    
-    return bearing;
+    return (bearing + 360) % 360; // Normalize to 0-360°
+  }
+  
+  // Format distance with German locale (comma as decimal separator)
+  function formatDistance(distanceKm: number): string {
+    if (distanceKm < 1) {
+      // Show in meters with German formatting
+      const meters = Math.round(distanceKm * 1000);
+      return `${meters}m`;
+    } else {
+      // Show in kilometers with German formatting (comma as decimal separator)
+      return `${distanceKm.toFixed(1).replace('.', ',')}km`;
+    }
   }
   
   // Update user position on map
@@ -392,21 +480,44 @@
     userLat = lat;
     userLon = lon;
     
-    if (!userMarker || !map) return;
+    if (!map) {
+      console.log('[FullscreenMap] updateUserPosition: Map not initialized yet');
+      return;
+    }
     
-    const newPosition = [lon, lat];
+    // Check if map container is properly initialized
+    const mapContainer = map.getContainer();
+    if (!mapContainer || !mapContainer._leaflet_pos) {
+      console.log('[FullscreenMap] updateUserPosition: Map container not ready yet');
+      return;
+    }
     
-    // Update position without auto-rotation (handled by new toggleAutoRotate function)
-    userMarker.setLngLat(newPosition);
-    
-    // Save updated state
-    saveMapState();
+    try {
+      // Update user marker position
+      if (userMarker) {
+        userMarker.setLatLng([lat, lon]);
+      }
+      
+      // Keep user centered on map - force center without animation
+      map.setView([lat, lon], map.getZoom(), { animate: false });
+      
+      // Update marker labels with new distances
+      updateMarkerLabels();
+      
+      // Save updated state
+      saveMapState();
+    } catch (error) {
+      console.error('[FullscreenMap] Error in updateUserPosition:', error);
+    }
   }
   
   // Detect iOS device
   onMount(() => {
     isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
     console.log(`[FullscreenMap] Device detected: ${isIOS ? 'iOS' : 'Other'}`);
+    
+    // Setup GPS simulation listener
+    setupSimulationListener();
   });
 
   // Request device orientation permission for iOS
@@ -445,31 +556,20 @@
         
         compassHeading = heading;
         
-        if (autoRotateEnabled && useCompass && map) {
-          // Smooth rotation update
-          const targetBearing = -heading; // Negative because map rotation is opposite
-          
-          if (Math.abs(targetBearing - currentBearing) > 180) {
-            // Handle 360° wrap-around
-            if (targetBearing > currentBearing) {
-              currentBearing += 360;
-            } else {
-              currentBearing -= 360;
-            }
-          }
-          
-          // Smooth interpolation
-          const diff = targetBearing - currentBearing;
-          if (Math.abs(diff) > 2) { // Only update if significant change
-            currentBearing += diff * 0.1; // Smooth interpolation
-            map.setBearing(currentBearing);
-            console.log(`[FullscreenMap] Compass rotation: ${heading.toFixed(1)}° → map bearing: ${currentBearing.toFixed(1)}°`);
-          }
+        // Apply map rotation based on compass heading
+        if (autoRotateEnabled) {
+          const targetBearing = -heading; // Negative because we want the heading to point up
+          console.log(`[FullscreenMap] Compass heading: ${heading.toFixed(1)}° -> Map bearing: ${targetBearing.toFixed(1)}°`);
+          setMapRotation(targetBearing);
         }
+        
+        useCompass = true;
       }
     };
     
-    window.addEventListener('deviceorientation', orientationListener);
+    if (orientationListener) {
+      window.addEventListener('deviceorientation', orientationListener);
+    }
     console.log('[FullscreenMap] Compass listener setup complete');
   }
 
@@ -478,124 +578,61 @@
     if (orientationListener) {
       window.removeEventListener('deviceorientation', orientationListener);
       orientationListener = null;
+      
+      // Reset map rotation
+      if (map) {
+        setMapRotation(0);
+      }
+      
       console.log('[FullscreenMap] Compass listener removed');
     }
   }
 
-  // Setup GPS-based direction tracking
-  function setupGPSTracking() {
-    if (!navigator.geolocation) {
-      console.warn('[FullscreenMap] Geolocation not available');
-      return;
-    }
-
-    const options: PositionOptions = {
-      enableHighAccuracy: true,
-      timeout: 10000,
-      maximumAge: 1000
-    };
-
-    watchId = navigator.geolocation.watchPosition(
-      (position) => {
-        const newPos = {
-          lat: position.coords.latitude,
-          lon: position.coords.longitude,
-          accuracy: position.coords.accuracy,
-          timestamp: Date.now()
-        };
-
-        if (autoRotateEnabled && !useCompass && lastPosition) {
-          // Calculate bearing between two GPS points
-          const bearing = calculateBearing(
-            lastPosition.lat, lastPosition.lon,
-            newPos.lat, newPos.lon
-          );
-
-          // Check if we've moved enough and with good accuracy
-          const distance = calculateDistance(
-            lastPosition.lat, lastPosition.lon,
-            newPos.lat, newPos.lon
-          );
-
-          const minDistance = isIOS ? 8 : 5; // Higher threshold for iOS
-          const maxAccuracy = isIOS ? 25 : 20; // More lenient for iOS
-          const minTimeDiff = 2000; // 2 seconds minimum
-
-          if (distance > minDistance && 
-              newPos.accuracy < maxAccuracy && 
-              lastPosition.accuracy < maxAccuracy &&
-              (newPos.timestamp - lastPosition.timestamp) > minTimeDiff) {
-            
-            if (map) {
-              currentBearing = bearing;
-              map.setBearing(bearing);
-              console.log(`[FullscreenMap] GPS rotation: distance=${distance.toFixed(1)}m, bearing=${bearing.toFixed(1)}°, accuracy=${newPos.accuracy.toFixed(1)}m`);
-            }
-          }
-        }
-
-        lastPosition = newPos;
-      },
-      (error) => {
-        console.warn('[FullscreenMap] GPS tracking error:', error.message);
-      },
-      options
-    );
-
-    console.log('[FullscreenMap] GPS tracking setup complete');
-  }
-
-  // Stop GPS tracking
-  function stopGPSTracking() {
-    if (watchId !== null) {
-      navigator.geolocation.clearWatch(watchId);
-      watchId = null;
-      console.log('[FullscreenMap] GPS tracking stopped');
-    }
-  }
-
-  // Toggle auto-rotation with hybrid approach
-  async function toggleAutoRotate() {
+  // Toggle auto-rotation based on movement direction
+  function toggleAutoRotate() {
     autoRotateEnabled = !autoRotateEnabled;
     console.log(`[FullscreenMap] Auto-rotation ${autoRotateEnabled ? 'enabled' : 'disabled'}`);
     
     if (autoRotateEnabled) {
-      // Request permissions for iOS
-      const hasPermission = await requestIOSPermissions();
+      // Check if simulation is active
+      if (simulationActive) {
+        console.log('[FullscreenMap] Using GPS simulation for auto-rotation');
+        // Don't start real GPS tracking when simulation is active
+        return;
+      }
       
-      if (hasPermission) {
-        // Try compass first on iOS, GPS as fallback
-        if (isIOS) {
-          useCompass = true;
-          setupCompassListener();
-          // Also setup GPS as backup
-          setupGPSTracking();
-          
-          // Check if compass is working after 3 seconds
-          setTimeout(() => {
-            if (compassHeading === null) {
-              console.log('[FullscreenMap] Compass not working, switching to GPS mode');
-              useCompass = false;
-            }
-          }, 3000);
-        } else {
-          // Non-iOS: prefer GPS
-          useCompass = false;
-          setupGPSTracking();
-          setupCompassListener(); // Setup compass as backup
-        }
-      } else {
-        console.warn('[FullscreenMap] Permissions denied, using GPS only');
-        useCompass = false;
-        setupGPSTracking();
+      // Request permissions first for real GPS
+      requestIOSPermissions();
+      
+      // Start continuous movement tracking
+      if (navigator.geolocation) {
+        trackUserMovement();
+        
+        // Setup compass as additional source
+        setupCompassListener();
       }
     } else {
-      // Disable both tracking methods
+      // Disable auto-rotation
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+      }
+      
       removeCompassListener();
-      stopGPSTracking();
-      compassHeading = null;
+      
+      // Reset position tracking
       lastPosition = null;
+      lastSimulatedPosition = null;
+      currentBearing = 0;
+      
+      // Reset map rotation
+      if (map) {
+        setMapRotation(0);
+      }
     }
+    
+    // Save state
+    saveMapState();
   }
   
   // Toggle display mode between distance and title
@@ -604,13 +641,15 @@
     console.log(`[FullscreenMap] Display mode toggled: ${showDistance ? 'distance' : 'title'}`);
     // Update all existing markers
     updateMarkerLabels();
+    // Save the new state
+    saveMapState();
   }
   
   // Update marker labels based on current display mode
   function updateMarkerLabels() {
-    if (!map || !mapInitialized || !images.length) return;
+    if (!map || !mapInitialized || !allImages.length) return;
     
-    console.log(`[FullscreenMap] Updating marker labels for ${images.length} images`);
+    console.log(`[FullscreenMap] Updating marker labels for ${allImages.length} images`);
     
     // Clear existing markers and recreate them with new labels
     imageMarkers.forEach(marker => {
@@ -622,48 +661,27 @@
     addImageMarkers();
   }
   
-  // Start watching position for movement-based rotation
-  function startPositionWatch() {
-    if ('geolocation' in navigator) {
-      watchId = navigator.geolocation.watchPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          updateUserPosition(latitude, longitude);
-        },
-        (error) => {
-          console.error('Error watching position:', error);
-        },
-        {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 5000
-        }
-      );
-    }
-  }
-  
-  // Stop watching position
-  function stopPositionWatch() {
-    if (watchId !== null) {
-      navigator.geolocation.clearWatch(watchId);
-      watchId = null;
-    }
-  }
-  
   onMount(() => {
     loadMapState();
     initMap();
-    
-    // Start position watching for movement-based rotation
-    startPositionWatch();
-    
-    return () => {
-      stopPositionWatch();
-    };
   });
   
   onDestroy(() => {
-    stopPositionWatch();
+    // Clean up auto-rotation if active
+    if (autoRotateEnabled) {
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+      }
+      removeCompassListener();
+    }
+    
+    // Clean up simulation listener
+    if (typeof window !== 'undefined') {
+      // Remove event listener (we can't remove specific listeners, so this is a limitation)
+      // The listener will be cleaned up when the component is destroyed
+    }
+    
     if (map) {
       saveMapState();
       map.remove();
@@ -671,11 +689,14 @@
   });
   
   // Reactive updates
-  $: if (mapInitialized && images.length > 0) {
-    console.log(`[FullscreenMap] Reactive update triggered: ${images.length} images`);
+  $: if (mapInitialized && allImages.length > 0) {
+    console.log(`[FullscreenMap] Reactive update triggered: ${allImages.length} images`);
     const leaflet = (window as any).L;
     if (leaflet) {
+      console.log(`[FullscreenMap] Leaflet available, calling addImageMarkers`);
       addImageMarkers();
+    } else {
+      console.log(`[FullscreenMap] Leaflet not available yet`);
     }
   }
   
@@ -687,8 +708,250 @@
   function trackUserMovement() {
     if (!autoRotateEnabled) return;
     
-    // This function is now handled by the new toggleAutoRotate logic
-    // No need for separate tracking
+    // Continuous movement tracking with frequent updates
+    if (watchId !== null) {
+      navigator.geolocation.clearWatch(watchId);
+    }
+    
+    watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        // Ignore real GPS if simulation is active
+        if (simulationActive) {
+          console.log('[FullscreenMap] Ignoring real GPS - simulation active');
+          return;
+        }
+        
+        // Check if map is ready before processing GPS updates
+        if (!map || !mapInitialized) {
+          console.log('[FullscreenMap] GPS update ignored - map not ready');
+          return;
+        }
+        
+        const newPos = {
+          lat: position.coords.latitude,
+          lon: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+          timestamp: Date.now()
+        };
+        
+        console.log(`[FullscreenMap] GPS position update:`, {
+          lat: newPos.lat,
+          lon: newPos.lon,
+          accuracy: newPos.accuracy,
+          heading: position.coords.heading
+        });
+        
+        // Update user position on map - ensure proper centering
+        userLat = newPos.lat;
+        userLon = newPos.lon;
+        
+        // Update user marker position
+        if (userMarker) {
+          userMarker.setLatLng([newPos.lat, newPos.lon]);
+        }
+        
+        // Force center the map on user position
+        if (map) {
+          map.setView([newPos.lat, newPos.lon], map.getZoom(), { animate: false });
+        }
+        
+        // Update marker labels with new distances
+        updateMarkerLabels();
+        
+        // Save updated state
+        saveMapState();
+        
+        // Use device heading if available (better for short distances)
+        if (position.coords.heading !== null && position.coords.heading !== undefined) {
+          console.log(`[FullscreenMap] Using device heading: ${position.coords.heading}°`);
+          const targetBearing = -position.coords.heading; // Negative because we want the heading to point up
+          setMapRotation(targetBearing);
+          return;
+        }
+        
+        if (lastPosition && newPos.accuracy < 25) {
+          const distanceKm = calculateDistance(
+            lastPosition.lat, lastPosition.lon,
+            newPos.lat, newPos.lon
+          );
+          const distanceMeters = distanceKm * 1000;
+          const timeDiff = newPos.timestamp - lastPosition.timestamp;
+          // Very small thresholds for continuous movement
+          const minDistance = isIOS ? 0.1 : 0.05; // 10cm/5cm minimum
+          const minTime = 50; // 50ms minimum
+          if (distanceMeters >= minDistance && timeDiff >= minTime) {
+            const bearing = calculateBearing(
+              lastPosition.lat, lastPosition.lon,
+              newPos.lat, newPos.lon
+            );
+            const targetBearing = -bearing; // Negative because we want the heading to point up
+            setMapRotation(targetBearing);
+            currentBearing = bearing;
+            lastPosition = newPos;
+          }
+        } else {
+          lastPosition = newPos;
+        }
+      },
+      (error) => {
+        console.warn('[FullscreenMap] GPS error:', error.message);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 2000,
+        maximumAge: 25 // Very fresh positions for continuous movement
+      }
+    );
+  }
+
+  // Setup listener for GPS simulation messages
+  function setupSimulationListener() {
+    if (typeof window !== 'undefined') {
+      window.addEventListener('message', (event) => {
+        if (event.data && event.data.type === 'gps-simulation') {
+          console.log('[FullscreenMap] Received GPS simulation data:', event.data);
+          simulationActive = true;
+          
+          // Check if map is ready before processing simulation updates
+          if (!map || !mapInitialized) {
+            console.log('[FullscreenMap] Simulation update ignored - map not ready');
+            return;
+          }
+          
+          const newPos = {
+            lat: event.data.lat,
+            lon: event.data.lon,
+            timestamp: Date.now()
+          };
+          
+          // Update user position on map - ensure proper centering
+          userLat = newPos.lat;
+          userLon = newPos.lon;
+          
+          // Update user marker position
+          if (userMarker) {
+            userMarker.setLatLng([newPos.lat, newPos.lon]);
+          }
+          
+          // Force center the map on user position
+          if (map) {
+            map.setView([newPos.lat, newPos.lon], map.getZoom(), { animate: false });
+          }
+          
+          // Update marker labels with new distances
+          updateMarkerLabels();
+          
+          // Save updated state
+          saveMapState();
+          
+          // Handle simulated movement for auto-rotation
+          if (autoRotateEnabled && lastSimulatedPosition) {
+            const distanceKm = calculateDistance(
+              lastSimulatedPosition.lat, lastSimulatedPosition.lon,
+              newPos.lat, newPos.lon
+            );
+            // Convert to meters for comparison
+            const distanceMeters = distanceKm * 1000;
+            const timeDiff = newPos.timestamp - lastSimulatedPosition.timestamp;
+            const minDistance = 0.5; // 0.5 Meter minimum für glattere Simulation-Updates
+            const minTime = 100; // 0.1 Sekunden für glattere Simulation
+            console.log(`[FullscreenMap] Simulation movement check:`, {
+              distanceKm: distanceKm,
+              distanceMeters: distanceMeters,
+              minDistance: minDistance,
+              timeDiff: timeDiff,
+              minTime: minTime
+            });
+            if (distanceMeters >= minDistance && timeDiff >= minTime) {
+              const bearing = calculateBearing(
+                lastSimulatedPosition.lat, lastSimulatedPosition.lon,
+                newPos.lat, newPos.lon
+              );
+              console.log(`[FullscreenMap] Simulated bearing: ${bearing}° (distance: ${distanceMeters.toFixed(1)}m)`);
+              const targetBearing = -bearing; // Negative because we want the heading to point up
+              setMapRotation(targetBearing);
+              currentBearing = bearing;
+            }
+          }
+          
+          lastSimulatedPosition = newPos;
+          
+        } else if (event.data && event.data.type === 'gps-simulation-stop') {
+          console.log('[FullscreenMap] GPS simulation stopped');
+          simulationActive = false;
+          lastSimulatedPosition = null;
+        }
+      });
+    }
+  }
+
+  // === MAP ROTATION (Kompass) ===
+  function setMapRotation(rotation: number) {
+    if (map) {
+      const mapContainer = map.getContainer();
+      mapContainer.style.setProperty('--map-rotation', `${rotation}deg`);
+      mapContainer.style.transform = `rotate(${rotation}deg)`;
+      mapContainer.style.transformOrigin = 'center center';
+      mapContainer.style.transition = 'transform 0.2s linear';
+      
+      // Auch auf das HTML-Element setzen für globale Verfügbarkeit
+      document.documentElement.style.setProperty('--map-rotation', `${rotation}deg`);
+    }
+  }
+
+  // Load all images for the map (no radius limit)
+  async function loadAllImagesForMap() {
+    try {
+      console.log('[FullscreenMap] Loading all images for map...');
+      
+      const { data, error } = await supabase
+        .from('items')
+        .select('id, path_512, path_2048, path_64, width, height, lat, lon, title, description, keywords')
+        .not('lat', 'is', null)
+        .not('lon', 'is', null)
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('[FullscreenMap] Error loading images:', error);
+        return;
+      }
+      
+      if (data) {
+        const processedImages = data.map((img: any) => ({
+          id: img.id,
+          src: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${img.path_512}`,
+          srcHD: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${img.path_2048}`,
+          width: img.width,
+          height: img.height,
+          lat: img.lat,
+          lon: img.lon,
+          title: img.title,
+          description: img.description,
+          keywords: img.keywords,
+          path_64: img.path_64,
+          path_512: img.path_512,
+          path_2048: img.path_2048
+        }));
+        
+        console.log(`[FullscreenMap] Loaded ${processedImages.length} images for map`);
+        
+        // Update the internal images array
+        allImages = processedImages;
+        
+        // Re-add markers if map is initialized
+        if (mapInitialized && markerClusterGroup) {
+          addImageMarkers();
+        }
+      }
+    } catch (err) {
+      console.error('[FullscreenMap] Error in loadAllImagesForMap:', err);
+    }
+  }
+  
+  // Reactive statement to update markers when allImages changes
+  $: if (mapInitialized && markerClusterGroup && allImages.length > 0) {
+    console.log(`[FullscreenMap] Reactive update: ${allImages.length} images available`);
+    addImageMarkers();
   }
 </script>
 
@@ -708,24 +971,22 @@
       title={isHybridView ? 'Zur Straßenansicht wechseln' : 'Zur Satellitenansicht wechseln'}
     >
       {#if isHybridView}
-        <!-- Street View Icon - shown when in hybrid view -->
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M3 12h18"/>
-          <path d="M3 18h18"/>
-          <path d="M3 6h18"/>
-          <circle cx="6" cy="12" r="1"/>
-          <circle cx="12" cy="12" r="1"/>
-          <circle cx="18" cy="12" r="1"/>
+        <!-- Karten-Icon (FAB-Style) für Straßenansicht -->
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2"/>
+          <line x1="8" y1="2" x2="8" y2="18"/>
+          <line x1="16" y1="6" x2="16" y2="22"/>
         </svg>
       {:else}
-        <!-- Satellite/Hybrid Icon - shown when in street view -->
+        <!-- Satelliten-Icon bleibt wie gehabt -->
         <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="3" width="6" height="6" rx="1"/>
-          <rect x="9" y="3" width="6" height="6" rx="1"/>
-          <rect x="15" y="3" width="6" height="6" rx="1"/>
-          <rect x="3" y="9" width="6" height="6" rx="1"/>
-          <rect x="9" y="9" width="6" height="6" rx="1"/>
-          <rect x="15" y="9" width="6" height="6" rx="1"/>
+          <rect x="11" y="3" width="2" height="7" rx="1"/>
+          <rect x="11" y="14" width="2" height="7" rx="1"/>
+          <rect x="3" y="11" width="7" height="2" rx="1"/>
+          <rect x="14" y="11" width="7" height="2" rx="1"/>
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M7 7l3 3"/>
+          <path d="M17 17l-3-3"/>
         </svg>
       {/if}
     </button>
@@ -737,18 +998,14 @@
       title={showDistance ? 'Titel anzeigen' : 'Entfernung anzeigen'}
     >
       {#if showDistance}
-        <!-- ABC Icon - shown when showing distance, click to show titles -->
+        <!-- ABC Icon für Titelanzeige -->
         <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M4 7h16M4 12h16M4 17h10"/>
-          <circle cx="18" cy="17" r="2"/>
+          <text x="12" y="16.5" text-anchor="middle" font-size="11" font-weight="200" fill="currentColor">ABC</text>
         </svg>
       {:else}
-        <!-- 123 Icon - shown when showing titles, click to show distance -->
+        <!-- 123 Icon für Entfernungsanzeige -->
         <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M9 7h6M9 12h6M9 17h6"/>
-          <circle cx="5" cy="7" r="2"/>
-          <circle cx="5" cy="12" r="2"/>
-          <circle cx="5" cy="17" r="2"/>
+          <text x="12" y="17" text-anchor="middle" font-size="14" font-weight="200" fill="currentColor">123</text>
         </svg>
       {/if}
     </button>
@@ -759,40 +1016,21 @@
       class:active={autoRotateEnabled}
       on:click={toggleAutoRotate}
       title={autoRotateEnabled 
-        ? (useCompass ? 'Kompass-Rotation deaktivieren' : 'GPS-Rotation deaktivieren')
-        : (isIOS ? 'Kompass-Rotation aktivieren' : 'GPS-Rotation aktivieren')
+        ? (simulationActive ? 'Simulation-Rotation deaktivieren' : (useCompass ? 'Kompass-Rotation deaktivieren' : 'GPS-Rotation deaktivieren'))
+        : (simulationActive ? 'Simulation-Rotation aktivieren' : (isIOS ? 'Kompass-Rotation aktivieren' : 'GPS-Rotation aktivieren'))
       }
     >
       {#if autoRotateEnabled}
-        {#if useCompass}
-          <!-- Active Compass Icon -->
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="animate-spin">
-            <circle cx="12" cy="12" r="10"/>
-            <polygon points="16.24,7.76 14.12,14.12 7.76,16.24 9.88,9.88"/>
-            <circle cx="12" cy="12" r="2"/>
-          </svg>
-        {:else}
-          <!-- Active GPS Icon -->
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="animate-pulse">
-            <path d="M12 2L13.09 8.26L22 9L13.09 15.74L12 22L10.91 15.74L2 9L10.91 8.26L12 2Z"/>
-            <circle cx="12" cy="12" r="3"/>
-          </svg>
-        {/if}
+        <!-- Pause Icon - Rotation is active -->
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="6" y="4" width="4" height="16"/>
+          <rect x="14" y="4" width="4" height="16"/>
+        </svg>
       {:else}
-        {#if isIOS}
-          <!-- Inactive Compass Icon for iOS -->
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"/>
-            <polygon points="16.24,7.76 14.12,14.12 7.76,16.24 9.88,9.88"/>
-            <circle cx="12" cy="12" r="2"/>
-          </svg>
-        {:else}
-          <!-- Inactive GPS Icon for other devices -->
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 2L13.09 8.26L22 9L13.09 15.74L12 22L10.91 15.74L2 9L10.91 8.26L12 2Z"/>
-            <circle cx="12" cy="12" r="3"/>
-          </svg>
-        {/if}
+        <!-- Play Icon - Rotation is inactive -->
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="5 3 19 12 5 21 5 3"/>
+        </svg>
       {/if}
     </button>
 
@@ -802,11 +1040,17 @@
       on:click={closeMap}
       title="Zur Galerie zurückkehren"
     >
+      <!-- Gallery Grid Icon for back to gallery -->
       <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="3" y="3" width="7" height="7"/>
-        <rect x="14" y="3" width="7" height="7"/>
-        <rect x="14" y="14" width="7" height="7"/>
-        <rect x="3" y="14" width="7" height="7"/>
+        <rect x="3" y="3" width="6" height="6"/>
+        <rect x="9" y="3" width="6" height="6"/>
+        <rect x="15" y="3" width="6" height="6"/>
+        <rect x="3" y="9" width="6" height="6"/>
+        <rect x="9" y="9" width="6" height="6"/>
+        <rect x="15" y="9" width="6" height="6"/>
+        <rect x="3" y="15" width="6" height="6"/>
+        <rect x="9" y="15" width="6" height="6"/>
+        <rect x="15" y="15" width="6" height="6"/>
       </svg>
     </button>
   </div>
@@ -824,8 +1068,14 @@
   }
   
   .map-container {
-    width: 100%;
-    height: 100%;
+    /* Lade die Karte von Anfang an größer um Rotations-Ränder abzudecken */
+    width: 220%; /* Noch größer für komplette Abdeckung bei allen Rotationen */
+    height: 220%;
+    position: absolute;
+    top: -60%; /* (220 - 100) / 2 = 60% */
+    left: -60%;
+    transform-origin: center center;
+    overflow: hidden;
   }
   
   /* Logo - exact same positioning as main page */
@@ -874,7 +1124,7 @@
     transition: all 0.3s ease;
     box-shadow: 0 4px 12px var(--shadow);
     backdrop-filter: blur(10px);
-    background: #ff6b35; /* Culoca Orange für bessere Sichtbarkeit auf der Karte */
+    background: transparent;
     overflow: hidden;
   }
   
@@ -883,7 +1133,7 @@
   .auto-rotate-fab:hover,
   .grid-fab:hover {
     transform: scale(1.1);
-    background: rgba(255, 107, 53, 0.9); /* Leicht transparenter Orange beim Hover */
+    background: rgba(255, 255, 255, 0.1);
   }
   
   .view-toggle-fab:active,
@@ -893,19 +1143,7 @@
     transform: scale(0.95);
   }
   
-  /* Rotating animation for active compass */
-  .rotating {
-    animation: rotate 2s linear infinite;
-  }
-  
-  @keyframes rotate {
-    from {
-      transform: rotate(0deg);
-    }
-    to {
-      transform: rotate(360deg);
-    }
-  }
+
   
   /* Mobile responsive adjustments */
   @media (max-width: 600px) {
@@ -943,6 +1181,13 @@
     border: none !important;
   }
   
+  /* Prevent markers from rotating with the map */
+  :global(.marker-text),
+  :global(.image-marker) {
+    transform-origin: center center !important;
+    transition: transform 0.05s ease-out, opacity 0.3s ease !important;
+  }
+  
   /* Auto-rotate animation */
   .auto-rotate-fab .animate-spin {
     animation: spin 2s linear infinite;
@@ -960,5 +1205,87 @@
   @keyframes pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.5; }
+  }
+
+  /* Marker-Inhalte immer horizontal - globale Regel */
+  :global(.marker-text),
+  :global(.image-marker),
+  :global(.custom-marker .marker-text),
+  :global(.custom-marker .image-marker) {
+    transform: rotate(calc(-1 * var(--map-rotation, 0deg))) !important;
+    transition: transform 0.2s linear !important;
+    transform-origin: center center !important;
+  }
+  
+  /* Marker Cluster Styles */
+  :global(.marker-cluster-small) {
+    background-color: rgba(238, 115, 31, 0.6);
+    border: 2px solid rgba(238, 115, 31, 0.8);
+  }
+  
+  :global(.marker-cluster-small div) {
+    background-color: rgba(238, 115, 31, 0.9);
+    color: white;
+    font-weight: bold;
+    font-size: 12px;
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  }
+  
+  :global(.marker-cluster-medium) {
+    background-color: rgba(238, 115, 31, 0.7);
+    border: 2px solid rgba(238, 115, 31, 0.9);
+  }
+  
+  :global(.marker-cluster-medium div) {
+    background-color: rgba(238, 115, 31, 1);
+    color: white;
+    font-weight: bold;
+    font-size: 13px;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+  }
+  
+  :global(.marker-cluster-large) {
+    background-color: rgba(238, 115, 31, 0.8);
+    border: 3px solid rgba(238, 115, 31, 1);
+  }
+  
+  :global(.marker-cluster-large div) {
+    background-color: rgba(238, 115, 31, 1);
+    color: white;
+    font-weight: bold;
+    font-size: 14px;
+    border-radius: 50%;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  }
+  
+  /* Cluster hover effects */
+  :global(.marker-cluster:hover) {
+    transform: scale(1.1);
+    transition: transform 0.2s ease;
+  }
+  
+  /* Cluster coverage area */
+  :global(.marker-cluster-small),
+  :global(.marker-cluster-medium),
+  :global(.marker-cluster-large) {
+    border-radius: 50%;
+    transition: all 0.3s ease;
   }
 </style> 

@@ -137,7 +137,7 @@ $: if (mounted && mode !== 'aus') {
 }
 
 function handleImageClick(img: NewsFlashImage) {
-  goto(`/image/${img.id}`);
+  goto(`/item/${img.id}`);
 }
 
 function toggleMode() {

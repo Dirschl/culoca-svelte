@@ -22,7 +22,7 @@ async function checkUploadedFiles() {
     
     // Get all images from database
     const { data: images, error } = await supabase
-      .from('images')
+      .from('items')
       .select('id, original_name, created_at, user_id, profile_id')
       .order('created_at', { ascending: true });
     

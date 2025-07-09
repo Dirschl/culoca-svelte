@@ -14,7 +14,7 @@ export const GET: RequestHandler = async ({ params, fetch }) => {
 
   // 1. Hole Bilddaten aus Supabase DB
   const { data: images, error } = await supabase
-    .from('images')
+    .from('items')
     .select('*')
     .eq('id', id)
     .limit(1);

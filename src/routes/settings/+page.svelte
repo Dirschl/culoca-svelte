@@ -28,6 +28,11 @@
   let showCompass = false;
   let autoguide = false;
   let newsFlashMode: 'aus' | 'eigene' | 'alle' = 'alle';
+  let enableSearch = false;
+  
+  // Bildkomprimierung Einstellungen
+  let imageFormat: 'webp' | 'jpg' = 'jpg';
+  let imageQuality: number = 85;
 
   let galleryLayout = 'grid';
 
@@ -119,6 +124,9 @@
         showCompass = data.show_compass ?? false;
         autoguide = data.autoguide ?? false;
         newsFlashMode = data.newsflash_mode ?? 'alle';
+        enableSearch = data.enable_search ?? false;
+        imageFormat = data.image_format ?? 'jpg';
+        imageQuality = data.image_quality ?? 85;
       }
     } catch (error) {
       console.error('Error loading profile:', error);
@@ -149,8 +157,11 @@
         show_distance: showDistance,
         show_compass: showCompass,
         autoguide: autoguide,
+        enable_search: enableSearch,
         avatar_url: profile?.avatar_url,
         newsflash_mode: newsFlashMode,
+        image_format: imageFormat,
+        image_quality: imageQuality,
         updated_at: new Date().toISOString()
       };
 
@@ -167,7 +178,10 @@
         localStorage.setItem('showDistance', showDistance ? 'true' : 'false');
         localStorage.setItem('showCompass', showCompass ? 'true' : 'false');
         localStorage.setItem('autoguide', autoguide ? 'true' : 'false');
+        localStorage.setItem('enableSearch', enableSearch ? 'true' : 'false');
         localStorage.setItem('newsFlashMode', newsFlashMode);
+        localStorage.setItem('imageFormat', imageFormat);
+        localStorage.setItem('imageQuality', imageQuality.toString());
       }
 
       profile = profileData;
@@ -400,6 +414,28 @@
           </div>
         </section>
 
+        <!-- Search Settings -->
+        <section class="settings-section">
+          <div class="section-header">
+            <h2>Suchfunktion</h2>
+            <p class="section-description">Aktiviere die Suchfunktion für die Bildergalerie</p>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-info">
+              <label class="setting-label" for="search-toggle">Suchfeld anzeigen</label>
+              <p class="setting-description">Ersetzt das Culoca-Logo durch ein Suchfeld auf der Hauptseite. Suche nach Titel, Beschreibung und Keywords.</p>
+            </div>
+            <div class="setting-control">
+              <label class="toggle-switch" for="search-toggle">
+                <input type="checkbox" id="search-toggle" bind:checked={enableSearch} />
+                <span class="toggle-slider"></span>
+              </label>
+              <span class="setting-status">{enableSearch ? 'Aktiviert' : 'Deaktiviert'}</span>
+            </div>
+          </div>
+        </section>
+
         <!-- Audio Settings -->
         <section class="settings-section">
           <div class="section-header">
@@ -443,6 +479,60 @@
                   <span class="radio-custom"></span>
                   <span class="radio-label">Alle</span>
                 </label>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Bildkomprimierung Settings -->
+        <section class="settings-section">
+          <div class="section-header">
+            <h2>Bildkomprimierung</h2>
+            <p class="section-description">Wähle das Bildformat und die Qualität für deine Uploads</p>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-info">
+              <label class="setting-label">Bildformat</label>
+              <p class="setting-description">WebP bietet bessere Komprimierung, JPG bessere Browser-Kompatibilität</p>
+            </div>
+            <div class="setting-control">
+              <div class="radio-group">
+                <label class="radio-option">
+                  <input type="radio" bind:group={imageFormat} value="jpg" />
+                  <span class="radio-custom"></span>
+                  <span class="radio-label">JPG</span>
+                </label>
+                <label class="radio-option">
+                  <input type="radio" bind:group={imageFormat} value="webp" />
+                  <span class="radio-custom"></span>
+                  <span class="radio-label">WebP</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-info">
+              <label class="setting-label" for="quality-slider">Bildqualität</label>
+              <p class="setting-description">Höhere Qualität = größere Dateien, niedrigere Qualität = kleinere Dateien</p>
+            </div>
+            <div class="setting-control">
+              <div class="quality-control">
+                <input 
+                  type="range" 
+                  id="quality-slider" 
+                  min="35" 
+                  max="95" 
+                  step="5" 
+                  bind:value={imageQuality}
+                  class="quality-slider"
+                />
+                <div class="quality-value">{imageQuality}%</div>
+                <div class="quality-labels">
+                  <span>Klein</span>
+                  <span>Groß</span>
+                </div>
               </div>
             </div>
           </div>
@@ -744,6 +834,62 @@
     font-size: 0.85rem;
     font-weight: 500;
     color: var(--text-primary);
+  }
+
+  /* Quality Control */
+  .quality-control {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 200px;
+  }
+
+  .quality-slider {
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--border-color);
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  .quality-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--accent-color);
+    cursor: pointer;
+    box-shadow: 0 2px 4px var(--shadow);
+  }
+
+  .quality-slider::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--accent-color);
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 2px 4px var(--shadow);
+  }
+
+  .quality-value {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--accent-color);
+    min-width: 50px;
+    text-align: center;
+  }
+
+  .quality-labels {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
   }
 
   /* Actions */
