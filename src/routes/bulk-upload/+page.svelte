@@ -150,6 +150,7 @@
   }
 
   function handleFileSelect(event: Event) {
+    console.log('DEBUG: handleFileSelect ausgelöst', event);
     const input = event.target as HTMLInputElement;
     if (input.files) {
       processFiles(Array.from(input.files));
@@ -406,16 +407,27 @@
       image.uploadProgress = 0;
 
       try {
+        // --- NEUE LOGIK ---
+        // 1) Original in Supabase hochladen
+        const id = crypto.randomUUID();
+        const supabasePath = await uploadOriginalToSupabase(image.file, id);
+
+        // 2) Metadaten für Backend-Route vorbereiten (kein Original mehr mitsenden!)
         const access_token = sessionResult.data.session?.access_token;
-        // Create FormData for upload API (original System)
         const formData = new FormData();
-        formData.append('files', image.file);
+        formData.append('filename', `${id}.jpg`);
+        formData.append('original_path', supabasePath);
         formData.append('title', image.title);
         formData.append('description', image.description);
         formData.append('keywords', image.keywords);
         if (image.lat !== null) formData.append('lat', image.lat.toString());
         if (image.lon !== null) formData.append('lon', image.lon.toString());
         
+        // Logge das gesamte FormData
+        for (const [key, value] of formData.entries()) {
+          console.log('DEBUG: FormData:', key, value);
+        }
+
         const response = await fetch('/api/upload', {
           method: 'POST',
           headers: {
@@ -423,6 +435,7 @@
           },
           body: formData
         });
+        console.log('DEBUG: Response von /api/upload:', response);
         if (response.ok) {
           successCount++;
           image.uploadProgress = 100;
@@ -825,24 +838,22 @@
       const supabasePath = await uploadOriginalToSupabase(image.file, id);
 
       // 2) Metadaten an Vercel senden
-      const payload: any = {
-        supabasePath,
-        title: image.title,
-        description: image.description,
-        keywords: image.keywords,
-        lat: image.lat,
-        lon: image.lon
-      };
       const access_token = sessionResult.data.session?.access_token;
               // Create FormData for upload API
         const formData = new FormData();
-        formData.append('files', image.file);
+        formData.append('filename', `${id}.jpg`);
+        formData.append('original_path', supabasePath);
         formData.append('title', image.title);
         formData.append('description', image.description);
         formData.append('keywords', image.keywords);
         if (image.lat !== null) formData.append('lat', image.lat.toString());
         if (image.lon !== null) formData.append('lon', image.lon.toString());
         
+        // Logge das gesamte FormData
+        for (const [key, value] of formData.entries()) {
+          console.log('DEBUG: FormData:', key, value);
+        }
+
         const response = await fetch('/api/upload', {
           method: 'POST',
           headers: {
@@ -851,6 +862,7 @@
           body: formData
         });
       const result = await response.json();
+      console.log('DEBUG: JSON-Resultat:', result);
       if (result.status === 'success') {
         image.uploadProgress = 100;
         message = `✅ "${image.name}" erfolgreich hochgeladen!` +
@@ -901,24 +913,22 @@
         const supabasePath = await uploadOriginalToSupabase(image.file, id);
 
         // 2) Metadaten an Vercel senden
-        const payload: any = {
-          supabasePath,
-          title: image.title,
-          description: image.description,
-          keywords: image.keywords,
-          lat: image.lat,
-          lon: image.lon
-        };
         const access_token = sessionResult.data.session?.access_token;
         // Create FormData for upload API
         const formData = new FormData();
-        formData.append('files', image.file);
+        formData.append('filename', `${id}.jpg`);
+        formData.append('original_path', supabasePath);
         formData.append('title', image.title);
         formData.append('description', image.description);
         formData.append('keywords', image.keywords);
         if (image.lat !== null) formData.append('lat', image.lat.toString());
         if (image.lon !== null) formData.append('lon', image.lon.toString());
         
+        // Logge das gesamte FormData
+        for (const [key, value] of formData.entries()) {
+          console.log('DEBUG: FormData:', key, value);
+        }
+
         const response = await fetch('/api/upload', {
           method: 'POST',
           headers: {
@@ -927,6 +937,7 @@
           body: formData
         });
         const result = await response.json();
+        console.log('DEBUG: JSON-Resultat:', result);
         if (result.status === 'success') {
           successCount++;
           image.uploadProgress = 100;

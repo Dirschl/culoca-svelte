@@ -40,7 +40,7 @@ export function getImageQualitySettings() {
   return settings;
 }
 
-export async function resizeJPG(buffer: Buffer, userSettings?: { imageFormat?: 'webp' | 'jpg', imageQuality?: number }) {
+export async function resizeJPG(buffer: Buffer) {
   const metadata = await sharp(buffer).metadata();
   const { width: originalWidth, height: originalHeight } = metadata;
   
@@ -63,57 +63,30 @@ export async function resizeJPG(buffer: Buffer, userSettings?: { imageFormat?: '
 
   console.log(`Resizing from ${originalWidth}x${originalHeight} to ${targetWidth2048}x${targetHeight2048}`);
 
-  // Get quality settings from environment variables
-  const qualitySettings = getImageQualitySettings();
-  
-  // Use user settings as fallback if environment variables are not set
-  const userFormat = userSettings?.imageFormat || 'jpg';
-  const userQuality = userSettings?.imageQuality || 85;
-
-  console.log('🔍 DEBUG: Image quality settings:', {
-    '2048px': { format: qualitySettings.format2048, quality: qualitySettings.quality2048 },
-    '512px': { format: qualitySettings.format512, quality: qualitySettings.quality512 },
-    '64px': { format: qualitySettings.format64, quality: qualitySettings.quality64 },
-    'user fallback': { format: userFormat, quality: userQuality }
-  });
-
   // Helper function to generate image in the correct format
-  const generateImage = async (width: number, height: number, format: 'webp' | 'jpg', quality: number) => {
-    const sharpInstance = sharp(buffer)
+  const generateImage = async (width: number, height: number) => {
+    return sharp(buffer)
       .resize(width, height, { 
         fit: 'inside', 
         withoutEnlargement: true 
-      });
-
-    if (format === 'webp') {
-      return sharpInstance
-        .webp({ 
-          quality: quality,
-          effort: 6,
-          nearLossless: false,
-          smartSubsample: true
-        })
-        .toBuffer();
-    } else {
-      return sharpInstance
-        .jpeg({ 
-          mozjpeg: true, 
-          quality: quality,
-          progressive: true,
-          chromaSubsampling: '4:2:0',
-          trellisQuantisation: true,
-          overshootDeringing: true,
-          optimizeScans: true
-        })
-        .toBuffer();
-    }
+      })
+      .jpeg({ 
+        mozjpeg: true, 
+        quality: 80,
+        progressive: true,
+        chromaSubsampling: '4:2:0',
+        trellisQuantisation: true,
+        overshootDeringing: true,
+        optimizeScans: true
+      })
+      .toBuffer();
   };
 
-  // Generate all versions with individual settings
+  // Generate all versions with fixed settings
   const [version2048, version512, version64] = await Promise.all([
-    generateImage(targetWidth2048, targetHeight2048, qualitySettings.format2048, qualitySettings.quality2048),
-    generateImage(512, 512, qualitySettings.format512, qualitySettings.quality512),
-    generateImage(64, 64, qualitySettings.format64, qualitySettings.quality64)
+    generateImage(targetWidth2048, targetHeight2048),
+    generateImage(512, 512),
+    generateImage(64, 64)
   ]);
 
   // Return with dynamic keys based on actual formats used
