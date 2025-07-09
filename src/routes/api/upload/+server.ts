@@ -106,13 +106,11 @@ export const POST = async ({ request }) => {
         const filename = `${id}.jpg`;
         const baseName = file.name; // Vollständiger Dateiname mit Endung
 
-        // Load user's save_originals setting from database
-        let saveOriginals = true;
-        let originalSupabasePath = null;
-        let originalUrl = null;
-        let exif: any = null;
+        // Load user's image compression settings from FormData (sent by frontend)
+        let userImageFormat: 'webp' | 'jpg' = 'jpg';
+        let userImageQuality: number = 85;
         
-        // Get settings from FormData (sent by frontend) - legacy support
+        // Get settings from FormData (sent by frontend)
         const formImageFormat = form.get('user_image_format') as string;
         const formImageQuality = form.get('user_image_quality') as string;
         
@@ -129,14 +127,25 @@ export const POST = async ({ request }) => {
           allFormData: formEntries
         });
         
-        console.log(`🔍 DEBUG: Legacy FormData settings (ignored): format=${formImageFormat}, quality=${formImageQuality}`);
+        if (formImageFormat) {
+          userImageFormat = (formImageFormat === 'webp' || formImageFormat === 'jpg') ? formImageFormat : 'jpg';
+        }
+        
+        if (formImageQuality) {
+          const quality = parseInt(formImageQuality);
+          if (!isNaN(quality) && quality >= 1 && quality <= 100) {
+            userImageQuality = quality;
+          }
+        }
+        
+        console.log(`🔍 DEBUG: User settings from FormData: format=${userImageFormat}, quality=${userImageQuality}%`);
         
         // ALWAYS load from database to ensure we get the correct settings
         try {
           console.log('🔍 DEBUG: Loading profile from database...');
           const { data: profileData, error: profileError } = await supabase
             .from('profiles')
-            .select('save_originals')
+            .select('image_format, image_quality')
             .eq('id', authenticatedUser.id)
             .maybeSingle();
           
@@ -146,11 +155,10 @@ export const POST = async ({ request }) => {
           
           if (profileData) {
             console.log('🔍 DEBUG: Profile data from database:', profileData);
-            // Use save_originals setting from database
-            if (typeof profileData.save_originals === 'boolean') {
-              saveOriginals = profileData.save_originals;
-            }
-            console.log(`🔍 DEBUG: Final save_originals setting from database: ${saveOriginals}`);
+            // ALWAYS use database settings, ignore FormData for now
+            userImageFormat = profileData.image_format || 'jpg';
+            userImageQuality = profileData.image_quality || 85;
+            console.log(`🔍 DEBUG: Final user settings from database: format=${userImageFormat}, quality=${userImageQuality}%`);
           } else {
             console.log('🔍 DEBUG: No profile data found, using defaults');
           }
@@ -158,71 +166,13 @@ export const POST = async ({ request }) => {
           console.log('🔍 DEBUG: Could not load user profile settings, using defaults:', profileError);
         }
 
-        // 1. Prüfe, ob das Original gespeichert werden soll (Profil-Einstellung)
-        try {
-          const { data: profileData } = await supabase
-            .from('profiles')
-            .select('save_originals')
-            .eq('id', authenticatedUser.id)
-            .maybeSingle();
-          if (profileData && typeof profileData.save_originals === 'boolean') {
-            saveOriginals = profileData.save_originals;
-          }
-        } catch (e) {
-          // Default bleibt true
-        }
-
-        // 2. Original-Upload-Flow (umgeht Vercel-Limit)
-        
-        // 2a. Original zuerst in Supabase originals speichern (umgeht Vercel-Limit)
-        if (saveOriginals) {
-          try {
-            originalSupabasePath = `${id}.jpg`;
-            console.log('📤 Uploading original to Supabase originals:', originalSupabasePath);
-            
-            const { error: originalUploadError } = await supabase.storage
-              .from('originals')
-              .upload(originalSupabasePath, buf, { 
-                contentType: 'image/jpeg',
-                upsert: false
-              });
-            
-            if (originalUploadError) {
-              console.error('❌ Original upload to Supabase failed:', originalUploadError);
-            } else {
-              console.log('✅ Original uploaded to Supabase originals');
-            }
-          } catch (e) {
-            console.error('❌ Original upload process failed:', e);
-          }
-        } else {
-          console.log('ℹ️ saveOriginals disabled, skipping original upload');
-        }
-
-        // 2b. EXIF aus Original extrahieren (vor dem Resize)
-        try {
-          exif = await exifr.parse(buf, { iptc: true });
-          console.log('✅ EXIF data extracted from original');
-        } catch (exifErr) {
-          console.warn('EXIF parsing failed:', exifErr);
-        }
-
-        // 2c. Resize nur für Vercel-kompatible Versionen (klein genug für 4,5MB Limit)
+        // Resize image to multiple sizes with environment-based settings
         console.log('🔍 DEBUG: About to call resizeJPG with environment-based settings');
         
-        // WICHTIG: Nur die verkleinerte Version für Vercel verwenden
-        // Das Original wird bereits in Supabase gespeichert (wenn saveOriginals aktiv ist)
         const sizes = await resizeJPG(buf);
         
         console.log('🔍 DEBUG: resizeJPG returned keys:', Object.keys(sizes));
         console.log('🔍 DEBUG: sizes object:', sizes);
-        
-        // WICHTIG: Entferne das Original aus sizes, da es zu groß für Vercel ist
-        // Das Original ist bereits in Supabase gespeichert (wenn saveOriginals aktiv ist)
-        if (sizes.original) {
-          delete sizes.original;
-          console.log('✅ Original removed from sizes object (already in Supabase)');
-        }
         
         // Get quality settings to determine correct filenames
         const qualitySettings = getImageQualitySettings();
@@ -264,7 +214,9 @@ export const POST = async ({ request }) => {
           lon = parseFloat(formLon);
         }
 
+        let exif: any = null;
         try {
+          exif = await exifr.parse(buf, { iptc: true });
           if (exif) {
             // GPS coordinates
             if (exif.latitude && exif.longitude) {
@@ -471,144 +423,88 @@ export const POST = async ({ request }) => {
           console.log('64px upload successful');
         }
 
-        // --- Build comprehensive EXIF data to store as JSON ---
+        // --- Build condensed EXIF data to store as JSON ---
         const exifData: Record<string, any> = {};
-        
-        // Basic image information
-        if (width && height) { 
-          exifData.ImageWidth = width; 
-          exifData.ImageHeight = height; 
-        }
-        
-        // Camera information
+        if (width && height) { exifData.ImageWidth = width; exifData.ImageHeight = height; }
         if (exif?.Make) exifData.Make = fixEncoding(exif.Make);
         if (exif?.Model) exifData.Model = fixEncoding(exif.Model);
         if (lens) exifData.LensModel = lens;
-        
-        // Exposure settings
+        if (exif?.Orientation) exifData.Orientation = exif.Orientation;
         if (exif?.ExposureTime) exifData.ExposureTime = exif.ExposureTime;
         if (exif?.FNumber) exifData.FNumber = exif.FNumber;
         if (exif?.ISO) exifData.ISO = exif.ISO;
         if (exif?.FocalLength) exifData.FocalLength = exif.FocalLength;
         if (exif?.ApertureValue) exifData.ApertureValue = exif.ApertureValue;
-        
-        // Additional exposure settings
-        if (exif?.ExposureMode) exifData.ExposureMode = exif.ExposureMode;
-        if (exif?.ExposureProgram) exifData.ExposureProgram = exif.ExposureProgram;
-        if (exif?.ExposureBiasValue) exifData.ExposureBiasValue = exif.ExposureBiasValue;
-        if (exif?.MeteringMode) exifData.MeteringMode = exif.MeteringMode;
-        if (exif?.Flash) exifData.Flash = exif.Flash;
-        
-        // Image settings
-        if (exif?.Orientation) exifData.Orientation = exif.Orientation;
-        if (exif?.ColorSpace) exifData.ColorSpace = exif.ColorSpace;
-        if (exif?.WhiteBalance) exifData.WhiteBalance = exif.WhiteBalance;
-        if (exif?.DigitalZoomRatio) exifData.DigitalZoomRatio = exif.DigitalZoomRatio;
-        
-        // Date and time
         if (exif?.DateTimeOriginal || exif?.CreateDate) {
           exifData.CreateDate = exif?.DateTimeOriginal || exif?.CreateDate;
         }
-        if (exif?.DateTime) exifData.DateTime = exif.DateTime;
-        if (exif?.SubSecTimeOriginal) exifData.SubSecTimeOriginal = exif.SubSecTimeOriginal;
-        
-        // Artist and copyright information
         if (exif?.Artist) exifData.Artist = fixEncoding(exif.Artist);
         if (exif?.Copyright) exifData.Copyright = fixEncoding(exif.Copyright);
-        if (exif?.Software) exifData.Software = fixEncoding(exif.Software);
-        
-        // GPS information (if not already stored in lat/lon fields)
-        if (exif?.GPSLatitude && exif?.GPSLongitude) {
-          exifData.GPSLatitude = exif.GPSLatitude;
-          exifData.GPSLongitude = exif.GPSLongitude;
-        }
-        if (exif?.GPSAltitude) exifData.GPSAltitude = exif.GPSAltitude;
-        if (exif?.GPSTimeStamp) exifData.GPSTimeStamp = exif.GPSTimeStamp;
-        
-        // Lens information
-        if (exif?.LensMake) exifData.LensMake = fixEncoding(exif.LensMake);
-        if (exif?.LensModel) exifData.LensModel = fixEncoding(exif.LensModel);
-        if (exif?.LensSerialNumber) exifData.LensSerialNumber = fixEncoding(exif.LensSerialNumber);
-        if (exif?.FocalLengthIn35mmFormat) exifData.FocalLengthIn35mmFormat = exif.FocalLengthIn35mmFormat;
-        
-        // File information
+        // Original file size in bytes
         exifData.FileSize = file.size;
-        if (exif?.ImageSize) exifData.ImageSize = exif.ImageSize;
-        if (exif?.Megapixels) exifData.Megapixels = exif.Megapixels;
-        
-        // Additional metadata
-        if (exif?.SceneType) exifData.SceneType = exif.SceneType;
-        if (exif?.CustomRendered) exifData.CustomRendered = exif.CustomRendered;
-        if (exif?.GainControl) exifData.GainControl = exif.GainControl;
-        if (exif?.Contrast) exifData.Contrast = exif.Contrast;
-        if (exif?.Saturation) exifData.Saturation = exif.Saturation;
-        if (exif?.Sharpness) exifData.Sharpness = exif.Sharpness;
-        if (exif?.SubjectDistanceRange) exifData.SubjectDistanceRange = exif.SubjectDistanceRange;
 
-        // 3. Original-Upload-Flow (umgeht Vercel-Limit)
-        
-        if (saveOriginals) {
-          try {
-            // 3a. Original zuerst in Supabase originals speichern (umgeht Vercel-Limit)
-            originalSupabasePath = `${id}.jpg`;
-            console.log('📤 Uploading original to Supabase originals:', originalSupabasePath);
-            
-            const { error: originalUploadError } = await supabase.storage
-              .from('originals')
-              .upload(originalSupabasePath, buf, { 
-                contentType: 'image/jpeg',
-                upsert: false
-              });
-            
-            if (originalUploadError) {
-              console.error('❌ Original upload to Supabase failed:', originalUploadError);
-            } else {
-              console.log('✅ Original uploaded to Supabase originals');
-              
-              // 3b. Versuche, das Original zu Hetzner zu verschieben
-              if (process.env.HETZNER_WEBDAV_URL && process.env.HETZNER_WEBDAV_USER && process.env.HETZNER_WEBDAV_PASSWORD) {
-                try {
-                  const webdav = createClient(
-                    process.env.HETZNER_WEBDAV_URL!,
-                    {
-                      username: process.env.HETZNER_WEBDAV_USER!,
-                      password: process.env.HETZNER_WEBDAV_PASSWORD!
-                    }
-                  );
-                  
-                  // Test connection
-                  await webdav.getDirectoryContents('/');
-                  
-                  // Create items dir if needed
-                  try { await webdav.createDirectory('items'); } catch {}
-                  
-                  const hetznerPath = `items/${id}.jpg`;
-                  await webdav.putFileContents(hetznerPath, buf, { overwrite: true });
-                  originalUrl = `${process.env.HETZNER_WEBDAV_PUBLIC_URL || process.env.HETZNER_WEBDAV_URL}/items/${id}.jpg`;
-                  
-                  console.log('✅ Original zu Hetzner verschoben:', hetznerPath);
-                  
-                  // 3c. Wenn Hetzner erfolgreich, lösche Original aus Supabase
-                  try {
-                    await supabase.storage.from('originals').remove([originalSupabasePath]);
-                    console.log('🗑️ Original aus Supabase gelöscht:', originalSupabasePath);
-                  } catch (e) {
-                    console.error('⚠️ Konnte Original nicht aus Supabase löschen:', e);
-                  }
-                  
-                } catch (err) {
-                  console.error('❌ Hetzner-Upload fehlgeschlagen, Original bleibt in Supabase:', err);
-                  // Original bleibt in Supabase, URL bleibt leer
-                }
-              } else {
-                console.log('ℹ️ Hetzner environment variables not set, original stays in Supabase');
-              }
-            }
-          } catch (e) {
-            console.error('❌ Original upload process failed:', e);
+        // --- Hetzner WebDAV Upload (OPTIONAL - after database insert) ---
+        let originalUrl = null;
+        try {
+          // Debug: Log environment variables (without sensitive data)
+          console.log('🔍 DEBUG: Hetzner environment variables:');
+          console.log('  HETZNER_WEBDAV_URL:', process.env.HETZNER_WEBDAV_URL ? 'SET' : 'NOT SET');
+          console.log('  HETZNER_WEBDAV_USER:', process.env.HETZNER_WEBDAV_USER ? 'SET' : 'NOT SET');
+          console.log('  HETZNER_WEBDAV_PASSWORD:', process.env.HETZNER_WEBDAV_PASSWORD ? 'SET' : 'NOT SET');
+          console.log('  HETZNER_WEBDAV_PUBLIC_URL:', process.env.HETZNER_WEBDAV_PUBLIC_URL ? 'SET' : 'NOT SET');
+          
+          if (!process.env.HETZNER_WEBDAV_URL || !process.env.HETZNER_WEBDAV_USER || !process.env.HETZNER_WEBDAV_PASSWORD) {
+            console.error('❌ Missing Hetzner environment variables');
+            throw new Error('Missing Hetzner environment variables');
           }
-        } else {
-          console.log('ℹ️ saveOriginals disabled, skipping original upload');
+          
+          console.log('🔍 DEBUG: Creating WebDAV client...');
+          const webdav = createClient(
+            process.env.HETZNER_WEBDAV_URL!,
+            {
+              username: process.env.HETZNER_WEBDAV_USER!,
+              password: process.env.HETZNER_WEBDAV_PASSWORD!
+            }
+          );
+          
+          console.log('🔍 DEBUG: WebDAV client created, testing connection...');
+          
+          // Test connection first
+          try {
+            const contents = await webdav.getDirectoryContents('/');
+            const itemCount = Array.isArray(contents) ? contents.length : 0;
+            console.log('✅ WebDAV connection successful, root contents:', itemCount, 'items');
+          } catch (testErr) {
+            console.error('❌ WebDAV connection test failed:', testErr);
+            throw testErr;
+          }
+          
+          // Create items directory if it doesn't exist
+          try {
+            console.log('🔍 DEBUG: Creating items directory...');
+            await webdav.createDirectory('items');
+            console.log('✅ Created items directory');
+          } catch (dirErr) {
+            // Directory might already exist, that's okay
+            console.log('ℹ️ Items directory already exists or creation failed:', dirErr);
+          }
+          
+          const hetznerPath = `items/${id}.jpg`;
+          console.log('🔍 DEBUG: Uploading to Hetzner path:', hetznerPath);
+          console.log('🔍 DEBUG: File buffer size:', buf.length, 'bytes');
+          
+          await webdav.putFileContents(hetznerPath, buf, { overwrite: true });
+          originalUrl = `${process.env.HETZNER_WEBDAV_PUBLIC_URL || process.env.HETZNER_WEBDAV_URL}/items/${id}.jpg`;
+          console.log('✅ Hetzner WebDAV upload successful:', hetznerPath);
+          console.log('✅ Original URL set to:', originalUrl);
+        } catch (hetznerErr) {
+          console.error('❌ Hetzner WebDAV upload failed:', hetznerErr);
+          console.error('❌ Hetzner error details:', {
+            name: hetznerErr instanceof Error ? hetznerErr.name : 'Unknown',
+            message: hetznerErr instanceof Error ? hetznerErr.message : String(hetznerErr),
+            stack: hetznerErr instanceof Error ? hetznerErr.stack : 'No stack'
+          });
+          originalUrl = null;
         }
 
         // Insert into database with all paths and EXIF data

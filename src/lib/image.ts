@@ -27,16 +27,16 @@ function parseQuality(key: string, fallback: number): number {
 // Public API
 
 export function getImageQualitySettings() {
-  // Feste Werte für alle Varianten (Test-Modus)
+  // Environment-based settings
   const settings = {
-    format2048: 'jpg',
-    quality2048: 50,
-    format512: 'jpg',
-    quality512: 50,
-    format64: 'jpg',
-    quality64: 50
+    format2048: parseFormat('IMAGE_FORMAT_2048', 'jpg'),
+    quality2048: parseQuality('IMAGE_QUALITY_2048', 85),
+    format512: parseFormat('IMAGE_FORMAT_512', 'jpg'),
+    quality512: parseQuality('IMAGE_QUALITY_512', 85),
+    format64: parseFormat('IMAGE_FORMAT_64', 'jpg'),
+    quality64: parseQuality('IMAGE_QUALITY_64', 85)
   } as const;
-  console.log('✅ Feste Test-Qualitätseinstellungen:', settings);
+  console.log('✅ Environment-based Qualitätseinstellungen:', settings);
   return settings;
 }
 
