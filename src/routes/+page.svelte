@@ -1317,7 +1317,7 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
           try {
             const { data: profileData, error: profileError } = await supabase
               .from('profiles')
-              .select('image_format, image_quality')
+              .select('save_originals')
               .eq('id', currentUser.id)
               .single();
             
@@ -1325,20 +1325,16 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
             
             if (profileData) {
               console.log('🔍 Frontend: User settings loaded:', profileData);
-              const format = profileData.image_format || 'jpg';
-              const quality = (profileData.image_quality || 85).toString();
-              console.log('🔍 Frontend: Appending to FormData:', { format, quality });
-              formData.append('user_image_format', format);
-              formData.append('user_image_quality', quality);
+              const saveOriginals = profileData.save_originals ?? true;
+              console.log('🔍 Frontend: Appending to FormData:', { saveOriginals });
+              formData.append('save_originals', saveOriginals ? 'true' : 'false');
             } else {
               console.log('🔍 Frontend: No profile data found, using defaults');
-              formData.append('user_image_format', 'jpg');
-              formData.append('user_image_quality', '85');
+              formData.append('save_originals', 'true');
             }
           } catch (profileError) {
             console.log('🔍 Frontend: Could not load user profile settings:', profileError);
-            formData.append('user_image_format', 'jpg');
-            formData.append('user_image_quality', '85');
+            formData.append('save_originals', 'true');
           }
         }
         

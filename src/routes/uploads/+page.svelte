@@ -18,16 +18,14 @@
       // Load user settings
       const { data: profile } = await supabase
         .from('profiles')
-        .select('image_format, image_quality')
+        .select('save_originals')
         .eq('id', user.id)
         .single();
       
       if (profile) {
-        fd.append('user_image_format', profile.image_format || 'jpg');
-        fd.append('user_image_quality', (profile.image_quality || 85).toString());
+        fd.append('save_originals', profile.save_originals ? 'true' : 'false');
       } else {
-        fd.append('user_image_format', 'jpg');
-        fd.append('user_image_quality', '85');
+        fd.append('save_originals', 'true');
       }
     }
     

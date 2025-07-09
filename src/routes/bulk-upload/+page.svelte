@@ -767,8 +767,7 @@
     return [48.1351, 11.5820, 8];
   }
 
-  let userImageFormat: 'webp' | 'jpg' = 'jpg';
-  let userImageQuality: number = 85;
+  let saveOriginals = true;
 
   onMount(async () => {
     // Check if device is mobile
@@ -786,13 +785,12 @@
     if (user) {
       const { data: profile, error } = await supabase
         .from('profiles')
-        .select('image_format, image_quality')
+        .select('save_originals')
         .eq('id', user.id)
         .single();
-      if (profile) {
-        userImageFormat = profile.image_format || 'jpg';
-        userImageQuality = profile.image_quality || 85;
-      }
+              if (profile) {
+          saveOriginals = profile.save_originals ?? true;
+        }
     }
     
     // Try to get user location on page load
