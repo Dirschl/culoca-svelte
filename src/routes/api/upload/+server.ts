@@ -106,77 +106,47 @@ export const POST = async ({ request }) => {
         const filename = `${id}.jpg`;
         const baseName = file.name; // Vollständiger Dateiname mit Endung
 
-        // Load user's image compression settings from FormData (sent by frontend)
-        let userImageFormat: 'webp' | 'jpg' = 'jpg';
-        let userImageQuality: number = 85;
+        // STEP 1: Upload original to Supabase storage first (bypasses Vercel limit)
+        console.log('📤 STEP 1: Uploading original to Supabase storage...');
+        let originalSupabasePath = null;
         
-        // Get settings from FormData (sent by frontend)
-        const formImageFormat = form.get('user_image_format') as string;
-        const formImageQuality = form.get('user_image_quality') as string;
-        
-        // Debug: Log all FormData entries BEFORE consuming them
-        console.log('🔍 DEBUG: All FormData entries:');
-        const formEntries = Array.from(form.entries());
-        for (const [key, value] of formEntries) {
-          console.log(`  ${key}: ${value}`);
-        }
-        
-        console.log('🔍 DEBUG: FormData received:', {
-          formImageFormat,
-          formImageQuality,
-          allFormData: formEntries
-        });
-        
-        if (formImageFormat) {
-          userImageFormat = (formImageFormat === 'webp' || formImageFormat === 'jpg') ? formImageFormat : 'jpg';
-        }
-        
-        if (formImageQuality) {
-          const quality = parseInt(formImageQuality);
-          if (!isNaN(quality) && quality >= 1 && quality <= 100) {
-            userImageQuality = quality;
-          }
-        }
-        
-        console.log(`🔍 DEBUG: User settings from FormData: format=${userImageFormat}, quality=${userImageQuality}%`);
-        
-        // ALWAYS load from database to ensure we get the correct settings
         try {
-          console.log('🔍 DEBUG: Loading profile from database...');
-          const { data: profileData, error: profileError } = await supabase
-            .from('profiles')
-            .select('image_format, image_quality')
-            .eq('id', authenticatedUser.id)
-            .maybeSingle();
+          originalSupabasePath = `${id}.jpg`;
+          console.log('📤 Uploading original to Supabase originals:', originalSupabasePath);
           
-          if (profileError) {
-            console.log('🔍 DEBUG: Profile query error:', profileError);
-          }
+          const { error: originalUploadError } = await supabase.storage
+            .from('originals')
+            .upload(originalSupabasePath, buf, { 
+              contentType: 'image/jpeg',
+              upsert: false
+            });
           
-          if (profileData) {
-            console.log('🔍 DEBUG: Profile data from database:', profileData);
-            // ALWAYS use database settings, ignore FormData for now
-            userImageFormat = profileData.image_format || 'jpg';
-            userImageQuality = profileData.image_quality || 85;
-            console.log(`🔍 DEBUG: Final user settings from database: format=${userImageFormat}, quality=${userImageQuality}%`);
+          if (originalUploadError) {
+            console.error('❌ Original upload to Supabase failed:', originalUploadError);
+            throw originalUploadError;
           } else {
-            console.log('🔍 DEBUG: No profile data found, using defaults');
+            console.log('✅ Original uploaded to Supabase originals');
           }
-        } catch (profileError) {
-          console.log('🔍 DEBUG: Could not load user profile settings, using defaults:', profileError);
+        } catch (e) {
+          console.error('❌ Original upload process failed:', e);
+          throw e;
         }
 
-        // Resize image to multiple sizes with environment-based settings
-        console.log('🔍 DEBUG: About to call resizeJPG with environment-based settings');
-        
+        // STEP 2: Extract EXIF data from original
+        console.log('📤 STEP 2: Extracting EXIF data from original...');
+        let exif: any = null;
+        try {
+          exif = await exifr.parse(buf, { iptc: true });
+          console.log('✅ EXIF data extracted from original');
+        } catch (exifErr) {
+          console.warn('EXIF parsing failed:', exifErr);
+        }
+
+        // STEP 3: Resize image using the original buffer
+        console.log('📤 STEP 3: Resizing image...');
         const sizes = await resizeJPG(buf);
-        
-        console.log('🔍 DEBUG: resizeJPG returned keys:', Object.keys(sizes));
-        console.log('🔍 DEBUG: sizes object:', sizes);
-        
-        // Get quality settings to determine correct filenames
-        const qualitySettings = getImageQualitySettings();
-        
+        console.log('✅ Image resized successfully');
+
         // Get ACTUAL dimensions of the original image
         let width = 2048;
         let height = 2048;
@@ -214,9 +184,7 @@ export const POST = async ({ request }) => {
           lon = parseFloat(formLon);
         }
 
-        let exif: any = null;
         try {
-          exif = await exifr.parse(buf, { iptc: true });
           if (exif) {
             // GPS coordinates
             if (exif.latitude && exif.longitude) {
@@ -348,7 +316,10 @@ export const POST = async ({ request }) => {
           console.log('⚠️ Truncated description to 200 chars:', description);
         }
 
-        // Upload to storage bucket (all formats are jpg now)
+        // STEP 4: Upload resized versions to Supabase storage
+        console.log('📤 STEP 4: Uploading resized versions to Supabase storage...');
+        
+        // Upload 2048px version
         let upload2048Error = null;
         let uploadFilename = filename;
         
@@ -443,7 +414,8 @@ export const POST = async ({ request }) => {
         // Original file size in bytes
         exifData.FileSize = file.size;
 
-        // --- Hetzner WebDAV Upload (OPTIONAL - after database insert) ---
+        // STEP 5: Hetzner WebDAV Upload (OPTIONAL)
+        console.log('📤 STEP 5: Uploading to Hetzner (if configured)...');
         let originalUrl = null;
         try {
           // Debug: Log environment variables (without sensitive data)
@@ -497,6 +469,15 @@ export const POST = async ({ request }) => {
           originalUrl = `${process.env.HETZNER_WEBDAV_PUBLIC_URL || process.env.HETZNER_WEBDAV_URL}/items/${id}.jpg`;
           console.log('✅ Hetzner WebDAV upload successful:', hetznerPath);
           console.log('✅ Original URL set to:', originalUrl);
+          
+          // If Hetzner upload successful, delete original from Supabase
+          try {
+            await supabase.storage.from('originals').remove([originalSupabasePath]);
+            console.log('🗑️ Original deleted from Supabase after successful Hetzner upload');
+          } catch (deleteErr) {
+            console.error('⚠️ Could not delete original from Supabase:', deleteErr);
+          }
+          
         } catch (hetznerErr) {
           console.error('❌ Hetzner WebDAV upload failed:', hetznerErr);
           console.error('❌ Hetzner error details:', {
@@ -505,10 +486,11 @@ export const POST = async ({ request }) => {
             stack: hetznerErr instanceof Error ? hetznerErr.stack : 'No stack'
           });
           originalUrl = null;
+          // Original stays in Supabase if Hetzner fails
         }
 
-        // Insert into database with all paths and EXIF data
-        console.log('🔍 DEBUG: Creating database record with environment-based settings');
+        // STEP 6: Insert into database
+        console.log('📤 STEP 6: Inserting into database...');
         
         const dbRecord: any = {
           id,
