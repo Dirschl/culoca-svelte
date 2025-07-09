@@ -30,9 +30,8 @@
   let newsFlashMode: 'aus' | 'eigene' | 'alle' = 'alle';
   let enableSearch = false;
   
-  // Bildkomprimierung Einstellungen
-  let imageFormat: 'webp' | 'jpg' = 'jpg';
-  let imageQuality: number = 85;
+  // Upload Einstellungen
+  let saveOriginals = true;
 
   let galleryLayout = 'grid';
 
@@ -125,8 +124,7 @@
         autoguide = data.autoguide ?? false;
         newsFlashMode = data.newsflash_mode ?? 'alle';
         enableSearch = data.enable_search ?? false;
-        imageFormat = data.image_format ?? 'jpg';
-        imageQuality = data.image_quality ?? 85;
+        saveOriginals = data.save_originals ?? true;
       }
     } catch (error) {
       console.error('Error loading profile:', error);
@@ -160,8 +158,7 @@
         enable_search: enableSearch,
         avatar_url: profile?.avatar_url,
         newsflash_mode: newsFlashMode,
-        image_format: imageFormat,
-        image_quality: imageQuality,
+        save_originals: saveOriginals,
         updated_at: new Date().toISOString()
       };
 
@@ -180,8 +177,7 @@
         localStorage.setItem('autoguide', autoguide ? 'true' : 'false');
         localStorage.setItem('enableSearch', enableSearch ? 'true' : 'false');
         localStorage.setItem('newsFlashMode', newsFlashMode);
-        localStorage.setItem('imageFormat', imageFormat);
-        localStorage.setItem('imageQuality', imageQuality.toString());
+        localStorage.setItem('saveOriginals', saveOriginals ? 'true' : 'false');
       }
 
       profile = profileData;
@@ -484,56 +480,24 @@
           </div>
         </section>
 
-        <!-- Bildkomprimierung Settings -->
+        <!-- Upload Settings -->
         <section class="settings-section">
           <div class="section-header">
-            <h2>Bildkomprimierung</h2>
-            <p class="section-description">Wähle das Bildformat und die Qualität für deine Uploads</p>
+            <h2>Upload-Einstellungen</h2>
+            <p class="section-description">Lege fest, ob du beim Upload die Originaldateien zusätzlich sichern möchtest (Hetzner)</p>
           </div>
 
           <div class="setting-row">
             <div class="setting-info">
-              <label class="setting-label">Bildformat</label>
-              <p class="setting-description">WebP bietet bessere Komprimierung, JPG bessere Browser-Kompatibilität</p>
+              <label class="setting-label" for="save-originals-toggle">Originale sichern (Hetzner)</label>
+              <p class="setting-description">Wenn aktiviert, werden beim Upload zusätzlich die Originaldateien zu Hetzner gesichert. Standard: Ja</p>
             </div>
             <div class="setting-control">
-              <div class="radio-group">
-                <label class="radio-option">
-                  <input type="radio" bind:group={imageFormat} value="jpg" />
-                  <span class="radio-custom"></span>
-                  <span class="radio-label">JPG</span>
-                </label>
-                <label class="radio-option">
-                  <input type="radio" bind:group={imageFormat} value="webp" />
-                  <span class="radio-custom"></span>
-                  <span class="radio-label">WebP</span>
-                </label>
-              </div>
-            </div>
-          </div>
-
-          <div class="setting-row">
-            <div class="setting-info">
-              <label class="setting-label" for="quality-slider">Bildqualität</label>
-              <p class="setting-description">Höhere Qualität = größere Dateien, niedrigere Qualität = kleinere Dateien</p>
-            </div>
-            <div class="setting-control">
-              <div class="quality-control">
-                <input 
-                  type="range" 
-                  id="quality-slider" 
-                  min="35" 
-                  max="95" 
-                  step="5" 
-                  bind:value={imageQuality}
-                  class="quality-slider"
-                />
-                <div class="quality-value">{imageQuality}%</div>
-                <div class="quality-labels">
-                  <span>Klein</span>
-                  <span>Groß</span>
-                </div>
-              </div>
+              <label class="toggle-switch" for="save-originals-toggle">
+                <input type="checkbox" id="save-originals-toggle" bind:checked={saveOriginals} />
+                <span class="toggle-slider"></span>
+              </label>
+              <span class="setting-status">{saveOriginals ? 'Aktiviert' : 'Deaktiviert'}</span>
             </div>
           </div>
         </section>

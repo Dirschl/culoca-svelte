@@ -106,11 +106,10 @@ export const POST = async ({ request }) => {
         const filename = `${id}.jpg`;
         const baseName = file.name; // Vollständiger Dateiname mit Endung
 
-        // Load user's image compression settings from FormData (sent by frontend)
-        let userImageFormat: 'webp' | 'jpg' = 'jpg';
-        let userImageQuality: number = 85;
+        // Load user's save_originals setting from database
+        let saveOriginals = true;
         
-        // Get settings from FormData (sent by frontend)
+        // Get settings from FormData (sent by frontend) - legacy support
         const formImageFormat = form.get('user_image_format') as string;
         const formImageQuality = form.get('user_image_quality') as string;
         
@@ -127,25 +126,14 @@ export const POST = async ({ request }) => {
           allFormData: formEntries
         });
         
-        if (formImageFormat) {
-          userImageFormat = (formImageFormat === 'webp' || formImageFormat === 'jpg') ? formImageFormat : 'jpg';
-        }
-        
-        if (formImageQuality) {
-          const quality = parseInt(formImageQuality);
-          if (!isNaN(quality) && quality >= 1 && quality <= 100) {
-            userImageQuality = quality;
-          }
-        }
-        
-        console.log(`🔍 DEBUG: User settings from FormData: format=${userImageFormat}, quality=${userImageQuality}%`);
+        console.log(`🔍 DEBUG: Legacy FormData settings (ignored): format=${formImageFormat}, quality=${formImageQuality}`);
         
         // ALWAYS load from database to ensure we get the correct settings
         try {
           console.log('🔍 DEBUG: Loading profile from database...');
           const { data: profileData, error: profileError } = await supabase
             .from('profiles')
-            .select('image_format, image_quality')
+            .select('save_originals')
             .eq('id', authenticatedUser.id)
             .maybeSingle();
           
@@ -155,15 +143,51 @@ export const POST = async ({ request }) => {
           
           if (profileData) {
             console.log('🔍 DEBUG: Profile data from database:', profileData);
-            // ALWAYS use database settings, ignore FormData for now
-            userImageFormat = profileData.image_format || 'jpg';
-            userImageQuality = profileData.image_quality || 85;
-            console.log(`🔍 DEBUG: Final user settings from database: format=${userImageFormat}, quality=${userImageQuality}%`);
+            // Use save_originals setting from database
+            if (typeof profileData.save_originals === 'boolean') {
+              saveOriginals = profileData.save_originals;
+            }
+            console.log(`🔍 DEBUG: Final save_originals setting from database: ${saveOriginals}`);
           } else {
             console.log('🔍 DEBUG: No profile data found, using defaults');
           }
         } catch (profileError) {
           console.log('🔍 DEBUG: Could not load user profile settings, using defaults:', profileError);
+        }
+
+        // 1. Prüfe, ob das Original gespeichert werden soll (Profil-Einstellung)
+        try {
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('save_originals')
+            .eq('id', authenticatedUser.id)
+            .maybeSingle();
+          if (profileData && typeof profileData.save_originals === 'boolean') {
+            saveOriginals = profileData.save_originals;
+          }
+        } catch (e) {
+          // Default bleibt true
+        }
+
+        // 2. Original ggf. in Supabase 'originals' speichern
+        let originalSupabasePath = null;
+        if (saveOriginals) {
+          try {
+            const { error: origError } = await supabase.storage
+              .from('originals')
+              .upload(`${id}.jpg`, buf, {
+                contentType: file.type || 'image/jpeg',
+                upsert: false
+              });
+            if (!origError) {
+              originalSupabasePath = `${id}.jpg`;
+              console.log('✅ Original erfolgreich in Supabase gespeichert:', originalSupabasePath);
+            } else {
+              console.error('❌ Fehler beim Upload des Originals zu Supabase:', origError);
+            }
+          } catch (e) {
+            console.error('❌ Fehler beim Upload des Originals zu Supabase:', e);
+          }
         }
 
         // Resize image to multiple sizes with environment-based settings
@@ -497,70 +521,46 @@ export const POST = async ({ request }) => {
         if (exif?.Sharpness) exifData.Sharpness = exif.Sharpness;
         if (exif?.SubjectDistanceRange) exifData.SubjectDistanceRange = exif.SubjectDistanceRange;
 
-        // --- Hetzner WebDAV Upload (OPTIONAL - after database insert) ---
+        // 3. Versuche, das Original zu Hetzner zu verschieben
         let originalUrl = null;
-        
-        // Only attempt Hetzner upload if environment variables are available
-        if (process.env.HETZNER_WEBDAV_URL && process.env.HETZNER_WEBDAV_USER && process.env.HETZNER_WEBDAV_PASSWORD) {
-          try {
-            // Debug: Log environment variables (without sensitive data)
-            console.log('🔍 DEBUG: Hetzner environment variables:');
-            console.log('  HETZNER_WEBDAV_URL:', process.env.HETZNER_WEBDAV_URL ? 'SET' : 'NOT SET');
-            console.log('  HETZNER_WEBDAV_USER:', process.env.HETZNER_WEBDAV_USER ? 'SET' : 'NOT SET');
-            console.log('  HETZNER_WEBDAV_PASSWORD:', process.env.HETZNER_WEBDAV_PASSWORD ? 'SET' : 'NOT SET');
-            console.log('  HETZNER_WEBDAV_PUBLIC_URL:', process.env.HETZNER_WEBDAV_PUBLIC_URL ? 'SET' : 'NOT SET');
-            
-            console.log('🔍 DEBUG: Creating WebDAV client...');
-            const webdav = createClient(
-              process.env.HETZNER_WEBDAV_URL!,
-              {
-                username: process.env.HETZNER_WEBDAV_USER!,
-                password: process.env.HETZNER_WEBDAV_PASSWORD!
-              }
-            );
-            
-            console.log('🔍 DEBUG: WebDAV client created, testing connection...');
-            
-            // Test connection first
+        if (saveOriginals && originalSupabasePath) {
+          let originalBuffer = buf;
+          let hetznerSuccess = false;
+          if (process.env.HETZNER_WEBDAV_URL && process.env.HETZNER_WEBDAV_USER && process.env.HETZNER_WEBDAV_PASSWORD) {
             try {
-              const contents = await webdav.getDirectoryContents('/');
-              const itemCount = Array.isArray(contents) ? contents.length : 0;
-              console.log('✅ WebDAV connection successful, root contents:', itemCount, 'items');
-            } catch (testErr) {
-              console.error('❌ WebDAV connection test failed:', testErr);
-              throw testErr;
+              const webdav = createClient(
+                process.env.HETZNER_WEBDAV_URL!,
+                {
+                  username: process.env.HETZNER_WEBDAV_USER!,
+                  password: process.env.HETZNER_WEBDAV_PASSWORD!
+                }
+              );
+              // Test connection
+              await webdav.getDirectoryContents('/');
+              // Create items dir if needed
+              try { await webdav.createDirectory('items'); } catch {}
+              const hetznerPath = `items/${id}.jpg`;
+              await webdav.putFileContents(hetznerPath, originalBuffer, { overwrite: true });
+              originalUrl = `${process.env.HETZNER_WEBDAV_PUBLIC_URL || process.env.HETZNER_WEBDAV_URL}/items/${id}.jpg`;
+              hetznerSuccess = true;
+              console.log('✅ Original zu Hetzner verschoben:', hetznerPath);
+            } catch (err) {
+              console.error('❌ Hetzner-Upload fehlgeschlagen, Original bleibt in Supabase:', err);
+              hetznerSuccess = false;
             }
-            
-            // Create items directory if it doesn't exist
-            try {
-              console.log('🔍 DEBUG: Creating items directory...');
-              await webdav.createDirectory('items');
-              console.log('✅ Created items directory');
-            } catch (dirErr) {
-              // Directory might already exist, that's okay
-              console.log('ℹ️ Items directory already exists or creation failed:', dirErr);
-            }
-            
-            const hetznerPath = `items/${id}.jpg`;
-            console.log('🔍 DEBUG: Uploading to Hetzner path:', hetznerPath);
-            console.log('🔍 DEBUG: File buffer size:', buf.length, 'bytes');
-            
-            await webdav.putFileContents(hetznerPath, buf, { overwrite: true });
-            originalUrl = `${process.env.HETZNER_WEBDAV_PUBLIC_URL || process.env.HETZNER_WEBDAV_URL}/items/${id}.jpg`;
-            console.log('✅ Hetzner WebDAV upload successful:', hetznerPath);
-            console.log('✅ Original URL set to:', originalUrl);
-          } catch (hetznerErr) {
-            console.error('❌ Hetzner WebDAV upload failed:', hetznerErr);
-            console.error('❌ Hetzner error details:', {
-              name: hetznerErr instanceof Error ? hetznerErr.name : 'Unknown',
-              message: hetznerErr instanceof Error ? hetznerErr.message : String(hetznerErr),
-              stack: hetznerErr instanceof Error ? hetznerErr.stack : 'No stack'
-            });
-            originalUrl = null;
           }
-        } else {
-          console.log('ℹ️ Hetzner environment variables not available, skipping Hetzner upload');
-          console.log('ℹ️ This is normal for local development');
+          // Wenn Hetzner erfolgreich, lösche Original aus Supabase
+          if (hetznerSuccess) {
+            try {
+              await supabase.storage.from('originals').remove([originalSupabasePath]);
+              console.log('🗑️ Original aus Supabase gelöscht:', originalSupabasePath);
+            } catch (e) {
+              console.error('⚠️ Konnte Original nicht aus Supabase löschen:', e);
+            }
+          } else {
+            // Optional: originalUrl auf Supabase-URL setzen, falls Hetzner nicht erreichbar
+            // originalUrl = `https://.../storage/v1/object/public/originals/${originalSupabasePath}`;
+          }
         }
 
         // Insert into database with all paths and EXIF data
