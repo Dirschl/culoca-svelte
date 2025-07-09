@@ -2,7 +2,7 @@ import { json, error } from '@sveltejs/kit';
 import { supabase } from '$lib/supabaseClient';
 import { resizeJPG, getImageQualitySettings } from '$lib/image';
 import sharp from 'sharp';
-import * as exifr from 'exifr';
+import exifr from 'exifr';
 import { Buffer } from 'buffer';
 import { createClient } from 'webdav';
 import dotenv from 'dotenv';
@@ -39,6 +39,7 @@ export const POST = async ({ request }) => {
     const form = await request.formData();
     const filenames = form.getAll('filename') as string[];
     const originalPaths = form.getAll('original_path') as string[];
+    const clientExifJsonRaw = form.get('exif_json') as string | null;
 
     // NEW: Allow profile_id to be passed explicitly from the client.
     const passedProfileId = form.get('profile_id') as string | null;
@@ -61,6 +62,22 @@ export const POST = async ({ request }) => {
     console.log('Auth header:', authHeader ? 'present' : 'missing');
     
     let authenticatedUser = user;
+
+    // --- Profile-Einstellungen laden (insb. save_originals) ---
+    let saveOriginalsPref = true; // Standard: Originale sichern
+    try {
+      const { data: profileRow } = await supabase
+        .from('profiles')
+        .select('save_originals')
+        .eq('id', authenticatedUser?.id)
+        .single();
+      if (profileRow && typeof profileRow.save_originals === 'boolean') {
+        saveOriginalsPref = profileRow.save_originals;
+      }
+    } catch (prefErr) {
+      console.warn('⚠️  Konnte Profileinstellung save_originals nicht laden, verwende Default true:', prefErr);
+    }
+    console.log('save_originals Pref:', saveOriginalsPref);
     
     if (!user && authHeader) {
       // Try to get user from token in Authorization header
@@ -125,11 +142,25 @@ export const POST = async ({ request }) => {
         // STEP 2: Extract EXIF data from original
         console.log('📤 STEP 2: Extracting EXIF data from original...');
         let exif: any = null;
-        try {
-          exif = await exifr.parse(buf, { iptc: true });
-          console.log('✅ EXIF data extracted from original');
-        } catch (exifErr) {
-          console.warn('EXIF parsing failed:', exifErr);
+        if (clientExifJsonRaw) {
+          try {
+            const clientExif = JSON.parse(clientExifJsonRaw);
+            console.log('✅ Using client-provided EXIF data');
+            exif = cleanExifData(clientExif);
+          } catch (parseErr) {
+            console.warn('Client EXIF JSON parsing failed:', parseErr);
+            // Fallback to server-side parsing below
+          }
+        }
+
+        // Fallback: server-side EXIF parsing
+        if (!exif) {
+          try {
+            exif = await exifr.parse(buf, { iptc: true });
+            console.log('✅ EXIF data extracted from original (server)');
+          } catch (exifErr) {
+            console.warn('EXIF parsing failed:', exifErr);
+          }
         }
 
         // STEP 3: Resize image using the original buffer
@@ -158,6 +189,34 @@ export const POST = async ({ request }) => {
         let keywords: string | null = null;
         let camera: string | null = null;
         let lens: string | null = null;
+
+        // Funktion zum Bereinigen von EXIF-Daten (entfernt Null-Bytes und andere problematische Zeichen)
+        function cleanExifData(obj: any): any {
+          if (typeof obj === 'string') {
+            // Entferne Null-Bytes und andere Steuerzeichen
+            return obj.replace(/\u0000/g, '').replace(/[\x00-\x1F\x7F]/g, '');
+          } else if (Array.isArray(obj)) {
+            return obj.map(cleanExifData);
+          } else if (obj && typeof obj === 'object') {
+            const cleaned: any = {};
+            for (const [key, value] of Object.entries(obj)) {
+              cleaned[key] = cleanExifData(value);
+            }
+            return cleaned;
+          }
+          return obj;
+        }
+
+        // Bereite EXIF-Daten für die Datenbank vor
+        const { MakerNote, ...exifWithoutMakerNote } = exif || {};
+        const rawExifData = {
+          ...exifWithoutMakerNote,
+          width: sizes.width,
+          height: sizes.height,
+          FileSize: buf.length
+        };
+        // Bereinige die EXIF-Daten von Null-Bytes und Steuerzeichen
+        const exifToStore = cleanExifData(rawExifData);
 
         // Check for manual input from FormData (bulk upload)
         const formTitle = form.get('title') as string;
@@ -384,99 +443,92 @@ export const POST = async ({ request }) => {
           console.log('64px upload successful');
         }
 
-        // --- Build condensed EXIF data to store as JSON ---
-        const exifData: Record<string, any> = {};
-        if (width && height) { exifData.ImageWidth = width; exifData.ImageHeight = height; }
-        if (exif?.Make) exifData.Make = fixEncoding(exif.Make);
-        if (exif?.Model) exifData.Model = fixEncoding(exif.Model);
-        if (lens) exifData.LensModel = lens;
-        if (exif?.Orientation) exifData.Orientation = exif.Orientation;
-        if (exif?.ExposureTime) exifData.ExposureTime = exif.ExposureTime;
-        if (exif?.FNumber) exifData.FNumber = exif.FNumber;
-        if (exif?.ISO) exifData.ISO = exif.ISO;
-        if (exif?.FocalLength) exifData.FocalLength = exif.FocalLength;
-        if (exif?.ApertureValue) exifData.ApertureValue = exif.ApertureValue;
-        if (exif?.DateTimeOriginal || exif?.CreateDate) {
-          exifData.CreateDate = exif?.DateTimeOriginal || exif?.CreateDate;
-        }
-        if (exif?.Artist) exifData.Artist = fixEncoding(exif.Artist);
-        if (exif?.Copyright) exifData.Copyright = fixEncoding(exif.Copyright);
-        // Original file size in bytes
-        exifData.FileSize = buf.length;
-
-        // STEP 5: Hetzner WebDAV Upload (OPTIONAL)
-        console.log('📤 STEP 5: Uploading to Hetzner (if configured)...');
+        // STEP 5: Hetzner WebDAV Upload (abhängig von save_originals)
+        console.log('📤 STEP 5: Handling original file (Hetzner)...');
         let originalUrl = null;
-        try {
-          // Debug: Log environment variables (without sensitive data)
-          console.log('🔍 DEBUG: Hetzner environment variables:');
-          console.log('  HETZNER_WEBDAV_URL:', process.env.HETZNER_WEBDAV_URL ? 'SET' : 'NOT SET');
-          console.log('  HETZNER_WEBDAV_USER:', process.env.HETZNER_WEBDAV_USER ? 'SET' : 'NOT SET');
-          console.log('  HETZNER_WEBDAV_PASSWORD:', process.env.HETZNER_WEBDAV_PASSWORD ? 'SET' : 'NOT SET');
-          console.log('  HETZNER_WEBDAV_PUBLIC_URL:', process.env.HETZNER_WEBDAV_PUBLIC_URL ? 'SET' : 'NOT SET');
-          
-          if (!process.env.HETZNER_WEBDAV_URL || !process.env.HETZNER_WEBDAV_USER || !process.env.HETZNER_WEBDAV_PASSWORD) {
-            console.error('❌ Missing Hetzner environment variables');
-            throw new Error('Missing Hetzner environment variables');
-          }
-          
-          console.log('🔍 DEBUG: Creating WebDAV client...');
-          const webdav = createClient(
-            process.env.HETZNER_WEBDAV_URL!,
-            {
-              username: process.env.HETZNER_WEBDAV_USER!,
-              password: process.env.HETZNER_WEBDAV_PASSWORD!
+
+        let shouldDeleteOriginal = false; // Flag zum Löschen aus Supabase
+
+        if (saveOriginalsPref) {
+          // Originale sollen gesichert werden → versuche Upload zu Hetzner
+          try {
+            // Debug: Log environment variables (without sensitive data)
+            console.log('🔍 DEBUG: Hetzner environment variables:');
+            console.log('  HETZNER_WEBDAV_URL:', process.env.HETZNER_WEBDAV_URL ? 'SET' : 'NOT SET');
+            console.log('  HETZNER_WEBDAV_USER:', process.env.HETZNER_WEBDAV_USER ? 'SET' : 'NOT SET');
+            console.log('  HETZNER_WEBDAV_PASSWORD:', process.env.HETZNER_WEBDAV_PASSWORD ? 'SET' : 'NOT SET');
+            console.log('  HETZNER_WEBDAV_PUBLIC_URL:', process.env.HETZNER_WEBDAV_PUBLIC_URL ? 'SET' : 'NOT SET');
+            
+            if (!process.env.HETZNER_WEBDAV_URL || !process.env.HETZNER_WEBDAV_USER || !process.env.HETZNER_WEBDAV_PASSWORD) {
+              console.error('❌ Missing Hetzner environment variables');
+              throw new Error('Missing Hetzner environment variables');
             }
-          );
-          
-          console.log('🔍 DEBUG: WebDAV client created, testing connection...');
-          
-          // Test connection first
-          try {
-            const contents = await webdav.getDirectoryContents('/');
-            const itemCount = Array.isArray(contents) ? contents.length : 0;
-            console.log('✅ WebDAV connection successful, root contents:', itemCount, 'items');
-          } catch (testErr) {
-            console.error('❌ WebDAV connection test failed:', testErr);
-            throw testErr;
+            
+            console.log('🔍 DEBUG: Creating WebDAV client...');
+            const webdav = createClient(
+              process.env.HETZNER_WEBDAV_URL!,
+              {
+                username: process.env.HETZNER_WEBDAV_USER!,
+                password: process.env.HETZNER_WEBDAV_PASSWORD!
+              }
+            );
+            
+            console.log('🔍 DEBUG: WebDAV client created, testing connection...');
+            
+            // Test connection first
+            try {
+              const contents = await webdav.getDirectoryContents('/');
+              const itemCount = Array.isArray(contents) ? contents.length : 0;
+              console.log('✅ WebDAV connection successful, root contents:', itemCount, 'items');
+            } catch (testErr) {
+              console.error('❌ WebDAV connection test failed:', testErr);
+              throw testErr;
+            }
+            
+            // Create items directory if it doesn't exist
+            try {
+              console.log('🔍 DEBUG: Creating items directory...');
+              await webdav.createDirectory('items');
+              console.log('✅ Created items directory');
+            } catch (dirErr) {
+              // Directory might already exist, that's okay
+              console.log('ℹ️ Items directory already exists or creation failed:', dirErr);
+            }
+            
+            const hetznerPath = `items/${id}.jpg`;
+            console.log('🔍 DEBUG: Uploading to Hetzner path:', hetznerPath);
+            console.log('🔍 DEBUG: File buffer size:', buf.length, 'bytes');
+            
+            await webdav.putFileContents(hetznerPath, buf, { overwrite: true });
+            originalUrl = `${process.env.HETZNER_WEBDAV_PUBLIC_URL || process.env.HETZNER_WEBDAV_URL}/items/${id}.jpg`;
+            console.log('✅ Hetzner WebDAV upload successful:', hetznerPath);
+            console.log('✅ Original URL set to:', originalUrl);
+            shouldDeleteOriginal = true; // nach erfolgreichem Upload löschen
+
+          } catch (hetznerErr) {
+            console.error('❌ Hetzner WebDAV upload failed:', hetznerErr);
+            console.error('❌ Hetzner error details:', {
+              name: hetznerErr instanceof Error ? hetznerErr.name : 'Unknown',
+              message: hetznerErr instanceof Error ? hetznerErr.message : String(hetznerErr),
+              stack: hetznerErr instanceof Error ? hetznerErr.stack : 'No stack'
+            });
+            originalUrl = null;
+            // Bei Fehler kein Löschen, Original bleibt in Supabase als Fallback
           }
-          
-          // Create items directory if it doesn't exist
-          try {
-            console.log('🔍 DEBUG: Creating items directory...');
-            await webdav.createDirectory('items');
-            console.log('✅ Created items directory');
-          } catch (dirErr) {
-            // Directory might already exist, that's okay
-            console.log('ℹ️ Items directory already exists or creation failed:', dirErr);
-          }
-          
-          const hetznerPath = `items/${id}.jpg`;
-          console.log('🔍 DEBUG: Uploading to Hetzner path:', hetznerPath);
-          console.log('🔍 DEBUG: File buffer size:', buf.length, 'bytes');
-          
-          await webdav.putFileContents(hetznerPath, buf, { overwrite: true });
-          originalUrl = `${process.env.HETZNER_WEBDAV_PUBLIC_URL || process.env.HETZNER_WEBDAV_URL}/items/${id}.jpg`;
-          console.log('✅ Hetzner WebDAV upload successful:', hetznerPath);
-          console.log('✅ Original URL set to:', originalUrl);
-          
-          // If Hetzner upload successful, delete original from Supabase
+
+        } else {
+          console.log('ℹ️ save_originals == false → Überspringe Hetzner-Upload');
+          shouldDeleteOriginal = true; // trotzdem in Supabase löschen
+        }
+
+        // Original ggf. aus Supabase löschen
+        if (shouldDeleteOriginal) {
           try {
             await supabase.storage.from('originals').remove([originalSupabasePath]);
-            console.log('🗑️ Original deleted from Supabase after successful Hetzner upload');
+            console.log('🗑️ Original deleted from Supabase (save_originals false oder Hetzner ok)');
           } catch (deleteErr) {
             console.error('⚠️ Could not delete original from Supabase:', deleteErr);
           }
-          
-        } catch (hetznerErr) {
-          console.error('❌ Hetzner WebDAV upload failed:', hetznerErr);
-          console.error('❌ Hetzner error details:', {
-            name: hetznerErr instanceof Error ? hetznerErr.name : 'Unknown',
-            message: hetznerErr instanceof Error ? hetznerErr.message : String(hetznerErr),
-            stack: hetznerErr instanceof Error ? hetznerErr.stack : 'No stack'
-          });
-          originalUrl = null;
-          // Original stays in Supabase if Hetzner fails
         }
 
         // STEP 6: Insert into database
@@ -497,7 +549,7 @@ export const POST = async ({ request }) => {
           image_format: 'jpg', // Always jpg now
           original_url: originalUrl, // Include original_url in main record
           ...(keywordsArray ? { keywords: keywordsArray } : {}),
-          exif_data: Object.keys(exifData).length ? exifData : null
+          exif_data: Object.keys(exifToStore).length ? exifToStore : null
         };
 
         // Füge EXIF-Felder nur hinzu, wenn sie nicht null sind
@@ -551,7 +603,7 @@ export const POST = async ({ request }) => {
             image_format: 'jpg',
             original_url: originalUrl, // Include original_url in fallback record
             ...(keywordsArray ? { keywords: keywordsArray } : {}),
-            exif_data: Object.keys(exifData).length ? exifData : null
+            exif_data: Object.keys(exifToStore).length ? exifToStore : null
           };
           
           console.log('Attempting fallback insert with:', JSON.stringify(fallbackRecord, null, 2));

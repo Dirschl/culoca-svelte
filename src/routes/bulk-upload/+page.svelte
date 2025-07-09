@@ -422,7 +422,28 @@
         formData.append('keywords', image.keywords);
         if (image.lat !== null) formData.append('lat', image.lat.toString());
         if (image.lon !== null) formData.append('lon', image.lon.toString());
-        
+
+        // EXIF JSON anhängen (bereinigt, ohne MakerNotes)
+        if (image.exifData) {
+          const cleanExif: Record<string, any> = {};
+          for (const [k, v] of Object.entries(image.exifData)) {
+            if (k.toLowerCase().includes('makernotes')) continue;
+            if (typeof v === 'bigint') {
+              cleanExif[k] = v.toString();
+            } else if (v instanceof ArrayBuffer || v instanceof Uint8Array) {
+              // Binary Felder auslassen
+              continue;
+            } else {
+              cleanExif[k] = v;
+            }
+          }
+          try {
+            formData.append('exif_json', JSON.stringify(cleanExif));
+          } catch (jsonErr) {
+            console.warn('⚠️  Could not stringify EXIF data:', jsonErr);
+          }
+        }
+
         // Logge das gesamte FormData
         for (const [key, value] of formData.entries()) {
           console.log('DEBUG: FormData:', key, value);
@@ -924,6 +945,16 @@
         if (image.lat !== null) formData.append('lat', image.lat.toString());
         if (image.lon !== null) formData.append('lon', image.lon.toString());
         
+        // EXIF JSON anhängen (bereinigt, ohne MakerNotes)
+        if (image.exifData) {
+          const cleanExif: Record<string, any> = {};
+          for (const [k, v] of Object.entries(image.exifData)) {
+            if (k.toLowerCase().includes('makernotes')) continue;
+            cleanExif[k] = v;
+          }
+          formData.append('exif_json', JSON.stringify(cleanExif));
+        }
+
         // Logge das gesamte FormData
         for (const [key, value] of formData.entries()) {
           console.log('DEBUG: FormData:', key, value);
