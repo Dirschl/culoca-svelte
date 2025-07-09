@@ -210,10 +210,19 @@ export const POST = async ({ request }) => {
         // 2c. Resize nur für Vercel-kompatible Versionen (klein genug für 4,5MB Limit)
         console.log('🔍 DEBUG: About to call resizeJPG with environment-based settings');
         
+        // WICHTIG: Nur die verkleinerte Version für Vercel verwenden
+        // Das Original wird bereits in Supabase gespeichert (wenn saveOriginals aktiv ist)
         const sizes = await resizeJPG(buf);
         
         console.log('🔍 DEBUG: resizeJPG returned keys:', Object.keys(sizes));
         console.log('🔍 DEBUG: sizes object:', sizes);
+        
+        // WICHTIG: Entferne das Original aus sizes, da es zu groß für Vercel ist
+        // Das Original ist bereits in Supabase gespeichert (wenn saveOriginals aktiv ist)
+        if (sizes.original) {
+          delete sizes.original;
+          console.log('✅ Original removed from sizes object (already in Supabase)');
+        }
         
         // Get quality settings to determine correct filenames
         const qualitySettings = getImageQualitySettings();
