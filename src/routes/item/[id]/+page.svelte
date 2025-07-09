@@ -1141,20 +1141,38 @@
           <!-- Column 2: All EXIF/Meta -->
           <div class="meta-column">
             <h2>Aufnahmedaten</h2>
+            
+            <!-- Basic Image Information -->
             {#if image.exif_data && image.exif_data.ImageWidth}
               <div class="meta-line">Auflösung: {image.exif_data.ImageWidth}×{image.exif_data.ImageHeight} px</div>
             {/if}
             {#if image.exif_data && image.exif_data.FileSize}
               <div class="meta-line">Dateigröße: {formatFileSize(image.exif_data.FileSize)}</div>
             {/if}
+            {#if image.exif_data && image.exif_data.Megapixels}
+              <div class="meta-line">Megapixel: {image.exif_data.Megapixels}</div>
+            {/if}
+            
+            <!-- Camera Information -->
             {#if image.exif_data && image.exif_data.Make}
               <div class="meta-line">Kamera: {image.exif_data.Make} {image.exif_data.Model}</div>
             {/if}
             {#if image.exif_data && image.exif_data.LensModel}
               <div class="meta-line">Objektiv: {image.exif_data.LensModel}</div>
             {/if}
+            {#if image.exif_data && image.exif_data.LensMake}
+              <div class="meta-line">Objektiv-Hersteller: {image.exif_data.LensMake}</div>
+            {/if}
+            {#if image.exif_data && image.exif_data.LensSerialNumber}
+              <div class="meta-line">Objektiv-Seriennummer: {image.exif_data.LensSerialNumber}</div>
+            {/if}
+            
+            <!-- Exposure Settings -->
             {#if image.exif_data && image.exif_data.FocalLength}
               <div class="meta-line">Brennweite: {image.exif_data.FocalLength} mm</div>
+            {/if}
+            {#if image.exif_data && image.exif_data.FocalLengthIn35mmFormat}
+              <div class="meta-line">Brennweite (35mm): {image.exif_data.FocalLengthIn35mmFormat} mm</div>
             {/if}
             {#if image.exif_data && image.exif_data.ISO}
               <div class="meta-line">ISO: {image.exif_data.ISO}</div>
@@ -1162,23 +1180,101 @@
             {#if image.exif_data && image.exif_data.FNumber}
               <div class="meta-line">Blende: ƒ/{image.exif_data.FNumber}</div>
             {/if}
+            {#if image.exif_data && image.exif_data.ApertureValue}
+              <div class="meta-line">Blendenwert: {image.exif_data.ApertureValue}</div>
+            {/if}
             {#if image.exif_data && image.exif_data.ExposureTime}
               <div class="meta-line">Verschlusszeit: {formatExposureTime(image.exif_data.ExposureTime)}</div>
             {/if}
+            {#if image.exif_data && image.exif_data.ExposureMode}
+              <div class="meta-line">Belichtungsmodus: {image.exif_data.ExposureMode}</div>
+            {/if}
+            {#if image.exif_data && image.exif_data.ExposureProgram}
+              <div class="meta-line">Belichtungsprogramm: {image.exif_data.ExposureProgram}</div>
+            {/if}
+            {#if image.exif_data && image.exif_data.ExposureBiasValue}
+              <div class="meta-line">Belichtungskorrektur: {image.exif_data.ExposureBiasValue} EV</div>
+            {/if}
+            {#if image.exif_data && image.exif_data.MeteringMode}
+              <div class="meta-line">Messmethode: {image.exif_data.MeteringMode}</div>
+            {/if}
+            {#if image.exif_data && image.exif_data.Flash}
+              <div class="meta-line">Blitz: {image.exif_data.Flash}</div>
+            {/if}
+            
+            <!-- Image Settings -->
+            {#if image.exif_data && image.exif_data.Orientation}
+              <div class="meta-line">Ausrichtung: {image.exif_data.Orientation}</div>
+            {/if}
+            {#if image.exif_data && image.exif_data.ColorSpace}
+              <div class="meta-line">Farbraum: {image.exif_data.ColorSpace}</div>
+            {/if}
+            {#if image.exif_data && image.exif_data.WhiteBalance}
+              <div class="meta-line">Weißabgleich: {image.exif_data.WhiteBalance}</div>
+            {/if}
+            {#if image.exif_data && image.exif_data.DigitalZoomRatio}
+              <div class="meta-line">Digitalzoom: {image.exif_data.DigitalZoomRatio}x</div>
+            {/if}
+            
+            <!-- Date and Time -->
             {#if image.exif_data && image.exif_data.CreateDate}
               <div class="meta-line">Aufgenommen: {new Date(image.exif_data.CreateDate).toLocaleDateString('de-DE')}</div>
             {/if}
-            {#if image.created_at}
-              <div class="published-date">Veröffentlicht am: {new Date(image.created_at).toLocaleDateString('de-DE')}</div>
+            {#if image.exif_data && image.exif_data.DateTime}
+              <div class="meta-line">Datum/Zeit: {new Date(image.exif_data.DateTime).toLocaleString('de-DE')}</div>
             {/if}
+            {#if image.exif_data && image.exif_data.SubSecTimeOriginal}
+              <div class="meta-line">Subsekunden: {image.exif_data.SubSecTimeOriginal}</div>
+            {/if}
+            
+            <!-- GPS Information -->
             {#if image.lat && image.lon}
               <div class="meta-line">GPS: {image.lat.toFixed(5)}, {image.lon.toFixed(5)}</div>
             {/if}
+            {#if image.exif_data && image.exif_data.GPSAltitude}
+              <div class="meta-line">Höhe: {image.exif_data.GPSAltitude} m</div>
+            {/if}
+            {#if image.exif_data && image.exif_data.GPSTimeStamp}
+              <div class="meta-line">GPS-Zeit: {image.exif_data.GPSTimeStamp}</div>
+            {/if}
+            
+            <!-- Artist and Copyright -->
             {#if image.exif_data && image.exif_data.Artist}
               <div class="meta-line">Fotograf: {image.exif_data.Artist}</div>
             {/if}
             {#if image.exif_data && image.exif_data.Copyright}
               <div class="meta-line">© {image.exif_data.Copyright}</div>
+            {/if}
+            {#if image.exif_data && image.exif_data.Software}
+              <div class="meta-line">Software: {image.exif_data.Software}</div>
+            {/if}
+            
+            <!-- Additional Metadata -->
+            {#if image.exif_data && image.exif_data.SceneType}
+              <div class="meta-line">Szenentyp: {image.exif_data.SceneType}</div>
+            {/if}
+            {#if image.exif_data && image.exif_data.CustomRendered}
+              <div class="meta-line">Benutzerdefiniert: {image.exif_data.CustomRendered}</div>
+            {/if}
+            {#if image.exif_data && image.exif_data.GainControl}
+              <div class="meta-line">Verstärkung: {image.exif_data.GainControl}</div>
+            {/if}
+            {#if image.exif_data && image.exif_data.Contrast}
+              <div class="meta-line">Kontrast: {image.exif_data.Contrast}</div>
+            {/if}
+            {#if image.exif_data && image.exif_data.Saturation}
+              <div class="meta-line">Sättigung: {image.exif_data.Saturation}</div>
+            {/if}
+            {#if image.exif_data && image.exif_data.Sharpness}
+              <div class="meta-line">Schärfe: {image.exif_data.Sharpness}</div>
+            {/if}
+            {#if image.exif_data && image.exif_data.SubjectDistanceRange}
+              <div class="meta-line">Motivdistanz: {image.exif_data.SubjectDistanceRange}</div>
+            {/if}
+            
+            <!-- Publication Date -->
+            {#if image.created_at}
+              <div class="published-date">Veröffentlicht am: {new Date(image.created_at).toLocaleDateString('de-DE')}</div>
             {/if}
           </div>
           <!-- Column 3: Creator Card (if available) -->

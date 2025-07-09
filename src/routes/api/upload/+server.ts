@@ -423,25 +423,79 @@ export const POST = async ({ request }) => {
           console.log('64px upload successful');
         }
 
-        // --- Build condensed EXIF data to store as JSON ---
+        // --- Build comprehensive EXIF data to store as JSON ---
         const exifData: Record<string, any> = {};
-        if (width && height) { exifData.ImageWidth = width; exifData.ImageHeight = height; }
+        
+        // Basic image information
+        if (width && height) { 
+          exifData.ImageWidth = width; 
+          exifData.ImageHeight = height; 
+        }
+        
+        // Camera information
         if (exif?.Make) exifData.Make = fixEncoding(exif.Make);
         if (exif?.Model) exifData.Model = fixEncoding(exif.Model);
         if (lens) exifData.LensModel = lens;
-        if (exif?.Orientation) exifData.Orientation = exif.Orientation;
+        
+        // Exposure settings
         if (exif?.ExposureTime) exifData.ExposureTime = exif.ExposureTime;
         if (exif?.FNumber) exifData.FNumber = exif.FNumber;
         if (exif?.ISO) exifData.ISO = exif.ISO;
         if (exif?.FocalLength) exifData.FocalLength = exif.FocalLength;
         if (exif?.ApertureValue) exifData.ApertureValue = exif.ApertureValue;
+        
+        // Additional exposure settings
+        if (exif?.ExposureMode) exifData.ExposureMode = exif.ExposureMode;
+        if (exif?.ExposureProgram) exifData.ExposureProgram = exif.ExposureProgram;
+        if (exif?.ExposureBiasValue) exifData.ExposureBiasValue = exif.ExposureBiasValue;
+        if (exif?.MeteringMode) exifData.MeteringMode = exif.MeteringMode;
+        if (exif?.Flash) exifData.Flash = exif.Flash;
+        
+        // Image settings
+        if (exif?.Orientation) exifData.Orientation = exif.Orientation;
+        if (exif?.ColorSpace) exifData.ColorSpace = exif.ColorSpace;
+        if (exif?.WhiteBalance) exifData.WhiteBalance = exif.WhiteBalance;
+        if (exif?.DigitalZoomRatio) exifData.DigitalZoomRatio = exif.DigitalZoomRatio;
+        
+        // Date and time
         if (exif?.DateTimeOriginal || exif?.CreateDate) {
           exifData.CreateDate = exif?.DateTimeOriginal || exif?.CreateDate;
         }
+        if (exif?.DateTime) exifData.DateTime = exif.DateTime;
+        if (exif?.SubSecTimeOriginal) exifData.SubSecTimeOriginal = exif.SubSecTimeOriginal;
+        
+        // Artist and copyright information
         if (exif?.Artist) exifData.Artist = fixEncoding(exif.Artist);
         if (exif?.Copyright) exifData.Copyright = fixEncoding(exif.Copyright);
-        // Original file size in bytes
+        if (exif?.Software) exifData.Software = fixEncoding(exif.Software);
+        
+        // GPS information (if not already stored in lat/lon fields)
+        if (exif?.GPSLatitude && exif?.GPSLongitude) {
+          exifData.GPSLatitude = exif.GPSLatitude;
+          exifData.GPSLongitude = exif.GPSLongitude;
+        }
+        if (exif?.GPSAltitude) exifData.GPSAltitude = exif.GPSAltitude;
+        if (exif?.GPSTimeStamp) exifData.GPSTimeStamp = exif.GPSTimeStamp;
+        
+        // Lens information
+        if (exif?.LensMake) exifData.LensMake = fixEncoding(exif.LensMake);
+        if (exif?.LensModel) exifData.LensModel = fixEncoding(exif.LensModel);
+        if (exif?.LensSerialNumber) exifData.LensSerialNumber = fixEncoding(exif.LensSerialNumber);
+        if (exif?.FocalLengthIn35mmFormat) exifData.FocalLengthIn35mmFormat = exif.FocalLengthIn35mmFormat;
+        
+        // File information
         exifData.FileSize = file.size;
+        if (exif?.ImageSize) exifData.ImageSize = exif.ImageSize;
+        if (exif?.Megapixels) exifData.Megapixels = exif.Megapixels;
+        
+        // Additional metadata
+        if (exif?.SceneType) exifData.SceneType = exif.SceneType;
+        if (exif?.CustomRendered) exifData.CustomRendered = exif.CustomRendered;
+        if (exif?.GainControl) exifData.GainControl = exif.GainControl;
+        if (exif?.Contrast) exifData.Contrast = exif.Contrast;
+        if (exif?.Saturation) exifData.Saturation = exif.Saturation;
+        if (exif?.Sharpness) exifData.Sharpness = exif.Sharpness;
+        if (exif?.SubjectDistanceRange) exifData.SubjectDistanceRange = exif.SubjectDistanceRange;
 
         // --- Hetzner WebDAV Upload (OPTIONAL - after database insert) ---
         let originalUrl = null;
