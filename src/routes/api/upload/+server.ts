@@ -499,66 +499,68 @@ export const POST = async ({ request }) => {
 
         // --- Hetzner WebDAV Upload (OPTIONAL - after database insert) ---
         let originalUrl = null;
-        try {
-          // Debug: Log environment variables (without sensitive data)
-          console.log('🔍 DEBUG: Hetzner environment variables:');
-          console.log('  HETZNER_WEBDAV_URL:', process.env.HETZNER_WEBDAV_URL ? 'SET' : 'NOT SET');
-          console.log('  HETZNER_WEBDAV_USER:', process.env.HETZNER_WEBDAV_USER ? 'SET' : 'NOT SET');
-          console.log('  HETZNER_WEBDAV_PASSWORD:', process.env.HETZNER_WEBDAV_PASSWORD ? 'SET' : 'NOT SET');
-          console.log('  HETZNER_WEBDAV_PUBLIC_URL:', process.env.HETZNER_WEBDAV_PUBLIC_URL ? 'SET' : 'NOT SET');
-          
-          if (!process.env.HETZNER_WEBDAV_URL || !process.env.HETZNER_WEBDAV_USER || !process.env.HETZNER_WEBDAV_PASSWORD) {
-            console.error('❌ Missing Hetzner environment variables');
-            throw new Error('Missing Hetzner environment variables');
-          }
-          
-          console.log('🔍 DEBUG: Creating WebDAV client...');
-          const webdav = createClient(
-            process.env.HETZNER_WEBDAV_URL!,
-            {
-              username: process.env.HETZNER_WEBDAV_USER!,
-              password: process.env.HETZNER_WEBDAV_PASSWORD!
+        
+        // Only attempt Hetzner upload if environment variables are available
+        if (process.env.HETZNER_WEBDAV_URL && process.env.HETZNER_WEBDAV_USER && process.env.HETZNER_WEBDAV_PASSWORD) {
+          try {
+            // Debug: Log environment variables (without sensitive data)
+            console.log('🔍 DEBUG: Hetzner environment variables:');
+            console.log('  HETZNER_WEBDAV_URL:', process.env.HETZNER_WEBDAV_URL ? 'SET' : 'NOT SET');
+            console.log('  HETZNER_WEBDAV_USER:', process.env.HETZNER_WEBDAV_USER ? 'SET' : 'NOT SET');
+            console.log('  HETZNER_WEBDAV_PASSWORD:', process.env.HETZNER_WEBDAV_PASSWORD ? 'SET' : 'NOT SET');
+            console.log('  HETZNER_WEBDAV_PUBLIC_URL:', process.env.HETZNER_WEBDAV_PUBLIC_URL ? 'SET' : 'NOT SET');
+            
+            console.log('🔍 DEBUG: Creating WebDAV client...');
+            const webdav = createClient(
+              process.env.HETZNER_WEBDAV_URL!,
+              {
+                username: process.env.HETZNER_WEBDAV_USER!,
+                password: process.env.HETZNER_WEBDAV_PASSWORD!
+              }
+            );
+            
+            console.log('🔍 DEBUG: WebDAV client created, testing connection...');
+            
+            // Test connection first
+            try {
+              const contents = await webdav.getDirectoryContents('/');
+              const itemCount = Array.isArray(contents) ? contents.length : 0;
+              console.log('✅ WebDAV connection successful, root contents:', itemCount, 'items');
+            } catch (testErr) {
+              console.error('❌ WebDAV connection test failed:', testErr);
+              throw testErr;
             }
-          );
-          
-          console.log('🔍 DEBUG: WebDAV client created, testing connection...');
-          
-          // Test connection first
-          try {
-            const contents = await webdav.getDirectoryContents('/');
-            const itemCount = Array.isArray(contents) ? contents.length : 0;
-            console.log('✅ WebDAV connection successful, root contents:', itemCount, 'items');
-          } catch (testErr) {
-            console.error('❌ WebDAV connection test failed:', testErr);
-            throw testErr;
+            
+            // Create items directory if it doesn't exist
+            try {
+              console.log('🔍 DEBUG: Creating items directory...');
+              await webdav.createDirectory('items');
+              console.log('✅ Created items directory');
+            } catch (dirErr) {
+              // Directory might already exist, that's okay
+              console.log('ℹ️ Items directory already exists or creation failed:', dirErr);
+            }
+            
+            const hetznerPath = `items/${id}.jpg`;
+            console.log('🔍 DEBUG: Uploading to Hetzner path:', hetznerPath);
+            console.log('🔍 DEBUG: File buffer size:', buf.length, 'bytes');
+            
+            await webdav.putFileContents(hetznerPath, buf, { overwrite: true });
+            originalUrl = `${process.env.HETZNER_WEBDAV_PUBLIC_URL || process.env.HETZNER_WEBDAV_URL}/items/${id}.jpg`;
+            console.log('✅ Hetzner WebDAV upload successful:', hetznerPath);
+            console.log('✅ Original URL set to:', originalUrl);
+          } catch (hetznerErr) {
+            console.error('❌ Hetzner WebDAV upload failed:', hetznerErr);
+            console.error('❌ Hetzner error details:', {
+              name: hetznerErr instanceof Error ? hetznerErr.name : 'Unknown',
+              message: hetznerErr instanceof Error ? hetznerErr.message : String(hetznerErr),
+              stack: hetznerErr instanceof Error ? hetznerErr.stack : 'No stack'
+            });
+            originalUrl = null;
           }
-          
-          // Create items directory if it doesn't exist
-          try {
-            console.log('🔍 DEBUG: Creating items directory...');
-            await webdav.createDirectory('items');
-            console.log('✅ Created items directory');
-          } catch (dirErr) {
-            // Directory might already exist, that's okay
-            console.log('ℹ️ Items directory already exists or creation failed:', dirErr);
-          }
-          
-          const hetznerPath = `items/${id}.jpg`;
-          console.log('🔍 DEBUG: Uploading to Hetzner path:', hetznerPath);
-          console.log('🔍 DEBUG: File buffer size:', buf.length, 'bytes');
-          
-          await webdav.putFileContents(hetznerPath, buf, { overwrite: true });
-          originalUrl = `${process.env.HETZNER_WEBDAV_PUBLIC_URL || process.env.HETZNER_WEBDAV_URL}/items/${id}.jpg`;
-          console.log('✅ Hetzner WebDAV upload successful:', hetznerPath);
-          console.log('✅ Original URL set to:', originalUrl);
-        } catch (hetznerErr) {
-          console.error('❌ Hetzner WebDAV upload failed:', hetznerErr);
-          console.error('❌ Hetzner error details:', {
-            name: hetznerErr instanceof Error ? hetznerErr.name : 'Unknown',
-            message: hetznerErr instanceof Error ? hetznerErr.message : String(hetznerErr),
-            stack: hetznerErr instanceof Error ? hetznerErr.stack : 'No stack'
-          });
-          originalUrl = null;
+        } else {
+          console.log('ℹ️ Hetzner environment variables not available, skipping Hetzner upload');
+          console.log('ℹ️ This is normal for local development');
         }
 
         // Insert into database with all paths and EXIF data
