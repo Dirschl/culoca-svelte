@@ -1037,23 +1037,31 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
     }
 
     if (userLat !== null && userLon !== null) {
-      // Lade die nächste Seite nach Entfernung sortiert per RPC
-      console.log(`[Gallery] Loading images sorted by distance via RPC...`);
+      // Lade die nächste Seite nach Entfernung sortiert
+      console.log(`[Gallery] Loading images sorted by distance...`);
       const { data, error } = await supabase
-        .rpc('images_by_distance', {
-          user_lat: userLat,
-          user_lon: userLon,
-          page,
-          page_size: size
-        });
+        .from('items')
+        .select('id,path_512,path_2048,path_64,width,height,lat,lon,title,description,keywords')
+        .not('path_512', 'is', null) // Only load images with valid path_512
+        .not('lat', 'is', null)
+        .not('lon', 'is', null)
+        .order('created_at', { ascending: false })
+        .range(page * size, page * size + size - 1);
       if (error) {
-        console.error('RPC error:', error);
+        console.error('Database error:', error);
         hasMoreImages = false;
         loading = false;
         return;
       }
       if (data && data.length > 0) {
-        const newPics = data.map((d: any) => ({
+        // Sort by distance if user has GPS coordinates
+        const sortedData = data.sort((a: any, b: any) => {
+          const distA = a.lat && a.lon ? getDistanceInMeters(userLat!, userLon!, a.lat, a.lon) : Number.MAX_VALUE;
+          const distB = b.lat && b.lon ? getDistanceInMeters(userLat!, userLon!, b.lat, b.lon) : Number.MAX_VALUE;
+          return distA - distB;
+        });
+
+        const newPics = sortedData.map((d: any) => ({
           id: d.id,
           src: d.path_512 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${d.path_512}` : '',
           srcHD: d.path_2048 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${d.path_2048}` : '',
@@ -1084,7 +1092,7 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
         const totalCount = await getTotalImageCount();
         updateGalleryStats($pics.length, totalCount);
         
-        console.log(`[Gallery] RPC loaded ${uniqueNewPics.length} unique images sorted by distance, total now: ${$pics.length}`);
+        console.log(`[Gallery] Loaded ${uniqueNewPics.length} unique images sorted by distance, total now: ${$pics.length}`);
         
         // Announce first image if autoguide is enabled and new images were loaded
         if (autoguide && uniqueNewPics.length > 0) {
@@ -1094,7 +1102,7 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
         
         // Wenn weniger Bilder geladen wurden als erwartet, könnte das bedeuten, dass wir am Ende sind
         if (data.length < size) {
-          console.log(`[Gallery] RPC returned ${data.length} images, expected ${size}. This might be the end.`);
+          console.log(`[Gallery] Database returned ${data.length} images, expected ${size}. This might be the end.`);
           
           // Prüfe, ob es noch mehr Bilder gibt
           const totalImages = await supabase
@@ -1108,7 +1116,7 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
         }
       } else {
         hasMoreImages = false;
-        console.log(`[Gallery] RPC no data returned, hasMoreImages set to false`);
+        console.log(`[Gallery] Database no data returned, hasMoreImages set to false`);
       }
       page++;
       loading = false;
