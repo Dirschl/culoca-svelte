@@ -521,46 +521,71 @@ export const POST = async ({ request }) => {
         if (exif?.Sharpness) exifData.Sharpness = exif.Sharpness;
         if (exif?.SubjectDistanceRange) exifData.SubjectDistanceRange = exif.SubjectDistanceRange;
 
-        // 3. Versuche, das Original zu Hetzner zu verschieben
+        // 3. Original-Upload-Flow (umgeht Vercel-Limit)
         let originalUrl = null;
-        if (saveOriginals && originalSupabasePath) {
-          let originalBuffer = buf;
-          let hetznerSuccess = false;
-          if (process.env.HETZNER_WEBDAV_URL && process.env.HETZNER_WEBDAV_USER && process.env.HETZNER_WEBDAV_PASSWORD) {
-            try {
-              const webdav = createClient(
-                process.env.HETZNER_WEBDAV_URL!,
-                {
-                  username: process.env.HETZNER_WEBDAV_USER!,
-                  password: process.env.HETZNER_WEBDAV_PASSWORD!
+        
+        if (saveOriginals) {
+          try {
+            // 3a. Original zuerst in Supabase originals speichern (umgeht Vercel-Limit)
+            originalSupabasePath = `${id}.jpg`;
+            console.log('📤 Uploading original to Supabase originals:', originalSupabasePath);
+            
+            const { error: originalUploadError } = await supabase.storage
+              .from('originals')
+              .upload(originalSupabasePath, buf, { 
+                contentType: 'image/jpeg',
+                upsert: false
+              });
+            
+            if (originalUploadError) {
+              console.error('❌ Original upload to Supabase failed:', originalUploadError);
+            } else {
+              console.log('✅ Original uploaded to Supabase originals');
+              
+              // 3b. Versuche, das Original zu Hetzner zu verschieben
+              if (process.env.HETZNER_WEBDAV_URL && process.env.HETZNER_WEBDAV_USER && process.env.HETZNER_WEBDAV_PASSWORD) {
+                try {
+                  const webdav = createClient(
+                    process.env.HETZNER_WEBDAV_URL!,
+                    {
+                      username: process.env.HETZNER_WEBDAV_USER!,
+                      password: process.env.HETZNER_WEBDAV_PASSWORD!
+                    }
+                  );
+                  
+                  // Test connection
+                  await webdav.getDirectoryContents('/');
+                  
+                  // Create items dir if needed
+                  try { await webdav.createDirectory('items'); } catch {}
+                  
+                  const hetznerPath = `items/${id}.jpg`;
+                  await webdav.putFileContents(hetznerPath, buf, { overwrite: true });
+                  originalUrl = `${process.env.HETZNER_WEBDAV_PUBLIC_URL || process.env.HETZNER_WEBDAV_URL}/items/${id}.jpg`;
+                  
+                  console.log('✅ Original zu Hetzner verschoben:', hetznerPath);
+                  
+                  // 3c. Wenn Hetzner erfolgreich, lösche Original aus Supabase
+                  try {
+                    await supabase.storage.from('originals').remove([originalSupabasePath]);
+                    console.log('🗑️ Original aus Supabase gelöscht:', originalSupabasePath);
+                  } catch (e) {
+                    console.error('⚠️ Konnte Original nicht aus Supabase löschen:', e);
+                  }
+                  
+                } catch (err) {
+                  console.error('❌ Hetzner-Upload fehlgeschlagen, Original bleibt in Supabase:', err);
+                  // Original bleibt in Supabase, URL bleibt leer
                 }
-              );
-              // Test connection
-              await webdav.getDirectoryContents('/');
-              // Create items dir if needed
-              try { await webdav.createDirectory('items'); } catch {}
-              const hetznerPath = `items/${id}.jpg`;
-              await webdav.putFileContents(hetznerPath, originalBuffer, { overwrite: true });
-              originalUrl = `${process.env.HETZNER_WEBDAV_PUBLIC_URL || process.env.HETZNER_WEBDAV_URL}/items/${id}.jpg`;
-              hetznerSuccess = true;
-              console.log('✅ Original zu Hetzner verschoben:', hetznerPath);
-            } catch (err) {
-              console.error('❌ Hetzner-Upload fehlgeschlagen, Original bleibt in Supabase:', err);
-              hetznerSuccess = false;
+              } else {
+                console.log('ℹ️ Hetzner environment variables not set, original stays in Supabase');
+              }
             }
+          } catch (e) {
+            console.error('❌ Original upload process failed:', e);
           }
-          // Wenn Hetzner erfolgreich, lösche Original aus Supabase
-          if (hetznerSuccess) {
-            try {
-              await supabase.storage.from('originals').remove([originalSupabasePath]);
-              console.log('🗑️ Original aus Supabase gelöscht:', originalSupabasePath);
-            } catch (e) {
-              console.error('⚠️ Konnte Original nicht aus Supabase löschen:', e);
-            }
-          } else {
-            // Optional: originalUrl auf Supabase-URL setzen, falls Hetzner nicht erreichbar
-            // originalUrl = `https://.../storage/v1/object/public/originals/${originalSupabasePath}`;
-          }
+        } else {
+          console.log('ℹ️ saveOriginals disabled, skipping original upload');
         }
 
         // Insert into database with all paths and EXIF data
