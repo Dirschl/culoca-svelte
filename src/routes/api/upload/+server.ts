@@ -37,17 +37,18 @@ export const POST = async ({ request }) => {
     console.log('  VERCEL_URL:', process.env.VERCEL_URL);
     
     const form = await request.formData();
-    const files = form.getAll('files') as File[];
+    const filenames = form.getAll('filename') as string[];
+    const originalPaths = form.getAll('original_path') as string[];
 
     // NEW: Allow profile_id to be passed explicitly from the client.
     const passedProfileId = form.get('profile_id') as string | null;
 
-    if (!files.length) {
-      console.log('No files received');
-      throw error(400, 'No files received');
+    if (!filenames.length) {
+      console.log('No filenames received');
+      throw error(400, 'No filenames received');
     }
 
-    console.log(`Received ${files.length} files`);
+    console.log(`Received ${filenames.length} filenames to process`);
 
     // Get current user (from Supabase auth cookie) – may be null when using anon key
     const { data: { user } } = await supabase.auth.getUser();
@@ -92,45 +93,34 @@ export const POST = async ({ request }) => {
     const results = [];
     const successfulUploads: string[] = [];
     const failedUploads: string[] = [];
-    const totalFiles = files.length;
+    const totalFiles = filenames.length;
 
     console.log(`=== UPLOAD START: Processing ${totalFiles} files ===`);
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      console.log(`\n[${i + 1}/${totalFiles}] Processing file: ${file.name}`);
+    for (let i = 0; i < filenames.length; i++) {
+      const filename = filenames[i];
+      const originalPath = originalPaths[i] || filename;
+      console.log(`\n[${i + 1}/${totalFiles}] Processing file: ${filename}`);
       
       try {
-        const buf = Buffer.from(await file.arrayBuffer());
-        const id = crypto.randomUUID();
-        const filename = `${id}.jpg`;
-        const baseName = file.name; // Vollständiger Dateiname mit Endung
-
-        // STEP 1: Upload original to Supabase storage first (bypasses Vercel limit)
-        console.log('📤 STEP 1: Uploading original to Supabase storage...');
-        let originalSupabasePath = null;
+        // Download original from Supabase storage
+        console.log('📥 Downloading original from Supabase storage...');
+        const { data: originalData, error: downloadError } = await supabase.storage
+          .from('originals')
+          .download(originalPath);
         
-        try {
-          originalSupabasePath = `${id}.jpg`;
-          console.log('📤 Uploading original to Supabase originals:', originalSupabasePath);
-          
-          const { error: originalUploadError } = await supabase.storage
-            .from('originals')
-            .upload(originalSupabasePath, buf, { 
-              contentType: 'image/jpeg',
-              upsert: false
-            });
-          
-          if (originalUploadError) {
-            console.error('❌ Original upload to Supabase failed:', originalUploadError);
-            throw originalUploadError;
-          } else {
-            console.log('✅ Original uploaded to Supabase originals');
-          }
-        } catch (e) {
-          console.error('❌ Original upload process failed:', e);
-          throw e;
+        if (downloadError) {
+          console.error('❌ Download from Supabase failed:', downloadError);
+          throw downloadError;
         }
+        
+        const buf = Buffer.from(await originalData.arrayBuffer());
+        const id = filename.replace('.jpg', '');
+        const baseName = filename; // Vollständiger Dateiname mit Endung
+
+        // STEP 1: Original is already uploaded to Supabase storage
+        console.log('📤 STEP 1: Original already uploaded to Supabase storage');
+        let originalSupabasePath = originalPath;
 
         // STEP 2: Extract EXIF data from original
         console.log('📤 STEP 2: Extracting EXIF data from original...');
@@ -412,7 +402,7 @@ export const POST = async ({ request }) => {
         if (exif?.Artist) exifData.Artist = fixEncoding(exif.Artist);
         if (exif?.Copyright) exifData.Copyright = fixEncoding(exif.Copyright);
         // Original file size in bytes
-        exifData.FileSize = file.size;
+        exifData.FileSize = buf.length;
 
         // STEP 5: Hetzner WebDAV Upload (OPTIONAL)
         console.log('📤 STEP 5: Uploading to Hetzner (if configured)...');
@@ -603,12 +593,12 @@ export const POST = async ({ request }) => {
 
         console.log('Database insert successful:', dbData);
         results.push(dbData);
-        successfulUploads.push(file.name);
-        console.log(`✅ Successfully processed: ${file.name}`);
+        successfulUploads.push(filename);
+        console.log(`✅ Successfully processed: ${filename}`);
         
       } catch (fileError) {
-        console.error(`❌ Failed to process file: ${file.name}`, fileError);
-        failedUploads.push(file.name);
+        console.error(`❌ Failed to process file: ${filename}`, fileError);
+        failedUploads.push(filename);
         
         // Continue with next file instead of stopping the entire upload
         continue;

@@ -1294,8 +1294,31 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
         currentUploading = file.name;
         uploadMessage = `Uploading ${file.name} (${i + 1}/${totalFiles})...`;
 
+        // STEP 1: Upload original to Supabase first (bypasses Vercel 4.5MB limit)
+        console.log('🔍 Frontend: STEP 1 - Uploading original to Supabase...');
+        const id = crypto.randomUUID();
+        const filename = `${id}.jpg`;
+        
+        // Upload original to Supabase originals bucket
+        const { error: originalUploadError } = await supabase.storage
+          .from('originals')
+          .upload(filename, file, { 
+            contentType: 'image/jpeg',
+            upsert: false
+          });
+        
+        if (originalUploadError) {
+          console.error('❌ Original upload to Supabase failed:', originalUploadError);
+          throw new Error(`Original upload failed: ${originalUploadError.message}`);
+        }
+        
+        console.log('✅ Original uploaded to Supabase originals');
+        
+        // STEP 2: Send metadata to Vercel API for processing
+        console.log('🔍 Frontend: STEP 2 - Sending metadata to Vercel API...');
         const formData = new FormData();
-        formData.append('files', file);
+        formData.append('filename', filename);
+        formData.append('original_path', filename);
         
         // Load user settings and attach them to the request
         console.log('🔍 Frontend: Starting to load user settings...');
