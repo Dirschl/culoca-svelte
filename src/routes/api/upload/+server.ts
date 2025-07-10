@@ -39,6 +39,7 @@ export const POST = async ({ request }) => {
     const form = await request.formData();
     const filenames = form.getAll('filename') as string[];
     const originalPaths = form.getAll('original_path') as string[];
+    const originalFilenames = form.getAll('original_filename') as string[];
     const clientExifJsonRaw = form.get('exif_json') as string | null;
 
     // NEW: Allow profile_id to be passed explicitly from the client.
@@ -117,6 +118,7 @@ export const POST = async ({ request }) => {
     for (let i = 0; i < filenames.length; i++) {
       const filename = filenames[i];
       const originalPath = originalPaths[i] || filename;
+      const originalFilename = originalFilenames[i] || filename; // Ursprünglicher Dateiname
       console.log(`\n[${i + 1}/${totalFiles}] Processing file: ${filename}`);
       
       try {
@@ -133,7 +135,7 @@ export const POST = async ({ request }) => {
         
         const buf = Buffer.from(await originalData.arrayBuffer());
         const id = filename.replace('.jpg', '');
-        const baseName = filename; // Vollständiger Dateiname mit Endung
+        const baseName = originalFilename; // Ursprünglicher Dateiname mit Endung
 
         // STEP 1: Original is already uploaded to Supabase storage
         console.log('📤 STEP 1: Original already uploaded to Supabase storage');

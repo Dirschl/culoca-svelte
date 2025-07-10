@@ -59,6 +59,7 @@
     file: File;
     id: string;
     name: string;
+    originalFileName: string; // Ursprünglicher Dateiname für Datenbank
     preview: string;
     exifData: any;
     title: string;
@@ -82,8 +83,8 @@
   // Validation limits
   const TITLE_MIN_LENGTH = 40;
   const TITLE_MAX_LENGTH = 60;
-  const DESCRIPTION_MIN_LENGTH = 120;
-  const DESCRIPTION_MAX_LENGTH = 160;
+  const DESCRIPTION_MIN_LENGTH = 100; // Von 120 auf 100 reduziert
+  const DESCRIPTION_MAX_LENGTH = 160; // 160 ist inklusiv, nicht exklusiv
   const KEYWORDS_MIN = 10;
   const KEYWORDS_MAX = 50;
 
@@ -228,6 +229,7 @@
         file,
         id: crypto.randomUUID(),
         name: file.name,
+        originalFileName: file.name, // Initialwert, wird später überschrieben
         preview: URL.createObjectURL(file),
         exifData: null,
         title: '',
@@ -337,15 +339,24 @@
         }
       }
 
-      // Dateiname setzen, falls leer/generisch
+      // WICHTIG: originalName wird für Datenbank verwendet, imageFile.name für Anzeige
+      const originalFileName = file.name; // Bewahre ursprünglichen Dateinamen auf
+      
+      // Prüfe ob Dateiname generisch/automatisch generiert ist
       const genericNames = ['image.jpg', 'image.jpeg', 'photo.jpg', 'photo.jpeg', 'image.png', 'photo.png', 'image', 'photo'];
       const isGeneric = !imageFile.name || genericNames.includes(imageFile.name.toLowerCase());
+      
+      // Nur für ANZEIGE-Zwecke einen besseren Namen generieren, NICHT für Datenbank
       if ((isGeneric || imageFile.name.startsWith('PXL_') || imageFile.name.startsWith('IMG_')) && currentUserId && imageFile.lat && imageFile.lon) {
         const ts = Date.now();
         const latStr = imageFile.lat.toFixed(6);
         const lonStr = imageFile.lon.toFixed(6);
-        imageFile.name = `${currentUserId}_${latStr}_${lonStr}_${ts}.jpg`;
+        // Für Anzeige: verwende generierten Namen
+        imageFile.name = `📍 ${originalFileName} (${latStr}, ${lonStr})`;
       }
+      
+      // Bewahre den ursprünglichen Dateinamen für Upload auf
+      imageFile.originalFileName = originalFileName;
 
       // Validate the image
       validateImage(imageFile);
@@ -417,7 +428,7 @@
         const formData = new FormData();
         formData.append('filename', `${id}.jpg`);
         formData.append('original_path', supabasePath);
-        formData.append('original_filename', image.name); // Ursprünglicher Dateiname
+        formData.append('original_filename', image.originalFileName); // Ursprünglicher Dateiname
         formData.append('title', image.title);
         formData.append('description', image.description);
         formData.append('keywords', image.keywords);
@@ -488,14 +499,8 @@
           description: last.description,
           keywords: last.keywords
         };
-        message = `✅ Alle ${successCount} Bilder erfolgreich hochgeladen!` +
-          `<br><br>Letzte gemerkte Daten:<br>` +
-          `Titel: ${last.title || '(leer)'}<br>` +
-          `Beschreibung: ${last.description || '(leer)'}<br>` +
-          `Keywords: ${last.keywords || '(leer)'}<br>`;
-      } else {
-        message = `✅ Alle ${successCount} Bilder erfolgreich hochgeladen!`;
       }
+      message = `✅ Alle ${successCount} Bilder erfolgreich hochgeladen!`;
       messageType = 'success';
       // Wichtig: Erst nach der Erfolgsmeldung die files leeren
       setTimeout(() => {
@@ -865,7 +870,7 @@
         const formData = new FormData();
         formData.append('filename', `${id}.jpg`);
         formData.append('original_path', supabasePath);
-        formData.append('original_filename', image.name); // Ursprünglicher Dateiname
+        formData.append('original_filename', image.originalFileName); // Ursprünglicher Dateiname
         formData.append('title', image.title);
         formData.append('description', image.description);
         formData.append('keywords', image.keywords);
@@ -888,11 +893,7 @@
       console.log('DEBUG: JSON-Resultat:', result);
       if (result.status === 'success') {
         image.uploadProgress = 100;
-        message = `✅ "${image.name}" erfolgreich hochgeladen!` +
-          `<br><br>Letzte gemerkte Daten:<br>` +
-          `Titel: ${image.title || '(leer)'}<br>` +
-          `Beschreibung: ${image.description || '(leer)'}<br>` +
-          `Keywords: ${image.keywords || '(leer)'}<br>`;
+        message = `✅ "${image.originalFileName}" erfolgreich hochgeladen!`;
         messageType = 'success';
         files = files.filter(f => f.id !== image.id);
         // lastImageData nach Upload setzen
@@ -903,12 +904,12 @@
         };
       } else {
         image.errors.push(`Upload fehlgeschlagen: ${result.message}`);
-        message = `❌ Upload von "${image.name}" fehlgeschlagen`;
+        message = `❌ Upload von "${image.originalFileName}" fehlgeschlagen`;
         messageType = 'error';
       }
     } catch (error) {
       image.errors.push(`Upload fehlgeschlagen: ${error}`);
-      message = `❌ Upload von "${image.name}" fehlgeschlagen`;
+      message = `❌ Upload von "${image.originalFileName}" fehlgeschlagen`;
       messageType = 'error';
     } finally {
       image.isUploading = false;
@@ -941,7 +942,7 @@
         const formData = new FormData();
         formData.append('filename', `${id}.jpg`);
         formData.append('original_path', supabasePath);
-        formData.append('original_filename', image.name); // Ursprünglicher Dateiname
+        formData.append('original_filename', image.originalFileName); // Ursprünglicher Dateiname
         formData.append('title', image.title);
         formData.append('description', image.description);
         formData.append('keywords', image.keywords);
