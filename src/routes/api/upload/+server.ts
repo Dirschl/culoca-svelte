@@ -337,10 +337,10 @@ export const POST = async ({ request }) => {
         let keywordsArray: string[] | null = null;
         if (keywords) {
           keywordsArray = keywords.split(',').map((k) => k.trim()).filter(Boolean);
-          // Begrenze Keywords auf maximal 20 Stück, um Check-Constraint-Probleme zu vermeiden
-          if (keywordsArray.length > 20) {
-            keywordsArray = keywordsArray.slice(0, 20);
-            console.log('⚠️ Keywords truncated to 20 items to avoid constraint violation');
+          // Begrenze Keywords auf maximal 50 Stück (Frontend erlaubt auch 50)
+          if (keywordsArray.length > 50) {
+            keywordsArray = keywordsArray.slice(0, 50);
+            console.log('⚠️ Keywords truncated to 50 items to match frontend validation');
           }
         }
 

@@ -197,6 +197,11 @@
   function goHome() {
     goto('/');
   }
+
+  async function signOut() {
+    await supabase.auth.signOut();
+    goto('/');
+  }
 </script>
 
 <svelte:head>
@@ -220,6 +225,12 @@
           Zurück
         </button>
         <h1 class="page-title">Mein Profil</h1>
+        <button class="signout-btn" on:click={signOut}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M10.09 15.59L11.5 17l5-5-5-5-1.41 1.41L12.67 11H3v2h9.67l-2.58 2.59zM19 3H5c-1.11 0-2 .9-2 2v4h2V5h14v14H5v-4H3v4c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/>
+          </svg>
+          Abmelden
+        </button>
       </div>
 
       <!-- Hauptinhalt -->
@@ -557,6 +568,27 @@
     font-weight: 700;
     margin: 0;
     color: var(--text-primary);
+    flex: 1;
+  }
+
+  .signout-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 600;
+    transition: all 0.2s ease;
+    background: var(--error-color);
+    color: white;
+  }
+
+  .signout-btn:hover {
+    background: #dc2626;
+    transform: translateY(-1px);
   }
 
   .profile-content {
@@ -945,12 +977,18 @@
   @media (max-width: 480px) {
     .profile-header {
       flex-direction: column;
-      align-items: flex-start;
+      align-items: stretch;
       gap: 1rem;
     }
 
     .page-title {
       font-size: 1.5rem;
+      order: -1;
+    }
+
+    .signout-btn {
+      align-self: flex-end;
+      margin-top: 0.5rem;
     }
 
     .card {

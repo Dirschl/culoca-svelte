@@ -4112,19 +4112,7 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
       margin: 2rem 0 0.8rem 0;
     }
     
-          .impressum-link {
-        left: 0.7rem;
-        bottom: 0.7rem;
-        font-size: 0.85rem;
-        padding: 0.18rem 0.7rem;
-      }
-      
-        .datenschutz-link {
-    left: 6.5rem;
-    bottom: 0.7rem;
-    font-size: 0.85rem;
-    padding: 0.18rem 0.7rem;
-  }
+
 
   /* GPS Message Styles */
   .gps-message {
