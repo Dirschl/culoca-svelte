@@ -61,7 +61,7 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
   let showCompass = false;
   let autoguide = false;
   let newsFlashMode: 'aus' | 'eigene' | 'alle' = 'alle';
-  let enableSearch = false;
+  let showSearchField = false; // Default: Logo sichtbar, Suchfeld versteckt
   let userLat: number | null = null;
   let userLon: number | null = null;
   let deviceHeading: number | null = null;
@@ -1443,7 +1443,8 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
     showDistance = data?.show_distance ?? false;
     showCompass = data?.show_compass ?? false;
     autoguide = data?.autoguide ?? false;
-    enableSearch = data?.enable_search ?? false;
+          // Load showSearchField from localStorage (default: false = Logo visible)
+      showSearchField = localStorage.getItem('showSearchField') === 'true';
     useJustifiedLayout = data?.use_justified_layout ?? true;
     newsFlashMode = data?.newsflash_mode ?? 'alle';
     
@@ -2486,6 +2487,24 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
     }
   }
 
+  function toggleSearchField() {
+    showSearchField = !showSearchField;
+    // Save state to localStorage
+    localStorage.setItem('showSearchField', showSearchField.toString());
+    
+    // If switching to search field, focus input after short delay
+    if (showSearchField) {
+      setTimeout(() => {
+        if (searchInput) {
+          searchInput.focus();
+        }
+      }, 100);
+    } else {
+      // If hiding search field, clear search
+      clearSearch();
+    }
+  }
+
   // Helper to exit simulation across frames
   function exitSimulation() {
     if (typeof window !== 'undefined') {
@@ -2607,36 +2626,47 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
 
 
 <!-- Search Bar or Culoca Logo -->
-{#if isLoggedIn && enableSearch}
-  <div class="search-container">
-    <div class="search-box">
-      <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
-      </svg>
-      <input 
-        type="text" 
-        placeholder=""
-        bind:value={searchQuery}
-        on:keydown={handleSearchKeydown}
-        class="search-input"
-        disabled={isSearching}
-        bind:this={searchInput}
-      />
-      {#if searchQuery}
-        <button class="clear-search-btn" on:click={clearSearch} disabled={isSearching}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-          </svg>
-        </button>
-      {/if}
-      {#if isSearching}
-        <div class="search-spinner"></div>
-      {/if}
+{#if isLoggedIn}
+  {#if showSearchField}
+    <div class="search-container">
+      <div class="search-box">
+        <!-- Culoca Logo SVG als klickbares Icon -->
+        <svg class="culoca-icon" width="20" height="20" viewBox="0 0 83.86 100.88" fill="currentColor" on:click={toggleSearchField}>
+          <path d="M0,41.35c0-5.67,1.1-11.03,3.29-16.07,2.19-5.04,5.19-9.43,8.98-13.17,3.79-3.74,8.25-6.69,13.36-8.86,5.11-2.17,10.54-3.25,16.29-3.25s11.18,1.08,16.29,3.25c5.11,2.17,9.56,5.12,13.36,8.86,3.79,3.74,6.79,8.13,8.98,13.17,2.19,5.04,3.29,10.4,3.29,16.07s-1.1,11.03-3.29,16.07c-2.2,5.04-5.19,9.43-8.98,13.17-3.8,3.74-8.25,6.7-13.36,8.86-5.11,2.17-9.49,21.42-15.25,21.42s-12.23-19.25-17.34-21.42c-5.11-2.17-9.56-5.12-13.36-8.86-3.79-3.74-6.79-8.13-8.98-13.17-2.2-5.04-3.29-10.4-3.29-16.07ZM25.16,41.35c0,2.29.44,4.43,1.32,6.44.88,2.01,2.07,3.76,3.59,5.26,1.52,1.5,3.29,2.68,5.33,3.55,2.04.87,4.21,1.3,6.53,1.3s4.49-.43,6.53-1.3c2.04-.87,3.81-2.05,5.33-3.55,1.52-1.5,2.71-3.25,3.59-5.26.88-2.01,1.32-4.15,1.32-6.44s-.44-4.43-1.32-6.44c-.88-2.01-2.08-3.76-3.59-5.26-1.52-1.5-3.29-2.68-5.33-3.55-2.03-.87-4.21-1.3-6.53-1.3s-4.49.43-6.53,1.3c-2.04.87-3.81,2.05-5.33,3.55-1.52,1.5-2.72,3.25-3.59,5.26-.88,2.01-1.32,4.16-1.32,6.44Z"/>
+        </svg>
+        <input 
+          type="text" 
+          placeholder=""
+          bind:value={searchQuery}
+          on:keydown={handleSearchKeydown}
+          class="search-input"
+          disabled={isSearching}
+          bind:this={searchInput}
+        />
+        {#if searchQuery}
+          <button class="clear-search-btn" on:click={clearSearch} disabled={isSearching}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+            </svg>
+          </button>
+        {/if}
+        {#if isSearching}
+          <div class="search-spinner"></div>
+        {/if}
+      </div>
     </div>
+  {/if}
+{/if}
 
-  </div>
-{:else}
-  <img src="/culoca-logo-512px.png" alt="Culoca" class="culoca-logo" />
+<!-- Originales Culoca Logo (PNG) - immer sichtbar außer wenn Suchfeld aktiv ist -->
+{#if !isLoggedIn || !showSearchField}
+  <img 
+    src="/culoca-logo-512px.png" 
+    alt="Culoca" 
+    class="culoca-logo"
+    class:clickable={isLoggedIn}
+    on:click={isLoggedIn ? toggleSearchField : undefined}
+  />
 {/if}
 
 <!-- GPS Status Message -->
@@ -3564,10 +3594,16 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
     box-shadow: 0 4px 25px var(--shadow);
   }
 
-  .search-icon {
-    color: var(--text-secondary);
+  .culoca-icon {
+    color: #ee7221;
     margin-right: 0.75rem;
     flex-shrink: 0;
+    cursor: pointer;
+    transition: color 0.2s ease;
+  }
+
+  .culoca-icon:hover {
+    color: #d55a1a;
   }
 
   .search-input {
@@ -3650,6 +3686,16 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
   .culoca-logo:hover {
     opacity: 1;
   }
+
+  .culoca-logo.clickable {
+    cursor: pointer;
+    transition: opacity 0.2s ease;
+  }
+
+  .culoca-logo.clickable:hover {
+    opacity: 0.8;
+  }
+
   @media (max-width: 600px) {
     .culoca-logo {
       width: 10rem;

@@ -35,6 +35,28 @@
 	onMount(async () => {
 		const { data: { user } } = await supabase.auth.getUser();
 		isLoggedIn = !!user;
+		
+		// Setze Culoca SVG Favicon für alle Seiten außer Detailseiten
+		// Detailseiten (/item/[id]) haben ihr eigenes dynamisches Favicon
+		if (!$page.route.id?.includes('/item/[id]')) {
+			// Entferne alle bestehenden Favicon-Links (außer die vom Server gesetzten)
+			const existingFavicons = document.querySelectorAll('link[rel="icon"]:not([data-static])');
+			existingFavicons.forEach(link => link.remove());
+			
+			// Füge das neue Culoca SVG Favicon hinzu (moderne Browser)
+			const svgFaviconLink = document.createElement('link');
+			svgFaviconLink.rel = 'icon';
+			svgFaviconLink.type = 'image/svg+xml';
+			svgFaviconLink.href = '/culoca-favicon.svg';
+			document.head.appendChild(svgFaviconLink);
+			
+			// Füge PNG Fallback hinzu (ältere Browser)
+			const pngFaviconLink = document.createElement('link');
+			pngFaviconLink.rel = 'icon';
+			pngFaviconLink.type = 'image/png';
+			pngFaviconLink.href = '/culoca-icon.png';
+			document.head.appendChild(pngFaviconLink);
+		}
 	});
 </script>
 

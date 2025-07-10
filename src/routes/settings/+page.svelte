@@ -28,7 +28,7 @@
   let showCompass = false;
   let autoguide = false;
   let newsFlashMode: 'aus' | 'eigene' | 'alle' = 'alle';
-  let enableSearch = false;
+
   
   // Upload Einstellungen
   let saveOriginals = true;
@@ -123,7 +123,7 @@
         showCompass = data.show_compass ?? false;
         autoguide = data.autoguide ?? false;
         newsFlashMode = data.newsflash_mode ?? 'alle';
-        enableSearch = data.enable_search ?? false;
+
         saveOriginals = data.save_originals ?? true;
       }
     } catch (error) {
@@ -155,7 +155,7 @@
         show_distance: showDistance,
         show_compass: showCompass,
         autoguide: autoguide,
-        enable_search: enableSearch,
+
         avatar_url: profile?.avatar_url,
         newsflash_mode: newsFlashMode,
         save_originals: saveOriginals,
@@ -175,7 +175,7 @@
         localStorage.setItem('showDistance', showDistance ? 'true' : 'false');
         localStorage.setItem('showCompass', showCompass ? 'true' : 'false');
         localStorage.setItem('autoguide', autoguide ? 'true' : 'false');
-        localStorage.setItem('enableSearch', enableSearch ? 'true' : 'false');
+    
         localStorage.setItem('newsFlashMode', newsFlashMode);
         localStorage.setItem('saveOriginals', saveOriginals ? 'true' : 'false');
       }
@@ -401,27 +401,7 @@
           </div>
         </section>
 
-        <!-- Search Settings -->
-        <section class="settings-section">
-          <div class="section-header">
-            <h2>Suchfunktion</h2>
-            <p class="section-description">Aktiviere die Suchfunktion für die Bildergalerie</p>
-          </div>
 
-          <div class="setting-row">
-            <div class="setting-info">
-              <label class="setting-label" for="search-toggle">Suchfeld anzeigen</label>
-              <p class="setting-description">Ersetzt das Culoca-Logo durch ein Suchfeld auf der Hauptseite. Suche nach Titel, Beschreibung und Keywords.</p>
-            </div>
-            <div class="setting-control">
-              <label class="toggle-switch" for="search-toggle">
-                <input type="checkbox" id="search-toggle" bind:checked={enableSearch} />
-                <span class="toggle-slider"></span>
-              </label>
-              <span class="setting-status">{enableSearch ? 'Aktiviert' : 'Deaktiviert'}</span>
-            </div>
-          </div>
-        </section>
 
         <!-- Audio Settings -->
         <section class="settings-section">
