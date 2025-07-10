@@ -417,6 +417,7 @@
         const formData = new FormData();
         formData.append('filename', `${id}.jpg`);
         formData.append('original_path', supabasePath);
+        formData.append('original_filename', image.name); // Ursprünglicher Dateiname
         formData.append('title', image.title);
         formData.append('description', image.description);
         formData.append('keywords', image.keywords);
@@ -864,6 +865,7 @@
         const formData = new FormData();
         formData.append('filename', `${id}.jpg`);
         formData.append('original_path', supabasePath);
+        formData.append('original_filename', image.name); // Ursprünglicher Dateiname
         formData.append('title', image.title);
         formData.append('description', image.description);
         formData.append('keywords', image.keywords);
@@ -939,6 +941,7 @@
         const formData = new FormData();
         formData.append('filename', `${id}.jpg`);
         formData.append('original_path', supabasePath);
+        formData.append('original_filename', image.name); // Ursprünglicher Dateiname
         formData.append('title', image.title);
         formData.append('description', image.description);
         formData.append('keywords', image.keywords);

@@ -128,6 +128,10 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
   // Fullscreen map mode
   let showFullscreenMap = false;
   
+  // GPS availability status
+  let gpsStatus: 'checking' | 'available' | 'denied' | 'unavailable' = 'checking';
+  let showGPSMessage = false;
+  
   // Function to get currently visible image
   function getCurrentlyVisibleImage(): any | null {
     const currentPics = get(pics);
@@ -937,13 +941,28 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
     loading = true;
     
     try {
-      // Load all images in one request
-      const { data } = await supabase
-        .from('items')
-        .select('id,path_512,path_2048,path_64,width,height,lat,lon,title,description,keywords')
-        .not('lat', 'is', null)
-        .not('lon', 'is', null)
-        .order('created_at', { ascending: false });
+      let data;
+      
+      // Use distance function if user has GPS coordinates and distance is enabled
+      if (isLoggedIn && showDistance && userLat !== null && userLon !== null) {
+        const result = await supabase
+          .rpc('images_by_distance', {
+            user_lat: userLat,
+            user_lon: userLon,
+            page: 0,
+            page_size: 2000 // Load alle verfügbaren Bilder
+          });
+        data = result.data;
+      } else {
+        // Normal load for non-distance mode
+        const result = await supabase
+          .from('items')
+          .select('id,path_512,path_2048,path_64,width,height,lat,lon,title,description,keywords')
+          .not('lat', 'is', null)
+          .not('lon', 'is', null)
+          .order('created_at', { ascending: false });
+        data = result.data;
+      }
       
       if (data) {
         const allPics = data.map((d: any) => ({
@@ -959,19 +978,12 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
           keywords: d.keywords,
           path_64: d.path_64,
           path_512: d.path_512,
-          path_2048: d.path_2048
+          path_2048: d.path_2048,
+          distance: d.distance || null
         })).filter((pic: any) => pic.path_512); // Filter out images without path_512
 
-        // Sort by distance if user is logged in and distance is enabled
-        if (isLoggedIn && showDistance && userLat !== null && userLon !== null) {
-          allPics.sort((a, b) => {
-            const distA = a.lat && a.lon ? getDistanceInMeters(userLat!, userLon!, a.lat, a.lon) : Number.MAX_VALUE;
-            const distB = b.lat && b.lon ? getDistanceInMeters(userLat!, userLon!, b.lat, b.lon) : Number.MAX_VALUE;
-            return distA - distB;
-          });
-        }
-
         pics.set(allPics);
+        page = Math.ceil(allPics.length / size); // Page korrekt setzen
         hasMoreImages = false;
         
         // Announce first image if autoguide is enabled
@@ -1023,121 +1035,25 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
     
     loading = true;
 
-    // Debug: Check if specific image exists in database
-    const specificImageCheck = await supabase
-      .from('items')
-      .select('id, lat, lon, path_512, title')
-      .eq('id', '2c6407f6-1ca5-4e82-afb1-0e0fe37db0ea')
-      .single();
-    
-    if (specificImageCheck.data) {
-      console.log('🔍 Specific image found in database:', specificImageCheck.data);
-    } else {
-      console.log('❌ Specific image not found in database');
-    }
-
-    if (userLat !== null && userLon !== null) {
-      // Lade die nächste Seite nach Entfernung sortiert
-      console.log(`[Gallery] Loading images sorted by distance...`);
-      const { data, error } = await supabase
-        .from('items')
-        .select('id,path_512,path_2048,path_64,width,height,lat,lon,title,description,keywords')
-        .not('path_512', 'is', null) // Only load images with valid path_512
-        .not('lat', 'is', null)
-        .not('lon', 'is', null)
-        .order('created_at', { ascending: false })
-        .range(page * size, page * size + size - 1);
-      if (error) {
-        console.error('Database error:', error);
-        hasMoreImages = false;
-        loading = false;
-        return;
-      }
-      if (data && data.length > 0) {
-        // Sort by distance if user has GPS coordinates
-        const sortedData = data.sort((a: any, b: any) => {
-          const distA = a.lat && a.lon ? getDistanceInMeters(userLat!, userLon!, a.lat, a.lon) : Number.MAX_VALUE;
-          const distB = b.lat && b.lon ? getDistanceInMeters(userLat!, userLon!, b.lat, b.lon) : Number.MAX_VALUE;
-          return distA - distB;
-        });
-
-        const newPics = sortedData.map((d: any) => ({
-          id: d.id,
-          src: d.path_512 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${d.path_512}` : '',
-          srcHD: d.path_2048 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${d.path_2048}` : '',
-          width: d.width,
-          height: d.height,
-          lat: d.lat,
-          lon: d.lon,
-          title: d.title,
-          description: d.description,
-          keywords: d.keywords,
-          path_64: d.path_64,
-          path_512: d.path_512,
-          path_2048: d.path_2048
-        })).filter((pic: any) => pic.path_512); // Filter out images without path_512
-        
-        // Prüfe auf Duplikate vor dem Hinzufügen
-        const currentPics = get(pics);
-        const existingIds = new Set(currentPics.map((p: any) => p.id));
-        const uniqueNewPics = newPics.filter((pic: any) => !existingIds.has(pic.id));
-        
-        if (uniqueNewPics.length !== newPics.length) {
-          console.log(`[Gallery] Filtered out ${newPics.length - uniqueNewPics.length} duplicate images`);
-        }
-        
-        pics.update((p: any[]) => [...p, ...uniqueNewPics]);
-        
-        // Update gallery stats
-        const totalCount = await getTotalImageCount();
-        updateGalleryStats($pics.length, totalCount);
-        
-        console.log(`[Gallery] Loaded ${uniqueNewPics.length} unique images sorted by distance, total now: ${$pics.length}`);
-        
-        // Announce first image if autoguide is enabled and new images were loaded
-        if (autoguide && uniqueNewPics.length > 0) {
-          console.log('🎤 Autoguide enabled and new images loaded, announcing first image...');
-          setTimeout(() => announceFirstImage(), 500);
-        }
-        
-        // Wenn weniger Bilder geladen wurden als erwartet, könnte das bedeuten, dass wir am Ende sind
-        if (data.length < size) {
-          console.log(`[Gallery] Database returned ${data.length} images, expected ${size}. This might be the end.`);
-          
-          // Prüfe, ob es noch mehr Bilder gibt
-          const totalImages = await supabase
-            .from('items')
-            .select('id', { count: 'exact' });
-          
-          if (totalImages.count && $pics.length >= totalImages.count) {
-            hasMoreImages = false;
-            console.log(`[Gallery] All ${totalImages.count} images loaded, hasMoreImages set to false`);
-          }
-        }
-      } else {
-        hasMoreImages = false;
-        console.log(`[Gallery] Database no data returned, hasMoreImages set to false`);
-      }
-      page++;
-      loading = false;
-      return;
-    }
-
-    // Normale Pagination für nicht eingeloggte User oder wenn Distanz deaktiviert ist
-    console.log(`[Gallery] Using normal pagination, range: ${page * size} to ${page * size + size - 1}`);
+    // WIEDERHERGESTELLTE ARCHITEKTUR: Normale Pagination mit client-seitiger Sortierung
+    // Lade Bilder ohne Vorsortierung von der Datenbank - Sortierung erfolgt client-seitig
+    console.log(`[Gallery] Loading images with normal pagination, range: ${page * size} to ${page * size + size - 1}`);
     const { data } = await supabase
       .from('items')
       .select('id,path_512,path_2048,path_64,width,height,lat,lon,title,description,keywords')
       .not('path_512', 'is', null) // Only load images with valid path_512
+      .not('lat', 'is', null) // Only load images with GPS data
+      .not('lon', 'is', null)
       .order('created_at', { ascending: false })
       .range(page * size, page * size + size - 1);
 
     if (data) {
-      console.log(`[Gallery] Normal pagination loaded ${data.length} images`);
+      console.log(`[Gallery] Loaded ${data.length} images from database`);
       if (data.length < size) {
         hasMoreImages = false;
-        console.log(`[Gallery] Normal pagination hasMoreImages set to false, data.length (${data.length}) < size (${size})`);
+        console.log(`[Gallery] hasMoreImages set to false, data.length (${data.length}) < size (${size})`);
       }
+      
       const newPics = data.map((d: any) => ({
         id: d.id,
         src: d.path_512 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${d.path_512}` : '',
@@ -1160,16 +1076,32 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
       const uniqueNewPics = newPics.filter((pic: any) => !existingIds.has(pic.id));
       
       if (uniqueNewPics.length !== newPics.length) {
-        console.log(`[Gallery] Normal pagination: Filtered out ${newPics.length - uniqueNewPics.length} duplicate images`);
+        console.log(`[Gallery] Filtered out ${newPics.length - uniqueNewPics.length} duplicate images`);
       }
       
-      pics.update((p: any[]) => [...p, ...uniqueNewPics]);
+      // Füge neue Bilder hinzu
+      pics.update((p: any[]) => {
+        const combined = [...p, ...uniqueNewPics];
+        
+        // CLIENT-SEITIGE SORTIERUNG: Sortiere alle Bilder nach Entfernung wenn GPS verfügbar
+        if (isLoggedIn && showDistance && userLat !== null && userLon !== null) {
+          console.log(`[Gallery] Client-side sorting ${combined.length} images by distance`);
+          return combined.sort((a: any, b: any) => {
+            const distA = a.lat && a.lon ? getDistanceInMeters(userLat!, userLon!, a.lat, a.lon) : Number.MAX_VALUE;
+            const distB = b.lat && b.lon ? getDistanceInMeters(userLat!, userLon!, b.lat, b.lon) : Number.MAX_VALUE;
+            return distA - distB;
+          });
+        } else {
+          // Für non-distance mode: neue Bilder vorne (neueste zuerst)
+          return combined;
+        }
+      });
       
       // Update gallery stats
       const totalCount = await getTotalImageCount();
       updateGalleryStats($pics.length, totalCount);
       
-      console.log(`[Gallery] Total images now: ${$pics.length}`);
+      console.log(`[Gallery] Total images now: ${$pics.length} (added ${uniqueNewPics.length} unique)`);
       
       // Announce first image if autoguide is enabled and new images were loaded
       if (autoguide && uniqueNewPics.length > 0) {
@@ -1177,7 +1109,7 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
       }
     } else {
       hasMoreImages = false;
-      console.log(`[Gallery] Normal pagination no data returned, hasMoreImages set to false`);
+      console.log(`[Gallery] No data returned, hasMoreImages set to false`);
     }
 
     page++; 
@@ -1517,7 +1449,10 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
     
     // Start GPS tracking if distance is enabled
     if (showDistance && navigator.geolocation) {
-      startGPSTracking();
+      // Nur GPS-Tracking starten, wenn wir noch keine gültigen Koordinaten haben
+      if (userLat === null || userLon === null) {
+        startGPSTracking();
+      }
     } else {
       stopGPSTracking();
     }
@@ -1663,9 +1598,14 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
 
   function startGPSTracking() {
     if (!navigator.geolocation || gpsTrackingActive) return;
+    
+    gpsStatus = 'checking';
     gpsTrackingActive = true;
+    
     navigator.geolocation.getCurrentPosition(
       (pos) => {
+        gpsStatus = 'available';
+        showGPSMessage = false;
         lastKnownLat = pos.coords.latitude;
         lastKnownLon = pos.coords.longitude;
         userLat = pos.coords.latitude;
@@ -1677,7 +1617,7 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
           pics.set([]);
           page = 0;
           hasMoreImages = true;
-          loadMore('initial mount');
+          loadMore('initial GPS mount');
         }
         gpsWatchId = navigator.geolocation.watchPosition(
           handlePositionUpdate,
@@ -1686,7 +1626,16 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
         );
         radiusCheckInterval = window.setInterval(checkRadiusForNewImages, RADIUS_CHECK_INTERVAL);
       },
-      (error) => console.error('Initial GPS error:', error),
+      (error) => {
+        console.error('Initial GPS error:', error);
+        if (error.code === error.PERMISSION_DENIED) {
+          gpsStatus = 'denied';
+        } else {
+          gpsStatus = 'unavailable';
+        }
+        showGPSMessage = true;
+        gpsTrackingActive = false;
+      },
       { enableHighAccuracy: true, timeout: 10000 }
     );
   }
@@ -1755,6 +1704,112 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
     return maxDistance > 10000; // 10km threshold - if farthest image is >10km away, reload
   }
 
+  // INTELLIGENTE COVERAGE-PRÜFUNG: Erkenne ob User außerhalb des gecachten Bereichs ist
+  async function checkIfUserOutsideCoverage(currentPics: any[]): Promise<boolean> {
+    if (!userLat || !userLon || currentPics.length === 0) return true;
+    
+    // Check if user has moved completely outside the cached area
+    // This happens when images are only available in one direction or none at all
+    
+    const coverageRadius = 5000; // 5km radius für Coverage-Check
+    const directions = [
+      { name: 'N', lat: 1, lon: 0 },   // North
+      { name: 'NO', lat: 1, lon: 1 },  // Northeast  
+      { name: 'O', lat: 0, lon: 1 },   // East
+      { name: 'SO', lat: -1, lon: 1 }, // Southeast
+      { name: 'S', lat: -1, lon: 0 },  // South
+      { name: 'SW', lat: -1, lon: -1 }, // Southwest
+      { name: 'W', lat: 0, lon: -1 },  // West
+      { name: 'NW', lat: 1, lon: -1 }  // Northwest
+    ];
+    
+    let coveredDirections = 0;
+    const checkDistance = 3000; // 3km from center to check each direction
+    
+    for (const direction of directions) {
+      const checkLat = userLat + (direction.lat * checkDistance / 111000);
+      const checkLon = userLon + (direction.lon * checkDistance / (111000 * Math.cos(userLat * Math.PI / 180)));
+      
+      const imagesInDirection = currentPics.filter((pic: any) => {
+        if (!pic.lat || !pic.lon) return false;
+        const distance = getDistanceInMeters(checkLat, checkLon, pic.lat, pic.lon);
+        return distance <= coverageRadius;
+      });
+      
+      if (imagesInDirection.length > 0) {
+        coveredDirections++;
+      }
+    }
+    
+    // Wenn weniger als 3 Richtungen abgedeckt sind, ist der User außerhalb des Cached-Bereichs
+    const isOutsideCoverage = coveredDirections < 3;
+    
+    console.log(`[Coverage Check] Covered directions: ${coveredDirections}/8, outside coverage: ${isOutsideCoverage}`);
+    
+    return isOutsideCoverage;
+  }
+
+  // State für "Keine Items in der Nähe" Meldung
+  let showNoItemsMessage = false;
+  let noItemsMessageTimeout: ReturnType<typeof setTimeout> | null = null;
+  let showMap = false;
+
+  // EFFIZIENTES NACHLADEN: Verhindert übermäßige Server-Anfragen
+  async function loadMoreEfficiently(reason = 'default') {
+    if (!userLat || !userLon) {
+      await loadMore(reason);
+      return;
+    }
+    
+    console.log(`[Efficient Load] Attempting efficient load, reason: ${reason}`);
+    
+    // Versuche zuerst eine kleine Stichprobe zu laden um zu prüfen ob überhaupt Bilder vorhanden sind
+    const { data: sampleData, error } = await supabase
+      .from('items')
+      .select('id,lat,lon')
+      .not('lat', 'is', null)
+      .not('lon', 'is', null)
+      .limit(100) // Kleine Stichprobe
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error('[Efficient Load] Error loading sample:', error);
+      await loadMore(reason);
+      return;
+    }
+    
+    if (!sampleData || sampleData.length === 0) {
+      console.log('[Efficient Load] No images with GPS data found');
+      showNoItemsMessage = true;
+      return;
+    }
+    
+    // Prüfe ob es Bilder im 25km Umkreis gibt
+    const nearbyImages = sampleData.filter((img: any) => {
+      const distance = getDistanceInMeters(userLat!, userLon!, img.lat, img.lon);
+      return distance <= 25000; // 25km radius
+    });
+    
+    if (nearbyImages.length === 0) {
+      console.log('[Efficient Load] No images within 25km radius found');
+      showNoItemsMessage = true;
+      
+      // Auto-hide message after 10 seconds
+      if (noItemsMessageTimeout) clearTimeout(noItemsMessageTimeout);
+      noItemsMessageTimeout = setTimeout(() => {
+        showNoItemsMessage = false;
+      }, 10000);
+      
+      return;
+    }
+    
+    console.log(`[Efficient Load] Found ${nearbyImages.length} images within 25km, proceeding with normal load`);
+    showNoItemsMessage = false;
+    
+    // Normale Ladung wenn Bilder in der Nähe verfügbar sind
+    await loadMore(reason);
+  }
+
   function resortExistingImages() {
     if (!userLat || !userLon || !$pics.length) return;
     
@@ -1790,9 +1845,24 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
       return distance <= 5000; // 5km radius
     });
 
+    // NEUE PRÜFUNG: Auch hier den 100-Bilder-Schwellenwert für erweiterten Radius prüfen
+    const widerRadiusImages = currentPics.filter((pic: any) => {
+      if (!pic.lat || !pic.lon || !userLat || !userLon) return false;
+      const distance = getDistanceInMeters(userLat, userLon, pic.lat, pic.lon);
+      return distance <= 10000; // 10km radius für 100-Bilder-Check
+    });
+
+    // Priorität 1: Proaktives Nachladen bei weniger als 100 Bildern im 10km Umkreis
+    if (widerRadiusImages.length < 100) {
+      console.log(`[Radius Check] Only ${widerRadiusImages.length} images in 10km radius (< 100 threshold), proactively loading more for offline capability...`);
+      loadMore('radius-check-proactive-100-threshold');
+      return;
+    }
+
+    // Priorität 2: Standard-Check für 5km Radius
     if (visibleImages.length < 20) {
-      console.log(`Only ${visibleImages.length} images in 5km radius, loading more...`);
-      loadMore();
+      console.log(`[Radius Check] Only ${visibleImages.length} images in 5km radius, loading more...`);
+      loadMore('radius-check-standard');
     }
   }
   
@@ -1808,6 +1878,24 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
     gpsTrackingActive = false;
     console.log('GPS tracking stopped');
   }
+
+  // Funktion um GPS-Koordinaten von der Karte zu erhalten
+  function setLocationFromMap(lat: number, lon: number) {
+    userLat = lat;
+    userLon = lon;
+    saveLastKnownLocation(lat, lon);
+    gpsStatus = 'available';
+    showGPSMessage = false;
+    
+    if (showDistance && !searchQuery.trim()) {
+      pics.set([]);
+      page = 0;
+      hasMoreImages = true;
+      loadMore('location from map');
+    }
+    
+    console.log(`Location set from map: ${lat}, ${lon}`);
+  }
   
   async function reloadGalleryWithNewPosition() {
     if (!isLoggedIn || !showDistance) return;
@@ -1819,106 +1907,39 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
     
     console.log('Reloading gallery with fresh GPS position...');
     
-    // First, get a fresh GPS position to ensure we have the most current location
-    try {
-      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 0 // Force fresh position
-        });
+    // INTELLIGENTE TELEPORTATIONSERKENNUNG
+    const currentPics = get(pics);
+    const shouldReloadFromNewPosition = await checkIfUserOutsideCoverage(currentPics);
+    
+    if (shouldReloadFromNewPosition) {
+      console.log('[Teleportation] User outside cached coverage area, reloading from new position');
+      pics.set([]);
+      page = 0;
+      hasMoreImages = true;
+      
+      // Versuche effizientes Nachladen von neuer Position
+      await loadMoreEfficiently('teleportation-detected');
+      return;
+    }
+    
+    // Normale Positionsaktualisierung: Nur bestehende Bilder neu sortieren
+    if (currentPics.length > 0) {
+      console.log(`[Position Update] Resorting ${currentPics.length} existing images by new position`);
+      const sortedPics = [...currentPics].sort((a: any, b: any) => {
+        const distA = a.lat && a.lon && userLat && userLon ? getDistanceInMeters(userLat, userLon, a.lat, a.lon) : Number.MAX_VALUE;
+        const distB = b.lat && b.lon && userLat && userLon ? getDistanceInMeters(userLat, userLon, b.lat, b.lon) : Number.MAX_VALUE;
+        return distA - distB;
       });
       
-      // Update position variables
-      const newLat = position.coords.latitude;
-      const newLon = position.coords.longitude;
+      pics.set(sortedPics);
+      console.log('Gallery resorted by distance based on new position');
       
-      console.log(`Fresh GPS position: ${newLat}, ${newLon}`);
-      
-      // Update stored positions
-      lastKnownLat = newLat;
-      lastKnownLon = newLon;
-      userLat = newLat;
-      userLon = newLon;
-      
-      // Now reload gallery with fresh position
-      const { data } = await supabase
-        .from('items')
-        .select('id,path_512,path_2048,width,height,lat,lon,title,description,keywords')
-        .not('lat', 'is', null)
-        .not('lon', 'is', null);
-      
-      if (data) {
-        const allPics = data.map((d: any) => ({
-          id: d.id,
-          src: d.path_512 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${d.path_512}` : '',
-          srcHD: d.path_2048 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${d.path_2048}` : '',
-          width: d.width,
-          height: d.height,
-          lat: d.lat,
-          lon: d.lon,
-          title: d.title,
-          description: d.description,
-          keywords: d.keywords
-        })).filter((pic: any) => pic.path_512); // Filter out images without path_512
-
-        // Sort by distance to fresh position
-        const sortedPics = allPics.sort((a, b) => {
-          const distA = a.lat && a.lon ? getDistanceInMeters(userLat!, userLon!, a.lat, a.lon) : Number.MAX_VALUE;
-          const distB = b.lat && b.lon ? getDistanceInMeters(userLat!, userLon!, b.lat, b.lon) : Number.MAX_VALUE;
-          return distA - distB;
-        });
-
-        pics.set(sortedPics);
-        hasMoreImages = false;
-        console.log(`Gallery reordered with fresh position: ${sortedPics.length} images sorted by distance`);
-        
-        // Announce first image if autoguide is enabled
-        if (autoguide && sortedPics.length > 0) {
-          setTimeout(() => announceFirstImage(), 500);
-        }
-      }
-    } catch (error) {
-      console.error('Error getting fresh GPS position or reloading gallery:', error);
-      // Fallback: try with current position if fresh position fails
-      if (userLat !== null && userLon !== null) {
-        console.log('Falling back to current position...');
-        // Use existing reloadGalleryWithNewPosition logic with current position
-        try {
-          const { data } = await supabase
-            .from('items')
-            .select('id,path_512,path_2048,width,height,lat,lon,title,description,keywords')
-            .not('lat', 'is', null)
-            .not('lon', 'is', null);
-          
-          if (data) {
-            const allPics = data.map((d: any) => ({
-              id: d.id,
-              src: d.path_512 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${d.path_512}` : '',
-              srcHD: d.path_2048 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${d.path_2048}` : '',
-              width: d.width,
-              height: d.height,
-              lat: d.lat,
-              lon: d.lon,
-              title: d.title,
-              description: d.description,
-              keywords: d.keywords
-            })).filter((pic: any) => pic.path_512); // Filter out images without path_512
-
-            const sortedPics = allPics.sort((a, b) => {
-              const distA = a.lat && a.lon ? getDistanceInMeters(userLat!, userLon!, a.lat, a.lon) : Number.MAX_VALUE;
-              const distB = b.lat && b.lon ? getDistanceInMeters(userLat!, userLon!, b.lat, b.lon) : Number.MAX_VALUE;
-              return distA - distB;
-            });
-
-            pics.set(sortedPics);
-            hasMoreImages = false;
-            console.log(`Gallery reordered with fallback position: ${sortedPics.length} images sorted by distance`);
-          }
-        } catch (fallbackError) {
-          console.error('Fallback gallery reload also failed:', fallbackError);
-        }
-      }
+      // Prüfe ob mehr Bilder geladen werden müssen
+      checkAndLoadMoreImages();
+    } else {
+      // Keine gecachten Bilder: Normale Erstladung
+      console.log('[Position Update] No cached images, loading fresh');
+      await loadMoreEfficiently('fresh-position-no-cache');
     }
   }
 
@@ -2051,12 +2072,26 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
     if (sessionPics) {
       pics.set(JSON.parse(sessionPics));
     } else {
-      // Galerie erst laden, nachdem alle Einstellungen geladen sind
-      // Aber nur wenn keine Suche aktiv ist
-      if (!showDistance && !searchParam) {
-        loadMore('initial mount');
+      // Galerie laden abhängig von Entfernungseinstellung
+      if (!searchParam) {
+        if (showDistance) {
+          // Bei aktivierter Entfernungsanzeige: Nur laden wenn GPS verfügbar
+          const lastLocation = loadLastKnownLocation();
+          if (lastLocation && lastLocation.lat !== null && lastLocation.lon !== null) {
+            userLat = lastLocation.lat;
+            userLon = lastLocation.lon;
+            gpsStatus = 'available';
+            loadMore('initial mount with last known location');
+          } else {
+            // Keine GPS-Daten verfügbar: Meldung anzeigen
+            gpsStatus = 'unavailable';
+            showGPSMessage = true;
+          }
+        } else {
+          // Normale Ansicht: Immer laden
+          loadMore('initial mount normal');
+        }
       }
-      // Wenn showDistance aktiv ist, wird loadMore im GPS-Callback von startGPSTracking aufgerufen
     }
 
     window.addEventListener('scroll', handleScroll, { passive: true });
@@ -2084,20 +2119,6 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
         gpsSimulationActive = false;
       }
     });
-
-    // Vor dem ersten GPS-Fix: Letzte bekannte Koordinaten verwenden
-    if (showDistance && (userLat === null || userLon === null)) {
-      const lastLocation = loadLastKnownLocation();
-      if (lastLocation && lastLocation.lat !== null && lastLocation.lon !== null) {
-        userLat = lastLocation.lat;
-        userLon = lastLocation.lon;
-        // Galerie mit diesen Koordinaten laden
-        pics.set([]);
-        page = 0;
-        hasMoreImages = true;
-        loadMore('last known location');
-      }
-    }
 
     return () => {
       window.removeEventListener('scroll', handleScroll);
@@ -2220,6 +2241,13 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
       return distance <= 5000; // 5km radius
     });
     
+    // Check coverage in wider radius for the 100-image threshold
+    const widerRadiusImages = currentPics.filter((pic: any) => {
+      if (!pic.lat || !pic.lon) return false;
+      const distance = getDistanceInMeters(userLat as number, userLon as number, pic.lat, pic.lon);
+      return distance <= 10000; // 10km radius for 100-image check
+    });
+    
     // Find the nearest image to check if we're too far from any cached images
     const imagesWithGPS = currentPics.filter((pic: any) => pic.lat && pic.lon);
     let nearestDistance = Infinity;
@@ -2231,27 +2259,27 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
     
     console.log(`[Auto-Load] Current position: ${userLat}, ${userLon}`);
     console.log(`[Auto-Load] Nearby images (5km): ${nearbyImages.length}`);
+    console.log(`[Auto-Load] Images in wider radius (10km): ${widerRadiusImages.length}`);
     console.log(`[Auto-Load] Total loaded images: ${currentPics.length}`);
     console.log(`[Auto-Load] Nearest image distance: ${nearestDistance.toFixed(0)}m`);
     console.log(`[Auto-Load] Coverage check - Uncovered directions: ${uncoveredDirections.join(', ') || 'All covered'}`);
     
-    // If we have no nearby images at all, reset and load from new position
-    if (nearbyImages.length === 0 && currentPics.length > 0) {
-      console.log(`[Auto-Load] No nearby images found, resetting and loading from new position...`);
+    // INTELLIGENTE TELEPORTATIONSERKENNUNG: Prüfe ob User außerhalb der Coverage ist
+    const isOutsideCoverage = await checkIfUserOutsideCoverage(currentPics);
+    if (isOutsideCoverage && currentPics.length > 0) {
+      console.log(`[Auto-Load] User outside cached coverage area, reloading efficiently...`);
       pics.set([]);
       page = 0;
       hasMoreImages = true;
-      await loadMore('auto-load-new-position');
+      await loadMoreEfficiently('auto-load-outside-coverage');
       return;
     }
     
-    // If the nearest image is more than 10km away, we're probably outside the cached area
-    if (nearestDistance > 10000 && currentPics.length > 0) {
-      console.log(`[Auto-Load] Nearest image is ${nearestDistance.toFixed(0)}m away (>10km), resetting and loading from new position...`);
-      pics.set([]);
-      page = 0;
-      hasMoreImages = true;
-      await loadMore('auto-load-outside-cached-area');
+    // NEUE PRÜFUNG: Proaktives Nachladen bei weniger als 100 Bildern im Umkreis
+    // Dies passiert BEVOR der Benutzer den aktuellen Radius verlässt
+    if (widerRadiusImages.length < 100 && hasMoreImages) {
+      console.log(`[Auto-Load] Only ${widerRadiusImages.length} images in 10km radius (< 100 threshold), proactively loading more for offline capability...`);
+      await loadMore('auto-load-proactive-100-threshold');
       return;
     }
     
@@ -2611,6 +2639,42 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
   <img src="/culoca-logo-512px.png" alt="Culoca" class="culoca-logo" />
 {/if}
 
+<!-- GPS Status Message -->
+{#if isLoggedIn && showDistance && showGPSMessage}
+  <div class="gps-message">
+    <div class="gps-message-content">
+      {#if gpsStatus === 'checking'}
+        <div class="gps-spinner"></div>
+        <p>GPS wird aktiviert...</p>
+      {:else if gpsStatus === 'denied'}
+        <div class="gps-icon error">📍</div>
+        <h3>GPS-Berechtigung erforderlich</h3>
+        <p>Für die Entfernungsanzeige benötigen wir Ihren Standort. Bitte aktivieren Sie GPS in Ihren Browser-Einstellungen.</p>
+        <div class="gps-actions">
+          <button class="gps-btn primary" on:click={() => showFullscreenMap = true}>
+            🗺️ Standort auf Karte wählen
+          </button>
+          <button class="gps-btn secondary" on:click={() => {showDistance = false; loadMore('disable distance');}}>
+            Ohne GPS fortfahren
+          </button>
+        </div>
+      {:else if gpsStatus === 'unavailable'}
+        <div class="gps-icon error">❌</div>
+        <h3>GPS nicht verfügbar</h3>
+        <p>GPS ist auf diesem Gerät oder in diesem Browser nicht verfügbar.</p>
+        <div class="gps-actions">
+          <button class="gps-btn primary" on:click={() => showFullscreenMap = true}>
+            🗺️ Standort auf Karte wählen
+          </button>
+          <button class="gps-btn secondary" on:click={() => {showDistance = false; loadMore('disable distance');}}>
+            Ohne GPS fortfahren
+          </button>
+        </div>
+      {/if}
+    </div>
+  </div>
+{/if}
+
 <!-- NewsFlash Component -->
 {#if isLoggedIn && newsFlashMode !== 'aus'}
   <NewsFlash 
@@ -2778,6 +2842,29 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
     <div class="empty-state">
       <h3>Noch keine Bilder vorhanden</h3>
       <p>Lade deine ersten Bilder hoch, um die Galerie zu starten!</p>
+    </div>
+  {/if}
+
+  <!-- Keine Items in der Nähe Meldung -->
+  {#if showNoItemsMessage}
+    <div class="no-items-message">
+      <div class="no-items-content">
+        <div class="no-items-icon">🗺️</div>
+        <h3>Keine Items in der Nähe</h3>
+        <p>In einem Umkreis von 25km sind keine Bilder verfügbar.</p>
+        <p>Du kannst auf der Karte navigieren, um Bereiche mit Items zu finden.</p>
+        <div class="no-items-actions">
+          <button class="map-nav-btn" on:click={() => showMap = true}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM10 5.47l4 1.4v11.66l-4-1.4V5.47z"/>
+            </svg>
+            Karte öffnen
+          </button>
+          <button class="dismiss-btn" on:click={() => showNoItemsMessage = false}>
+            Verstanden
+          </button>
+        </div>
+      </div>
     </div>
   {/if}
 
@@ -4032,12 +4119,205 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
         padding: 0.18rem 0.7rem;
       }
       
-      .datenschutz-link {
-        left: 6.5rem;
-        bottom: 0.7rem;
-        font-size: 0.85rem;
-        padding: 0.18rem 0.7rem;
-      }
+        .datenschutz-link {
+    left: 6.5rem;
+    bottom: 0.7rem;
+    font-size: 0.85rem;
+    padding: 0.18rem 0.7rem;
+  }
+
+  /* GPS Message Styles */
+  .gps-message {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    padding: 1rem;
+  }
+
+  .gps-message-content {
+    background: var(--bg-primary);
+    border-radius: 16px;
+    padding: 2rem;
+    max-width: 400px;
+    text-align: center;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  }
+
+  .gps-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid var(--border-color);
+    border-top: 4px solid var(--accent-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1rem;
+  }
+
+  .gps-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+  }
+
+  .gps-icon.error {
+    color: var(--error-color);
+  }
+
+  .gps-message h3 {
+    margin: 0 0 1rem 0;
+    color: var(--text-primary);
+    font-size: 1.3rem;
+  }
+
+  .gps-message p {
+    margin: 0 0 1.5rem 0;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+
+  .gps-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .gps-btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .gps-btn.primary {
+    background: var(--accent-color);
+    color: white;
+  }
+
+  .gps-btn.primary:hover {
+    background: var(--accent-hover);
+  }
+
+  .gps-btn.secondary {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+  }
+
+  .gps-btn.secondary:hover {
+    background: var(--border-color);
+  }
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  /* Keine Items in der Nähe Meldung */
+  .no-items-message {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 1rem;
+  }
+
+  .no-items-content {
+    background: var(--bg-secondary);
+    border-radius: 16px;
+    padding: 2rem;
+    max-width: 400px;
+    width: 100%;
+    text-align: center;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 8px 32px var(--shadow);
+  }
+
+  .no-items-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    display: block;
+  }
+
+  .no-items-content h3 {
+    margin: 0 0 1rem 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  .no-items-content p {
+    margin: 0 0 1rem 0;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+
+  .no-items-actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+    flex-direction: column;
+  }
+
+  .map-nav-btn, .dismiss-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: 600;
+    transition: all 0.2s ease;
+  }
+
+  .map-nav-btn {
+    background: var(--accent-color);
+    color: white;
+  }
+
+  .map-nav-btn:hover {
+    background: var(--accent-hover);
+    transform: translateY(-1px);
+  }
+
+  .dismiss-btn {
+    background: var(--bg-primary);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+  }
+
+  .dismiss-btn:hover {
+    background: var(--border-color);
+    color: var(--text-primary);
+  }
+
+  @media (max-width: 768px) {
+    .no-items-content {
+      padding: 1.5rem;
+      margin: 1rem;
+    }
+
+    .no-items-actions {
+      flex-direction: column;
+    }
+  }
   }
 </style>
 
@@ -4053,6 +4333,7 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
       showFullscreenMap = false;
       location.href = `/item/${event.detail.imageId}`;
     }}
+    on:locationSelected={(event) => setLocationFromMap(event.detail.lat, event.detail.lon)}
   />
 {/if}
 

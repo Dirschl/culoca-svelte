@@ -203,6 +203,21 @@
     // Save map state on zoom/move
     map.on('zoomend moveend', saveMapState);
     
+    // Handle map clicks for location selection
+    map.on('click', function(e: any) {
+      const { lat, lng } = e.latlng;
+      console.log(`Map clicked at: ${lat}, ${lng}`);
+      
+      // Dispatch location selected event
+      dispatch('locationSelected', {
+        lat: lat,
+        lon: lng
+      });
+      
+      // Close the map after selection
+      dispatch('close');
+    });
+    
     mapInitialized = true;
     
     // Load all images for clustering

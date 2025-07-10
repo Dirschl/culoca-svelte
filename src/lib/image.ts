@@ -41,6 +41,9 @@ export function getImageQualitySettings() {
 }
 
 export async function resizeJPG(buffer: Buffer) {
+  // Hole die Qualitätseinstellungen aus den Environment-Variablen
+  const settings = getImageQualitySettings();
+  
   const metadata = await sharp(buffer).metadata();
   const { width: originalWidth, height: originalHeight } = metadata;
   
@@ -63,38 +66,50 @@ export async function resizeJPG(buffer: Buffer) {
 
   console.log(`Resizing from ${originalWidth}x${originalHeight} to ${targetWidth2048}x${targetHeight2048}`);
 
-  // Helper function to generate image in the correct format
-  const generateImage = async (width: number, height: number) => {
-    return sharp(buffer)
+  // Helper function to generate image in the correct format and quality
+  const generateImage = async (width: number, height: number, format: 'webp' | 'jpg', quality: number) => {
+    const sharpInstance = sharp(buffer)
       .resize(width, height, { 
         fit: 'inside', 
         withoutEnlargement: true 
-      })
-      .jpeg({ 
-        mozjpeg: true, 
-        quality: 80,
-        progressive: true,
-        chromaSubsampling: '4:2:0',
-        trellisQuantisation: true,
-        overshootDeringing: true,
-        optimizeScans: true
-      })
-      .toBuffer();
+      });
+
+    if (format === 'webp') {
+      return sharpInstance
+        .webp({ 
+          quality,
+          effort: 6,
+          smartSubsample: true
+        })
+        .toBuffer();
+    } else {
+      return sharpInstance
+        .jpeg({ 
+          mozjpeg: true, 
+          quality,
+          progressive: true,
+          chromaSubsampling: '4:2:0',
+          trellisQuantisation: true,
+          overshootDeringing: true,
+          optimizeScans: true
+        })
+        .toBuffer();
+    }
   };
 
-  // Generate all versions with fixed settings
+  // Generate all versions with environment-based settings
   const [version2048, version512, version64] = await Promise.all([
-    generateImage(targetWidth2048, targetHeight2048),
-    generateImage(512, 512),
-    generateImage(64, 64)
+    generateImage(targetWidth2048, targetHeight2048, settings.format2048, settings.quality2048),
+    generateImage(512, 512, settings.format512, settings.quality512),
+    generateImage(64, 64, settings.format64, settings.quality64)
   ]);
 
   // Return with dynamic keys based on actual formats used
   const result: any = {
     original: buffer,
-    jpg2048: version2048,
-    jpg512: version512,
-    jpg64: version64
+    [`${settings.format2048}2048`]: version2048,
+    [`${settings.format512}512`]: version512,
+    [`${settings.format64}64`]: version64
   };
 
   return result;

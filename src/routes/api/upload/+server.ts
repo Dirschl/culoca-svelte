@@ -165,6 +165,7 @@ export const POST = async ({ request }) => {
 
         // STEP 3: Resize image using the original buffer
         console.log('📤 STEP 3: Resizing image...');
+        const qualitySettings = getImageQualitySettings();
         const sizes = await resizeJPG(buf);
         console.log('✅ Image resized successfully');
 
@@ -368,17 +369,36 @@ export const POST = async ({ request }) => {
         // STEP 4: Upload resized versions to Supabase storage
         console.log('📤 STEP 4: Uploading resized versions to Supabase storage...');
         
+        // Bestimme die tatsächlichen Formate und Buffer-Keys
+        const format2048Key = `${qualitySettings.format2048}2048`;
+        const format512Key = `${qualitySettings.format512}512`;
+        const format64Key = `${qualitySettings.format64}64`;
+        
+        const contentType2048 = qualitySettings.format2048 === 'webp' ? 'image/webp' : 'image/jpeg';
+        const contentType512 = qualitySettings.format512 === 'webp' ? 'image/webp' : 'image/jpeg';
+        const contentType64 = qualitySettings.format64 === 'webp' ? 'image/webp' : 'image/jpeg';
+        
+        // Bestimme die Dateiendungen
+        const extension2048 = qualitySettings.format2048 === 'webp' ? '.webp' : '.jpg';
+        const extension512 = qualitySettings.format512 === 'webp' ? '.webp' : '.jpg';
+        const extension64 = qualitySettings.format64 === 'webp' ? '.webp' : '.jpg';
+        
+        // Erstelle Dateinamen mit korrekten Endungen
+        const filename2048 = filename.replace(/\.[^.]+$/, extension2048);
+        const filename512 = filename.replace(/\.[^.]+$/, extension512);
+        const filename64 = filename.replace(/\.[^.]+$/, extension64);
+        
         // Upload 2048px version
         let upload2048Error = null;
-        let uploadFilename = filename;
+        let uploadFilename = filename2048;
         
-        console.log(`📸 Uploading 2048px version: ${uploadFilename} (format: jpg)`);
+        console.log(`📸 Uploading 2048px version: ${uploadFilename} (format: ${qualitySettings.format2048}, quality: ${qualitySettings.quality2048})`);
         
         try {
           const { error: error2048 } = await supabase.storage
             .from('images-2048')
-            .upload(uploadFilename, sizes.jpg2048, { 
-              contentType: 'image/jpeg',
+            .upload(uploadFilename, sizes[format2048Key], { 
+              contentType: contentType2048,
               upsert: false
             });
           upload2048Error = error2048;
@@ -397,13 +417,13 @@ export const POST = async ({ request }) => {
         let uploadError = null;
         let uploadData = null;
         
-        console.log(`📸 Uploading 512px version: ${filename} (format: jpg)`);
+        console.log(`📸 Uploading 512px version: ${filename512} (format: ${qualitySettings.format512}, quality: ${qualitySettings.quality512})`);
         
         try {
           const { data, error } = await supabase.storage
             .from('images-512')
-            .upload(filename, sizes.jpg512, { 
-              contentType: 'image/jpeg',
+            .upload(filename512, sizes[format512Key], { 
+              contentType: contentType512,
               upsert: false
             });
           uploadData = data;
@@ -422,13 +442,13 @@ export const POST = async ({ request }) => {
         // Upload 64px version for map markers
         let upload64Error = null;
         
-        console.log(`📸 Uploading 64px version: ${filename} (format: jpg)`);
+        console.log(`📸 Uploading 64px version: ${filename64} (format: ${qualitySettings.format64}, quality: ${qualitySettings.quality64})`);
         
         try {
           const { error: error64 } = await supabase.storage
             .from('images-64')
-            .upload(filename, sizes.jpg64, { 
-              contentType: 'image/jpeg',
+            .upload(filename64, sizes[format64Key], { 
+              contentType: contentType64,
               upsert: false
             });
           upload64Error = error64;
@@ -538,15 +558,15 @@ export const POST = async ({ request }) => {
           id,
           profile_id: authenticatedUser.id, // Use authenticatedUser.id as profile_id
           user_id: authenticatedUser.id,
-          path_512: filename,
+          path_512: filename512,
           path_2048: upload2048Error ? null : uploadFilename,
-          path_64: upload64Error ? null : filename,
+          path_64: upload64Error ? null : filename64,
           width,
           height,
           lat,
           lon,
           original_name: baseName,
-          image_format: 'jpg', // Always jpg now
+          image_format: qualitySettings.format512, // Use actual format from settings
           original_url: originalUrl, // Include original_url in main record
           ...(keywordsArray ? { keywords: keywordsArray } : {}),
           exif_data: Object.keys(exifToStore).length ? exifToStore : null
@@ -592,15 +612,15 @@ export const POST = async ({ request }) => {
             id,
             profile_id: authenticatedUser.id, // Use authenticatedUser.id as profile_id
             user_id: authenticatedUser.id,
-            path_512: filename,
+            path_512: filename512,
             path_2048: upload2048Error ? null : uploadFilename,
-            path_64: upload64Error ? null : filename,
+            path_64: upload64Error ? null : filename64,
             width,
             height,
             lat,
             lon,
             original_name: baseName,
-            image_format: 'jpg',
+            image_format: qualitySettings.format512,
             original_url: originalUrl, // Include original_url in fallback record
             ...(keywordsArray ? { keywords: keywordsArray } : {}),
             exif_data: Object.keys(exifToStore).length ? exifToStore : null
@@ -639,7 +659,7 @@ export const POST = async ({ request }) => {
           });
           // Clean up uploaded file if database insert fails
           console.log('Cleaning up uploaded file due to database error...');
-          await supabase.storage.from('images-512').remove([filename]);
+          await supabase.storage.from('images-512').remove([filename512]);
           throw error(500, `Database error: ${(dbError as any).message}`);
         }
 
