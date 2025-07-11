@@ -7,9 +7,12 @@
   import FloatingActionButtons from '$lib/FloatingActionButtons.svelte';
   import FullscreenMap from '$lib/FullscreenMap.svelte';
   import WelcomeSection from '$lib/WelcomeSection.svelte';
-import { beforeNavigate, afterNavigate } from '$app/navigation';
+  import FilterBar from '$lib/FilterBar.svelte';
+  import { beforeNavigate, afterNavigate } from '$app/navigation';
   import { showPublicContentModal } from '$lib/modalStore';
   import { welcomeVisible, hideWelcome, dismissWelcome, isWelcomeDismissed } from '$lib/welcomeStore';
+  import { filterStore, userFilter, locationFilter, hasActiveFilters } from '$lib/filterStore';
+  import { page as pageStore } from '$app/stores';
 
   import { updateGalleryStats, galleryStats } from '$lib/galleryStats';
 
@@ -33,6 +36,24 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
       window.dispatchEvent(new CustomEvent('displayedImageCountChanged', {
         detail: { displayedCount: displayedImageCount, totalCount: $galleryStats.totalCount }
       }));
+    }
+  }
+  
+  // Reaktive Funktion: Reload gallery when filters change
+  $: if ($filterStore && authChecked) {
+    console.log('[Filter Change] Filter store changed, reloading gallery:', $filterStore);
+    
+    // Don't reload during search
+    if (!searchQuery.trim() && !isSearching) {
+      // Reset gallery state
+      pics.set([]);
+      page = 0;
+      hasMoreImages = true;
+      
+      // Small delay to ensure filter state is properly set
+      setTimeout(() => {
+        loadMore('filter change');
+      }, 100);
     }
   }
   
@@ -754,9 +775,15 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
       
       // Only resort existing images, don't reload from server
       if ($pics.length > 0) {
+        // Get current filter state for effective coordinates
+        const currentFilters = get(filterStore);
+        const hasLocationFilter = currentFilters.locationFilter !== null;
+        const effectiveLat = hasLocationFilter ? currentFilters.locationFilter!.lat : userLat;
+        const effectiveLon = hasLocationFilter ? currentFilters.locationFilter!.lon : userLon;
+        
         const sortedPics = [...$pics].sort((a, b) => {
-          const distA = a.lat && a.lon ? getDistanceInMeters(userLat!, userLon!, a.lat, a.lon) : Number.MAX_VALUE;
-          const distB = b.lat && b.lon ? getDistanceInMeters(userLat!, userLon!, b.lat, b.lon) : Number.MAX_VALUE;
+          const distA = a.lat && a.lon ? getDistanceInMeters(effectiveLat!, effectiveLon!, a.lat, a.lon) : Number.MAX_VALUE;
+          const distB = b.lat && b.lon ? getDistanceInMeters(effectiveLat!, effectiveLon!, b.lat, b.lon) : Number.MAX_VALUE;
           return distA - distB;
         });
         
@@ -990,36 +1017,50 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
 
     let data;
     
-    // TEMPORÄRE LÖSUNG: Verwende bestehende images_by_distance Funktion mit client-seitiger Sortierung
-    if (isLoggedIn && showDistance && userLat !== null && userLon !== null) {
-      console.log(`[Gallery] Loading images by distance from ${userLat}, ${userLon}`);
+    // Get current filter state
+    const currentFilters = get(filterStore);
+    const hasUserFilter = currentFilters.userFilter !== null;
+    const hasLocationFilter = currentFilters.locationFilter !== null;
+    const effectiveLat = hasLocationFilter ? currentFilters.locationFilter!.lat : userLat;
+    const effectiveLon = hasLocationFilter ? currentFilters.locationFilter!.lon : userLon;
+    
+    console.log(`[Gallery] Loading with filters:`, {
+      hasUserFilter,
+      hasLocationFilter,
+      effectiveLat,
+      effectiveLon,
+      userFilter: currentFilters.userFilter?.username,
+      locationFilter: currentFilters.locationFilter?.name
+    });
+    
+    // Use GPS-based loading if location is available (from GPS or location filter)
+    if ((isLoggedIn && showDistance && userLat !== null && userLon !== null) || hasLocationFilter) {
+      const loadLat = effectiveLat!;
+      const loadLon = effectiveLon!;
+      console.log(`[Gallery] Loading images by distance from ${loadLat}, ${loadLon}`);
       
       try {
-        // Versuche zuerst die optimierte Funktion
+        // Use the optimized function with filter support
         const optimizedResult = await supabase.rpc('images_by_distance_optimized', {
-          user_lat: userLat,
-          user_lon: userLon,
-          max_radius_meters: 5000,
+          user_lat: loadLat,
+          user_lon: loadLon,
           max_results: size,
-          offset_count: page * size
+          offset_count: page * size,
+          filter_user_id: hasUserFilter ? currentFilters.userFilter!.userId : null
         });
         
         if (optimizedResult.error) {
           console.log('[Gallery] Optimized function not available, using fallback');
-          // Fallback: Verwende bestehende images_by_distance Funktion
-          const fallbackResult = await supabase.rpc('images_by_distance', {
-            user_lat: userLat,
-            user_lon: userLon,
-            page: page,
-            page_size: size * 2 // Lade mehr Bilder für bessere Sortierung
-          });
+          // Fallback: Use API endpoint with filter support
+          const response = await fetch(`/api/images?limit=${size}&offset=${page * size}&lat=${loadLat}&lon=${loadLon}${hasUserFilter ? `&filter_user_id=${currentFilters.userFilter!.userId}` : ''}`);
+          const fallbackResult = await response.json();
           
-          if (fallbackResult.error) {
-            console.error('[Gallery] Fallback function also failed:', fallbackResult.error);
+          if (fallbackResult.status !== 'success') {
+            console.error('[Gallery] Fallback API also failed:', fallbackResult.message);
             data = await loadImagesNormal();
           } else {
-            data = fallbackResult.data;
-            console.log(`[Gallery] Loaded ${data?.length || 0} images via fallback distance function`);
+            data = fallbackResult.images;
+            console.log(`[Gallery] Loaded ${data?.length || 0} images via fallback API`);
           }
         } else {
           data = optimizedResult.data;
@@ -1034,8 +1075,21 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
         data = await loadImagesNormal();
       }
     } else {
-      // Normaler Modus: Pagination
-      data = await loadImagesNormal();
+      // Normal mode: Use API endpoint with possible user filter
+      if (hasUserFilter) {
+        const response = await fetch(`/api/images?limit=${size}&offset=${page * size}&filter_user_id=${currentFilters.userFilter!.userId}`);
+        const result = await response.json();
+        if (result.status === 'success') {
+          data = result.images;
+          console.log(`[Gallery] Loaded ${data?.length || 0} images with user filter`);
+        } else {
+          console.error('[Gallery] Error loading with user filter:', result.message);
+          data = await loadImagesNormal();
+        }
+      } else {
+        // Normal pagination without filters
+        data = await loadImagesNormal();
+      }
     }
 
     if (data && data.length > 0) {
@@ -1066,7 +1120,7 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
       }
       
       // Intelligente Bild-Verwaltung je nach Datenquelle
-      if (isLoggedIn && showDistance && userLat !== null && userLon !== null) {
+      if ((isLoggedIn && showDistance && userLat !== null && userLon !== null) || hasLocationFilter) {
         if (data[0]?.distance !== undefined) {
           // Optimierte Daten bereits sortiert - ersetze komplette Liste
           pics.set(newPics);
@@ -1077,14 +1131,14 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
             // Bei GPS-Modus: Ersetze alte Bilder komplett für bessere Sortierung
             const allImages = [...p, ...uniqueNewPics];
             
-            // Sortiere alle Bilder nach Entfernung
+            // Sortiere alle Bilder nach Entfernung (verwende effektive Koordinaten)
             const sortedImages = allImages.sort((a: any, b: any) => {
-              const distA = a.lat && a.lon ? getDistanceInMeters(userLat!, userLon!, a.lat, a.lon) : Number.MAX_VALUE;
-              const distB = b.lat && b.lon ? getDistanceInMeters(userLat!, userLon!, b.lat, b.lon) : Number.MAX_VALUE;
+              const distA = a.lat && a.lon ? getDistanceInMeters(effectiveLat!, effectiveLon!, a.lat, a.lon) : Number.MAX_VALUE;
+              const distB = b.lat && b.lon ? getDistanceInMeters(effectiveLat!, effectiveLon!, b.lat, b.lon) : Number.MAX_VALUE;
               return distA - distB;
             });
             
-            console.log(`[Gallery] Client-side sorted ${sortedImages.length} images by distance`);
+            console.log(`[Gallery] Client-side sorted ${sortedImages.length} images by distance from ${effectiveLat}, ${effectiveLon}`);
             return sortedImages;
           });
         }
@@ -1837,7 +1891,13 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
   }
 
   function resortExistingImages() {
-    if (!userLat || !userLon || !$pics.length) return;
+    // Get current filter state
+    const currentFilters = get(filterStore);
+    const hasLocationFilter = currentFilters.locationFilter !== null;
+    const effectiveLat = hasLocationFilter ? currentFilters.locationFilter!.lat : userLat;
+    const effectiveLon = hasLocationFilter ? currentFilters.locationFilter!.lon : userLon;
+    
+    if ((!effectiveLat || !effectiveLon) || !$pics.length) return;
     
     console.log('Resorting existing images based on new position...');
     
@@ -1847,14 +1907,14 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
       const sortedPics = [...$pics].sort((a: any, b: any) => {
         if (!a.lat || !a.lon || !b.lat || !b.lon) return 0;
         
-        const distA = a.lat && a.lon && userLat && userLon ? getDistanceInMeters(userLat, userLon, a.lat, a.lon) : Number.MAX_VALUE;
-        const distB = b.lat && b.lon && userLat && userLon ? getDistanceInMeters(userLat, userLon, b.lat, b.lon) : Number.MAX_VALUE;
+        const distA = a.lat && a.lon && effectiveLat && effectiveLon ? getDistanceInMeters(effectiveLat, effectiveLon, a.lat, a.lon) : Number.MAX_VALUE;
+        const distB = b.lat && b.lon && effectiveLat && effectiveLon ? getDistanceInMeters(effectiveLat, effectiveLon, b.lat, b.lon) : Number.MAX_VALUE;
         
         return distA - distB;
       });
       
       pics.set(sortedPics);
-      console.log(`[Resort] Resorted ${sortedPics.length} existing images by distance`);
+      console.log(`[Resort] Resorted ${sortedPics.length} existing images by distance from ${effectiveLat}, ${effectiveLon}`);
     }, 300); // Kürzeres Delay für bessere Responsiveness
   }
 
@@ -1955,14 +2015,21 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
     // Normale Positionsaktualisierung: Nur bestehende Bilder neu sortieren
     if (currentPics.length > 0) {
       console.log(`[Position Update] Resorting ${currentPics.length} existing images by new position`);
+      
+      // Get current filter state for effective coordinates
+      const currentFilters = get(filterStore);
+      const hasLocationFilter = currentFilters.locationFilter !== null;
+      const effectiveLat = hasLocationFilter ? currentFilters.locationFilter!.lat : userLat;
+      const effectiveLon = hasLocationFilter ? currentFilters.locationFilter!.lon : userLon;
+      
       const sortedPics = [...currentPics].sort((a: any, b: any) => {
-        const distA = a.lat && a.lon && userLat && userLon ? getDistanceInMeters(userLat, userLon, a.lat, a.lon) : Number.MAX_VALUE;
-        const distB = b.lat && b.lon && userLat && userLon ? getDistanceInMeters(userLat, userLon, b.lat, b.lon) : Number.MAX_VALUE;
+        const distA = a.lat && a.lon && effectiveLat && effectiveLon ? getDistanceInMeters(effectiveLat, effectiveLon, a.lat, a.lon) : Number.MAX_VALUE;
+        const distB = b.lat && b.lon && effectiveLat && effectiveLon ? getDistanceInMeters(effectiveLat, effectiveLon, b.lat, b.lon) : Number.MAX_VALUE;
         return distA - distB;
       });
       
       pics.set(sortedPics);
-      console.log('Gallery resorted by distance based on new position');
+      console.log(`Gallery resorted by distance based on new position (${effectiveLat}, ${effectiveLon})`);
       
       // Prüfe ob mehr Bilder geladen werden müssen
       checkAndLoadMoreImages();
@@ -2000,6 +2067,9 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
       autoguide = false;
       newsFlashMode = 'alle';
     }
+
+    // Initialize filter store from URL parameters
+    filterStore.initFromUrl($pageStore.url.searchParams);
 
     // Check for URL parameters
     const urlParams = new URLSearchParams(window.location.search);
@@ -2452,11 +2522,16 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
           path_2048: d.path_2048
         })).filter((pic: any) => pic.path_512); // Filter out images without path_512
         
-        // If user is logged in and has GPS coordinates, sort by distance
-        if (isLoggedIn && userLat !== null && userLon !== null) {
+        // If user is logged in and has GPS coordinates or location filter, sort by distance
+        const currentFilters = get(filterStore);
+        const hasLocationFilter = currentFilters.locationFilter !== null;
+        const effectiveLat = hasLocationFilter ? currentFilters.locationFilter!.lat : userLat;
+        const effectiveLon = hasLocationFilter ? currentFilters.locationFilter!.lon : userLon;
+        
+        if ((isLoggedIn && userLat !== null && userLon !== null) || hasLocationFilter) {
           searchPics.sort((a: any, b: any) => {
-            const distA = a.lat && a.lon && userLat && userLon ? getDistanceInMeters(userLat, userLon, a.lat, a.lon) : Number.MAX_VALUE;
-            const distB = b.lat && b.lon && userLat && userLon ? getDistanceInMeters(userLat, userLon, b.lat, b.lon) : Number.MAX_VALUE;
+            const distA = a.lat && a.lon && effectiveLat && effectiveLon ? getDistanceInMeters(effectiveLat, effectiveLon, a.lat, a.lon) : Number.MAX_VALUE;
+            const distB = b.lat && b.lon && effectiveLat && effectiveLon ? getDistanceInMeters(effectiveLat, effectiveLon, b.lat, b.lon) : Number.MAX_VALUE;
             return distA - distB;
           });
         }
@@ -2817,6 +2892,9 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
     }}
   />
 {/if}
+
+<!-- Filter Bar -->
+<FilterBar showOnMap={false} />
 
 <!-- Galerie bleibt erhalten -->
 <div class="gallery-container">

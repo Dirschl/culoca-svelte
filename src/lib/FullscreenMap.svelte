@@ -1,6 +1,9 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { createEventDispatcher } from 'svelte';
+  import { get } from 'svelte/store';
+  import FilterBar from './FilterBar.svelte';
+  import { filterStore, userFilter, locationFilter } from './filterStore';
   
   export let images: any[] = [];
   export let userLat: number | null = null;
@@ -124,13 +127,19 @@
     let initialLon = userLon || 13.4050;
     let initialZoom = savedZoom;
     
-    // Use saved center if available and no user position
-    if (savedCenter && !userLat && !userLon) {
-      [initialLat, initialLon] = savedCenter;
-    }
+    // Check if location filter is active - use filter coordinates as initial position
+    const initialFilters = get(filterStore);
+    const hasInitialLocationFilter = initialFilters.locationFilter !== null;
     
-    // If we have user position, use it
-    if (userLat && userLon) {
+    if (hasInitialLocationFilter) {
+      // Use location filter coordinates as initial position
+      initialLat = initialFilters.locationFilter!.lat;
+      initialLon = initialFilters.locationFilter!.lon;
+    } else if (savedCenter && !userLat && !userLon) {
+      // Use saved center if available and no user position
+      [initialLat, initialLon] = savedCenter;
+    } else if (userLat && userLon) {
+      // If we have user position, use it
       initialLat = userLat;
       initialLon = userLon;
     }
@@ -185,8 +194,11 @@
     // Add cluster group to map
     map.addLayer(markerClusterGroup);
     
-    // Add user marker if position available
-    if (userLat && userLon) {
+    // Add user marker if position available and no location filter is active
+    const currentFilters = get(filterStore);
+    const hasLocationFilter = currentFilters.locationFilter !== null;
+    
+    if (userLat && userLon && !hasLocationFilter) {
       const userIcon = leaflet.divIcon({
         className: 'user-marker-fullscreen',
         html: `<div style="background: #ff5252; width: 24px; height: 24px; border-radius: 50%; border: 4px solid white; box-shadow: 0 3px 8px rgba(0,0,0,0.5); transform: rotate(${deviceHeading || 0}deg);"></div>`,
@@ -197,7 +209,22 @@
       userMarker = leaflet.marker([userLat, userLon], { icon: userIcon }).addTo(map);
     }
     
-    // Add image markers
+    // Add image markers (filtered based on active filters)
+  function getFilteredImages() {
+    const currentFilters = get(filterStore);
+    let filteredImages = allImages;
+    
+    // Apply user filter
+    if (currentFilters.userFilter) {
+      filteredImages = filteredImages.filter(img => 
+        img.profile_id === currentFilters.userFilter!.userId
+      );
+    }
+    
+    return filteredImages;
+  }
+  
+  // Add image markers
     addImageMarkers();
     
     // Save map state on zoom/move
@@ -352,10 +379,17 @@
       
       // Calculate label text based on current display mode
       let labelText = '';
-      if (userLat !== null && userLon !== null) {
+      
+      // Get effective coordinates (location filter overrides GPS)
+      const currentFilters = get(filterStore);
+      const hasLocationFilter = currentFilters.locationFilter !== null;
+      const effectiveLat = hasLocationFilter ? currentFilters.locationFilter!.lat : userLat;
+      const effectiveLon = hasLocationFilter ? currentFilters.locationFilter!.lon : userLon;
+      
+      if (effectiveLat !== null && effectiveLon !== null) {
         if (showDistance) {
-          // Show distance
-          const distance = calculateDistance(userLat, userLon, image.lat, image.lon);
+          // Show distance from effective position
+          const distance = calculateDistance(effectiveLat, effectiveLon, image.lat, image.lon);
           labelText = formatDistance(distance);
         } else {
           // Show title (up to comma, max 60 chars)
@@ -409,23 +443,41 @@
   }
   
   function updateUserMarker() {
-    if (!map || !userLat || !userLon) return;
-    
     const leaflet = (window as any).L;
-    if (!leaflet) return;
+    if (!leaflet || !map) return;
     
-    const userIcon = leaflet.divIcon({
-      className: 'user-marker-fullscreen',
-      html: `<div style="background: #ff5252; width: 24px; height: 24px; border-radius: 50%; border: 4px solid white; box-shadow: 0 3px 8px rgba(0,0,0,0.5); transform: rotate(${deviceHeading || 0}deg);"></div>`,
-      iconSize: [24, 24],
-      iconAnchor: [12, 12]
-    });
+    // Check if location filter is active - hide user marker if so
+    const currentFilters = get(filterStore);
+    const hasLocationFilter = currentFilters.locationFilter !== null;
     
-    if (userMarker) {
-      userMarker.setLatLng([userLat, userLon]);
-      userMarker.setIcon(userIcon);
-    } else {
-      userMarker = leaflet.marker([userLat, userLon], { icon: userIcon }).addTo(map);
+    if (hasLocationFilter) {
+      // Hide user marker when location filter is active
+      if (userMarker) {
+        map.removeLayer(userMarker);
+        userMarker = null;
+      }
+      return;
+    }
+    
+    // Show user marker when no location filter is active and GPS is available
+    if (userLat !== null && userLon !== null) {
+      const userIcon = leaflet.divIcon({
+        className: 'user-marker-fullscreen',
+        html: `<div style="background: #ff5252; width: 24px; height: 24px; border-radius: 50%; border: 4px solid white; box-shadow: 0 3px 8px rgba(0,0,0,0.5); transform: rotate(${deviceHeading || 0}deg);"></div>`,
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
+      });
+      
+      if (userMarker) {
+        userMarker.setLatLng([userLat, userLon]);
+        userMarker.setIcon(userIcon);
+      } else {
+        userMarker = leaflet.marker([userLat, userLon], { icon: userIcon }).addTo(map);
+      }
+    } else if (userMarker) {
+      // Remove user marker if GPS is not available
+      map.removeLayer(userMarker);
+      userMarker = null;
     }
   }
   
@@ -719,6 +771,27 @@
     updateUserMarker();
   }
   
+  // Reactive update for filter changes - hide/show user marker and center map
+  $: if (mapInitialized && $filterStore) {
+    updateUserMarker();
+    
+    // Center map based on active filters
+    if ($filterStore.locationFilter) {
+      // Location filter is active - center on filter location
+      const { lat, lon } = $filterStore.locationFilter;
+      if (map) {
+        map.setView([lat, lon], map.getZoom(), { animate: true });
+        console.log(`[FullscreenMap] Centered map on location filter: ${lat}, ${lon}`);
+      }
+    } else if (userLat !== null && userLon !== null) {
+      // No location filter but GPS available - center on GPS position
+      if (map) {
+        map.setView([userLat, userLon], map.getZoom(), { animate: true });
+        console.log(`[FullscreenMap] Centered map on GPS position: ${userLat}, ${userLon}`);
+      }
+    }
+  }
+  
   // Track user movement for auto-rotation
   function trackUserMovement() {
     if (!autoRotateEnabled) return;
@@ -971,6 +1044,9 @@
 </script>
 
 <div class="fullscreen-map">
+  <!-- Filter Bar for Map -->
+  <FilterBar showOnMap={true} />
+  
   <!-- Map container -->
   <div bind:this={mapEl} class="map-container"></div>
   

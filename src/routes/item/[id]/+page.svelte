@@ -6,6 +6,8 @@
   import { browser } from '$app/environment';
   import { tick } from 'svelte';
   import { darkMode } from '$lib/darkMode';
+  import { filterStore } from '$lib/filterStore';
+  import { goto } from '$app/navigation';
 
   let image: any = null;
   let loading = true;
@@ -1008,6 +1010,34 @@
     const lastDot = filename.lastIndexOf('.');
     return lastDot >= 0 ? filename.substring(lastDot) : '';
   }
+
+  // Filter functions
+  function setUserFilter() {
+    if (!profile) return;
+    
+    filterStore.setUserFilter({
+      userId: profile.id,
+      username: profile.full_name,
+      accountName: profile.accountname || undefined
+    });
+    
+    // Navigate to gallery with filter
+    goto('/');
+  }
+
+  function setLocationFilter() {
+    if (!image?.lat || !image?.lon) return;
+    
+    filterStore.setLocationFilter({
+      lat: image.lat,
+      lon: image.lon,
+      name: image.title || 'Standort',
+      fromItem: true
+    });
+    
+    // Navigate to gallery with filter
+    goto('/');
+  }
 </script>
 
 <svelte:head>
@@ -1423,11 +1453,31 @@
           <div class="column-card">
             <h2>Ersteller</h2>
             {#if profile}
-              {#if profile.avatar_url}
-                <img src={profile.avatar_url.startsWith('http') ? profile.avatar_url : `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/avatars/${profile.avatar_url}`} alt="Avatar" class="avatar"/>
-              {/if}
+              <div class="creator-header">
+                {#if profile.avatar_url}
+                  <img 
+                    src={profile.avatar_url.startsWith('http') ? profile.avatar_url : `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/avatars/${profile.avatar_url}`} 
+                    alt="Avatar" 
+                    class="avatar clickable-avatar"
+                    on:click={setUserFilter}
+                    title="Nur Bilder von {profile.full_name} anzeigen"
+                  />
+                {:else}
+                  <div 
+                    class="avatar-placeholder clickable-avatar"
+                    on:click={setUserFilter}
+                    title="Nur Bilder von {profile.full_name} anzeigen"
+                  >
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                    </svg>
+                  </div>
+                {/if}
+              </div>
               <div class="creator-details">
-                <h3>{profile.full_name}</h3>
+                <h3 class="creator-name clickable-name" on:click={setUserFilter} title="Nur Bilder von {profile.full_name} anzeigen">
+                  {profile.full_name}
+                </h3>
                 
                 <!-- Address Information -->
                 <div class="creator-address">
@@ -1515,6 +1565,12 @@
                     </button>
                   {/if}
                   <h2 class="map-title">{image.title || 'Standort'}</h2>
+                <button class="location-filter-btn" on:click={setLocationFilter} title="Standort als Filter setzen">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                    <circle cx="12" cy="10" r="3"/>
+                  </svg>
+                </button>
                 <button class="map-type-btn" on:click={toggleMapType} title={mapType === 'standard' ? 'Satellit' : 'Standard'}>
                   {#if mapType === 'standard'}
                     <!-- Satelliten-Icon (zeigt: zur Satellitenansicht wechseln) -->
@@ -2087,6 +2143,63 @@
     object-fit: cover;
     margin-bottom: 0.5rem;
     background: transparent;
+  }
+
+  .creator-header {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 1rem;
+  }
+
+  .clickable-avatar, .avatar-placeholder {
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 2px solid transparent;
+  }
+
+  .clickable-avatar:hover, .avatar-placeholder:hover {
+    border-color: var(--culoca-orange);
+    transform: scale(1.05);
+  }
+
+  .avatar-placeholder {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: var(--bg-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+  }
+
+  .creator-name {
+    cursor: pointer;
+    transition: color 0.2s ease;
+  }
+
+  .creator-name:hover {
+    color: var(--culoca-orange);
+  }
+
+  .location-filter-btn {
+    background: var(--bg-secondary);
+    border: none;
+    border-radius: 8px;
+    padding: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .location-filter-btn:hover {
+    background: var(--culoca-orange);
+    color: white;
+    transform: scale(1.05);
   }
   @media (max-width: 900px) {
     .meta-section.single-exif {

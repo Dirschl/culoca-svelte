@@ -29,6 +29,11 @@
   let show_social = false;
   let email = '';
   let show_email = false;
+  let accountname = '';
+  let accountnameChecking = false;
+  let accountnameAvailable = true;
+  let accountnameMessage = '';
+  let accountnameTimeout: NodeJS.Timeout;
 
   let errorLogExists = false;
   let errorLogUrl = '';
@@ -41,6 +46,21 @@
   $: instagramValid = instagram.length === 0 || instagram.startsWith('https://');
   $: facebookValid = facebook.length === 0 || facebook.startsWith('https://');
   $: twitterValid = twitter.length === 0 || twitter.startsWith('https://');
+  $: accountnameValid = accountname.length === 0 || (accountname.length >= 3 && accountname.length <= 30 && /^[a-z0-9_-]+$/.test(accountname));
+  
+  // Reserved accountnames that can't be used
+  const reservedAccountnames = [
+    'admin', 'api', 'www', 'mail', 'support', 'help', 'info', 'contact', 'about', 'privacy', 'terms',
+    'login', 'logout', 'signup', 'register', 'auth', 'callback', 'profile', 'settings', 'dashboard',
+    'user', 'users', 'account', 'accounts', 'home', 'index', 'root', 'blog', 'news', 'events',
+    'upload', 'uploads', 'download', 'downloads', 'file', 'files', 'image', 'images', 'photo', 'photos',
+    'item', 'items', 'gallery', 'map', 'search', 'explore', 'discover', 'trending', 'popular',
+    'debug', 'test', 'dev', 'staging', 'production', 'app', 'mobile', 'web', 'static', 'assets',
+    'css', 'js', 'img', 'fonts', 'icons', 'favicon', 'robots', 'sitemap', 'manifest',
+    'bulk-upload', 'simulation', 'newsflash', 'filter', 'location'
+  ];
+  
+  $: isReservedAccountname = reservedAccountnames.includes(accountname.toLowerCase());
 
   onMount(async () => {
     const { data: { user: currentUser } } = await supabase.auth.getUser();
@@ -81,6 +101,7 @@
         facebook = data.facebook || '';
         twitter = data.twitter || '';
         email = data.email || '';
+        accountname = data.accountname || '';
         show_address = data.show_address ?? false;
         show_phone = data.show_phone ?? false;
         show_website = data.show_website ?? false;
@@ -116,10 +137,61 @@
     }
   }
 
+  function debouncedCheckAccountname() {
+    if (accountnameTimeout) {
+      clearTimeout(accountnameTimeout);
+    }
+    
+    accountnameTimeout = setTimeout(() => {
+      checkAccountnameAvailability();
+    }, 500);
+  }
+
+  async function checkAccountnameAvailability() {
+    if (!accountname || !accountnameValid || isReservedAccountname) {
+      accountnameAvailable = false;
+      accountnameMessage = '';
+      return;
+    }
+    
+    accountnameChecking = true;
+    accountnameMessage = '';
+    
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('accountname', accountname.toLowerCase())
+        .neq('id', user.id);
+        
+      if (error) throw error;
+      
+      accountnameAvailable = data.length === 0;
+      if (!accountnameAvailable) {
+        accountnameMessage = 'Dieser Accountname ist bereits vergeben';
+      } else {
+        accountnameMessage = 'Accountname ist verfügbar';
+      }
+    } catch (error) {
+      console.error('Error checking accountname:', error);
+      accountnameAvailable = false;
+      accountnameMessage = 'Fehler bei der Überprüfung';
+    } finally {
+      accountnameChecking = false;
+    }
+  }
+
   async function saveProfile() {
     saving = true;
     message = '';
     try {
+      // Check accountname availability before saving if accountname is set
+      if (accountname && (!accountnameAvailable || isReservedAccountname)) {
+        showMessage('Bitte wähle einen gültigen und verfügbaren Accountname', 'error');
+        saving = false;
+        return;
+      }
+      
       let avatarPath = profile?.avatar_url;
       if (avatarFile) {
         avatarPath = await uploadAvatar();
@@ -133,6 +205,7 @@
         instagram,
         facebook,
         twitter,
+        accountname: accountname ? accountname.toLowerCase() : null,
         show_address: show_address,
         show_phone: show_phone,
         show_website: show_website,
@@ -301,6 +374,42 @@
               />
               {#if name.length > 0 && !nameValid}
                 <span class="error-text">Name muss zwischen 2 und 60 Zeichen lang sein</span>
+              {/if}
+            </div>
+
+            <div class="form-group">
+              <label for="accountname">Accountname (für Permalinks)</label>
+              <div class="accountname-input-group">
+                <span class="url-prefix">culoca.com/</span>
+                <input 
+                  id="accountname" 
+                  type="text" 
+                  bind:value={accountname} 
+                  placeholder="mein-accountname"
+                  class:valid={accountnameValid && accountnameAvailable && !isReservedAccountname && accountname.length > 0}
+                  class:invalid={accountname.length > 0 && (!accountnameValid || isReservedAccountname || !accountnameAvailable)}
+                  on:input={debouncedCheckAccountname}
+                  on:blur={checkAccountnameAvailability}
+                />
+                {#if accountnameChecking}
+                  <div class="checking-spinner">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" class="animate-spin">
+                      <path d="M12,1A11,11,0,1,0,23,12,11,11,0,0,0,12,1Zm0,19a8,8,0,1,1,8-8A8,8,0,0,1,12,20Z" opacity=".25"/>
+                      <path d="M12,4a8,8,0,0,1,7.89,6.7A1.53,1.53,0,0,0,21.38,12h0a1.5,1.5,0,0,0,1.48-1.75,11,11,0,0,0-21.72,0A1.5,1.5,0,0,0,2.62,12h0a1.53,1.53,0,0,0,1.49-1.3A8,8,0,0,1,12,4Z"/>
+                    </svg>
+                  </div>
+                {/if}
+              </div>
+              {#if accountname.length > 0}
+                {#if !accountnameValid}
+                  <span class="error-text">3-30 Zeichen, nur Kleinbuchstaben, Zahlen, Bindestriche und Unterstriche</span>
+                {:else if isReservedAccountname}
+                  <span class="error-text">Dieser Accountname ist reserviert</span>
+                {:else if accountnameMessage}
+                  <span class="success-text" class:error-text={!accountnameAvailable}>{accountnameMessage}</span>
+                {/if}
+              {:else}
+                <span class="help-text">Optional: Erstelle einen personalisierten Link zu deinem Profil</span>
               {/if}
             </div>
           </div>
@@ -936,6 +1045,75 @@
 
   .hidden {
     display: none;
+  }
+
+  /* Accountname Styles */
+  .accountname-input-group {
+    display: flex;
+    align-items: center;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--bg-primary);
+    transition: all 0.2s ease;
+    position: relative;
+  }
+
+  .accountname-input-group:focus-within {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+
+  .url-prefix {
+    padding: 0.75rem 1rem;
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    font-weight: 500;
+    border-right: 1px solid var(--border-color);
+    white-space: nowrap;
+    font-size: 0.875rem;
+  }
+
+  .accountname-input-group input {
+    border: none;
+    background: transparent;
+    padding: 0.75rem 1rem;
+    flex: 1;
+    font-size: 1rem;
+    color: var(--text-primary);
+    outline: none;
+  }
+
+  .accountname-input-group input::placeholder {
+    color: var(--text-tertiary);
+  }
+
+  .checking-spinner {
+    position: absolute;
+    right: 12px;
+    display: flex;
+    align-items: center;
+    color: var(--accent-color);
+  }
+
+  .animate-spin {
+    animation: spin 1s linear infinite;
+  }
+
+  .help-text {
+    display: block;
+    margin-top: 0.5rem;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    font-style: italic;
+  }
+
+  .success-text {
+    display: block;
+    margin-top: 0.5rem;
+    font-size: 0.875rem;
+    color: var(--success-color);
+    font-weight: 500;
   }
 
   /* Responsive Design */
