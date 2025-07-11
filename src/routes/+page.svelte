@@ -105,6 +105,7 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
   let radiusCheckInterval: number | null = null;
   let lastGalleryLoadTime = 0; // Verhindert zu häufiges Neuladen
   const MIN_RELOAD_INTERVAL = 30000; // Mindestabstand zwischen Neuladungen: 30s
+  let galleryUpdateTimeout: number | null = null; // Debounce für Gallery-Updates
 
   // GPS Simulation support
   let gpsSimulationActive = false;
@@ -989,29 +990,43 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
 
     let data;
     
-    // NEUE OPTIMIERTE ARCHITEKTUR: Verwende Datenbank-Funktion wenn GPS verfügbar
+    // TEMPORÄRE LÖSUNG: Verwende bestehende images_by_distance Funktion mit client-seitiger Sortierung
     if (isLoggedIn && showDistance && userLat !== null && userLon !== null) {
-      console.log(`[Gallery] Loading optimized images by distance from ${userLat}, ${userLon}`);
+      console.log(`[Gallery] Loading images by distance from ${userLat}, ${userLon}`);
       
       try {
-        const result = await supabase.rpc('images_by_distance_optimized', {
+        // Versuche zuerst die optimierte Funktion
+        const optimizedResult = await supabase.rpc('images_by_distance_optimized', {
           user_lat: userLat,
           user_lon: userLon,
-          max_radius_meters: 5000, // 5km radius
-          max_results: 100 // Maximum 100 Bilder
+          max_radius_meters: 5000,
+          max_results: 100
         });
         
-        if (result.error) {
-          console.error('[Gallery] Error calling optimized function:', result.error);
-          // Fallback to normal loading
-          data = await loadImagesNormal();
+        if (optimizedResult.error) {
+          console.log('[Gallery] Optimized function not available, using fallback');
+          // Fallback: Verwende bestehende images_by_distance Funktion
+          const fallbackResult = await supabase.rpc('images_by_distance', {
+            user_lat: userLat,
+            user_lon: userLon,
+            page: page,
+            page_size: size * 2 // Lade mehr Bilder für bessere Sortierung
+          });
+          
+          if (fallbackResult.error) {
+            console.error('[Gallery] Fallback function also failed:', fallbackResult.error);
+            data = await loadImagesNormal();
+          } else {
+            data = fallbackResult.data;
+            console.log(`[Gallery] Loaded ${data?.length || 0} images via fallback distance function`);
+          }
         } else {
-          data = result.data;
+          data = optimizedResult.data;
           console.log(`[Gallery] Loaded ${data?.length || 0} images via optimized function`);
-          hasMoreImages = false; // Mit optimierter Funktion laden wir alle relevanten Bilder auf einmal
+          hasMoreImages = false; // Mit optimierter Funktion alle relevanten Bilder auf einmal
         }
       } catch (error) {
-        console.error('[Gallery] Error with optimized loading:', error);
+        console.error('[Gallery] Error with distance loading:', error);
         data = await loadImagesNormal();
       }
     } else {
@@ -1046,25 +1061,32 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
         console.log(`[Gallery] Filtered out ${newPics.length - uniqueNewPics.length} duplicate images`);
       }
       
-      // Verwende optimierte Bilder direkt (bereits sortiert) oder füge sie hinzu
-      if (isLoggedIn && showDistance && userLat !== null && userLon !== null && data[0]?.distance !== undefined) {
-        // Optimierte Daten bereits sortiert - ersetze komplette Liste
-        pics.set(newPics);
-        console.log(`[Gallery] Set ${newPics.length} optimized images (already sorted by distance)`);
-      } else {
-        // Normale Hinzufügung und Sortierung
-        pics.update((p: any[]) => {
-          const combined = [...p, ...uniqueNewPics];
-          
-          if (isLoggedIn && showDistance && userLat !== null && userLon !== null) {
-            return combined.sort((a: any, b: any) => {
+      // Intelligente Bild-Verwaltung je nach Datenquelle
+      if (isLoggedIn && showDistance && userLat !== null && userLon !== null) {
+        if (data[0]?.distance !== undefined) {
+          // Optimierte Daten bereits sortiert - ersetze komplette Liste
+          pics.set(newPics);
+          console.log(`[Gallery] Set ${newPics.length} optimized images (already sorted by distance)`);
+        } else {
+          // GPS-Modus aber normale Daten - sortiere client-seitig nach Entfernung
+          pics.update((p: any[]) => {
+            // Bei GPS-Modus: Ersetze alte Bilder komplett für bessere Sortierung
+            const allImages = [...p, ...uniqueNewPics];
+            
+            // Sortiere alle Bilder nach Entfernung
+            const sortedImages = allImages.sort((a: any, b: any) => {
               const distA = a.lat && a.lon ? getDistanceInMeters(userLat!, userLon!, a.lat, a.lon) : Number.MAX_VALUE;
               const distB = b.lat && b.lon ? getDistanceInMeters(userLat!, userLon!, b.lat, b.lon) : Number.MAX_VALUE;
               return distA - distB;
             });
-          }
-          return combined;
-        });
+            
+            console.log(`[Gallery] Client-side sorted ${sortedImages.length} images by distance`);
+            return sortedImages;
+          });
+        }
+      } else {
+        // Normaler Modus ohne GPS - einfach anhängen
+        pics.update((p: any[]) => [...p, ...uniqueNewPics]);
         console.log(`[Gallery] Added ${uniqueNewPics.length} unique images (total: ${$pics.length})`);
       }
       
@@ -1090,6 +1112,10 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
   // Hilfsfunktion für normales Laden
   async function loadImagesNormal() {
     console.log(`[Gallery] Loading images with normal pagination, range: ${page * size} to ${page * size + size - 1}`);
+    
+    // Für GPS-Modus: Lade mehr Bilder für bessere Sortierung
+    const loadSize = (isLoggedIn && showDistance && userLat !== null && userLon !== null) ? size * 3 : size;
+    
     const { data } = await supabase
       .from('items')
       .select('id,path_512,path_2048,path_64,width,height,lat,lon,title,description,keywords')
@@ -1097,7 +1123,7 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
       .not('lat', 'is', null)
       .not('lon', 'is', null)
       .order('created_at', { ascending: false })
-      .range(page * size, page * size + size - 1);
+      .range(page * size, page * size + loadSize - 1);
       
     if (data && data.length < size) {
       hasMoreImages = false;
@@ -1800,22 +1826,34 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
     await loadMore(reason);
   }
 
+  // Debounced Gallery Update um Zucken zu vermeiden
+  function debouncedGalleryUpdate(updateFunction: () => void, delay: number = 500) {
+    if (galleryUpdateTimeout) {
+      clearTimeout(galleryUpdateTimeout);
+    }
+    galleryUpdateTimeout = window.setTimeout(updateFunction, delay);
+  }
+
   function resortExistingImages() {
     if (!userLat || !userLon || !$pics.length) return;
     
     console.log('Resorting existing images based on new position...');
     
-    // Sort existing images by distance without reloading
-    const sortedPics = [...$pics].sort((a: any, b: any) => {
-      if (!a.lat || !a.lon || !b.lat || !b.lon) return 0;
+    // Debounce das Update um Zucken zu vermeiden
+    debouncedGalleryUpdate(() => {
+      // Sort existing images by distance without reloading
+      const sortedPics = [...$pics].sort((a: any, b: any) => {
+        if (!a.lat || !a.lon || !b.lat || !b.lon) return 0;
+        
+        const distA = a.lat && a.lon && userLat && userLon ? getDistanceInMeters(userLat, userLon, a.lat, a.lon) : Number.MAX_VALUE;
+        const distB = b.lat && b.lon && userLat && userLon ? getDistanceInMeters(userLat, userLon, b.lat, b.lon) : Number.MAX_VALUE;
+        
+        return distA - distB;
+      });
       
-                const distA = a.lat && a.lon && userLat && userLon ? getDistanceInMeters(userLat, userLon, a.lat, a.lon) : Number.MAX_VALUE;
-          const distB = b.lat && b.lon && userLat && userLon ? getDistanceInMeters(userLat, userLon, b.lat, b.lon) : Number.MAX_VALUE;
-      
-      return distA - distB;
-    });
-    
-    pics.set(sortedPics);
+      pics.set(sortedPics);
+      console.log(`[Resort] Resorted ${sortedPics.length} existing images by distance`);
+    }, 300); // Kürzeres Delay für bessere Responsiveness
   }
 
   function checkRadiusForNewImages() {
