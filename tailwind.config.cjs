@@ -4,7 +4,12 @@ module.exports = {
     './src/**/*.{html,js,svelte,ts}'
   ],
   theme: {
-    extend: {},
+    extend: {
+      colors: {
+        'culoca-orange': '#ee7221',
+        'culoca-orange-dark': '#d6641c',
+      },
+    },
   },
   plugins: [],
 } 

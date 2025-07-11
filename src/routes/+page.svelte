@@ -1000,7 +1000,8 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
           user_lat: userLat,
           user_lon: userLon,
           max_radius_meters: 5000,
-          max_results: 100
+          max_results: size,
+          offset_count: page * size
         });
         
         if (optimizedResult.error) {
@@ -1022,8 +1023,11 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
           }
         } else {
           data = optimizedResult.data;
-          console.log(`[Gallery] Loaded ${data?.length || 0} images via optimized function`);
-          hasMoreImages = false; // Mit optimierter Funktion alle relevanten Bilder auf einmal
+          console.log(`[Gallery] Loaded ${data?.length || 0} images via optimized function (page ${page})`);
+          // Check if we have fewer results than requested - if so, no more images
+          if (data && data.length < size) {
+            hasMoreImages = false;
+          }
         }
       } catch (error) {
         console.error('[Gallery] Error with distance loading:', error);
@@ -1102,10 +1106,8 @@ import { beforeNavigate, afterNavigate } from '$app/navigation';
       console.log(`[Gallery] No data returned, hasMoreImages set to false`);
     }
 
-    // Nur bei normalem Modus page erhöhen
-    if (!isLoggedIn || !showDistance || userLat === null || userLon === null) {
-      page++;
-    }
+    // Erhöhe page für alle Modi (normaler Modus und GPS-Modus)
+    page++;
     loading = false;
   }
   

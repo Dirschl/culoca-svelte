@@ -3,6 +3,7 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { darkMode } from '$lib/darkMode';
+  import { welcomeVisible, resetWelcome } from '$lib/welcomeStore';
 
   let user: any = null;
   let profile: any = null;
@@ -28,6 +29,7 @@
   let showCompass = false;
   let autoguide = false;
   let newsFlashMode: 'aus' | 'eigene' | 'alle' = 'alle';
+  let showWelcome = true;
 
   
   // Upload Einstellungen
@@ -123,6 +125,7 @@
         showCompass = data.show_compass ?? false;
         autoguide = data.autoguide ?? false;
         newsFlashMode = data.newsflash_mode ?? 'alle';
+        showWelcome = data.show_welcome ?? true;
 
         saveOriginals = data.save_originals ?? true;
       }
@@ -155,6 +158,7 @@
         show_distance: showDistance,
         show_compass: showCompass,
         autoguide: autoguide,
+        show_welcome: showWelcome,
 
         avatar_url: profile?.avatar_url,
         newsflash_mode: newsFlashMode,
@@ -298,6 +302,14 @@
     setTimeout(() => {
       message = '';
     }, 5000);
+  }
+
+  function handleWelcomeToggle() {
+    if (showWelcome) {
+      resetWelcome();
+    } else {
+      welcomeVisible.set(false);
+    }
   }
 </script>
 
@@ -447,6 +459,28 @@
                   <span class="radio-label">Alle</span>
                 </label>
               </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Interface Settings -->
+        <section class="settings-section">
+          <div class="section-header">
+            <h2>Interface-Einstellungen</h2>
+            <p class="section-description">Anpassungen der Benutzeroberfläche</p>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-info">
+              <label class="setting-label" for="welcome-toggle">Willkommensbereich</label>
+              <p class="setting-description">Zeigt eine Begrüßung für neue Mitglieder mit ersten Schritten und Tipps</p>
+            </div>
+            <div class="setting-control">
+              <label class="toggle-switch" for="welcome-toggle">
+                <input type="checkbox" id="welcome-toggle" bind:checked={showWelcome} on:change={handleWelcomeToggle} />
+                <span class="toggle-slider"></span>
+              </label>
+              <span class="setting-status">{showWelcome ? 'Aktiviert' : 'Deaktiviert'}</span>
             </div>
           </div>
         </section>

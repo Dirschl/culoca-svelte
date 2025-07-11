@@ -47,11 +47,28 @@
     loading = true;
     error = '';
     info = '';
-    const { error: authError } = await supabase.auth.signUp({ email, password });
+    
+    // Development mode: disable email confirmation
+    const isDevelopment = window.location.hostname === 'localhost';
+    
+    const { error: authError } = await supabase.auth.signUp({ 
+      email, 
+      password,
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        // In development: skip email confirmation
+        ...(isDevelopment && { data: { email_confirm: false } })
+      }
+    });
+    
     if (authError) {
       error = authError.message;
     } else {
-      info = 'Bitte bestätige deine E-Mail-Adresse. Du kannst dich nach der Bestätigung anmelden.';
+      if (isDevelopment) {
+        info = 'Entwicklungsmodus: Konto erstellt. Du kannst dich direkt anmelden.';
+      } else {
+        info = 'Bitte bestätige deine E-Mail-Adresse. Du kannst dich nach der Bestätigung anmelden.';
+      }
       email = '';
       password = '';
       showRegister = false;
@@ -109,25 +126,44 @@
     </div>
 
     <div class="w-full flex justify-center mb-6">
-      <button class="px-4 py-1 rounded-l bg-white/20 text-white font-semibold focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors duration-150" on:click={() => showRegister = false} class:bg-orange-500={!showRegister} class:text-white={!showRegister}>Anmelden</button>
-      <button class="px-4 py-1 rounded-r bg-white/20 font-semibold focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors duration-150" on:click={() => showRegister = true} class:bg-orange-500={showRegister} class:text-white={showRegister} class:text-orange-500={!showRegister}>Registrieren</button>
+      <button class="px-4 py-1 rounded-l bg-white/20 text-white font-semibold focus:outline-none focus:ring-2 focus:ring-culoca-orange transition-colors duration-150" on:click={() => showRegister = false} class:bg-culoca-orange={!showRegister} class:text-white={!showRegister}>Anmelden</button>
+      <button class="px-4 py-1 rounded-r bg-white/20 font-semibold focus:outline-none focus:ring-2 focus:ring-culoca-orange transition-colors duration-150" on:click={() => showRegister = true} class:bg-culoca-orange={showRegister} class:text-white={showRegister} class:text-culoca-orange={!showRegister}>Registrieren</button>
     </div>
 
     {#if !showRegister}
       <form class="w-full flex flex-col gap-4" on:submit|preventDefault={loginWithEmail}>
-        <input class="w-full rounded px-3 py-2 bg-white/80 text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500" type="email" placeholder="E-Mail" bind:value={email} required />
-        <input class="w-full rounded px-3 py-2 bg-white/80 text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500" type="password" placeholder="Passwort" bind:value={password} required />
-        <button class="w-full bg-orange-600 hover:bg-orange-700 text-white font-semibold py-2 px-4 rounded transition" type="submit" disabled={loading}>Anmelden</button>
+        <input class="w-full rounded px-3 py-2 bg-white/80 text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-culoca-orange" type="email" placeholder="E-Mail" bind:value={email} required />
+        <input class="w-full rounded px-3 py-2 bg-white/80 text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-culoca-orange" type="password" placeholder="Passwort" bind:value={password} required />
+        <button class="w-full bg-culoca-orange hover:bg-culoca-orange-dark text-white font-semibold py-2 px-4 rounded transition" type="submit" disabled={loading}>Anmelden</button>
       </form>
     {:else}
       <form class="w-full flex flex-col gap-4" on:submit|preventDefault={signupWithEmail}>
-        <input class="w-full rounded px-3 py-2 bg-white/80 text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500" type="email" placeholder="E-Mail" bind:value={email} required />
-        <input class="w-full rounded px-3 py-2 bg-white/80 text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500" type="password" placeholder="Passwort" bind:value={password} required />
-        <button class="w-full bg-orange-600 hover:bg-orange-700 text-white font-semibold py-2 px-4 rounded transition" type="submit" disabled={loading}>Registrieren</button>
+        <input class="w-full rounded px-3 py-2 bg-white/80 text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-culoca-orange" type="email" placeholder="E-Mail" bind:value={email} required />
+        <input class="w-full rounded px-3 py-2 bg-white/80 text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-culoca-orange" type="password" placeholder="Passwort" bind:value={password} required />
+        <button class="w-full bg-culoca-orange hover:bg-culoca-orange-dark text-white font-semibold py-2 px-4 rounded transition" type="submit" disabled={loading}>Registrieren</button>
       </form>
     {/if}
-    <div class="mt-8 text-sm text-white/80">
-      Noch kein Konto? <button class="underline text-orange-400 hover:text-orange-300" on:click={() => showRegister = true}>Registrieren</button>
+    <!-- Links and footer -->
+    <div class="mt-8 text-center space-y-4">
+      <!-- Legal links -->
+      <div class="text-xs text-white/60 space-x-4">
+        <a href="/" class="hover:text-white transition-colors">← Zur Hauptseite</a>
+        <span>•</span>
+        <a href="/impressum" class="hover:text-white transition-colors">Impressum</a>
+        <span>•</span>
+        <a href="/datenschutz" class="hover:text-white transition-colors">Datenschutz</a>
+      </div>
+      
+      <!-- Register prompt -->
+      {#if !showRegister}
+        <div class="text-sm text-white/80">
+          Noch kein Konto? <button class="underline text-culoca-orange hover:text-white transition-colors" on:click={() => showRegister = true}>Registrieren</button>
+        </div>
+      {:else}
+        <div class="text-sm text-white/80">
+          Bereits ein Konto? <button class="underline text-culoca-orange hover:text-white transition-colors" on:click={() => showRegister = false}>Anmelden</button>
+        </div>
+      {/if}
     </div>
   </div>
 </div> 

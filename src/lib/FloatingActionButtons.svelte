@@ -14,8 +14,25 @@
   
   const dispatch = createEventDispatcher();
   
-  function handleScrollToTop() {
+  function handleScrollToTop(event?: Event) {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+
+    
+    // Smooth scroll to top
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    
+    // Force state update after scroll completes to ensure FAB switches
+    setTimeout(() => {
+      const currentScrollY = window.scrollY || document.documentElement.scrollTop;
+      if (currentScrollY <= 100) {
+        
+        // Trigger a scroll event to ensure parent component updates
+        window.dispatchEvent(new Event('scroll'));
+      }
+    }, 800); // Wait for smooth scroll animation
   }
   
   function handleUpload() {
@@ -186,11 +203,8 @@
         />
       {:else}
         <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="8" r="3"/>
-          <circle cx="6" cy="16" r="3"/>
-          <circle cx="18" cy="16" r="3"/>
-          <path d="M12 11v3"/>
-          <path d="M9 16h6"/>
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+          <circle cx="12" cy="7" r="4"/>
         </svg>
       {/if}
     </button>
@@ -239,9 +253,11 @@
     <!-- Scroll to top button (bottom) - shows when scrolled -->
     <button 
       class="fab-button scroll-to-top"
-      on:click={handleScrollToTop}
+      on:click={(e) => handleScrollToTop(e)}
+      on:touchend={(e) => handleScrollToTop(e)}
       aria-label="Nach oben scrollen"
       title="Nach oben scrollen"
+      data-testid="scroll-to-top"
     >
       <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="m18 15-6-6-6 6"/>
@@ -258,7 +274,8 @@
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-    z-index: 1000;
+    z-index: 1001;
+    pointer-events: none;
   }
   
   .fab-button {
@@ -277,6 +294,10 @@
     backdrop-filter: blur(10px);
     background: transparent;
     overflow: hidden;
+    pointer-events: auto;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
   }
   
   .fab-button:hover {

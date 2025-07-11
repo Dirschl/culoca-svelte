@@ -86,7 +86,7 @@
       // First, get all images to see the total count
       const { data: allData, error: allError } = await supabase
         .from('items')
-        .select('id, path_512, path_2048, path_64, width, height, lat, lon, title, description, keywords');
+        .select('id, path_512, path_2048, path_64, width, height, lat, lon, title, description, keywords, original_url');
 
       if (allError) throw allError;
 
@@ -143,7 +143,9 @@
         !img.title || 
         !img.description || 
         !img.keywords || 
-        img.keywords.length === 0
+        img.keywords.length === 0 ||
+        !img.path_2048 || // Fehlende 2048px Version
+        !img.path_512   // Fehlende 512px Version
       );
 
       imagesWithGPS = gpsImages.length;
@@ -756,7 +758,14 @@
                 {#if !img.title}❌ Kein Titel{/if}
                 {#if !img.description}❌ Keine Beschreibung{/if}
                 {#if !img.keywords || img.keywords.length === 0}❌ Keine Keywords{/if}
+                {#if !img.path_2048}❌ Fehlende 2048px Version{/if}
+                {#if !img.path_512}❌ Fehlende 512px Version{/if}
               </div>
+              {#if !img.path_2048 && img.original_url}
+                <div class="compact-note">🔧 Kann von Hetzner nachträglich erstellt werden</div>
+              {:else if !img.path_2048}
+                <div class="compact-note">⚠️ Bild muss erneut hochgeladen werden</div>
+              {/if}
             </div>
           </div>
         {/each}
