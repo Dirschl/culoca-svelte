@@ -65,8 +65,14 @@
       
       images = imagesData || [];
       
-      // Set user filter in store
-      filterStore.setUserFilter(profile.id);
+      // Set user filter in store only if profile has valid id
+      if (profile.id) {
+        filterStore.setUserFilter({
+          userId: profile.id,
+          username: profile.full_name || profile.accountname,
+          accountName: profile.accountname
+        });
+      }
       
     } catch (err) {
       console.error('Error loading profile:', err);

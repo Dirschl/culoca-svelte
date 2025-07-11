@@ -163,7 +163,7 @@ function updateURL(state: FilterState) {
 	params.delete('location');
 
 	// Add current filters
-	if (state.userFilter) {
+	if (state.userFilter && state.userFilter.userId) {
 		params.set('user', state.userFilter.userId);
 		if (state.userFilter.accountName) {
 			params.set('account', state.userFilter.accountName);
