@@ -2,9 +2,14 @@
 <html lang="en">
 	<head>
 		<meta charset="utf-8" />
-		<link rel="icon" type="image/svg+xml" href="%sveltekit.assets%/culoca-favicon.svg" />
-		<link rel="icon" type="image/png" href="%sveltekit.assets%/culoca-icon.png" />
+		<link rel="shortcut icon" href="/culoca-icon.png" type="image/png" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		
+		<!-- Cache-Kontrolle für bessere Updates -->
+		<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+		<meta http-equiv="Pragma" content="no-cache" />
+		<meta http-equiv="Expires" content="0" />
+		
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">

@@ -36,26 +36,63 @@
 		const { data: { user } } = await supabase.auth.getUser();
 		isLoggedIn = !!user;
 		
+		// Service Worker registrieren für bessere Cache-Kontrolle
+		if ('serviceWorker' in navigator) {
+			try {
+				const registration = await navigator.serviceWorker.register('/sw.js');
+				console.log('Service Worker registered:', registration);
+				
+				// Handle Service Worker Updates
+				registration.addEventListener('updatefound', () => {
+					const newWorker = registration.installing;
+					if (newWorker) {
+						newWorker.addEventListener('statechange', () => {
+							if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+								// Neuer Service Worker verfügbar - Update anbieten
+								if (confirm('Neue Version verfügbar. Seite neu laden?')) {
+									newWorker.postMessage({ type: 'SKIP_WAITING' });
+									window.location.reload();
+								}
+							}
+						});
+					}
+				});
+			} catch (error) {
+				console.log('Service Worker registration failed:', error);
+			}
+		}
+		
 		// Setze Culoca SVG Favicon für alle Seiten außer Detailseiten
 		// Detailseiten (/item/[id]) haben ihr eigenes dynamisches Favicon
 		if (!$page.route.id?.includes('/item/[id]')) {
-			// Entferne alle bestehenden Favicon-Links (außer die vom Server gesetzten)
-			const existingFavicons = document.querySelectorAll('link[rel="icon"]:not([data-static])');
+			// Entferne alle bestehenden Favicon-Links
+			const existingFavicons = document.querySelectorAll('link[rel="icon"], link[rel="shortcut icon"]');
 			existingFavicons.forEach(link => link.remove());
+			
+			// Cache-Buster für bessere Browser-Kompatibilität
+			const timestamp = Date.now();
 			
 			// Füge das neue Culoca SVG Favicon hinzu (moderne Browser)
 			const svgFaviconLink = document.createElement('link');
 			svgFaviconLink.rel = 'icon';
 			svgFaviconLink.type = 'image/svg+xml';
-			svgFaviconLink.href = '/culoca-favicon.svg';
+			svgFaviconLink.href = `/culoca-favicon.svg?v=${timestamp}`;
 			document.head.appendChild(svgFaviconLink);
 			
-			// Füge PNG Fallback hinzu (ältere Browser)
+			// Füge PNG Fallback hinzu (ältere Browser und traditionelle favicon.ico Anfragen)
 			const pngFaviconLink = document.createElement('link');
 			pngFaviconLink.rel = 'icon';
 			pngFaviconLink.type = 'image/png';
-			pngFaviconLink.href = '/culoca-icon.png';
+			pngFaviconLink.href = `/culoca-icon.png?v=${timestamp}`;
 			document.head.appendChild(pngFaviconLink);
+			
+			// Traditioneller favicon.ico Link für bessere Browser-Kompatibilität
+			const icoFaviconLink = document.createElement('link');
+			icoFaviconLink.rel = 'shortcut icon';
+			icoFaviconLink.type = 'image/x-icon';
+			icoFaviconLink.href = `/culoca-icon.png?v=${timestamp}`; // Nutzt PNG als ICO-Ersatz
+			document.head.appendChild(icoFaviconLink);
+
 		}
 	});
 </script>
