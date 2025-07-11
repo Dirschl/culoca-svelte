@@ -29,6 +29,13 @@
   // Keywords editing
   let editingKeywords = false;
   let keywordsEditValue = '';
+  
+  // Original filename editing
+  let editingFilename = false;
+  let filenameEditValue = '';
+  
+  // EXIF toggle
+  let showFullExif = false;
 
   // 1. State für Map-Picker und Map-Type
   let showMapPicker = false;
@@ -73,7 +80,26 @@
 
       const { data, error: fetchError } = await supabase
         .from('items')
-        .select('*')
+        .select(`
+          *,
+          profiles!items_profile_id_fkey (
+            id,
+            full_name,
+            avatar_url,
+            show_address,
+            address,
+            show_phone,
+            phone,
+            show_email,
+            email,
+            show_website,
+            website,
+            show_social,
+            instagram,
+            facebook,
+            twitter
+          )
+        `)
         .eq('id', imageId)
         .single();
 
@@ -81,14 +107,24 @@
         error = fetchError.message;
       } else {
         image = data;
+        
+        // Extract profile from joined data
+        if (data.profiles) {
+          profile = data.profiles;
+        }
+        
         console.log('📸 Image loaded:', { 
           id: image.id, 
           lat: image.lat, 
           lon: image.lon, 
-          title: image.title 
+          title: image.title,
+          profile: profile ? profile.full_name : 'No profile'
         });
         if (!image.exif_data) image.exif_data = {};
         titleEditValue = image.title || '';
+        filenameEditValue = image.original_name || '';
+        descriptionEditValue = image.description || '';
+        keywordsList = image.keywords || [];
         
         // Favicon sofort aktualisieren
         if (browser) {
@@ -229,14 +265,7 @@
 
 
 
-  async function fetchProfile(profileId: string) {
-    const { data, error: profileErr } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', profileId)
-      .single();
-    if (!profileErr) profile = data;
-  }
+
 
   async function fetchNearbyImages(lat: number, lon: number, maxRadius: number) {
     console.log('🔍 Fetching nearby images for radius:', maxRadius, 'm');
@@ -317,7 +346,7 @@
       : `${baseUrl}/images-512/${image.path_512}`;
     const currentImageIcon = leaflet.divIcon({
       className: 'custom-marker current-image',
-      html: `<img src="${thumbnailUrl}" alt="${image.title || 'Bild'}" style="width: 48px; height: 48px; border-radius: 50%; border: 3px solid #ff6b35; box-shadow: 0 2px 8px rgba(0,0,0,0.3); object-fit: cover;">`,
+      html: `<img src="${thumbnailUrl}" alt="${image.title || 'Bild'}" style="width: 48px; height: 48px; border-radius: 50%; border: 3px solid #ee7221; box-shadow: 0 2px 8px rgba(0,0,0,0.3); object-fit: cover;">`,
       iconSize: [48, 48],
       iconAnchor: [48, 48],
       popupAnchor: [0, -48]
@@ -366,10 +395,7 @@
     }
   }
 
-  // After image fetch completed (reactively)
-  $: if (image && image.profile_id) {
-    fetchProfile(image.profile_id);
-  }
+
   
   // Initialize map when image is loaded
   $: if (image && image.lat && image.lon && !map) {
@@ -460,6 +486,22 @@
       const denom = Math.round(1 / value);
       return `1/${denom} s`;
     }
+    return String(value);
+  }
+
+  function formatTimeCreated(value: any): string {
+    if (value === undefined || value === null || value === '') return '';
+    
+    // Value is expected to be like "125359" (HHMMSS format)
+    const timeStr = String(value);
+    if (timeStr.length === 6) {
+      const hours = timeStr.substring(0, 2);
+      const minutes = timeStr.substring(2, 4);
+      const seconds = timeStr.substring(4, 6);
+      return `${hours}:${minutes}:${seconds}`;
+    }
+    
+    // Fallback: return as is if not in expected format
     return String(value);
   }
 
@@ -799,11 +841,9 @@
       .update({ lat: mapPickerLat, lon: mapPickerLon })
       .eq('id', image.id);
     if (!updateError) {
-      image.lat = mapPickerLat;
-      image.lon = mapPickerLon;
       closeMapPicker();
-      map = null; // Karte neu initialisieren
-      setTimeout(() => initMap(), 200);
+      // Ganze Seite neu laden, um alle Daten zu aktualisieren
+      window.location.reload();
     } else {
       alert('Fehler beim Speichern der Koordinaten: ' + updateError.message);
     }
@@ -903,6 +943,70 @@
   $: if (image) {
     // Wait a bit for images to load
     setTimeout(fetchFileSizes, 1000);
+  }
+
+
+
+  // Filename editing functions
+  function startEditFilename() {
+    if (!isCreator) return;
+    editingFilename = true;
+    filenameEditValue = image.original_name || '';
+    setTimeout(() => {
+      const input = document.getElementById('filename-edit-input') as HTMLInputElement;
+      if (input) {
+        input.focus();
+        input.select();
+      }
+    }, 100);
+  }
+
+  async function saveFilename() {
+    if (!editingFilename || !isCreator) return;
+    editingFilename = false;
+    
+    const newFilename = filenameEditValue.trim();
+    if (newFilename && newFilename !== image.original_name) {
+      // Extrahiere die Dateiendung vom ursprünglichen Namen
+      const originalExtension = getFileExtension(image.original_name || '');
+      
+      // Prüfe ob der neue Name bereits die korrekte Endung hat
+      let finalFilename;
+      if (newFilename.toLowerCase().endsWith(originalExtension.toLowerCase())) {
+        // Dateiendung ist bereits vorhanden
+        finalFilename = newFilename;
+      } else {
+        // Dateiendung fehlt, füge sie hinzu
+        finalFilename = newFilename + originalExtension;
+      }
+      
+      const { error } = await supabase
+        .from('items')
+        .update({ original_name: finalFilename })
+        .eq('id', image.id);
+      
+      if (!error) {
+        image.original_name = finalFilename;
+        filenameEditValue = finalFilename;
+      }
+    }
+  }
+
+  function handleFilenameKeydown(event: KeyboardEvent) {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      saveFilename();
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      editingFilename = false;
+      filenameEditValue = image.original_name || '';
+    }
+  }
+
+  // Helper function for filename
+  function getFileExtension(filename: string): string {
+    const lastDot = filename.lastIndexOf('.');
+    return lastDot >= 0 ? filename.substring(lastDot) : '';
   }
 </script>
 
@@ -1132,8 +1236,32 @@
             {/if}
             
             <h2>File Details</h2>
-            <div class="filename">
-              {image.original_name || 'Unbekannt'}
+            <div class="filename" class:editable={isCreator} class:editing={editingFilename}>
+              {#if editingFilename}
+                <div class="filename-edit-container">
+                  <input
+                    id="filename-edit-input"
+                    type="text"
+                    bind:value={filenameEditValue}
+                    maxlength="120"
+                    on:keydown={handleFilenameKeydown}
+                    on:blur={saveFilename}
+                    class="filename-edit-input"
+                    placeholder="Dateiname eingeben..."
+                    autocomplete="off"
+                    autocorrect="off"
+                    autocapitalize="words"
+                    inputmode="text"
+                  />
+                  <span class="char-count">
+                    {filenameEditValue.length}/120
+                  </span>
+                </div>
+              {:else}
+                <span class="filename-text" on:click={startEditFilename}>
+                  {image.original_name || 'Unbekannt'}
+                </span>
+              {/if}
             </div>
             <div class="filename">
               {browser ? window.location.href : ''}
@@ -1144,76 +1272,151 @@
           </div>
           <!-- Column 2: All EXIF/Meta -->
           <div class="meta-column">
-            <h2>Aufnahmedaten</h2>
+            <h2 class="exif-toggle" on:click={() => showFullExif = !showFullExif}>Aufnahmedaten</h2>
             
-            <!-- Auflösung -->
-            {#if image.exif_data && image.exif_data.ImageWidth}
-              <div class="meta-line">Auflösung: {image.exif_data.ImageWidth}×{image.exif_data.ImageHeight} px</div>
-            {/if}
-            
-            <!-- Dateigröße -->
-            {#if image.exif_data && image.exif_data.FileSize}
-              <div class="meta-line">Dateigröße: {formatFileSize(image.exif_data.FileSize)}</div>
-            {/if}
-            
-            <!-- Kamera -->
-            {#if image.exif_data && image.exif_data.Make}
-              <div class="meta-line">Kamera: {image.exif_data.Make} {image.exif_data.Model || ''}</div>
-            {/if}
-            
-            <!-- Objektiv -->
-            {#if image.exif_data && image.exif_data.LensModel}
-              <div class="meta-line">Objektiv: {image.exif_data.LensModel}</div>
-            {/if}
-            
-            <!-- Brennweite -->
-            {#if image.exif_data && image.exif_data.FocalLength}
-              <div class="meta-line">Brennweite: {image.exif_data.FocalLength} mm{#if image.exif_data.FocalLengthIn35mmFormat && image.exif_data.FocalLengthIn35mmFormat !== image.exif_data.FocalLength} (35mm: {image.exif_data.FocalLengthIn35mmFormat} mm){/if}</div>
-            {/if}
-            
-            <!-- ISO -->
-            {#if image.exif_data && image.exif_data.ISO}
-              <div class="meta-line">ISO: {image.exif_data.ISO}</div>
-            {/if}
-            
-            <!-- Blende -->
-            {#if image.exif_data && image.exif_data.FNumber}
-              <div class="meta-line">Blende: ƒ/{image.exif_data.FNumber}</div>
-            {/if}
-            
-            <!-- Verschlusszeit -->
-            {#if image.exif_data && image.exif_data.ExposureTime}
-              <div class="meta-line">Verschlusszeit: {formatExposureTime(image.exif_data.ExposureTime)}</div>
-            {/if}
-            
-            <!-- Ausrichtung -->
-            {#if image.exif_data && image.exif_data.Orientation}
-              <div class="meta-line">Ausrichtung: {image.exif_data.Orientation}</div>
-            {/if}
-            
-            <!-- Aufgenommen -->
-            {#if image.exif_data && image.exif_data.CreateDate}
-              <div class="meta-line">Aufgenommen: {new Date(image.exif_data.CreateDate).toLocaleDateString('de-DE')}</div>
-            {/if}
-            
-            <!-- GPS -->
-            {#if image.lat && image.lon}
-              <div class="meta-line">GPS: {image.lat.toFixed(5)}, {image.lon.toFixed(5)}</div>
-            {/if}
-            
-            <!-- Fotograf -->
-            {#if image.exif_data && image.exif_data.Artist}
-              <div class="meta-line">Fotograf: {image.exif_data.Artist}</div>
-            {/if}
-            
-            <!-- Copyright -->
-            {#if image.exif_data && image.exif_data.Copyright}
-              <div class="meta-line">Copyright: {image.exif_data.Copyright}</div>
-            {/if}
-            
-            <!-- Veröffentlicht am -->
-            {#if image.created_at}
-              <div class="meta-line">Veröffentlicht am: {new Date(image.created_at).toLocaleDateString('de-DE')}</div>
+            {#if !showFullExif}
+              <!-- Essential EXIF data -->
+              <!-- Auflösung (aus Original-Bild) -->
+              {#if image.width && image.height}
+                <div class="meta-line">Auflösung: {image.width}×{image.height} px</div>
+              {/if}
+              
+              <!-- Dateigröße -->
+              {#if image.exif_data && image.exif_data.FileSize}
+                <div class="meta-line">Dateigröße: {formatFileSize(image.exif_data.FileSize)}</div>
+              {/if}
+              
+              <!-- Kamera -->
+              {#if image.exif_data && image.exif_data.Make}
+                <div class="meta-line">Kamera: {image.exif_data.Make} {image.exif_data.Model || ''}</div>
+              {/if}
+              
+              <!-- Objektiv -->
+              {#if image.exif_data && image.exif_data.LensModel}
+                <div class="meta-line">Objektiv: {image.exif_data.LensModel}</div>
+              {/if}
+              
+              <!-- Brennweite -->
+              {#if image.exif_data && image.exif_data.FocalLength}
+                <div class="meta-line">Brennweite: {image.exif_data.FocalLength} mm{#if image.exif_data.FocalLengthIn35mmFormat && image.exif_data.FocalLengthIn35mmFormat !== image.exif_data.FocalLength} (35mm: {image.exif_data.FocalLengthIn35mmFormat} mm){/if}</div>
+              {/if}
+              
+              <!-- ISO -->
+              {#if image.exif_data && image.exif_data.ISO}
+                <div class="meta-line">ISO: {image.exif_data.ISO}</div>
+              {/if}
+              
+              <!-- Blende -->
+              {#if image.exif_data && image.exif_data.FNumber}
+                <div class="meta-line">Blende: ƒ/{image.exif_data.FNumber}</div>
+              {/if}
+              
+              <!-- Verschlusszeit -->
+              {#if image.exif_data && image.exif_data.ExposureTime}
+                <div class="meta-line">Verschlusszeit: {formatExposureTime(image.exif_data.ExposureTime)}</div>
+              {/if}
+              
+              <!-- Aufnahmedatum -->
+              {#if image.exif_data && image.exif_data.CreateDate}
+                <div class="meta-line">Aufgenommen: {new Date(image.exif_data.CreateDate).toLocaleDateString('de-DE')}</div>
+              {/if}
+              
+              <!-- GPS-Daten -->
+              {#if image.lat && image.lon}
+                <div class="meta-line">GPS: {image.lat.toFixed(5)}, {image.lon.toFixed(5)}</div>
+              {/if}
+              
+              <!-- Fotograf -->
+              {#if image.exif_data && image.exif_data.Artist}
+                <div class="meta-line">Fotograf: {image.exif_data.Artist}</div>
+              {/if}
+              
+              <!-- Copyright -->
+              {#if image.exif_data && image.exif_data.Copyright}
+                <div class="meta-line">Copyright: {image.exif_data.Copyright}</div>
+              {/if}
+              
+              <!-- Upload-Datum -->
+              {#if image.created_at}
+                <div class="meta-line">Veröffentlicht am: {new Date(image.created_at).toLocaleDateString('de-DE')}</div>
+              {/if}
+            {:else}
+              <!-- Full EXIF data -->
+              {#if image.width && image.height}
+                <div class="meta-line">Auflösung: {image.width}×{image.height} px</div>
+              {/if}
+              
+              {#if image.exif_data && image.exif_data.FileSize}
+                <div class="meta-line">Dateigröße: {formatFileSize(image.exif_data.FileSize)}</div>
+              {/if}
+              
+              {#if image.exif_data && image.exif_data.Make}
+                <div class="meta-line">Kamera: {image.exif_data.Make} {image.exif_data.Model || ''}</div>
+              {/if}
+              
+              {#if image.exif_data && image.exif_data.LensModel}
+                <div class="meta-line">Objektiv: {image.exif_data.LensModel}</div>
+              {/if}
+              
+              {#if image.exif_data && image.exif_data.FocalLength}
+                <div class="meta-line">Brennweite: {image.exif_data.FocalLength} mm{#if image.exif_data.FocalLengthIn35mmFormat && image.exif_data.FocalLengthIn35mmFormat !== image.exif_data.FocalLength} (35mm: {image.exif_data.FocalLengthIn35mmFormat} mm){/if}</div>
+              {/if}
+              
+              {#if image.exif_data && image.exif_data.ISO}
+                <div class="meta-line">ISO: {image.exif_data.ISO}</div>
+              {/if}
+              
+              {#if image.exif_data && image.exif_data.FNumber}
+                <div class="meta-line">Blende: ƒ/{image.exif_data.FNumber}</div>
+              {/if}
+              
+              {#if image.exif_data && image.exif_data.ExposureTime}
+                <div class="meta-line">Verschlusszeit: {formatExposureTime(image.exif_data.ExposureTime)}</div>
+              {/if}
+              
+              {#if image.exif_data && image.exif_data.Orientation}
+                <div class="meta-line">Ausrichtung: {image.exif_data.Orientation}</div>
+              {/if}
+              
+              {#if image.exif_data && image.exif_data.CreateDate}
+                <div class="meta-line">Aufgenommen: {new Date(image.exif_data.CreateDate).toLocaleDateString('de-DE')}</div>
+              {/if}
+              
+              {#if image.lat && image.lon}
+                <div class="meta-line">GPS: {image.lat.toFixed(5)}, {image.lon.toFixed(5)}</div>
+              {/if}
+              
+              {#if image.exif_data && image.exif_data.Artist}
+                <div class="meta-line">Fotograf: {image.exif_data.Artist}</div>
+              {/if}
+              
+              {#if image.exif_data && image.exif_data.Copyright}
+                <div class="meta-line">Copyright: {image.exif_data.Copyright}</div>
+              {/if}
+              
+              {#if image.created_at}
+                <div class="meta-line">Veröffentlicht am: {new Date(image.created_at).toLocaleDateString('de-DE')}</div>
+              {/if}
+              
+              <!-- Additional selected EXIF fields -->
+              {#if image.exif_data}
+                
+                <!-- Blitz -->
+                {#if image.exif_data.Flash}
+                  <div class="meta-line">Blitz: {image.exif_data.Flash}</div>
+                {/if}
+                
+                <!-- Software -->
+                {#if image.exif_data.Software}
+                  <div class="meta-line">Software: {image.exif_data.Software}</div>
+                {/if}
+                
+                <!-- Aufnahmezeit -->
+                {#if image.exif_data.TimeCreated}
+                  <div class="meta-line">Aufnahmezeit: {formatTimeCreated(image.exif_data.TimeCreated)}</div>
+                {/if}
+                
+              {/if}
             {/if}
           </div>
           <!-- Column 3: Creator Card (if available) -->
@@ -1230,15 +1433,6 @@
                 <div class="creator-address">
                   {#if profile.show_address && profile.address}
                     <div>{@html profile.address.replace(/\n/g, '<br>')}</div>
-                  {/if}
-                  {#if profile.show_zip && profile.zip}
-                    <span>{profile.zip}</span>
-                  {/if}
-                  {#if profile.show_city && profile.city}
-                    <span> {profile.city}</span>
-                  {/if}
-                  {#if profile.show_country && profile.country}
-                    <div>{profile.country}</div>
                   {/if}
                 </div>
                 
@@ -1357,6 +1551,16 @@
             <div class="map-modal-fullscreen">
               <div class="map-modal-content-fullscreen">
                 <div class="map-modal-header-fullscreen">
+                  <!-- 64px Vorschaubild -->
+                  {#if image?.path_64}
+                    <div class="map-picker-thumbnail">
+                      <img 
+                        src="https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/{image.path_64}" 
+                        alt={image.title || 'Bild'} 
+                        title="{image.title || image.original_name || 'Bild'}"
+                      />
+                    </div>
+                  {/if}
                   <input class="map-search-input" type="text" placeholder="Ort suchen..." bind:value={mapPickerSearch} on:keydown={handleSearchKeydown} />
                   <button class="map-type-btn" on:click={toggleMapPickerType} title={mapPickerType === 'standard' ? 'Satellit' : 'Standard'}>
                     {#if mapPickerType === 'standard'}
@@ -1847,6 +2051,15 @@
     margin: 0 0 1rem 0;
     padding: 0;
   }
+  
+  .exif-toggle {
+    cursor: pointer;
+    transition: color 0.2s ease;
+  }
+  
+  .exif-toggle:hover {
+    color: var(--culoca-orange);
+  }
 
   .filename {
     color: var(--text-secondary);
@@ -1975,7 +2188,7 @@
     text-decoration: none;
   }
   .creator-contact a:hover {
-    color: var(--accent-color);
+    color: var(--culoca-orange);
     text-decoration: underline;
   }
   
@@ -2015,7 +2228,7 @@
     transform: scale(1.1);
   }
   .social-link:hover .social-icon {
-    color: var(--accent-color);
+    color: var(--culoca-orange);
   }
 
   /* Scroll to Top Button */
@@ -2042,7 +2255,7 @@
   }
 
   .scroll-to-top:hover {
-    background: var(--accent-hover);
+    background: var(--culoca-orange);
     transform: translateY(-2px);
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
   }
@@ -2126,8 +2339,7 @@
   }
 
   .title.editable:hover .title-text {
-    color: var(--accent-color);
-    background: var(--bg-tertiary);
+    color: var(--culoca-orange);
   }
 
   .title.editing .title-text {
@@ -2218,8 +2430,7 @@
   }
 
   .description.editable:hover .description-text {
-    color: var(--accent-color);
-    background: var(--bg-tertiary);
+    color: var(--culoca-orange);
   }
 
   .description.editing .description-text {
@@ -2304,6 +2515,7 @@
     aspect-ratio: 1/1;
     position: relative;
   }
+
 
   /* Mobile optimizations */
   @media (max-width: 768px) {
@@ -2397,7 +2609,7 @@
   }
 
   .keyword-link:hover {
-    color: var(--accent-color);
+    color: var(--culoca-orange);
     transform: translateY(-1px);
     box-shadow: 0 2px 8px var(--shadow);
   }
@@ -2414,7 +2626,7 @@
   }
 
   .keywords-title.editable:hover {
-    color: #ee731f;
+    color: var(--culoca-orange);
     background: transparent;
   }
 
@@ -2501,8 +2713,8 @@
     transition: background 0.2s, color 0.2s;
   }
   .map-edit-btn:hover {
-    background: linear-gradient(135deg, #ffc107, #ff9800);
-    color: #000;
+    background: var(--culoca-orange);
+    color: white;
   }
   .map-type-btn {
     background: none;
@@ -2516,8 +2728,8 @@
     transition: background 0.2s, color 0.2s;
   }
   .map-type-btn:hover {
-    background: #eee;
-    color: #222;
+    background: var(--culoca-orange);
+    color: white;
   }
   .map-modal {
     position: fixed;
@@ -2561,8 +2773,8 @@
     transition: background 0.2s, color 0.2s;
   }
   .map-close-btn:hover {
-    background: #eee;
-    color: #222;
+    background: var(--culoca-orange);
+    color: white;
   }
   .map-container {
     width: 100%;
@@ -2594,8 +2806,8 @@
     transition: background 0.2s, color 0.2s;
   }
   .map-cancel-btn:hover, .map-confirm-btn:hover {
-    background: linear-gradient(135deg, #0056b3, #004085);
-    color: #fff;
+    background: var(--culoca-orange);
+    color: white;
   }
 
   /* CSS für Map-Picker Fullscreen und Buttons */
@@ -2644,6 +2856,23 @@
     background: #fff;
     z-index: 2;
   }
+
+  .map-picker-thumbnail {
+    flex-shrink: 0;
+    width: 64px;
+    height: 64px;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border: 2px solid #ddd;
+  }
+
+  .map-picker-thumbnail img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
   .map-search-input {
     flex: 1;
     font-size: 1.1rem;
@@ -2672,7 +2901,8 @@
     border-bottom: none;
   }
   .map-search-result:hover {
-    background: #f5f5f5;
+    background: var(--culoca-orange);
+    color: white;
   }
   .map-picker-container-fullscreen {
     position: relative;
@@ -2720,7 +2950,7 @@
     transition: fill 0.2s;
   }
   .culoca-o-edit:hover path {
-    fill: #ee7221;
+    fill: var(--culoca-orange);
   }
   .culoca-o-edit {
     display: block;
@@ -2755,6 +2985,64 @@
     color: #fff;
     text-decoration: none;
     box-shadow: 0 4px 16px rgba(33, 150, 243, 0.15);
+  }
+
+  /* Filename editing styles */
+  .filename.editable {
+    cursor: pointer;
+    transition: color 0.2s;
+    background: transparent;
+  }
+
+  .filename.editable:hover {
+    background: transparent;
+  }
+
+  .filename-text {
+    cursor: pointer;
+    transition: color 0.2s;
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    margin: -0.25rem -0.5rem;
+  }
+
+  .filename.editable:hover .filename-text {
+    color: var(--culoca-orange);
+  }
+
+  .filename.editing .filename-text {
+    display: none;
+  }
+
+  .filename-edit-container {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: transparent;
+    margin: 0.25rem 0;
+  }
+
+  .filename-edit-input {
+    background: var(--bg-secondary);
+    border: 2px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-primary);
+    font-size: 1rem;
+    padding: 0.5rem;
+    flex: 1;
+    transition: border-color 0.2s, background-color 0.3s ease, color 0.3s ease;
+    /* Mobile optimizations */
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    font-size: 16px; /* Prevents zoom on iOS */
+  }
+
+  .filename-edit-input:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    background: var(--bg-tertiary);
   }
 
 </style> 
