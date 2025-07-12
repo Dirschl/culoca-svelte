@@ -2180,7 +2180,7 @@
 
   .creator-header {
     display: flex;
-    justify-content: center;
+    justify-content: flex-start;
     margin-bottom: 1rem;
   }
 
@@ -2863,15 +2863,16 @@
     color: white;
   }
   .map-type-btn {
-    background: none;
-    color: #888;
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
     border: none;
     border-radius: 8px;
-    padding: 0.2rem 0.7rem;
-    font-size: 1.5rem;
+    padding: 8px;
     cursor: pointer;
-    margin-left: 0.5rem;
-    transition: background 0.2s, color 0.2s;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
   .map-type-btn:hover {
     background: var(--culoca-orange);

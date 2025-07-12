@@ -4069,9 +4069,6 @@
   }
 
   @media (max-width: 600px) {
-    .culoca-logo {
-      width: 10rem;
-    }
     .search-container {
       max-width: 250px;
     }
