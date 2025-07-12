@@ -48,20 +48,28 @@
     try {
       console.log(`[Justified] Starting layout calculation with ${items.length} items, containerWidth: ${containerWidth}`);
       
+      // Create input items with dynamic dimension calculation
       const inputItems = items.map((item, index) => { 
         let width = item.width;
         let height = item.height;
         
-        // Ensure we have valid dimensions for justified layout
-        if (!width || width <= 0 || !height || height <= 0) {
-          console.warn(`[Justified] Invalid dimensions for item ${item.id} (index ${index}): ${width}x${height}, using defaults`);
-          width = 400;
-          height = 300;
+        // If we have valid dimensions from database, use them
+        if (width && width > 0 && height && height > 0) {
+          console.log(`[Justified] Using database dimensions for item ${item.id}: ${width}x${height}`);
+          return { width, height };
         }
         
-        // Ensure minimum dimensions
-        if (width < 100) width = 100;
-        if (height < 100) height = 100;
+        // Otherwise, create varied dimensions based on index to ensure justified layout works
+        // Use different aspect ratios to create visual variety
+        const aspectRatios = [4/3, 3/2, 16/9, 1/1, 3/4]; // Common photo aspect ratios
+        const aspectRatio = aspectRatios[index % aspectRatios.length];
+        
+        // Base width between 300-600 pixels
+        const baseWidth = 300 + (index % 4) * 100;
+        width = baseWidth;
+        height = Math.round(baseWidth / aspectRatio);
+        
+        console.log(`[Justified] Generated dimensions for item ${item.id}: ${width}x${height} (aspect: ${aspectRatio.toFixed(2)})`);
         
         return { width, height };
       });
@@ -69,18 +77,16 @@
       console.log(`[Justified] Calculating layout for ${inputItems.length} items with container width: ${containerWidth}`);
       console.log(`[Justified] Sample dimensions:`, inputItems.slice(0, 3));
       
-      layout = justifiedLayout(inputItems, { 
-        containerWidth, 
-        targetRowHeight: responsiveTargetRowHeight, 
+      // Calculate justified layout
+      const result = justifiedLayout(inputItems, {
+        containerWidth: containerWidth - 20, // Account for padding
+        targetRowHeight: responsiveTargetRowHeight,
         boxSpacing: gap,
-        containerPadding: 0,
-        maxNumRows: 100,  // Allow many rows
-        forceAspectRatio: false,  // Keep original aspect ratios
-        showWidows: true,  // Show incomplete last row
-        fullWidthBreakoutRowCadence: false  // No full-width rows
+        containerPadding: 0
       });
       
-      boxes = layout.boxes || [];
+      layout = result;
+      boxes = result.boxes;
       
       console.log('Stock-style layout calculated:', {
         itemCount: items.length,
@@ -108,6 +114,11 @@
   // Debug: Monitor container height changes
   $: if (layout.containerHeight > 0) {
     console.log(`[Justified] Container height updated: ${layout.containerHeight}px`);
+    // Force a reflow to ensure the height is applied
+    if (galleryEl) {
+      galleryEl.style.height = `${layout.containerHeight}px`;
+      console.log(`[Justified] Applied height to gallery element: ${layout.containerHeight}px`);
+    }
   }
   
   function resize() {
