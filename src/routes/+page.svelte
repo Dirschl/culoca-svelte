@@ -1828,8 +1828,12 @@
   }
 
   function startGPSTracking() {
-    if (!navigator.geolocation || gpsTrackingActive) return;
+    if (!navigator.geolocation || gpsTrackingActive) {
+      console.log('🔄 [GPS] Already tracking or geolocation not available');
+      return;
+    }
     
+    console.log('🔄 [GPS] Starting GPS tracking...');
     gpsStatus = 'checking';
     gpsTrackingActive = true;
     
@@ -1842,7 +1846,11 @@
         userLat = pos.coords.latitude;
         userLon = pos.coords.longitude;
         saveLastKnownLocation(userLat, userLon);
-        console.log('🔄 GPS active:', { lat: userLat, lon: userLon });
+        console.log('🔄 [GPS] Active:', { lat: userLat, lon: userLon });
+        
+        // Resort existing images immediately for distance display
+        resortExistingImages();
+        
         // Wenn GPS-Koordinaten verfügbar sind, lade Bilder nach Entfernung sortiert
         // Aber nur wenn keine Suche aktiv ist
         if (userLat !== null && userLon !== null && !searchQuery.trim()) {
@@ -1851,9 +1859,13 @@
           hasMoreImages = true;
           loadMore('initial GPS mount');
         }
+        
         gpsWatchId = navigator.geolocation.watchPosition(
           handlePositionUpdate,
-          (error) => console.error('GPS tracking error:', error),
+          (error) => {
+            console.error('GPS tracking error:', error);
+            gpsStatus = 'error';
+          },
           { enableHighAccuracy: true, maximumAge: 1000, timeout: 3000 }
         );
         radiusCheckInterval = window.setInterval(checkRadiusForNewImages, RADIUS_CHECK_INTERVAL);
@@ -1890,6 +1902,10 @@
     userLon = newLon;
     
     console.log(`GPS position updated: ${newLat.toFixed(6)}, ${newLon.toFixed(6)}`);
+    console.log(`[GPS Debug] userLat: ${userLat}, userLon: ${userLon}`);
+    
+    // Update GPS status
+    gpsStatus = 'active';
     
     // Resort existing images immediately for distance display
     resortExistingImages();
@@ -2317,6 +2333,12 @@
     // Start GPS tracking immediately if not in simulation mode
     if (!simulationMode && !gpsSimulationActive) {
       console.log('🔄 Starting GPS tracking immediately...');
+      startGPSTracking();
+    }
+    
+    // FORCE GPS START: Ensure GPS tracking starts even if simulation mode is not set
+    if (!gpsTrackingActive && !gpsSimulationActive) {
+      console.log('🔄 [FORCE] Starting GPS tracking as fallback...');
       startGPSTracking();
     }
 
