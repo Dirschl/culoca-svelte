@@ -1576,7 +1576,12 @@
   function updateLayoutFromStorage() {
     if (typeof localStorage !== 'undefined') {
       const savedLayout = localStorage.getItem('galleryLayout');
-      useJustifiedLayout = savedLayout === 'justified';
+      // Only update if there's a saved layout preference, otherwise keep justified
+      if (savedLayout) {
+        useJustifiedLayout = savedLayout === 'justified';
+      } else {
+        useJustifiedLayout = true; // Default to justified layout
+      }
     }
   }
 
@@ -1619,6 +1624,10 @@
           // Load showSearchField from localStorage (default: false = Logo visible)
       showSearchField = localStorage.getItem('showSearchField') === 'true';
     useJustifiedLayout = data?.use_justified_layout ?? true;
+    // Ensure justified layout is enabled by default
+    if (useJustifiedLayout === undefined || useJustifiedLayout === null) {
+      useJustifiedLayout = true;
+    }
     newsFlashMode = data?.newsflash_mode ?? 'alle';
     
     // Start GPS tracking if distance is enabled
