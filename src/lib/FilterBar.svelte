@@ -17,9 +17,7 @@
 	export let permalinkImageId: string | null = null;
 	export let showDistance = false; // New prop to show current sorting method
 	export let isLoggedIn = false; // New prop to determine if user is logged in
-	
-	// GPS status tracking
-	let gpsStatus: 'active' | 'cached' | 'none' = 'none';
+	export let gpsStatus: 'active' | 'cached' | 'none' | 'checking' | 'denied' | 'unavailable' = 'none';
 	let cachedLat: number | null = null;
 	let cachedLon: number | null = null;
 	
@@ -34,25 +32,6 @@
 			} catch (e) {
 				// Ignore parsing errors
 			}
-		}
-	}
-	
-	// Determine GPS status
-	$: {
-		if (userLat !== null && userLon !== null) {
-			gpsStatus = 'active';
-			// Store current position as cached
-			if (browser) {
-				localStorage.setItem('lastKnownPosition', JSON.stringify({
-					lat: userLat,
-					lon: userLon,
-					timestamp: Date.now()
-				}));
-			}
-		} else if (cachedLat !== null && cachedLon !== null) {
-			gpsStatus = 'cached';
-		} else {
-			gpsStatus = 'none';
 		}
 	}
 	
@@ -192,6 +171,24 @@
 							{formatCoordinates(userLat, userLon)}
 						</span>
 					</div>
+				{:else if gpsStatus === 'checking'}
+					<div class="gps-status checking">
+						<span class="gps-text">
+							GPS wird ermittelt...
+						</span>
+					</div>
+				{:else if gpsStatus === 'denied'}
+					<div class="gps-status denied">
+						<span class="gps-text">
+							GPS verweigert - nur Karte oder Suche möglich
+						</span>
+					</div>
+				{:else if gpsStatus === 'unavailable'}
+					<div class="gps-status unavailable">
+						<span class="gps-text">
+							GPS nicht verfügbar - nur Karte oder Suche möglich
+						</span>
+					</div>
 				{:else if gpsStatus === 'cached' && cachedLat !== null && cachedLon !== null}
 					<div class="gps-status cached">
 						<span class="gps-coords">
@@ -200,9 +197,9 @@
 					</div>
 				{:else if isLoggedIn}
 					<div class="gps-status none">
-						<span class="gps-text">
+						<button class="gps-map-link" on:click={() => window.dispatchEvent(new CustomEvent('openMap'))}>
 							Kein GPS - nur Karte oder Suche möglich
-						</span>
+						</button>
 					</div>
 				{/if}
 			</div>
@@ -365,6 +362,38 @@
 	/* Cached GPS - Orange/Yellow */
 	.gps-status.cached {
 		color: var(--text-accent, #f59e0b);
+	}
+
+	/* Checking GPS - Blue */
+	.gps-status.checking {
+		color: var(--text-accent, #3b82f6);
+	}
+
+	/* Denied GPS - Red */
+	.gps-status.denied {
+		color: var(--text-accent, #ef4444);
+	}
+
+	/* Unavailable GPS - Gray */
+	.gps-status.unavailable {
+		color: var(--text-secondary, #6b7280);
+	}
+
+	/* GPS Map Link Button */
+	.gps-map-link {
+		background: none;
+		border: none;
+		color: var(--text-secondary, #6b7280);
+		font-size: 16px;
+		font-weight: 500;
+		cursor: pointer;
+		text-decoration: underline;
+		padding: 0;
+		margin: 0;
+	}
+
+	.gps-map-link:hover {
+		color: var(--culoca-orange, #ee7221);
 	}
 
 	:global(.dark) .gps-status.cached {

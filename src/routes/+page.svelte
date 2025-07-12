@@ -1149,8 +1149,8 @@
         id: d.id,
         src: d.path_512 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${d.path_512}` : '',
         srcHD: d.path_2048 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${d.path_2048}` : '',
-        width: d.width || 400,  // Default width for justified layout
-        height: d.height || 300, // Default height for justified layout
+        width: d.width && d.width > 0 ? d.width : 400,  // Use actual width if available
+        height: d.height && d.height > 0 ? d.height : 300, // Use actual height if available
         lat: d.lat,
         lon: d.lon,
         title: d.title,
@@ -1161,6 +1161,16 @@
         path_2048: d.path_2048,
         distance: d.distance || null
       })).filter((pic: any) => pic.path_512);
+      
+      // Debug: Log sample dimensions
+      if (newPics.length > 0) {
+        console.log('[Gallery] Sample image dimensions:', newPics.slice(0, 3).map((p: any) => ({
+          id: p.id,
+          width: p.width,
+          height: p.height,
+          hasSrc: !!p.src
+        })));
+      }
       
       // Prüfe auf Duplikate vor dem Hinzufügen
       const currentPics = get(pics);
@@ -3197,8 +3207,6 @@
         userLon={userLon}
         getDistanceFromLatLonInMeters={getDistanceFromLatLonInMeters}
       />
-      
-
     </div>
   {:else}
     <div class="grid-layout">

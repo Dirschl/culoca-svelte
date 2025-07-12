@@ -30,6 +30,7 @@
   let boxes: LayoutBox[] = [];
   let layout: JustifiedLayoutResult = { boxes: [], containerHeight: 0, widowCount: 0 };
   let deviceHeading: number | null = null;
+  let galleryEl: HTMLDivElement;
   
   // Responsive target row height calculation
   $: responsiveTargetRowHeight = (() => {
@@ -45,10 +46,28 @@
   // Reactive layout calculation
   $: if (items.length > 0 && containerWidth > 0) {
     try {
-      const inputItems = items.map((item) => ({ 
-        width: item.width || 400, 
-        height: item.height || 300 
-      }));
+      console.log(`[Justified] Starting layout calculation with ${items.length} items, containerWidth: ${containerWidth}`);
+      
+      const inputItems = items.map((item, index) => { 
+        let width = item.width;
+        let height = item.height;
+        
+        // Ensure we have valid dimensions for justified layout
+        if (!width || width <= 0 || !height || height <= 0) {
+          console.warn(`[Justified] Invalid dimensions for item ${item.id} (index ${index}): ${width}x${height}, using defaults`);
+          width = 400;
+          height = 300;
+        }
+        
+        // Ensure minimum dimensions
+        if (width < 100) width = 100;
+        if (height < 100) height = 100;
+        
+        return { width, height };
+      });
+      
+      console.log(`[Justified] Calculating layout for ${inputItems.length} items with container width: ${containerWidth}`);
+      console.log(`[Justified] Sample dimensions:`, inputItems.slice(0, 3));
       
       layout = justifiedLayout(inputItems, { 
         containerWidth, 
@@ -68,19 +87,25 @@
         containerWidth,
         targetRowHeight: responsiveTargetRowHeight,
         boxes: boxes.length,
-        containerHeight: layout.containerHeight
+        containerHeight: layout.containerHeight,
+        sampleBoxes: boxes.slice(0, 3)
       });
     } catch (error) {
       console.error('Error calculating justified layout:', error);
+      console.error('Items that caused error:', items.slice(0, 5));
       boxes = [];
     }
   }
-
-  let galleryEl: HTMLDivElement;
+  
+  // Additional reactive statement to monitor items changes
+  $: if (items.length > 0) {
+    console.log(`[Justified] Items updated: ${items.length} items`);
+  }
   
   function resize() {
     if (galleryEl) {
       const newWidth = galleryEl.clientWidth;
+      console.log(`[Justified] Resize detected: ${newWidth}px`);
       if (newWidth !== containerWidth && newWidth > 0) {
         containerWidth = newWidth;
       }
@@ -94,11 +119,23 @@
   }
   
   onMount(() => {
+    console.log(`[Justified] Component mounted, initial containerWidth: ${containerWidth}`);
+    
+    // Initialize container width immediately
+    if (galleryEl) {
+      const initialWidth = galleryEl.clientWidth;
+      console.log(`[Justified] Initial gallery width: ${initialWidth}px`);
+      if (initialWidth > 0) {
+        containerWidth = initialWidth;
+      }
+    }
+    
     resize();
     window.addEventListener('resize', resize);
     
     // Also resize when images load
     const resizeObserver = new ResizeObserver(() => {
+      console.log(`[Justified] ResizeObserver triggered`);
       resize();
     });
     
