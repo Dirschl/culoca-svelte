@@ -3172,6 +3172,9 @@
           <div>userLon: {userLon}</div>
           <div>GPS Status: {gpsStatus}</div>
           <div>Images: {$pics.length}</div>
+          <div>Images with GPS: {$pics.filter(p => p.lat && p.lon).length}</div>
+          <div>First image GPS: {$pics[0]?.lat}, {$pics[0]?.lon}</div>
+          <div>Distance function: {typeof getDistanceFromLatLonInMeters}</div>
         </div>
       {/if}
     </div>
