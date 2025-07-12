@@ -81,6 +81,15 @@
   }
   let useJustifiedLayout = true;
   let profileAvatar: string | null = null;
+  
+  // Debug: Monitor justified layout usage
+  $: if (useJustifiedLayout && $pics.length > 0) {
+    console.log('[Gallery] Justified layout active:', {
+      useJustifiedLayout,
+      picsLength: $pics.length,
+      samplePics: $pics.slice(0, 2).map((p: any) => ({ id: p.id, width: p.width, height: p.height }))
+    });
+  }
   let showDistance = false;
   let showCompass = false;
   let autoguide = false;
