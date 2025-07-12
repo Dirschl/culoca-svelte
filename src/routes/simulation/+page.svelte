@@ -2,7 +2,7 @@
   import { onMount, onDestroy } from 'svelte';
   import { supabase } from '$lib/supabaseClient';
   import { writable, get } from 'svelte/store';
-  import Justified from '$lib/Justified.svelte';
+  import GalleryLayout from '$lib/GalleryLayout.svelte';
   import NewsFlash from '$lib/NewsFlash.svelte';
   import { darkMode } from '$lib/darkMode';
 

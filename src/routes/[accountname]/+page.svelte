@@ -4,7 +4,7 @@
   import { goto } from '$app/navigation';
   import { supabase } from '$lib/supabaseClient';
   import type { NewsFlashImage } from '$lib/types';
-  import Justified from '$lib/Justified.svelte';
+  import GalleryLayout from '$lib/GalleryLayout.svelte';
   import { sessionStore } from '$lib/sessionStore';
   import { filterStore } from '$lib/filterStore';
   
@@ -200,7 +200,7 @@
     
     {#if images.length > 0}
              <div class="gallery-container">
-         <Justified 
+         <GalleryLayout 
            items={images.map(img => ({
              src: img.path_512,
              width: 400,
@@ -209,9 +209,10 @@
              lat: img.lat,
              lon: img.lon
            }))}
-           on:imageClick={(e) => handleImageClick(e.detail)}
+           layout="justified"
            targetRowHeight={300}
            gap={4}
+           onImageClick={handleImageClick}
          />
        </div>
     {:else}

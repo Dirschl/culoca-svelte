@@ -2,7 +2,7 @@
   import { supabase } from '$lib/supabaseClient';
   import { onMount } from 'svelte';
   import { writable, get } from 'svelte/store';
-  import Justified from '$lib/Justified.svelte';
+  import GalleryLayout from '$lib/GalleryLayout.svelte';
   import NewsFlash from '$lib/NewsFlash.svelte';
   import FloatingActionButtons from '$lib/FloatingActionButtons.svelte';
   import FullscreenMap from '$lib/FullscreenMap.svelte';
@@ -81,15 +81,6 @@
   }
   let useJustifiedLayout = true;
   let profileAvatar: string | null = null;
-  
-  // Debug: Monitor justified layout usage
-  $: if (useJustifiedLayout && $pics.length > 0) {
-    console.log('[Gallery] Justified layout active:', {
-      useJustifiedLayout,
-      picsLength: $pics.length,
-      samplePics: $pics.slice(0, 2).map((p: any) => ({ id: p.id, width: p.width, height: p.height }))
-    });
-  }
   let showDistance = false;
   let showCompass = false;
   let autoguide = false;
@@ -1173,7 +1164,7 @@
       
       // Debug: Log sample dimensions
       if (newPics.length > 0) {
-        console.log('[Gallery] Sample image dimensions:', newPics.slice(0, 3).map((p: any) => ({
+        console.log('[Gallery] Sample image dimensions:', newPics.slice(0, 3).map(p => ({
           id: p.id,
           width: p.width,
           height: p.height,
@@ -1317,6 +1308,70 @@
       console.error('[Gallery AllUser] Fetch error:', error);
       return [];
     }
+  }
+
+  // TEST: Function to create sample data for testing justified layout
+  function createSampleImages() {
+    const sampleImages = [
+      {
+        id: 'test1',
+        src: 'https://picsum.photos/400/300?random=1',
+        width: 400,
+        height: 300,
+        lat: 52.5200,
+        lon: 13.4050,
+        title: 'Sample Image 1',
+        description: 'Test image for justified layout',
+        distance: 150
+      },
+      {
+        id: 'test2',
+        src: 'https://picsum.photos/600/400?random=2',
+        width: 600,
+        height: 400,
+        lat: 52.5201,
+        lon: 13.4051,
+        title: 'Sample Image 2',
+        description: 'Test image for justified layout',
+        distance: 250
+      },
+      {
+        id: 'test3',
+        src: 'https://picsum.photos/500/350?random=3',
+        width: 500,
+        height: 350,
+        lat: 52.5202,
+        lon: 13.4052,
+        title: 'Sample Image 3',
+        description: 'Test image for justified layout',
+        distance: 350
+      },
+      {
+        id: 'test4',
+        src: 'https://picsum.photos/450/300?random=4',
+        width: 450,
+        height: 300,
+        lat: 52.5203,
+        lon: 13.4053,
+        title: 'Sample Image 4',
+        description: 'Test image for justified layout',
+        distance: 450
+      },
+      {
+        id: 'test5',
+        src: 'https://picsum.photos/550/400?random=5',
+        width: 550,
+        height: 400,
+        lat: 52.5204,
+        lon: 13.4054,
+        title: 'Sample Image 5',
+        description: 'Test image for justified layout',
+        distance: 550
+      }
+    ];
+    
+    pics.set(sampleImages);
+    console.log('[TEST] Added sample images for justified layout testing');
   }
 
   let uploading = false;
@@ -3204,61 +3259,17 @@
 
 <!-- Galerie bleibt erhalten -->
 <div class="gallery-container">
-  {#if useJustifiedLayout}
-    <div class="justified-wrapper">
-      <Justified 
-        items={$pics} 
-        gap={2} 
-        targetRowHeight={220}
-        showDistance={isLoggedIn && showDistance}
-        showCompass={isLoggedIn && showCompass}
-        userLat={userLat}
-        userLon={userLon}
-        getDistanceFromLatLonInMeters={getDistanceFromLatLonInMeters}
-      />
-    </div>
-  {:else}
-    <div class="grid-layout">
-      {#each $pics as pic}
-        <div class="grid-item">
-          {#if isLoggedIn}
-            <img 
-              src={pic.src} 
-              alt="Gallery image {pic.id}"
-              on:click={() => location.href = `/item/${pic.id}`}
-              on:keydown={(e) => e.key === 'Enter' && (location.href = `/item/${pic.id}`)}
-              tabindex="0"
-              role="button"
-              aria-label="View image {pic.id}"
-            />
-          {:else}
-            <img 
-              src={pic.src} 
-              alt="Gallery image {pic.id}"
-              style="cursor: default; pointer-events: none;"
-            />
-          {/if}
-          
-
-          {#if isLoggedIn && showDistance && userLat !== null && userLon !== null && pic.lat && pic.lon}
-            <div class="distance-label">
-              {getDistanceFromLatLonInMeters(userLat, userLon, pic.lat, pic.lon)}
-            </div>
-          {/if}
-          {#if isLoggedIn && showCompass && userLat !== null && userLon !== null && pic.lat && pic.lon && deviceHeading !== null}
-            <div class="compass" style="position: absolute; left: 12px; bottom: 48px; z-index: 3;">
-              <svg width="36" height="36" viewBox="0 0 36 36">
-                <circle cx="18" cy="18" r="16" fill="rgba(24,24,40,0.55)" stroke="#fff" stroke-width="2" />
-                <g transform="rotate({getAzimuth(userLat, userLon, pic.lat, pic.lon) - deviceHeading}, 18, 18)">
-                  <polygon points="18,6 24,24 18,20 12,24" fill="#ff5252" />
-                </g>
-              </svg>
-            </div>
-          {/if}
-        </div>
-      {/each}
-    </div>
-  {/if}
+  <GalleryLayout
+    items={$pics}
+    layout={useJustifiedLayout ? 'justified' : 'grid'}
+    gap={2}
+    targetRowHeight={220}
+    showDistance={isLoggedIn && showDistance}
+    showCompass={isLoggedIn && showCompass}
+    userLat={userLat}
+    userLon={userLon}
+    getDistanceFromLatLonInMeters={getDistanceFromLatLonInMeters}
+  />
   
   {#if loading}
     <div class="loading-indicator">
@@ -3296,6 +3307,9 @@
     <div class="empty-state">
       <h3>Noch keine Bilder vorhanden</h3>
       <p>Lade deine ersten Bilder hoch, um die Galerie zu starten!</p>
+      <button on:click={createSampleImages} style="margin-top: 1rem; padding: 0.5rem 1rem; background: #0066cc; color: white; border: none; border-radius: 4px; cursor: pointer;">
+        🧪 Test Justified Layout
+      </button>
     </div>
   {/if}
 
@@ -3696,26 +3710,9 @@
     box-shadow: none;
   }
 
-  .justified-wrapper {
-    width: 100%;
-    margin: 0;
-    padding: 0;
-    background: var(--bg-primary);
-    border: none;
-    box-shadow: none;
-  }
 
-  .gallery {
-    position: relative;
-    width: 100%;
-    min-height: 200px;
-    margin: 0 !important;
-    padding: 0 !important;
-    background: var(--bg-primary) !important;
-    border: none !important;
-    box-shadow: none !important;
-    transition: background-color 0.3s ease;
-  }
+
+
 
   .grid-layout {
     display: grid;
@@ -4884,6 +4881,8 @@
       justify-content: center;
     }
   }
+  
+
   }
 </style>
 

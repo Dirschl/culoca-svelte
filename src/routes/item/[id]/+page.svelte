@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { supabase } from '$lib/supabaseClient';
   import { page } from '$app/stores';
-  import Justified from '$lib/Justified.svelte';
+  import GalleryLayout from '$lib/GalleryLayout.svelte';
   import { browser } from '$app/environment';
   import { tick } from 'svelte';
   import { darkMode } from '$lib/darkMode';
@@ -1226,29 +1226,15 @@
 
           {#if image.lat && image.lon && nearby.length}
             <div class="edge-to-edge-gallery">
-              {#if useJustifiedLayout}
-                <div class="justified-wrapper">
-                  <Justified
-                    items={nearby}
-                    gap={2}
-                    showDistance={true}
-                    userLat={image.lat}
-                    userLon={image.lon}
-                    getDistanceFromLatLonInMeters={getDistanceFromLatLonInMeters}
-                  />
-                </div>
-              {:else}
-                <div class="grid-layout">
-                  {#each nearby as img}
-                    <div class="grid-item" on:click={() => window.location.href = `/item/${img.id}` } tabindex="0" role="button" aria-label={`Bild ${img.title || img.id}` } title={img.title || ''}>
-                      <img src={img.src} alt={img.title || 'Bild'} />
-                      <div class="distance-label">
-                        {getDistanceFromLatLonInMeters(image.lat, image.lon, img.lat, img.lon)}
-                      </div>
-                    </div>
-                  {/each}
-                </div>
-              {/if}
+              <GalleryLayout
+                items={nearby}
+                layout={useJustifiedLayout ? 'justified' : 'grid'}
+                gap={2}
+                showDistance={true}
+                userLat={image.lat}
+                userLon={image.lon}
+                getDistanceFromLatLonInMeters={getDistanceFromLatLonInMeters}
+              />
             </div>
           {/if}
 

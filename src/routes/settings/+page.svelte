@@ -539,6 +539,79 @@
     color: var(--text-primary);
   }
 
+/* ============================================================= */
+/* 🔄   CSS-Anpassungen – nur dieser Teil ist neu/aktualisiert   */
+/* ============================================================= */
+
+/* Distanz-Badge links unten */
+.pic-container .distance-label {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(4px);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 500;
+  border-radius: 6px;
+  padding: 1px 8px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+/* Spezifische Klasse für bessere CSS-Spezifität */
+.pic-container .distance-label.s-prPRSjF7NRSe {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(4px);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 500;
+  border-radius: 6px;
+  padding: 1px 8px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+/* ============================================================= */
+/*   Bestehende Justified-Gallery-Styles (unverändert belassen)   */
+/* ============================================================= */
+
+/* Justified Gallery specific styles - higher specificity */
+.justified-wrapper .gallery {
+  position: relative !important;
+  width: 100% !important;
+  height: auto !important;
+  min-height: 200px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: var(--bg-primary) !important;
+  border: none !important;
+  box-shadow: none !important;
+  overflow: hidden !important;
+}
+
+/* Bild-Container */
+.justified-wrapper .pic-container {
+  position: absolute !important;
+  cursor: pointer !important;
+  overflow: hidden !important;
+  transition: box-shadow 0.3s ease, background-color 0.3s ease !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
+  background: var(--bg-secondary) !important;
+}
+
+.justified-wrapper .pic {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  display: block !important;
+  transition: transform 0.3s cubic-bezier(.4,0,.2,1) !important;
+  background: transparent !important;
+}
+
   .loading-container {
     display: flex;
     flex-direction: column;

@@ -17,7 +17,7 @@
     boxes: LayoutBox[];
   }
 
-  export let items: { src: string; width: number; height: number; id: string; lat?: number; lon?: number; distance?: number }[] = [];
+  export let items: { src: string; width: number; height: number; id: string; lat?: number; lon?: number }[] = [];
   export let containerWidth = 1024;
   export let targetRowHeight = 200;  // Will be adjusted responsively
   export let gap = 2;  // Set default gap to 2px
@@ -161,7 +161,6 @@
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     background: var(--bg-secondary);
   }
-
   .pic-container:focus {
     outline: 3px solid #0066cc;
     outline-offset: 2px;
@@ -269,17 +268,9 @@
             alt="Gallery image {item.id}"
             loading="lazy"
           />
-          {#if showDistance && userLat !== null && userLon !== null && item.lat && item.lon}
+          {#if showDistance && userLat !== null && userLon !== null && item.lat && item.lon && getDistanceFromLatLonInMeters}
             <div class="distance-label">
-              {#if item.distance !== undefined && item.distance !== null}
-                {#if item.distance < 1000}
-                  {Math.round(item.distance)}m
-                {:else}
-                  {(item.distance / 1000).toFixed(1)}km
-                {/if}
-              {:else if getDistanceFromLatLonInMeters}
-                {getDistanceFromLatLonInMeters(userLat, userLon, item.lat, item.lon)}
-              {/if}
+              {getDistanceFromLatLonInMeters(userLat, userLon, item.lat, item.lon)}
             </div>
           {/if}
           {#if showCompass && userLat !== null && userLon !== null && item.lat && item.lon && deviceHeading !== null}
