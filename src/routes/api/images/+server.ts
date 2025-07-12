@@ -139,9 +139,39 @@ export const GET = async ({ url, request }) => {
         throw error(500, countError.message);
       }
 
+      // Calculate distances for normal mode if GPS coordinates are provided
+      let imagesWithDistance = data;
+      if (lat && lon && !isNaN(parseFloat(lat)) && !isNaN(parseFloat(lon))) {
+        const userLat = parseFloat(lat);
+        const userLon = parseFloat(lon);
+        
+        imagesWithDistance = data.map((image: any) => {
+          if (image.lat && image.lon) {
+            // Calculate distance using Haversine formula
+            const R = 6371000; // Earth's radius in meters
+            const lat1Rad = userLat * Math.PI / 180;
+            const lat2Rad = image.lat * Math.PI / 180;
+            const deltaLatRad = (image.lat - userLat) * Math.PI / 180;
+            const deltaLonRad = (image.lon - userLon) * Math.PI / 180;
+            
+            const a = Math.sin(deltaLatRad / 2) * Math.sin(deltaLatRad / 2) +
+                     Math.cos(lat1Rad) * Math.cos(lat2Rad) *
+                     Math.sin(deltaLonRad / 2) * Math.sin(deltaLonRad / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            const distance = R * c;
+            
+            return {
+              ...image,
+              distance: distance
+            };
+          }
+          return image;
+        });
+      }
+      
       return json({ 
         status: 'success', 
-        images: data, 
+        images: imagesWithDistance, 
         totalCount: count || 0,
         loadedCount: data?.length || 0,
         gpsMode: false
