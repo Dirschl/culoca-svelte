@@ -1063,9 +1063,9 @@
       const loadLon = effectiveLon!;
       console.log(`[Gallery] Loading images by distance from ${loadLat}, ${loadLon}`);
       
-      // FIXED: For first few pages, use normal loading to get all images, then sort client-side
+      // FIXED: For first few pages, use normal loading with GPS parameters for distance sorting
       if (page < 3) {
-        console.log(`[Gallery] Page ${page} < 3, using normal loading for better coverage`);
+        console.log(`[Gallery] Page ${page} < 3, using normal loading with GPS parameters for distance sorting`);
         data = await loadImagesNormal();
       } else {
         try {
@@ -1241,6 +1241,12 @@
         url += `&current_user_id=${currentUser.id}`;
       }
       
+      // FIXED: Add GPS parameters for distance sorting if available
+      if (userLat !== null && userLon !== null) {
+        url += `&lat=${userLat}&lon=${userLon}`;
+        console.log(`[Gallery Normal] Adding GPS parameters for distance sorting: ${userLat}, ${userLon}`);
+      }
+      
       console.log(`[Gallery Normal] Fetching from: ${url}`);
       const response = await fetch(url);
       const result = await response.json();
@@ -1249,7 +1255,7 @@
       
       if (result.status === 'success') {
         // Don't set hasMoreImages to false here - let the main loadMore function handle it
-        console.log(`[Gallery Normal] Got ${result.images?.length || 0} images, total available: ${result.totalCount || 0}`);
+        console.log(`[Gallery Normal] Got ${result.images?.length || 0} images, total available: ${result.totalCount || 0}, GPS mode: ${result.gpsMode}`);
         
         return result.images;
       } else {
