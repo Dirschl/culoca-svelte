@@ -3198,19 +3198,7 @@
         getDistanceFromLatLonInMeters={getDistanceFromLatLonInMeters}
       />
       
-      <!-- Debug info -->
-      {#if isLoggedIn}
-        <div style="position: fixed; top: 10px; right: 10px; background: rgba(0,0,0,0.8); color: white; padding: 10px; border-radius: 5px; font-size: 12px; z-index: 9999;">
-          <div>showDistance: {showDistance}</div>
-          <div>userLat: {userLat}</div>
-          <div>userLon: {userLon}</div>
-          <div>GPS Status: {gpsStatus}</div>
-          <div>Images: {$pics.length}</div>
-          <div>Images with GPS: {$pics.filter(p => p.lat && p.lon).length}</div>
-          <div>First image GPS: {$pics[0]?.lat}, {$pics[0]?.lon}</div>
-          <div>Distance function: {typeof getDistanceFromLatLonInMeters}</div>
-        </div>
-      {/if}
+
     </div>
   {:else}
     <div class="grid-layout">
