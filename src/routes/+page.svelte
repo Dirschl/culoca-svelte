@@ -1057,13 +1057,8 @@
       locationFilter: currentFilters.locationFilter?.name
     });
     
-    // SPECIAL CASE: If distance is enabled and this is the first load, load ALL images at once
-    if (isLoggedIn && showDistance && (userLat !== null && userLon !== null) && page === 0) {
-      console.log(`[Gallery] Distance mode enabled, loading ALL images at once for proper distance sorting`);
-      data = await loadAllImagesForDistance();
-    }
     // Use GPS-based loading if location is available (from GPS or location filter)
-    else if ((isLoggedIn && showDistance && userLat !== null && userLon !== null) || hasLocationFilter) {
+    if ((isLoggedIn && showDistance && userLat !== null && userLon !== null) || hasLocationFilter) {
       const loadLat = effectiveLat!;
       const loadLon = effectiveLon!;
       console.log(`[Gallery] Loading images by distance from ${loadLat}, ${loadLon}`);
@@ -1199,26 +1194,14 @@
         console.log(`[Gallery] Added ${uniqueNewPics.length} unique images (total: ${$pics.length})`);
       }
       
-      // SPECIAL CASE: If we loaded all images for distance mode, set hasMoreImages to false
-      if (isLoggedIn && showDistance && (userLat !== null && userLon !== null) && page === 0 && data && data.length > 0) {
-        console.log(`[Gallery] Distance mode: loaded all ${data.length} images, setting hasMoreImages to false`);
-        hasMoreImages = false;
-      }
-      
       // Update gallery stats
       const totalCount = await getTotalImageCount();
       updateGalleryStats($pics.length, totalCount);
       
-      // Check if we have more images to load
+      // Check if we have more images to load - use normal pagination for ALL modes
       console.log(`[Gallery] Checking pagination: current=${$pics.length}, total=${totalCount}, hasMoreImages=${hasMoreImages}`);
       
-      // SPECIAL CASE: If distance mode loaded all images, don't load more
-      if (isLoggedIn && showDistance && (userLat !== null && userLon !== null) && page === 0 && data && data.length > 0) {
-        hasMoreImages = false;
-        console.log(`[Gallery] Distance mode: loaded all images, hasMoreImages set to false`);
-      }
-      // Normal pagination logic
-      else if ($pics.length >= totalCount) {
+      if ($pics.length >= totalCount) {
         hasMoreImages = false;
         console.log(`[Gallery] All images loaded: ${$pics.length} of ${totalCount}`);
       } else {
@@ -1273,35 +1256,7 @@
     }
   }
 
-  // NEW: Function to load all images for distance mode
-  async function loadAllImagesForDistance() {
-    console.log(`[Gallery] Loading ALL images for distance mode`);
-    
-    try {
-      // Use a large limit to get all images at once
-      let url = `/api/images?limit=2000&offset=0`;
-      if (isLoggedIn && currentUser) {
-        url += `&current_user_id=${currentUser.id}`;
-      }
-      
-      console.log(`[Gallery Distance] Fetching from: ${url}`);
-      const response = await fetch(url);
-      const result = await response.json();
-      
-      console.log(`[Gallery Distance] API response:`, result);
-      
-      if (result.status === 'success') {
-        console.log(`[Gallery Distance] Got ${result.images?.length || 0} images, total available: ${result.totalCount || 0}`);
-        return result.images;
-      } else {
-        console.error('[Gallery Distance] API error:', result.message);
-        return [];
-      }
-    } catch (error) {
-      console.error('[Gallery Distance] Fetch error:', error);
-      return [];
-    }
-  }
+
 
   // NEW: Function to load all user's own images without pagination limit
   async function loadAllUserImages() {
@@ -1888,7 +1843,7 @@
         gpsWatchId = navigator.geolocation.watchPosition(
           handlePositionUpdate,
           (error) => console.error('GPS tracking error:', error),
-          { enableHighAccuracy: true, maximumAge: 3000, timeout: 5000 }
+          { enableHighAccuracy: true, maximumAge: 1000, timeout: 3000 }
         );
         radiusCheckInterval = window.setInterval(checkRadiusForNewImages, RADIUS_CHECK_INTERVAL);
       },
@@ -1917,35 +1872,31 @@
     const newLon = pos.coords.longitude;
     saveLastKnownLocation(newLat, newLon);
     
-    if (lastKnownLat === null || lastKnownLon === null) {
-      lastKnownLat = newLat;
-      lastKnownLon = newLon;
-      userLat = newLat;
-      userLon = newLon;
-      return;
-    }
+    // Always update position for distance display
+    lastKnownLat = newLat;
+    lastKnownLon = newLon;
+    userLat = newLat;
+    userLon = newLon;
     
-    // Calculate distance moved
-    const distance = getDistanceInMeters(lastKnownLat, lastKnownLon, newLat, newLon);
+    console.log(`GPS position updated: ${newLat.toFixed(6)}, ${newLon.toFixed(6)}`);
     
-    if (distance > GPS_UPDATE_THRESHOLD) {
-      console.log(`Moved ${distance.toFixed(1)}m, updating position...`);
+    // Resort existing images immediately for distance display
+    resortExistingImages();
+    
+    // Only check for significant movement for reloading
+    if (lastKnownLat !== null && lastKnownLon !== null) {
+      const distance = getDistanceInMeters(lastKnownLat, lastKnownLon, newLat, newLon);
       
-      lastKnownLat = newLat;
-      lastKnownLon = newLon;
-      userLat = newLat;
-      userLon = newLon;
-      
-      // Nur noch bestehende Bilder neu sortieren - KEIN automatisches Neuladen mehr
-      console.log('Position changed significantly, resorting existing images...');
-      resortExistingImages();
-      
-      // Prüfe nur bei größeren Bewegungen (>1km) ob wir komplett neue Daten brauchen
-      if (distance > 1000) {
-        console.log(`Large movement detected (${distance.toFixed(1)}m), checking if reload needed...`);
-        const shouldReload = checkIfCompleteReloadNeeded();
-        if (shouldReload) {
-          reloadGalleryWithNewPosition();
+      if (distance > GPS_UPDATE_THRESHOLD) {
+        console.log(`Moved ${distance.toFixed(1)}m, checking if reload needed...`);
+        
+        // Prüfe nur bei größeren Bewegungen (>1km) ob wir komplett neue Daten brauchen
+        if (distance > 1000) {
+          console.log(`Large movement detected (${distance.toFixed(1)}m), checking if reload needed...`);
+          const shouldReload = checkIfCompleteReloadNeeded();
+          if (shouldReload) {
+            reloadGalleryWithNewPosition();
+          }
         }
       }
     }
