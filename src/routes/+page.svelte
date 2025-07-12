@@ -1621,6 +1621,9 @@
       .select('show_distance, show_compass, autoguide, enable_search, use_justified_layout, newsflash_mode')
       .eq('id', user.id)
       .single();
+    
+    console.log('[Settings] Loading user settings:', data);
+    
     showDistance = data?.show_distance ?? false;
     showCompass = data?.show_compass ?? false;
     autoguide = data?.autoguide ?? false;
@@ -1632,6 +1635,14 @@
       useJustifiedLayout = true;
     }
     newsFlashMode = data?.newsflash_mode ?? 'alle';
+    
+    console.log('[Settings] Loaded settings:', {
+      showDistance,
+      showCompass,
+      autoguide,
+      useJustifiedLayout,
+      newsFlashMode
+    });
     
     // Start GPS tracking if distance is enabled
     if (showDistance && navigator.geolocation) {
@@ -3152,6 +3163,17 @@
         userLon={userLon}
         getDistanceFromLatLonInMeters={getDistanceFromLatLonInMeters}
       />
+      
+      <!-- Debug info -->
+      {#if isLoggedIn}
+        <div style="position: fixed; top: 10px; right: 10px; background: rgba(0,0,0,0.8); color: white; padding: 10px; border-radius: 5px; font-size: 12px; z-index: 9999;">
+          <div>showDistance: {showDistance}</div>
+          <div>userLat: {userLat}</div>
+          <div>userLon: {userLon}</div>
+          <div>GPS Status: {gpsStatus}</div>
+          <div>Images: {$pics.length}</div>
+        </div>
+      {/if}
     </div>
   {:else}
     <div class="grid-layout">
