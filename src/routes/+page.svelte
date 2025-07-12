@@ -1063,54 +1063,60 @@
       const loadLon = effectiveLon!;
       console.log(`[Gallery] Loading images by distance from ${loadLat}, ${loadLon}`);
       
-      try {
-        // Use the optimized function with filter support
-        const optimizedResult = await supabase.rpc('images_by_distance_optimized', {
-          user_lat: loadLat,
-          user_lon: loadLon,
-          max_results: size,
-          offset_count: page * size,
-          filter_user_id: hasUserFilter ? currentFilters.userFilter!.userId : null
-        });
-        
-        if (optimizedResult.error) {
-          console.log('[Gallery] Optimized function not available, using fallback');
-          // Fallback: Use API endpoint with filter support
-          let fallbackUrl = `/api/images?limit=${size}&offset=${page * size}&lat=${loadLat}&lon=${loadLon}`;
-          if (hasUserFilter) {
-            fallbackUrl += `&filter_user_id=${currentFilters.userFilter!.userId}`;
-          }
-          if (isLoggedIn && currentUser) {
-            fallbackUrl += `&current_user_id=${currentUser.id}`;
-          }
-          console.log(`[Gallery] GPS fallback from: ${fallbackUrl}`);
-          const response = await fetch(fallbackUrl);
-          const fallbackResult = await response.json();
-          
-          if (fallbackResult.status !== 'success') {
-            console.error('[Gallery] Fallback API also failed:', fallbackResult.message);
-            data = await loadImagesNormal();
-          } else {
-            data = fallbackResult.images;
-            console.log(`[Gallery] Loaded ${data?.length || 0} images via fallback API`);
-          }
-        } else {
-          data = optimizedResult.data;
-          console.log(`[Gallery] Loaded ${data?.length || 0} images via optimized function (page ${page})`);
-          
-          // FIXED: If GPS mode returns too few images, fall back to normal mode
-          if (data && data.length < 10 && page === 0) {
-            console.log(`[Gallery] GPS mode returned only ${data.length} images, falling back to normal mode`);
-            data = await loadImagesNormal();
-          }
-          
-          // Let the main logic handle hasMoreImages based on total count
-          console.log(`[Gallery] GPS optimized: got ${data?.length || 0} images`);
-          // Don't set hasMoreImages here - let the main logic handle it
-        }
-      } catch (error) {
-        console.error('[Gallery] Error with distance loading:', error);
+      // FIXED: For first few pages, use normal loading to get all images, then sort client-side
+      if (page < 3) {
+        console.log(`[Gallery] Page ${page} < 3, using normal loading for better coverage`);
         data = await loadImagesNormal();
+      } else {
+        try {
+          // Use the optimized function with filter support for later pages
+          const optimizedResult = await supabase.rpc('images_by_distance_optimized', {
+            user_lat: loadLat,
+            user_lon: loadLon,
+            max_results: size,
+            offset_count: page * size,
+            filter_user_id: hasUserFilter ? currentFilters.userFilter!.userId : null
+          });
+          
+          if (optimizedResult.error) {
+            console.log('[Gallery] Optimized function not available, using fallback');
+            // Fallback: Use API endpoint with filter support
+            let fallbackUrl = `/api/images?limit=${size}&offset=${page * size}&lat=${loadLat}&lon=${loadLon}`;
+            if (hasUserFilter) {
+              fallbackUrl += `&filter_user_id=${currentFilters.userFilter!.userId}`;
+            }
+            if (isLoggedIn && currentUser) {
+              fallbackUrl += `&current_user_id=${currentUser.id}`;
+            }
+            console.log(`[Gallery] GPS fallback from: ${fallbackUrl}`);
+            const response = await fetch(fallbackUrl);
+            const fallbackResult = await response.json();
+            
+            if (fallbackResult.status !== 'success') {
+              console.error('[Gallery] Fallback API also failed:', fallbackResult.message);
+              data = await loadImagesNormal();
+            } else {
+              data = fallbackResult.images;
+              console.log(`[Gallery] Loaded ${data?.length || 0} images via fallback API`);
+            }
+          } else {
+            data = optimizedResult.data;
+            console.log(`[Gallery] Loaded ${data?.length || 0} images via optimized function (page ${page})`);
+            
+            // FIXED: If GPS mode returns too few images, fall back to normal mode
+            if (data && data.length < 10 && page === 0) {
+              console.log(`[Gallery] GPS mode returned only ${data.length} images, falling back to normal mode`);
+              data = await loadImagesNormal();
+            }
+            
+            // Let the main logic handle hasMoreImages based on total count
+            console.log(`[Gallery] GPS optimized: got ${data?.length || 0} images`);
+            // Don't set hasMoreImages here - let the main logic handle it
+          }
+        } catch (error) {
+          console.error('[Gallery] Error with distance loading:', error);
+          data = await loadImagesNormal();
+        }
       }
     } else {
       // Normal mode: Use API endpoint with possible user filter
@@ -1864,7 +1870,7 @@
           handlePositionUpdate,
           (error) => {
             console.error('GPS tracking error:', error);
-            gpsStatus = 'error';
+            gpsStatus = 'unavailable';
           },
           { enableHighAccuracy: true, maximumAge: 1000, timeout: 3000 }
         );
