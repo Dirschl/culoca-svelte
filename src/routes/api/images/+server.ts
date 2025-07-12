@@ -67,7 +67,7 @@ export const GET = async ({ url, request }) => {
       // Build query for images with GPS data (chronological order)
       let imagesQuery = supabase
         .from('items')
-        .select('id, path_512, path_2048, path_64, original_name, created_at, user_id, profile_id, title, description, lat, lon')
+        .select('id, path_512, path_2048, path_64, original_name, created_at, user_id, profile_id, title, description, lat, lon, width, height')
         .not('lat', 'is', null)
         .not('lon', 'is', null)
         .not('path_512', 'is', null)

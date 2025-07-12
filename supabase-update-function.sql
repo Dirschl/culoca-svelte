@@ -22,6 +22,8 @@ RETURNS TABLE(
     path_512 TEXT,
     path_2048 TEXT,
     path_64 TEXT,
+    width INTEGER,
+    height INTEGER,
     created_at TIMESTAMP WITH TIME ZONE,
     profile_id UUID,
     distance_m DOUBLE PRECISION
@@ -37,6 +39,8 @@ AS $$
         i.path_512,
         i.path_2048,
         i.path_64,
+        i.width,
+        i.height,
         i.created_at,
         i.profile_id,
         (6371000 * acos(cos(radians(user_lat)) * cos(radians(i.lat)) * cos(radians(i.lon) - radians(user_lon)) + sin(radians(user_lat)) * sin(radians(i.lat)))) AS distance_m

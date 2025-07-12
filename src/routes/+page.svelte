@@ -1143,8 +1143,8 @@
         id: d.id,
         src: d.path_512 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${d.path_512}` : '',
         srcHD: d.path_2048 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${d.path_2048}` : '',
-        width: d.width,
-        height: d.height,
+        width: d.width || 400,  // Default width for justified layout
+        height: d.height || 300, // Default height for justified layout
         lat: d.lat,
         lon: d.lon,
         title: d.title,
