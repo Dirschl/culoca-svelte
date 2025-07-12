@@ -160,7 +160,7 @@
   let showFullscreenMap = false;
   
   // GPS availability status
-  let gpsStatus: 'checking' | 'available' | 'denied' | 'unavailable' = 'checking';
+  let gpsStatus: 'checking' | 'active' | 'denied' | 'unavailable' = 'checking';
   let showGPSMessage = false;
   
   // Function to get currently visible image
@@ -1057,8 +1057,13 @@
       locationFilter: currentFilters.locationFilter?.name
     });
     
+    // SPECIAL CASE: If distance is enabled and this is the first load, load ALL images at once
+    if (isLoggedIn && showDistance && (userLat !== null && userLon !== null) && page === 0) {
+      console.log(`[Gallery] Distance mode enabled, loading ALL images at once for proper distance sorting`);
+      data = await loadAllImagesForDistance();
+    }
     // Use GPS-based loading if location is available (from GPS or location filter)
-    if ((isLoggedIn && showDistance && userLat !== null && userLon !== null) || hasLocationFilter) {
+    else if ((isLoggedIn && showDistance && userLat !== null && userLon !== null) || hasLocationFilter) {
       const loadLat = effectiveLat!;
       const loadLon = effectiveLon!;
       console.log(`[Gallery] Loading images by distance from ${loadLat}, ${loadLon}`);
@@ -1194,13 +1199,26 @@
         console.log(`[Gallery] Added ${uniqueNewPics.length} unique images (total: ${$pics.length})`);
       }
       
+      // SPECIAL CASE: If we loaded all images for distance mode, set hasMoreImages to false
+      if (isLoggedIn && showDistance && (userLat !== null && userLon !== null) && page === 0 && data && data.length > 0) {
+        console.log(`[Gallery] Distance mode: loaded all ${data.length} images, setting hasMoreImages to false`);
+        hasMoreImages = false;
+      }
+      
       // Update gallery stats
       const totalCount = await getTotalImageCount();
       updateGalleryStats($pics.length, totalCount);
       
       // Check if we have more images to load
       console.log(`[Gallery] Checking pagination: current=${$pics.length}, total=${totalCount}, hasMoreImages=${hasMoreImages}`);
-      if ($pics.length >= totalCount) {
+      
+      // SPECIAL CASE: If distance mode loaded all images, don't load more
+      if (isLoggedIn && showDistance && (userLat !== null && userLon !== null) && page === 0 && data && data.length > 0) {
+        hasMoreImages = false;
+        console.log(`[Gallery] Distance mode: loaded all images, hasMoreImages set to false`);
+      }
+      // Normal pagination logic
+      else if ($pics.length >= totalCount) {
         hasMoreImages = false;
         console.log(`[Gallery] All images loaded: ${$pics.length} of ${totalCount}`);
       } else {
@@ -1251,6 +1269,36 @@
       }
     } catch (error) {
       console.error('[Gallery Normal] Fetch error:', error);
+      return [];
+    }
+  }
+
+  // NEW: Function to load all images for distance mode
+  async function loadAllImagesForDistance() {
+    console.log(`[Gallery] Loading ALL images for distance mode`);
+    
+    try {
+      // Use a large limit to get all images at once
+      let url = `/api/images?limit=2000&offset=0`;
+      if (isLoggedIn && currentUser) {
+        url += `&current_user_id=${currentUser.id}`;
+      }
+      
+      console.log(`[Gallery Distance] Fetching from: ${url}`);
+      const response = await fetch(url);
+      const result = await response.json();
+      
+      console.log(`[Gallery Distance] API response:`, result);
+      
+      if (result.status === 'success') {
+        console.log(`[Gallery Distance] Got ${result.images?.length || 0} images, total available: ${result.totalCount || 0}`);
+        return result.images;
+      } else {
+        console.error('[Gallery Distance] API error:', result.message);
+        return [];
+      }
+    } catch (error) {
+      console.error('[Gallery Distance] Fetch error:', error);
       return [];
     }
   }
@@ -1821,13 +1869,14 @@
     
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        gpsStatus = 'available';
+        gpsStatus = 'active';
         showGPSMessage = false;
         lastKnownLat = pos.coords.latitude;
         lastKnownLon = pos.coords.longitude;
         userLat = pos.coords.latitude;
         userLon = pos.coords.longitude;
         saveLastKnownLocation(userLat, userLon);
+        console.log('🔄 GPS active:', { lat: userLat, lon: userLon });
         // Wenn GPS-Koordinaten verfügbar sind, lade Bilder nach Entfernung sortiert
         // Aber nur wenn keine Suche aktiv ist
         if (userLat !== null && userLon !== null && !searchQuery.trim()) {
@@ -2130,7 +2179,7 @@
     userLat = lat;
     userLon = lon;
     saveLastKnownLocation(lat, lon);
-    gpsStatus = 'available';
+    gpsStatus = 'active';
     showGPSMessage = false;
     
     if (showDistance && !searchQuery.trim()) {
@@ -2303,6 +2352,12 @@
       document.addEventListener('scroll', enableMobileSpeech, { once: true });
     }
 
+    // Start GPS tracking immediately if not in simulation mode
+    if (!simulationMode && !gpsSimulationActive) {
+      console.log('🔄 Starting GPS tracking immediately...');
+      startGPSTracking();
+    }
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       const wasAuthChecked = authChecked;
       isLoggedIn = !!session;
@@ -2340,8 +2395,8 @@
                if (lastLocation && lastLocation.lat !== null && lastLocation.lon !== null) {
                  userLat = lastLocation.lat;
                  userLon = lastLocation.lon;
-                 gpsStatus = 'available';
-                 setTimeout(() => loadMore('initial mount with last known location'), 100);
+                           gpsStatus = 'active';
+          setTimeout(() => loadMore('initial mount with last known location'), 100);
                } else {
                  // No GPS data available
                  gpsStatus = 'unavailable';
@@ -2401,7 +2456,7 @@
             if (lastLocation && lastLocation.lat !== null && lastLocation.lon !== null) {
               userLat = lastLocation.lat;
               userLon = lastLocation.lon;
-              gpsStatus = 'available';
+              gpsStatus = 'active';
               loadMore('fallback mount with last known location');
             } else {
               gpsStatus = 'unavailable';
@@ -2417,6 +2472,9 @@
     window.addEventListener('scroll', handleScroll, { passive: true });
     window.addEventListener('scroll', handleScrollForAudioguide, { passive: true });
     window.addEventListener('galleryLayoutChanged', updateLayoutFromStorage);
+    window.addEventListener('openMap', () => {
+      showMap = true;
+    });
     
     // SIMPLIFIED: Force gallery load immediately after setup
     console.log('🔄 [DEBUG] Forcing immediate gallery load after setup');
@@ -3043,7 +3101,7 @@
 
 
 <!-- Filter Bar - at the very top of the page -->
-<FilterBar showOnMap={false} userLat={userLat} userLon={userLon} isPermalinkMode={isPermalinkMode} permalinkImageId={permalinkImageId} showDistance={showDistance} isLoggedIn={isLoggedIn} />
+        <FilterBar showOnMap={false} userLat={userLat} userLon={userLon} isPermalinkMode={isPermalinkMode} permalinkImageId={permalinkImageId} showDistance={showDistance} isLoggedIn={isLoggedIn} gpsStatus={gpsStatus} />
 
 <!-- NewsFlash Component -->
 {#if isLoggedIn && newsFlashMode !== 'aus'}
