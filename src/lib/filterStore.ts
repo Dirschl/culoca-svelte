@@ -7,6 +7,8 @@ export interface UserFilter {
 	userId: string;
 	username: string;
 	accountName?: string;
+	avatarUrl?: string;
+	privacyMode?: 'public' | 'closed' | 'private' | 'all';
 }
 
 export interface LocationFilter {
@@ -16,11 +18,21 @@ export interface LocationFilter {
 	fromItem?: boolean; // true if set from item detail page
 }
 
+export interface ReferrerAccount {
+	profileId: string;
+	accountName: string;
+	fullName: string;
+	avatarUrl?: string;
+	privacyMode: 'public' | 'closed' | 'private' | 'all';
+	timestamp: number; // When referrer was set
+}
+
 export interface FilterState {
 	userFilter: UserFilter | null;
 	locationFilter: LocationFilter | null;
 	lastGpsPosition: { lat: number; lon: number } | null;
 	gpsAvailable: boolean;
+	referrerAccount: ReferrerAccount | null; // Persistent customer branding
 }
 
 // Create the store
@@ -29,7 +41,8 @@ function createFilterStore() {
 		userFilter: null,
 		locationFilter: null,
 		lastGpsPosition: null,
-		gpsAvailable: false
+		gpsAvailable: false,
+		referrerAccount: null
 	};
 
 	const { subscribe, set, update } = writable<FilterState>(initialState);
@@ -57,6 +70,15 @@ function createFilterStore() {
 			});
 		},
 
+		// Set referrer account (persistent customer branding)
+		setReferrerAccount: (referrer: ReferrerAccount | null) => {
+			update(state => {
+				const newState = { ...state, referrerAccount: referrer };
+				saveToStorage(newState);
+				return newState;
+			});
+		},
+
 		// Update GPS status and position
 		updateGpsStatus: (available: boolean, position?: { lat: number; lon: number }) => {
 			update(state => {
@@ -77,7 +99,7 @@ function createFilterStore() {
 			});
 		},
 
-		// Clear all filters
+		// Clear all filters (but keep referrer account)
 		clearFilters: () => {
 			update(state => {
 				const newState = { 
@@ -105,6 +127,35 @@ function createFilterStore() {
 		clearLocationFilter: () => {
 			update(state => {
 				const newState = { ...state, locationFilter: null };
+				updateURL(newState);
+				saveToStorage(newState);
+				return newState;
+			});
+		},
+
+		// Clear referrer account (remove customer branding)
+		clearReferrerAccount: () => {
+			update(state => {
+				const newState = { ...state, referrerAccount: null };
+				saveToStorage(newState);
+				return newState;
+			});
+		},
+
+		// Apply referrer account as user filter (for customer branding)
+		applyReferrerAsUserFilter: () => {
+			update(state => {
+				if (!state.referrerAccount) return state;
+				
+				const userFilter: UserFilter = {
+					userId: state.referrerAccount.profileId,
+					username: state.referrerAccount.fullName,
+					accountName: state.referrerAccount.accountName,
+					avatarUrl: state.referrerAccount.avatarUrl,
+					privacyMode: state.referrerAccount.privacyMode
+				};
+				
+				const newState = { ...state, userFilter };
 				updateURL(newState);
 				saveToStorage(newState);
 				return newState;
@@ -208,10 +259,34 @@ export const filterStore = createFilterStore();
 // Derived stores for easy access
 export const userFilter = derived(filterStore, $filterStore => $filterStore.userFilter);
 export const locationFilter = derived(filterStore, $filterStore => $filterStore.locationFilter);
+export const referrerAccount = derived(filterStore, $filterStore => $filterStore.referrerAccount);
 export const hasActiveFilters = derived(filterStore, $filterStore => 
 	!!$filterStore.userFilter || !!$filterStore.locationFilter
 );
 export const gpsStatus = derived(filterStore, $filterStore => ({
 	available: $filterStore.gpsAvailable,
 	lastPosition: $filterStore.lastGpsPosition
-})); 
+}));
+
+// Derived store to check if customer branding should be shown
+export const shouldShowCustomerBranding = derived(filterStore, $filterStore => {
+	// Show customer branding if:
+	// 1. There's a referrer account with private mode (always show), OR
+	// 2. There's a referrer account with closed mode (always show), OR
+	// 3. There's a referrer account with public mode (always show as branding)
+	if (!$filterStore.referrerAccount) return false;
+	
+	if ($filterStore.referrerAccount.privacyMode === 'private') {
+		return true; // Always show for private mode
+	}
+	
+	if ($filterStore.referrerAccount.privacyMode === 'closed') {
+		return true; // Always show for closed mode
+	}
+	
+	if ($filterStore.referrerAccount.privacyMode === 'public') {
+		return true; // Always show customer branding for public mode
+	}
+	
+	return false; // Don't show for 'all' mode
+}); 

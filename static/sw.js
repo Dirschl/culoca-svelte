@@ -71,7 +71,8 @@ self.addEventListener('fetch', event => {
     return;
   }
   
-  // Standard: normaler Fetch
+  // Standard: normaler Fetch für alle anderen Requests
+  event.respondWith(fetch(event.request));
 });
 
 // Message-Handler für manuelle Cache-Updates

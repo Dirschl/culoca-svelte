@@ -1,10 +1,11 @@
--- Update images_by_distance function to support user filtering
+-- Update images_by_distance function to use denormalized is_private field
+-- This eliminates the need for JOINs with profiles table for much better performance
 -- Run this in Supabase SQL Editor
 
 -- First drop the existing function
 DROP FUNCTION IF EXISTS images_by_distance_optimized(double precision, double precision, integer, integer, text);
 
--- Then create the new function with correct UUID types
+-- Then create the new function with is_private field filtering
 CREATE OR REPLACE FUNCTION images_by_distance_optimized(
     user_lat DOUBLE PRECISION,
     user_lon DOUBLE PRECISION,
@@ -44,7 +45,13 @@ AS $$
         i.lat IS NOT NULL 
         AND i.lon IS NOT NULL 
         AND i.path_512 IS NOT NULL 
-        AND (filter_user_id IS NULL OR i.profile_id::TEXT = filter_user_id)
+        AND (
+            -- If filtering for specific user, show all their items (including private)
+            filter_user_id IS NOT NULL AND i.profile_id::TEXT = filter_user_id
+            OR 
+            -- If no user filter, only show non-private items
+            (filter_user_id IS NULL AND i.is_private = FALSE)
+        )
     ORDER BY distance_m ASC
     LIMIT max_results
     OFFSET offset_count;

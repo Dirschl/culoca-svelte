@@ -15,6 +15,7 @@
   import { page as pageStore } from '$app/stores';
 
   import { updateGalleryStats, galleryStats } from '$lib/galleryStats';
+  import { sessionStore } from '$lib/sessionStore';
 
 
   const pics = writable<any[]>([]);
@@ -92,6 +93,10 @@
 
   let isLoggedIn = false;
   let currentUser: any = null;
+  
+  // FilterBar Props
+  let isPermalinkMode = false;
+  let permalinkImageId: string | null = null;
   
   // Search functionality
   let searchQuery = '';
@@ -925,14 +930,23 @@
           });
         data = result.data;
       } else {
-        // Normal load for non-distance mode
-        const result = await supabase
-          .from('items')
-          .select('id,path_512,path_2048,path_64,width,height,lat,lon,title,description,keywords')
-          .not('lat', 'is', null)
-          .not('lon', 'is', null)
-          .order('created_at', { ascending: false });
-        data = result.data;
+        // FIXED: Use API instead of direct database query to ensure consistent privacy filtering
+        let url = `/api/images?limit=2000&offset=0`;
+        if (isLoggedIn && currentUser) {
+          url += `&current_user_id=${currentUser.id}`;
+        }
+        
+        console.log(`[Gallery] LoadAllImages using API: ${url}`);
+        const response = await fetch(url);
+        const result = await response.json();
+        
+        if (result.status === 'success') {
+          data = result.images;
+          console.log(`[Gallery] LoadAllImages got ${data?.length || 0} images from API`);
+        } else {
+          console.error('[Gallery] LoadAllImages API error:', result.message);
+          data = [];
+        }
       }
       
       if (data) {
@@ -978,16 +992,22 @@
 
   async function getTotalImageCount() {
     try {
-      const { count, error } = await supabase
-        .from('items')
-        .select('id', { count: 'exact' });
-      
-      if (error) {
-        console.error('Error getting total image count:', error);
-        return 0;
+      // Use the API to get the total count that respects privacy filtering
+      let url = `/api/images?limit=1&offset=0`;
+      if (isLoggedIn && currentUser) {
+        url += `&current_user_id=${currentUser.id}`;
       }
       
-      return count || 0;
+      const response = await fetch(url);
+      const result = await response.json();
+      
+      if (result.status === 'success') {
+        console.log(`[Gallery] Total count from API: ${result.totalCount}`);
+        return result.totalCount || 0;
+      } else {
+        console.error('Error getting total image count from API:', result.message);
+        return 0;
+      }
     } catch (error) {
       console.error('Error getting total image count:', error);
       return 0;
@@ -995,7 +1015,8 @@
   }
 
   async function loadMore(reason = 'default') {
-    console.log(`[Gallery] loadMore called, reason: ${reason}`);
+    console.log(`[Gallery] loadMore called, reason: ${reason}, loading: ${loading}, hasMoreImages: ${hasMoreImages}, page: ${page}`);
+    console.log(`[Gallery] Current state: isLoggedIn=${isLoggedIn}, currentUser=${currentUser?.id}, authChecked=${authChecked}`);
     
     // Verhindere zu häufiges Neuladen
     const now = Date.now();
@@ -1004,7 +1025,10 @@
       return;
     }
     
-    if (loading || !hasMoreImages) return; 
+    if (loading || !hasMoreImages) {
+      console.log(`[Gallery] Skipping loadMore - loading: ${loading}, hasMoreImages: ${hasMoreImages}`);
+      return;
+    } 
     
     // Don't load more images if a search is active
     if (searchQuery.trim() || searchResults.length > 0) {
@@ -1052,7 +1076,15 @@
         if (optimizedResult.error) {
           console.log('[Gallery] Optimized function not available, using fallback');
           // Fallback: Use API endpoint with filter support
-          const response = await fetch(`/api/images?limit=${size}&offset=${page * size}&lat=${loadLat}&lon=${loadLon}${hasUserFilter ? `&filter_user_id=${currentFilters.userFilter!.userId}` : ''}`);
+          let fallbackUrl = `/api/images?limit=${size}&offset=${page * size}&lat=${loadLat}&lon=${loadLon}`;
+          if (hasUserFilter) {
+            fallbackUrl += `&filter_user_id=${currentFilters.userFilter!.userId}`;
+          }
+          if (isLoggedIn && currentUser) {
+            fallbackUrl += `&current_user_id=${currentUser.id}`;
+          }
+          console.log(`[Gallery] GPS fallback from: ${fallbackUrl}`);
+          const response = await fetch(fallbackUrl);
           const fallbackResult = await response.json();
           
           if (fallbackResult.status !== 'success') {
@@ -1065,10 +1097,16 @@
         } else {
           data = optimizedResult.data;
           console.log(`[Gallery] Loaded ${data?.length || 0} images via optimized function (page ${page})`);
-          // Check if we have fewer results than requested - if so, no more images
-          if (data && data.length < size) {
-            hasMoreImages = false;
+          
+          // FIXED: If GPS mode returns too few images, fall back to normal mode
+          if (data && data.length < 10 && page === 0) {
+            console.log(`[Gallery] GPS mode returned only ${data.length} images, falling back to normal mode`);
+            data = await loadImagesNormal();
           }
+          
+          // Let the main logic handle hasMoreImages based on total count
+          console.log(`[Gallery] GPS optimized: got ${data?.length || 0} images`);
+          // Don't set hasMoreImages here - let the main logic handle it
         }
       } catch (error) {
         console.error('[Gallery] Error with distance loading:', error);
@@ -1077,7 +1115,12 @@
     } else {
       // Normal mode: Use API endpoint with possible user filter
       if (hasUserFilter) {
-        const response = await fetch(`/api/images?limit=${size}&offset=${page * size}&filter_user_id=${currentFilters.userFilter!.userId}`);
+        let url = `/api/images?limit=${size}&offset=${page * size}&filter_user_id=${currentFilters.userFilter!.userId}`;
+        if (isLoggedIn && currentUser) {
+          url += `&current_user_id=${currentUser.id}`;
+        }
+        console.log(`[Gallery] Loading with user filter from: ${url}`);
+        const response = await fetch(url);
         const result = await response.json();
         if (result.status === 'success') {
           data = result.images;
@@ -1088,9 +1131,12 @@
         }
       } else {
         // Normal pagination without filters
+        console.log(`[Gallery] Loading images in normal mode...`);
         data = await loadImagesNormal();
       }
     }
+    
+    console.log(`[Gallery] Final data result:`, data ? `${data.length} images` : 'null/undefined');
 
     if (data && data.length > 0) {
       const newPics = data.map((d: any) => ({
@@ -1122,13 +1168,13 @@
       // Intelligente Bild-Verwaltung je nach Datenquelle
       if ((isLoggedIn && showDistance && userLat !== null && userLon !== null) || hasLocationFilter) {
         if (data[0]?.distance !== undefined) {
-          // Optimierte Daten bereits sortiert - ersetze komplette Liste
-          pics.set(newPics);
-          console.log(`[Gallery] Set ${newPics.length} optimized images (already sorted by distance)`);
+          // Optimierte Daten bereits sortiert - APPEND new images for pagination
+          pics.update((p: any[]) => [...p, ...uniqueNewPics]);
+          console.log(`[Gallery] Added ${uniqueNewPics.length} optimized images (already sorted by distance, total: ${$pics.length})`);
         } else {
           // GPS-Modus aber normale Daten - sortiere client-seitig nach Entfernung
           pics.update((p: any[]) => {
-            // Bei GPS-Modus: Ersetze alte Bilder komplett für bessere Sortierung
+            // Bei GPS-Modus: Append new images, then sort all
             const allImages = [...p, ...uniqueNewPics];
             
             // Sortiere alle Bilder nach Entfernung (verwende effektive Koordinaten)
@@ -1152,40 +1198,91 @@
       const totalCount = await getTotalImageCount();
       updateGalleryStats($pics.length, totalCount);
       
+      // Check if we have more images to load
+      console.log(`[Gallery] Checking pagination: current=${$pics.length}, total=${totalCount}, hasMoreImages=${hasMoreImages}`);
+      if ($pics.length >= totalCount) {
+        hasMoreImages = false;
+        console.log(`[Gallery] All images loaded: ${$pics.length} of ${totalCount}`);
+      } else {
+        hasMoreImages = true;
+        console.log(`[Gallery] More images available: ${$pics.length} of ${totalCount}, hasMoreImages set to true`);
+      }
+      
       if (autoguide && uniqueNewPics.length > 0) {
         setTimeout(() => announceFirstImage(), 500);
       }
     } else {
       hasMoreImages = false;
-      console.log(`[Gallery] No data returned, hasMoreImages set to false`);
+      console.log(`[Gallery] No data returned, hasMoreImages set to false (page ${page})`);
     }
 
     // Erhöhe page für alle Modi (normaler Modus und GPS-Modus)
     page++;
     loading = false;
+    console.log(`[Gallery] loadMore completed, page now: ${page}, total images: ${$pics.length}, hasMoreImages: ${hasMoreImages}`);
   }
   
   // Hilfsfunktion für normales Laden
   async function loadImagesNormal() {
     console.log(`[Gallery] Loading images with normal pagination, range: ${page * size} to ${page * size + size - 1}`);
     
-    // Für GPS-Modus: Lade mehr Bilder für bessere Sortierung
-    const loadSize = (isLoggedIn && showDistance && userLat !== null && userLon !== null) ? size * 3 : size;
-    
-    const { data } = await supabase
-      .from('items')
-      .select('id,path_512,path_2048,path_64,width,height,lat,lon,title,description,keywords')
-      .not('path_512', 'is', null)
-      .not('lat', 'is', null)
-      .not('lon', 'is', null)
-      .order('created_at', { ascending: false })
-      .range(page * size, page * size + loadSize - 1);
+    // SIMPLIFIED: Use the API endpoint that we know works
+    try {
+      // Add current user to query if logged in
+      let url = `/api/images?limit=${size}&offset=${page * size}`;
+      if (isLoggedIn && currentUser) {
+        url += `&current_user_id=${currentUser.id}`;
+      }
       
-    if (data && data.length < size) {
-      hasMoreImages = false;
+      console.log(`[Gallery Normal] Fetching from: ${url}`);
+      const response = await fetch(url);
+      const result = await response.json();
+      
+      console.log(`[Gallery Normal] API response:`, result);
+      
+      if (result.status === 'success') {
+        // Don't set hasMoreImages to false here - let the main loadMore function handle it
+        console.log(`[Gallery Normal] Got ${result.images?.length || 0} images, total available: ${result.totalCount || 0}`);
+        
+        return result.images;
+      } else {
+        console.error('[Gallery Normal] API error:', result.message);
+        return [];
+      }
+    } catch (error) {
+      console.error('[Gallery Normal] Fetch error:', error);
+      return [];
     }
+  }
+
+  // NEW: Function to load all user's own images without pagination limit
+  async function loadAllUserImages() {
+    console.log(`[Gallery] Loading ALL user images for: ${currentUser?.id}`);
     
-    return data;
+    try {
+      // Use a large limit to get all user images at once
+      let url = `/api/images?limit=2000&offset=0&user_id=${currentUser.id}`;
+      if (isLoggedIn && currentUser) {
+        url += `&current_user_id=${currentUser.id}`;
+      }
+      
+      console.log(`[Gallery AllUser] Fetching from: ${url}`);
+      const response = await fetch(url);
+      const result = await response.json();
+      
+      console.log(`[Gallery AllUser] API response:`, result);
+      
+      if (result.status === 'success') {
+        console.log(`[Gallery AllUser] Got ${result.images?.length || 0} user images, total available: ${result.totalCount || 0}`);
+        return result.images;
+      } else {
+        console.error('[Gallery AllUser] API error:', result.message);
+        return [];
+      }
+    } catch (error) {
+      console.error('[Gallery AllUser] Fetch error:', error);
+      return [];
+    }
   }
 
   let uploading = false;
@@ -1459,7 +1556,10 @@
 
   // Infinite scroll handler
   function handleScroll() {
-    if (loading || !hasMoreImages) return;
+    if (loading || !hasMoreImages) {
+      console.log(`[Scroll] Skipping scroll handler - loading: ${loading}, hasMoreImages: ${hasMoreImages}`);
+      return;
+    }
 
     // Scroll-to-top-Button nur zeigen, wenn gescrollt wurde
     showScrollToTop = window.scrollY > 100;
@@ -1468,7 +1568,8 @@
     const scrolledToBottom = scrollTop + clientHeight >= scrollHeight - 1000;
 
     if (scrolledToBottom) {
-      loadMore();
+      console.log(`[Scroll] Reached bottom, loading more images... (current: ${$pics.length}, hasMoreImages: ${hasMoreImages}, loading: ${loading})`);
+      loadMore('infinite scroll');
     }
   }
 
@@ -1598,6 +1699,10 @@
     loginLoading = true;
     loginError = '';
     
+    // Session löschen vor OAuth-Login für direkten Login
+    sessionStore.clearSession();
+    console.log('🔓 Direct OAuth login - cleared session data');
+    
     // Für Produktionsumgebung: Explizite Redirect-URL setzen
     const redirectTo = typeof window !== 'undefined' && window.location.hostname !== 'localhost' 
       ? `${window.location.origin}/auth/callback`
@@ -1621,7 +1726,10 @@
     if (authError) {
       loginError = authError.message;
     } else {
-      // Erfolgreicher Login - isLoggedIn wird automatisch aktualisiert
+      // Erfolgreicher Login - Session löschen für direkten Login
+      sessionStore.clearSession();
+      console.log('🔓 Direct login - cleared session data');
+      
       loginEmail = '';
       loginPassword = '';
     }
@@ -1636,11 +1744,38 @@
     if (authError) {
       loginError = authError.message;
     } else {
+      // Erfolgreiche Registrierung - Session löschen für direkten Login
+      sessionStore.clearSession();
+      console.log('🔓 Direct signup - cleared session data');
+      
       loginInfo = 'Bitte bestätige deine E-Mail-Adresse. Du kannst dich nach der Bestätigung anmelden.';
       loginEmail = '';
       loginPassword = '';
       showRegister = false;
     }
+    loginLoading = false;
+  }
+
+  async function resetPassword() {
+    if (!loginEmail) {
+      loginError = 'Bitte gib deine E-Mail-Adresse ein.';
+      return;
+    }
+    
+    loginLoading = true;
+    loginError = '';
+    
+    const { error } = await supabase.auth.resetPasswordForEmail(loginEmail, {
+      redirectTo: `${window.location.origin}/auth/callback?type=recovery`
+    });
+    
+    if (error) {
+      loginError = error.message;
+    } else {
+      loginInfo = 'Passwort-Reset-Link wurde an deine E-Mail gesendet.';
+      loginEmail = '';
+    }
+    
     loginLoading = false;
   }
 
@@ -1706,7 +1841,7 @@
         } else {
           gpsStatus = 'unavailable';
         }
-        showGPSMessage = true;
+        showGPSMessage = false;
         gpsTrackingActive = false;
       },
       { enableHighAccuracy: true, timeout: 10000 }
@@ -1836,11 +1971,23 @@
     console.log(`[Efficient Load] Attempting efficient load, reason: ${reason}`);
     
     // Versuche zuerst eine kleine Stichprobe zu laden um zu prüfen ob überhaupt Bilder vorhanden sind
-    const { data: sampleData, error } = await supabase
+    // Create query with privacy filtering
+    let sampleQuery = supabase
       .from('items')
-      .select('id,lat,lon')
+      .select('id,lat,lon,profile_id,is_private')
       .not('lat', 'is', null)
-      .not('lon', 'is', null)
+      .not('lon', 'is', null);
+    
+    // Apply privacy filtering based on user login status
+    if (isLoggedIn && currentUser) {
+      // For logged in users: show their own images (all) + other users' public images
+      sampleQuery = sampleQuery.or(`profile_id.eq.${currentUser.id},is_private.eq.false,is_private.is.null`);
+    } else {
+      // For anonymous users: only show public images
+      sampleQuery = sampleQuery.or('is_private.eq.false,is_private.is.null');
+    }
+    
+    const { data: sampleData, error } = await sampleQuery
       .limit(100) // Kleine Stichprobe
       .order('created_at', { ascending: false });
     
@@ -2054,20 +2201,18 @@
     }
   });
 
-  onMount(() => {
+  let initialSearchParam = '';
+  
+      onMount(() => {
     (async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    isLoggedIn = !!user;
-    currentUser = user;
+    // SIMPLIFIED: Force initial gallery load for debugging
+    console.log('🔄 [DEBUG] onMount - forcing immediate gallery load');
+    
+    // Set auth as checked to allow gallery loading
     authChecked = true;
-    if (!isLoggedIn) {
-      useJustifiedLayout = true;
-      showDistance = false;
-      showCompass = false;
-      autoguide = false;
-      newsFlashMode = 'alle';
-    }
-
+    isLoggedIn = false;
+    currentUser = null;
+    
     // Initialize filter store from URL parameters
     filterStore.initFromUrl($pageStore.url.searchParams);
 
@@ -2076,6 +2221,9 @@
     const simulation = urlParams.get('simulation');
     const stopSimulation = urlParams.get('stop');
     const searchParam = urlParams.get('s');
+    
+    // Store search param for later use in auth state change
+    initialSearchParam = searchParam || '';
     
     // Handle search parameter from URL
     if (searchParam && searchParam.trim()) {
@@ -2146,57 +2294,151 @@
       document.addEventListener('scroll', enableMobileSpeech, { once: true });
     }
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      const wasAuthChecked = authChecked;
       isLoggedIn = !!session;
       currentUser = session?.user || null;
       authChecked = true;
+      
+      console.log(`🔐 Auth state changed: ${event}, isLoggedIn: ${isLoggedIn}, wasAuthChecked: ${wasAuthChecked}`);
+      
       if (isLoggedIn) {
-        loadShowDistanceAndCompass();
-        loadProfileAvatar();
+        await loadShowDistanceAndCompass();
+        await loadProfileAvatar();
       } else {
         useJustifiedLayout = true;
         showDistance = false;
         showCompass = false;
         autoguide = false;
         newsFlashMode = 'alle';
+        profileAvatar = null;
       }
-    });
-
-    // WICHTIG: Erst Einstellungen laden, dann Galerie
-    await loadShowDistanceAndCompass();
-    // updateLayoutFromStorage(); // <-- Entfernt, da Einstellungen bereits aus DB geladen wurden
-    await loadProfileAvatar();
-
-    // Prüfe, ob Daten aus sessionStorage geladen werden
-    const sessionPics = sessionStorage.getItem('galleryPics');
-    if (sessionPics) {
-      pics.set(JSON.parse(sessionPics));
-    } else {
-      // Galerie laden abhängig von Entfernungseinstellung
-      if (!searchParam) {
-        if (showDistance) {
-          // Bei aktivierter Entfernungsanzeige: Nur laden wenn GPS verfügbar
-          const lastLocation = loadLastKnownLocation();
-          if (lastLocation && lastLocation.lat !== null && lastLocation.lon !== null) {
-            userLat = lastLocation.lat;
-            userLon = lastLocation.lon;
-            gpsStatus = 'available';
-            loadMore('initial mount with last known location');
-          } else {
-            // Keine GPS-Daten verfügbar: Meldung anzeigen
-            gpsStatus = 'unavailable';
-            showGPSMessage = true;
-          }
+      
+      // Only load gallery on first auth check, not on subsequent auth changes
+      if (!wasAuthChecked) {
+        console.log('🔐 First auth check complete, loading gallery...');
+        
+        // Load gallery with proper auth context
+        const sessionPics = sessionStorage.getItem('galleryPics');
+        if (sessionPics) {
+          pics.set(JSON.parse(sessionPics));
         } else {
-          // Normale Ansicht: Immer laden
-          loadMore('initial mount normal');
+                   // Load gallery based on distance settings
+                    if (!initialSearchParam.trim()) {
+             if (showDistance) {
+               // For distance mode: only load if GPS is available
+               const lastLocation = loadLastKnownLocation();
+               if (lastLocation && lastLocation.lat !== null && lastLocation.lon !== null) {
+                 userLat = lastLocation.lat;
+                 userLon = lastLocation.lon;
+                 gpsStatus = 'available';
+                 setTimeout(() => loadMore('initial mount with last known location'), 100);
+               } else {
+                 // No GPS data available
+                 gpsStatus = 'unavailable';
+                 showGPSMessage = false;
+               }
+             } else {
+               // Normal mode: always load
+               setTimeout(() => loadMore('initial mount normal'), 100);
+             }
+           }
         }
       }
-    }
+    });
+    
+    // IMMEDIATE: Check current session immediately to trigger auth state
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('🔐 Immediate session check:', !!session);
+      // The onAuthStateChange will be triggered automatically
+    });
+
+    // Gallery loading is now handled in onAuthStateChange to prevent race conditions
+    // This ensures auth context is properly set before loading images
+    
+    // FALLBACK: If onAuthStateChange doesn't fire within 2 seconds, load gallery anyway
+    setTimeout(async () => {
+      if (!authChecked) {
+        console.log('⚠️ Auth state change not detected after 2s, loading gallery as fallback...');
+        
+        // Check auth manually
+        const { data: { user } } = await supabase.auth.getUser();
+        isLoggedIn = !!user;
+        currentUser = user;
+        authChecked = true;
+        
+        if (!isLoggedIn) {
+          useJustifiedLayout = true;
+          showDistance = false;
+          showCompass = false;
+          autoguide = false;
+          newsFlashMode = 'alle';
+          profileAvatar = null;
+        } else {
+          await loadShowDistanceAndCompass();
+          await loadProfileAvatar();
+        }
+        
+        // Load gallery
+        if (!initialSearchParam.trim()) {
+          // Reset gallery state for fresh loading
+          pics.set([]);
+          page = 0;
+          hasMoreImages = true;
+          console.log('🔄 Reset gallery state for fallback loading');
+          
+          if (showDistance) {
+            const lastLocation = loadLastKnownLocation();
+            if (lastLocation && lastLocation.lat !== null && lastLocation.lon !== null) {
+              userLat = lastLocation.lat;
+              userLon = lastLocation.lon;
+              gpsStatus = 'available';
+              loadMore('fallback mount with last known location');
+            } else {
+              gpsStatus = 'unavailable';
+              showGPSMessage = false;
+            }
+          } else {
+            loadMore('fallback mount normal');
+          }
+        }
+      }
+    }, 2000);
 
     window.addEventListener('scroll', handleScroll, { passive: true });
     window.addEventListener('scroll', handleScrollForAudioguide, { passive: true });
     window.addEventListener('galleryLayoutChanged', updateLayoutFromStorage);
+    
+    // SIMPLIFIED: Force gallery load immediately after setup
+    console.log('🔄 [DEBUG] Forcing immediate gallery load after setup');
+    setTimeout(() => {
+      console.log('🔄 [DEBUG] About to call loadMore from onMount');
+      
+      // TEST: First test the API directly
+      fetch('/api/images?limit=10&offset=0')
+        .then(response => response.json())
+        .then(result => {
+          console.log('🔄 [DEBUG] Direct API test result:', result);
+          if (result.status === 'success') {
+            console.log('🔄 [DEBUG] API works, got', result.images?.length, 'images');
+            loadMore('debug force load');
+          } else {
+            console.error('🔄 [DEBUG] API failed:', result.message);
+          }
+        })
+        .catch(error => {
+          console.error('🔄 [DEBUG] API test failed:', error);
+        });
+    }, 500);
+    
+    // DOUBLE SAFETY: Force another load after 2 seconds
+    setTimeout(() => {
+      console.log('🔄 [DEBUG] Second forced load attempt');
+      if ($pics.length === 0) {
+        console.log('🔄 [DEBUG] No pics loaded yet, forcing another load');
+        loadMore('debug second force load');
+      }
+    }, 2000);
     window.addEventListener('profileSaved', loadProfileAvatar);
     window.addEventListener('keydown', handleKeydown);
     if (showCompass && window.DeviceOrientationEvent) {
@@ -2400,7 +2642,7 @@
   let showScrollToTop = false;
 
   // Search functions
-  async function performSearch(query: string = searchQuery, updateURL: boolean = false) {
+    async function performSearch(query: string = searchQuery, updateURL: boolean = false) {
     if (!query.trim()) {
       searchResults = [];
       if (updateURL) {
@@ -2439,10 +2681,15 @@
       
       // Build the search query with proper Supabase syntax
       // Search in title and description first
-      let { data, error } = await supabase
+      let itemsQuery = supabase
         .from('items')
-        .select('id,path_512,path_2048,path_64,width,height,lat,lon,title,description,keywords')
+        .select('id,path_512,path_2048,path_64,width,height,lat,lon,title,description,keywords,profile_id')
         .limit(1000); // Get more data for client-side filtering
+      
+      // Exclude private items from search (using denormalized is_private field)
+      itemsQuery = itemsQuery.eq('is_private', false);
+      
+      let { data, error } = await itemsQuery;
       
       if (error) {
         console.error('🔍 Supabase error:', error);
@@ -2461,17 +2708,28 @@
         });
         
         console.log(`🔍 Title/description search found ${data.length} results for terms:`, searchTerms);
-             }
+      }
       
-            // If no results from title/description search, try searching in keywords
+      // If no results from title/description search, try searching in keywords
       if (!data || data.length === 0) {
         console.log('🔍 No results from title/description search, trying keywords...');
         
         // Get all images and filter by keywords on client side
-        const { data: allImages, error: allError } = await supabase
+        let allImagesQuery = supabase
           .from('items')
-          .select('id,path_512,path_2048,path_64,width,height,lat,lon,title,description,keywords')
+          .select('id,path_512,path_2048,path_64,width,height,lat,lon,title,description,keywords,profile_id')
           .limit(1000);
+        
+        // Apply privacy filtering for search (using denormalized is_private field)
+        if (isLoggedIn && currentUser) {
+          // For logged in users: show their own images (all) + other users' public images
+          allImagesQuery = allImagesQuery.or(`profile_id.eq.${currentUser.id},is_private.eq.false,is_private.is.null`);
+        } else {
+          // For anonymous users: only show public images
+          allImagesQuery = allImagesQuery.or('is_private.eq.false,is_private.is.null');
+        }
+        
+        const { data: allImages, error: allError } = await allImagesQuery;
         
         if (allError) {
           console.error('🔍 Error fetching all images for keyword search:', allError);
@@ -2773,41 +3031,10 @@
   />
 {/if}
 
-<!-- GPS Status Message -->
-{#if isLoggedIn && showDistance && showGPSMessage}
-  <div class="gps-message">
-    <div class="gps-message-content">
-      {#if gpsStatus === 'checking'}
-        <div class="gps-spinner"></div>
-        <p>GPS wird aktiviert...</p>
-      {:else if gpsStatus === 'denied'}
-        <div class="gps-icon error">📍</div>
-        <h3>GPS-Berechtigung erforderlich</h3>
-        <p>Für die Entfernungsanzeige benötigen wir Ihren Standort. Bitte aktivieren Sie GPS in Ihren Browser-Einstellungen.</p>
-        <div class="gps-actions">
-          <button class="gps-btn primary" on:click={() => showFullscreenMap = true}>
-            🗺️ Standort auf Karte wählen
-          </button>
-          <button class="gps-btn secondary" on:click={() => {showDistance = false; loadMore('disable distance');}}>
-            Ohne GPS fortfahren
-          </button>
-        </div>
-      {:else if gpsStatus === 'unavailable'}
-        <div class="gps-icon error">❌</div>
-        <h3>GPS nicht verfügbar</h3>
-        <p>GPS ist auf diesem Gerät oder in diesem Browser nicht verfügbar.</p>
-        <div class="gps-actions">
-          <button class="gps-btn primary" on:click={() => showFullscreenMap = true}>
-            🗺️ Standort auf Karte wählen
-          </button>
-          <button class="gps-btn secondary" on:click={() => {showDistance = false; loadMore('disable distance');}}>
-            Ohne GPS fortfahren
-          </button>
-        </div>
-      {/if}
-    </div>
-  </div>
-{/if}
+
+
+<!-- Filter Bar - at the very top of the page -->
+<FilterBar showOnMap={false} userLat={userLat} userLon={userLon} isPermalinkMode={isPermalinkMode} permalinkImageId={permalinkImageId} showDistance={showDistance} isLoggedIn={isLoggedIn} />
 
 <!-- NewsFlash Component -->
 {#if isLoggedIn && newsFlashMode !== 'aus'}
@@ -2892,9 +3119,6 @@
     }}
   />
 {/if}
-
-<!-- Filter Bar -->
-<FilterBar showOnMap={false} />
 
 <!-- Galerie bleibt erhalten -->
 <div class="gallery-container">
@@ -3019,20 +3243,22 @@
 
   <!-- Login Overlay für nicht eingeloggte User -->
   {#if !isLoggedIn && authChecked}
-    <div class="login-overlay">
-      <div class="login-overlay-content">
-        <img src="/culoca-logo-512px.png" alt="Culoca Logo" class="login-logo" />
+    <div class="modern-login-overlay">
+      <div class="modern-login-content">
+        <!-- Compact Logo -->
+        <img src="/culoca-logo-512px.png" alt="Culoca Logo" class="modern-login-logo" />
 
         {#if loginError}
-          <div class="login-error">{loginError}</div>
+          <div class="modern-login-error">{loginError}</div>
         {/if}
         {#if loginInfo}
-          <div class="login-info">{loginInfo}</div>
+          <div class="modern-login-info">{loginInfo}</div>
         {/if}
 
-        <div class="social-login">
-          <button class="social-btn google-btn" on:click={() => loginWithProvider('google')} disabled={loginLoading}>
-            <svg class="social-icon" viewBox="0 0 48 48" fill="none">
+        <!-- Social Login Buttons -->
+        <div class="modern-social-login">
+          <button class="modern-social-btn google-btn" on:click={() => loginWithProvider('google')} disabled={loginLoading}>
+            <svg class="modern-social-icon" viewBox="0 0 48 48" fill="none">
               <g>
                 <path fill="#4285F4" d="M24 9.5c3.54 0 6.7 1.22 9.19 3.23l6.85-6.85C36.45 2.36 30.68 0 24 0 14.82 0 6.71 5.06 2.69 12.44l7.98 6.2C12.13 13.13 17.62 9.5 24 9.5z"/>
                 <path fill="#34A853" d="M46.1 24.5c0-1.64-.15-3.22-.42-4.74H24v9.01h12.42c-.54 2.9-2.18 5.36-4.65 7.03l7.19 5.6C43.98 37.13 46.1 31.3 46.1 24.5z"/>
@@ -3041,36 +3267,54 @@
               </g>
             </svg>
           </button>
-          <button class="social-btn facebook-btn" on:click={() => loginWithProvider('facebook')} disabled={loginLoading}>
-            <svg class="social-icon" viewBox="0 0 32 32" fill="none">
+          <button class="modern-social-btn facebook-btn" on:click={() => loginWithProvider('facebook')} disabled={loginLoading}>
+            <svg class="modern-social-icon" viewBox="0 0 32 32" fill="none">
               <circle cx="16" cy="16" r="16" fill="white"/>
               <path d="M20.5 16H18V24H15V16H13.5V13.5H15V12.25C15 10.73 15.67 9 18 9H20.5V11.5H19.25C18.84 11.5 18.5 11.84 18.5 12.25V13.5H20.5L20 16Z" fill="#23272F"/>
             </svg>
           </button>
         </div>
 
-        <div class="login-tabs">
-          <button class="tab-btn" class:active={!showRegister} on:click={() => showRegister = false}>Anmelden</button>
-          <button class="tab-btn" class:active={showRegister} on:click={() => showRegister = true}>Registrieren</button>
+        <!-- Login/Register Tabs -->
+        <div class="modern-login-tabs">
+          <button class="modern-tab-btn" class:active={!showRegister} on:click={() => showRegister = false}>
+            Anmelden
+          </button>
+          <button class="modern-tab-btn" class:active={showRegister} on:click={() => showRegister = true}>
+            Registrieren
+          </button>
         </div>
 
+        <!-- Login Form -->
         {#if !showRegister}
-          <form class="login-form" on:submit|preventDefault={loginWithEmail}>
-            <input class="login-input" type="email" placeholder="E-Mail" bind:value={loginEmail} required />
-            <input class="login-input" type="password" placeholder="Passwort" bind:value={loginPassword} required />
-            <button class="login-submit-btn" type="submit" disabled={loginLoading}>
+          <form class="modern-login-form" on:submit|preventDefault={loginWithEmail}>
+            <input class="modern-login-input" type="email" placeholder="E-Mail" bind:value={loginEmail} required />
+            <input class="modern-login-input" type="password" placeholder="Passwort" bind:value={loginPassword} required />
+            <button class="modern-login-submit-btn" type="submit" disabled={loginLoading}>
               {loginLoading ? 'Anmelden...' : 'Anmelden'}
+            </button>
+            <button type="button" class="modern-forgot-password" on:click={resetPassword}>
+              Passwort vergessen?
             </button>
           </form>
         {:else}
-          <form class="login-form" on:submit|preventDefault={signupWithEmail}>
-            <input class="login-input" type="email" placeholder="E-Mail" bind:value={loginEmail} required />
-            <input class="login-input" type="password" placeholder="Passwort" bind:value={loginPassword} required />
-            <button class="login-submit-btn" type="submit" disabled={loginLoading}>
+          <form class="modern-login-form" on:submit|preventDefault={signupWithEmail}>
+            <input class="modern-login-input" type="email" placeholder="E-Mail" bind:value={loginEmail} required />
+            <input class="modern-login-input" type="password" placeholder="Passwort" bind:value={loginPassword} required />
+            <button class="modern-login-submit-btn" type="submit" disabled={loginLoading}>
               {loginLoading ? 'Registrieren...' : 'Registrieren'}
             </button>
           </form>
         {/if}
+
+        <!-- Footer Links -->
+        <div class="modern-login-footer">
+          <div class="modern-footer-links">
+            <a href="/impressum" class="modern-footer-link">Impressum</a>
+            <span class="modern-footer-separator">•</span>
+            <a href="/datenschutz" class="modern-footer-link">Datenschutz</a>
+          </div>
+        </div>
       </div>
     </div>
   {/if}
@@ -3830,178 +4074,290 @@
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
   }
 
-  /* Login Overlay */
-  .login-overlay {
+  /* Modern Login Overlay */
+  .modern-login-overlay {
     position: fixed;
     top: 0;
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.8);
+    background: linear-gradient(135deg, #0a1124 0%, #1a202c 100%);
+    backdrop-filter: blur(10px);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 1000;
+    animation: fadeIn 0.3s ease-out;
   }
 
-  .login-overlay-content {
-    background: var(--bg-secondary);
-    color: var(--text-primary);
-    padding: 3rem;
-    border-radius: 16px;
+  .modern-login-content {
+    background: rgba(26, 32, 44, 0.95);
+    backdrop-filter: blur(20px);
+    border-radius: 24px;
+    padding: 2.5rem;
     text-align: center;
-    max-width: 400px;
-    margin: 2rem;
-    box-shadow: 0 8px 32px var(--shadow);
+    max-width: 440px;
+    width: 90%;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(238, 114, 33, 0.3);
+    position: relative;
+    overflow: hidden;
   }
 
-  .login-logo {
-    width: 256px;
-    height: 256px;
-    margin-bottom: 2rem;
-    margin-top: 1rem;
+  .modern-login-content::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, #ee7221, #ff8c42);
+    border-radius: 24px 24px 0 0;
+  }
+
+  .modern-login-logo {
+    width: 200px;
+    height: 200px;
+    margin: 0 auto 1.5rem;
     object-fit: contain;
+    filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3));
   }
 
-  .login-error {
-    background: #dc3545;
+  .modern-login-error {
+    background: linear-gradient(135deg, #dc3545, #c82333);
     color: #fff;
-    padding: 0.75rem;
-    border-radius: 8px;
-    margin-bottom: 1rem;
+    padding: 1rem;
+    border-radius: 12px;
+    margin-bottom: 1.5rem;
     font-weight: 500;
+    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
   }
 
-  .login-info {
-    background: #28a745;
+  .modern-login-info {
+    background: linear-gradient(135deg, #28a745, #218838);
     color: #fff;
-    padding: 0.75rem;
-    border-radius: 8px;
-    margin-bottom: 1rem;
+    padding: 1rem;
+    border-radius: 12px;
+    margin-bottom: 1.5rem;
     font-weight: 500;
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
   }
 
-  .social-login {
+  .modern-social-login {
     display: flex;
     gap: 1rem;
     justify-content: center;
     margin-bottom: 2rem;
   }
 
-  .social-btn {
+  .modern-social-btn {
     background: #fff;
-    border: none;
-    border-radius: 50%;
-    width: 48px;
-    height: 48px;
+    border: 2px solid #f0f0f0;
+    border-radius: 16px;
+    width: 64px;
+    height: 64px;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: transform 0.2s ease;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   }
 
-  .social-btn:hover:not(:disabled) {
-    transform: scale(1.05);
+  .modern-social-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+    border-color: #ee7221;
   }
 
-  .social-btn:disabled {
+  .modern-social-btn:active {
+    transform: translateY(0);
+  }
+
+  .modern-social-btn:disabled {
     opacity: 0.6;
     cursor: not-allowed;
   }
 
-  .social-icon {
+  .modern-social-icon {
     width: 32px;
     height: 32px;
   }
 
-  .login-tabs {
+  .modern-login-tabs {
     display: flex;
-    margin-bottom: 1.5rem;
-    border-radius: 8px;
+    margin-bottom: 2rem;
+    border-radius: 12px;
     overflow: hidden;
     background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
   }
 
-  .tab-btn {
+  .modern-tab-btn {
     flex: 1;
     padding: 0.75rem 1rem;
     background: transparent;
     border: none;
-    color: #fff;
+    color: rgba(255, 255, 255, 0.7);
     font-weight: 600;
     cursor: pointer;
-    transition: background 0.2s ease;
+    transition: all 0.3s ease;
+    position: relative;
   }
 
-  .tab-btn.active {
-    background: #ff6b35;
+  .modern-tab-btn.active {
+    background: linear-gradient(135deg, #ee7221, #ff8c42);
     color: #fff;
+    box-shadow: 0 2px 8px rgba(238, 114, 33, 0.3);
   }
 
-  .tab-btn:not(.active) {
-    color: #ff6b35;
+  .modern-tab-btn:not(.active):hover {
+    background: rgba(238, 114, 33, 0.2);
+    color: #ee7221;
   }
 
-  .login-form {
+  .modern-login-form {
     display: flex;
     flex-direction: column;
     gap: 1rem;
   }
 
-  .login-input {
+  .modern-login-input {
     width: 100%;
-    padding: 0.75rem;
-    border: none;
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.8);
-    color: #000;
+    padding: 1rem;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.9);
+    color: #2d3748;
     font-size: 1rem;
     box-sizing: border-box;
+    transition: all 0.3s ease;
   }
 
-  .login-input::placeholder {
-    color: #666;
+  .modern-login-input::placeholder {
+    color: #718096;
   }
 
-  .login-input:focus {
+  .modern-login-input:focus {
     outline: none;
-    box-shadow: 0 0 0 2px #ff6b35;
+    border-color: #ee7221;
+    box-shadow: 0 0 0 4px rgba(238, 114, 33, 0.2);
+    background: rgba(255, 255, 255, 0.95);
   }
 
-  .login-submit-btn {
+  .modern-login-submit-btn {
     width: 100%;
-    padding: 0.75rem;
-    background: #ff6b35;
+    padding: 1rem;
+    background: linear-gradient(135deg, #ee7221, #ff8c42);
     color: #fff;
     border: none;
-    border-radius: 8px;
-    font-weight: 600;
+    border-radius: 12px;
+    font-weight: 700;
     font-size: 1rem;
     cursor: pointer;
-    transition: background 0.2s ease;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(238, 114, 33, 0.3);
   }
 
-  .login-submit-btn:hover:not(:disabled) {
-    background: #e55a2b;
+  .modern-login-submit-btn:hover:not(:disabled) {
+    background: linear-gradient(135deg, #d6610a, #ee7221);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(238, 114, 33, 0.4);
   }
 
-  .login-submit-btn:disabled {
-    background: #666;
+  .modern-login-submit-btn:active {
+    transform: translateY(0);
+  }
+
+  .modern-login-submit-btn:disabled {
+    background: linear-gradient(135deg, #6c757d, #495057);
     cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+
+  .modern-forgot-password {
+    background: none;
+    border: none;
+    color: #ee7221;
+    font-size: 0.9rem;
+    cursor: pointer;
+    padding: 0.5rem 0;
+    text-decoration: underline;
+    transition: color 0.3s ease;
+  }
+
+  .modern-forgot-password:hover {
+    color: #d6610a;
+  }
+
+  .modern-login-footer {
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+  }
+
+  .modern-footer-links {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+  }
+
+  .modern-footer-link {
+    color: rgba(255, 255, 255, 0.7);
+    text-decoration: none;
+    transition: color 0.3s ease;
+  }
+
+  .modern-footer-link:hover {
+    color: #ee7221;
+  }
+
+  .modern-footer-separator {
+    color: rgba(255, 255, 255, 0.5);
+    font-weight: bold;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
   }
 
   @media (max-width: 600px) {
-    .login-overlay-content {
-      padding: 2rem;
+    .modern-login-content {
+      padding: 1.5rem;
       margin: 1rem;
+      border-radius: 20px;
     }
     
-    .login-logo {
-      width: 120px;
-      height: 120px;
-      margin-top: 0.25rem;
+    .modern-login-logo {
+      width: 160px;
+      height: 160px;
+      margin-bottom: 1rem;
+    }
+
+    .modern-social-btn {
+      width: 56px;
+      height: 56px;
+    }
+
+    .modern-social-icon {
+      width: 28px;
+      height: 28px;
+    }
+
+    .modern-login-input,
+    .modern-login-submit-btn {
+      padding: 0.875rem;
+      font-size: 0.95rem;
     }
   }
 
@@ -4279,99 +4635,7 @@
     
 
 
-  /* GPS Message Styles */
-  .gps-message {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.8);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1000;
-    padding: 1rem;
-  }
 
-  .gps-message-content {
-    background: var(--bg-primary);
-    border-radius: 16px;
-    padding: 2rem;
-    max-width: 400px;
-    text-align: center;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-  }
-
-  .gps-spinner {
-    width: 40px;
-    height: 40px;
-    border: 4px solid var(--border-color);
-    border-top: 4px solid var(--accent-color);
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-    margin: 0 auto 1rem;
-  }
-
-  .gps-icon {
-    font-size: 3rem;
-    margin-bottom: 1rem;
-  }
-
-  .gps-icon.error {
-    color: var(--error-color);
-  }
-
-  .gps-message h3 {
-    margin: 0 0 1rem 0;
-    color: var(--text-primary);
-    font-size: 1.3rem;
-  }
-
-  .gps-message p {
-    margin: 0 0 1.5rem 0;
-    color: var(--text-secondary);
-    line-height: 1.5;
-  }
-
-  .gps-actions {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-  }
-
-  .gps-btn {
-    padding: 0.75rem 1.5rem;
-    border: none;
-    border-radius: 8px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
-  }
-
-  .gps-btn.primary {
-    background: var(--accent-color);
-    color: white;
-  }
-
-  .gps-btn.primary:hover {
-    background: var(--accent-hover);
-  }
-
-  .gps-btn.secondary {
-    background: var(--bg-secondary);
-    color: var(--text-primary);
-    border: 1px solid var(--border-color);
-  }
-
-  .gps-btn.secondary:hover {
-    background: var(--border-color);
-  }
-
-  @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-  }
 
   /* Keine Items in der Nähe Meldung */
   .no-items-message {

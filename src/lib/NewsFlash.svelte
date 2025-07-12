@@ -42,6 +42,10 @@ async function fetchImages(isLoadMore = false) {
   if (mode === 'eigene' && userId) {
     url += `&user_id=${userId}`;
   }
+  // Add current user for privacy filtering
+  if (userId) {
+    url += `&current_user_id=${userId}`;
+  }
   console.log('NewsFlash: Fetching images from:', url, 'Mode:', mode, 'UserId:', userId, 'LoadMore:', isLoadMore);
   try {
     const res = await fetch(url);

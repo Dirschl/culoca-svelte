@@ -3,6 +3,7 @@
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
+  import { sessionStore } from '$lib/sessionStore';
 
   let email = '';
   let password = '';
@@ -10,15 +11,25 @@
   let error = '';
   let info = '';
   let showRegister = false;
+  let redirectUrl = '';
 
   async function loginWithProvider(provider: 'google' | 'facebook') {
     loading = true;
     error = '';
     
+    // Session löschen vor OAuth-Login für direkten Login
+    sessionStore.clearSession();
+    console.log('🔓 Direct OAuth login from /login - cleared session data');
+    
     // Für Produktionsumgebung: Explizite Redirect-URL setzen
-    const redirectTo = typeof window !== 'undefined' && window.location.hostname !== 'localhost' 
+    let redirectTo = typeof window !== 'undefined' && window.location.hostname !== 'localhost' 
       ? `${window.location.origin}/auth/callback`
       : undefined;
+    
+    // Add redirect URL as query parameter if provided
+    if (redirectTo && redirectUrl) {
+      redirectTo += `?redirect=${encodeURIComponent(redirectUrl)}`;
+    }
     
     const { error: authError } = await supabase.auth.signInWithOAuth({ 
       provider,
@@ -34,11 +45,18 @@
   async function loginWithEmail() {
     loading = true;
     error = '';
+    
+    // Session löschen vor Login für direkten Login
+    sessionStore.clearSession();
+    console.log('🔓 Direct email login from /login - cleared session data');
+    
     const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
     if (authError) {
       error = authError.message;
     } else {
-      goto('/settings');
+      // Redirect to original URL if provided, otherwise to main page
+      const targetUrl = redirectUrl || '/';
+      goto(targetUrl);
     }
     loading = false;
   }
@@ -47,6 +65,10 @@
     loading = true;
     error = '';
     info = '';
+    
+    // Session löschen vor Registrierung für direkten Login
+    sessionStore.clearSession();
+    console.log('🔓 Direct signup from /login - cleared session data');
     
     // Development mode: disable email confirmation
     const isDevelopment = window.location.hostname === 'localhost';
@@ -78,12 +100,19 @@
 
   // Nach Login per OAuth weiterleiten
   onMount(() => {
+    // Get redirect URL from query parameters
+    redirectUrl = $page.url.searchParams.get('redirect') || '';
+    
     supabase.auth.onAuthStateChange((event, session) => {
-      if (session) goto('/settings');
+      if (session) {
+        const targetUrl = redirectUrl || '/';
+        goto(targetUrl);
+      }
     });
-    // Nach OAuth-Redirect: Wenn #access_token in der URL, leite hart auf /settings weiter
+    // Nach OAuth-Redirect: Wenn #access_token in der URL, leite hart zur Hauptseite weiter
     if (typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
-      window.location.href = '/settings';
+      const targetUrl = redirectUrl || '/';
+      window.location.href = targetUrl;
     }
   });
 </script>

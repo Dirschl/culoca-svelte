@@ -2,6 +2,9 @@
   import { onMount } from 'svelte';
   import { supabase } from '$lib/supabaseClient';
   import { goto } from '$app/navigation';
+  import { page } from '$app/stores';
+  import { filterStore } from '$lib/filterStore';
+  import { sessionStore } from '$lib/sessionStore';
 
   onMount(async () => {
     try {
@@ -15,8 +18,33 @@
       }
 
       if (data.session) {
-        // Erfolgreicher Login - weiterleiten zu Settings
-        goto('/settings');
+        // Check if there's customer branding in session (from permalink visit)
+        const sessionData = JSON.parse(localStorage.getItem('culoca-session') || '{}');
+        
+        if (sessionData.customerBranding) {
+          // Permalink-based login: Keep customer branding
+          console.log('🔗 OAuth callback with permalink context - keeping customer branding');
+          
+          if (sessionData.customerBranding.privacyMode === 'private') {
+            // Private mode: Apply customer branding as user filter
+            sessionStore.applyCustomerBrandingAsFilter();
+            console.log('🔗 Private mode - applied customer branding as filter');
+          }
+          // For public mode, just display customer branding without filter
+        } else {
+          // Direct login: No permalink context, clear any old session data
+          sessionStore.clearSession();
+          console.log('🔓 OAuth callback without permalink context - cleared session data');
+        }
+        
+        // Check for redirect URL in query parameters
+        const redirectUrl = $page.url.searchParams.get('redirect');
+        if (redirectUrl) {
+          goto(redirectUrl);
+        } else {
+          // Erfolgreicher Login - weiterleiten zur Hauptseite
+          goto('/');
+        }
       } else {
         // Keine Session - zurück zum Login
         goto('/login');

@@ -5,6 +5,7 @@
   import { supabase } from '$lib/supabaseClient';
   import type { NewsFlashImage } from '$lib/types';
   import Justified from '$lib/Justified.svelte';
+  import { sessionStore } from '$lib/sessionStore';
   import { filterStore } from '$lib/filterStore';
   
   let loading = true;
@@ -31,6 +32,10 @@
     }
     
     try {
+      // Check if user is logged in
+      const { data: { user } } = await supabase.auth.getUser();
+      const isLoggedIn = !!user;
+      
       // Load profile by accountname
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
@@ -39,39 +44,74 @@
         .single();
         
       if (profileError || !profileData) {
-        error = 'Profil nicht gefunden';
-        loading = false;
+        // If profile not found and user is not logged in, redirect to login with return URL
+        if (!isLoggedIn) {
+          goto(`/login?redirect=${encodeURIComponent($page.url.pathname)}`);
+          return;
+        }
+        
+        // If user is logged in but profile not found, create virtual referrer account
+        // This handles cases like /tourismusverband where the account is for customer branding
+        // but doesn't correspond to an actual user profile
+        console.log(`Creating virtual referrer account for: ${accountname}`);
+        
+        // Create a virtual referrer account for customer branding
+        const virtualReferrer = {
+          profileId: `virtual-${accountname}`, // Virtual ID for non-existent profiles
+          accountName: accountname,
+          fullName: accountname.charAt(0).toUpperCase() + accountname.slice(1), // Capitalize first letter
+          avatarUrl: undefined,
+          privacyMode: 'public' as const, // Default to public mode for virtual accounts
+          timestamp: Date.now()
+        };
+        
+        // Store the virtual referrer account
+        filterStore.setReferrerAccount(virtualReferrer);
+        
+        // Redirect to main app with customer branding enabled
+        goto('/');
         return;
       }
       
       profile = profileData;
       
-      // Load user's images
-      const { data: imagesData, error: imagesError } = await supabase
-        .from('items')
-        .select('*')
-        .eq('profile_id', profile.id)
-        .not('lat', 'is', null)
-        .not('lon', 'is', null)
-        .not('path_512', 'is', null)
-        .order('created_at', { ascending: false });
-        
-      if (imagesError) {
-        console.error('Error loading images:', imagesError);
-        error = 'Fehler beim Laden der Bilder';
-        loading = false;
-        return;
+      // Store referrer account information for persistent customer branding
+      let avatarUrl = profile.avatar_url;
+      if (avatarUrl && !avatarUrl.startsWith('http')) {
+        avatarUrl = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/avatars/${avatarUrl}`;
       }
+
+      // Create referrer account object for session storage
+      const referrerAccount = {
+        profileId: profile.id,
+        accountName: profile.accountname,
+        fullName: profile.full_name || profile.accountname,
+        avatarUrl,
+        privacyMode: profile.privacy_mode || 'public',
+        timestamp: Date.now()
+      };
+
+      // Store in session (persistent customer branding)
+      sessionStore.setCustomerBranding(referrerAccount);
       
-      images = imagesData || [];
-      
-      // Set user filter in store only if profile has valid id
-      if (profile.id) {
-        filterStore.setUserFilter({
-          userId: profile.id,
-          username: profile.full_name || profile.accountname,
-          accountName: profile.accountname
-        });
+      if (profile.privacy_mode === 'private') {
+        // Private mode: Apply customer branding as active user filter
+        sessionStore.applyCustomerBrandingAsFilter();
+        console.log('Private mode - customer branding applied as active filter');
+        goto('/');
+        return;
+      } else if (profile.privacy_mode === 'closed') {
+        // Closed mode: Apply customer branding as active user filter (like private)
+        sessionStore.applyCustomerBrandingAsFilter();
+        console.log('Closed mode - customer branding applied as active filter');
+        goto('/');
+        return;
+      } else {
+        // Public/All mode: only set customer branding for display
+        // Don't set user filter - let user login with their own account
+        console.log('Public/All mode - customer branding enabled, user can login with personal account');
+        goto('/');
+        return;
       }
       
     } catch (err) {

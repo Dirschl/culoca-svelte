@@ -110,6 +110,26 @@
       } else {
         image = data;
         
+        // Privacy check: If image is private, only allow access for the owner
+        if (image.is_private === true) {
+          console.log('🔒 Privacy check for private image:', {
+            hasCurrentUser: !!currentUser,
+            currentUserId: currentUser?.id,
+            imageProfileId: image.profile_id,
+            imageId: image.id,
+            idsMatch: currentUser?.id === image.profile_id
+          });
+          
+          if (!currentUser || currentUser.id !== image.profile_id) {
+            console.log('🚫 Access denied - redirecting to main page');
+            // Redirect to main page instead of showing error
+            goto('/');
+            return;
+          }
+          
+          console.log('✅ Access granted for private image');
+        }
+        
         // Extract profile from joined data
         if (data.profiles) {
           profile = data.profiles;
@@ -271,12 +291,25 @@
 
   async function fetchNearbyImages(lat: number, lon: number, maxRadius: number) {
     console.log('🔍 Fetching nearby images for radius:', maxRadius, 'm');
-    const { data, error: nearErr } = await supabase
+    
+    // Build query with privacy filtering
+    let nearbyQuery = supabase
       .from('items')
       .select('*')
       .not('lat', 'is', null)
       .not('lon', 'is', null)
       .neq('id', imageId);
+    
+    // Apply privacy filtering based on user login status
+    if (currentUser) {
+      // For logged in users: show their own images (all) + other users' public images
+      nearbyQuery = nearbyQuery.or(`profile_id.eq.${currentUser.id},is_private.eq.false,is_private.is.null`);
+    } else {
+      // For anonymous users: only show public images
+      nearbyQuery = nearbyQuery.or('is_private.eq.false,is_private.is.null');
+    }
+    
+    const { data, error: nearErr } = await nearbyQuery;
     if (nearErr || !data) {
       console.log('❌ Error fetching nearby images:', nearErr);
       return;

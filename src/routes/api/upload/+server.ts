@@ -64,21 +64,28 @@ export const POST = async ({ request }) => {
     
     let authenticatedUser = user;
 
-    // --- Profile-Einstellungen laden (insb. save_originals) ---
+    // --- Profile-Einstellungen laden (insb. save_originals und privacy_mode) ---
     let saveOriginalsPref = true; // Standard: Originale sichern
+    let privacyMode = 'public'; // Standard: Public
     try {
       const { data: profileRow } = await supabase
         .from('profiles')
-        .select('save_originals')
+        .select('save_originals, privacy_mode')
         .eq('id', authenticatedUser?.id)
         .single();
-      if (profileRow && typeof profileRow.save_originals === 'boolean') {
-        saveOriginalsPref = profileRow.save_originals;
+      if (profileRow) {
+        if (typeof profileRow.save_originals === 'boolean') {
+          saveOriginalsPref = profileRow.save_originals;
+        }
+        if (profileRow.privacy_mode) {
+          privacyMode = profileRow.privacy_mode;
+        }
       }
     } catch (prefErr) {
-      console.warn('⚠️  Konnte Profileinstellung save_originals nicht laden, verwende Default true:', prefErr);
+      console.warn('⚠️  Konnte Profileinstellungen nicht laden, verwende Defaults:', prefErr);
     }
     console.log('save_originals Pref:', saveOriginalsPref);
+    console.log('privacy_mode:', privacyMode);
     
     if (!user && authHeader) {
       // Try to get user from token in Authorization header
@@ -96,6 +103,27 @@ export const POST = async ({ request }) => {
       console.log('No authenticated user found');
       throw error(401, 'Nicht angemeldet. Bitte zuerst einloggen.');
     }
+    
+    // SECURITY: Additional check for user profile completeness
+    const { data: userProfile } = await supabase
+      .from('profiles')
+      .select('full_name, accountname, created_at')
+      .eq('id', authenticatedUser.id)
+      .single();
+    
+    // Require users to have at least set up their profile with a name
+    if (!userProfile || (!userProfile.full_name && !userProfile.accountname)) {
+      console.log('User has incomplete profile, redirecting to setup');
+      throw error(403, 'Bitte vervollständige dein Profil bevor du Bilder hochlädst. Gehe zu den Einstellungen.');
+    }
+    
+    // Log security-relevant information
+    console.log('Security check passed:', {
+      userId: authenticatedUser.id,
+      hasName: !!userProfile.full_name,
+      hasAccountname: !!userProfile.accountname,
+      profileCreated: userProfile.created_at
+    });
     
     console.log('Authenticated user:', authenticatedUser.id);
     console.log('User details:', {
@@ -570,6 +598,7 @@ export const POST = async ({ request }) => {
           original_name: baseName,
           image_format: qualitySettings.format512, // Use actual format from settings
           original_url: originalUrl, // Include original_url in main record
+          is_private: privacyMode === 'private', // Set is_private based on user's privacy mode
           ...(keywordsArray ? { keywords: keywordsArray } : {}),
           exif_data: Object.keys(exifToStore).length ? exifToStore : null
         };
@@ -624,6 +653,7 @@ export const POST = async ({ request }) => {
             original_name: baseName,
             image_format: qualitySettings.format512,
             original_url: originalUrl, // Include original_url in fallback record
+            is_private: privacyMode === 'private', // Set is_private based on user's privacy mode
             ...(keywordsArray ? { keywords: keywordsArray } : {}),
             exif_data: Object.keys(exifToStore).length ? exifToStore : null
           };

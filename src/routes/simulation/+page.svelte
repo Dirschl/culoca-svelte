@@ -86,7 +86,8 @@
       // First, get all images to see the total count
       const { data: allData, error: allError } = await supabase
         .from('items')
-        .select('id, path_512, path_2048, path_64, width, height, lat, lon, title, description, keywords, original_url');
+        .select('id, path_512, path_2048, path_64, width, height, lat, lon, title, description, keywords, original_url')
+        .or('is_private.eq.false,is_private.is.null'); // Only load non-private images (handle null for legacy data)
 
       if (allError) throw allError;
 

@@ -3,7 +3,8 @@
   import { createEventDispatcher } from 'svelte';
   import { get } from 'svelte/store';
   import FilterBar from './FilterBar.svelte';
-  import { filterStore, userFilter, locationFilter } from './filterStore';
+  import { filterStore, userFilter, locationFilter, shouldShowCustomerBranding } from './filterStore';
+  import { sessionStore } from './sessionStore';
   
   export let images: any[] = [];
   export let userLat: number | null = null;
@@ -93,6 +94,36 @@
   function getDistanceFromLatLonInMeters(lat1: number, lon1: number, lat2: number, lon2: number): string {
     const meters = getDistanceInMeters(lat1, lon1, lat2, lon2);
     return meters >= 1000 ? (meters / 1000).toFixed(1).replace('.', ',') + 'km' : meters + 'm';
+  }
+
+  // Filter images based on active filters and privacy
+  function getFilteredImages() {
+    const currentFilters = get(filterStore);
+    const sessionData = get(sessionStore);
+    let filteredImages = allImages;
+    
+    // Apply privacy and user filtering
+    if (currentFilters.userFilter) {
+      // If user filter is active, show all images from that user (including private)
+      filteredImages = filteredImages.filter(img => 
+        img.profile_id === currentFilters.userFilter!.userId
+      );
+    } else {
+      // If no user filter, apply privacy filtering based on login status
+      if (sessionData.isAuthenticated && sessionData.userId) {
+        // For logged in users: show their own images (all) + other users' public images
+        filteredImages = filteredImages.filter(img => 
+          img.profile_id === sessionData.userId || img.is_private === false || img.is_private === null
+        );
+      } else {
+        // For anonymous users: only show public images
+        filteredImages = filteredImages.filter(img => 
+          img.is_private === false || img.is_private === null
+        );
+      }
+    }
+    
+    return filteredImages;
   }
   
   async function initMap() {
@@ -209,22 +240,7 @@
       userMarker = leaflet.marker([userLat, userLon], { icon: userIcon }).addTo(map);
     }
     
-    // Add image markers (filtered based on active filters)
-  function getFilteredImages() {
-    const currentFilters = get(filterStore);
-    let filteredImages = allImages;
-    
-    // Apply user filter
-    if (currentFilters.userFilter) {
-      filteredImages = filteredImages.filter(img => 
-        img.profile_id === currentFilters.userFilter!.userId
-      );
-    }
-    
-    return filteredImages;
-  }
-  
-  // Add image markers
+    // Add image markers
     addImageMarkers();
     
     // Save map state on zoom/move
@@ -252,9 +268,10 @@
   }
   
   function addImageMarkers() {
-    console.log(`[FullscreenMap] addImageMarkers called with ${allImages.length} images`);
-    if (!map || !markerClusterGroup || !allImages.length) {
-      console.log(`[FullscreenMap] Skipping addImageMarkers - map: ${!!map}, clusterGroup: ${!!markerClusterGroup}, allImages.length: ${allImages.length}`);
+    const filteredImages = getFilteredImages();
+    console.log(`[FullscreenMap] addImageMarkers called with ${allImages.length} total images, ${filteredImages.length} filtered images`);
+    if (!map || !markerClusterGroup || !filteredImages.length) {
+      console.log(`[FullscreenMap] Skipping addImageMarkers - map: ${!!map}, clusterGroup: ${!!markerClusterGroup}, filteredImages.length: ${filteredImages.length}`);
       return;
     }
     
@@ -262,9 +279,9 @@
     markerClusterGroup.clearLayers();
     imageMarkers = [];
     
-    console.log(`[FullscreenMap] Processing ${allImages.length} images for markers`);
-    allImages.forEach((image, index) => {
-      console.log(`[FullscreenMap] Processing image ${index + 1}/${allImages.length}:`, {
+    console.log(`[FullscreenMap] Processing ${filteredImages.length} filtered images for markers`);
+    filteredImages.forEach((image, index) => {
+      console.log(`[FullscreenMap] Processing image ${index + 1}/${filteredImages.length}:`, {
         id: image.id,
         lat: image.lat,
         lon: image.lon,
@@ -987,25 +1004,30 @@
     }
   }
 
-  // Load all images for the map (no radius limit)
+  // Load all images for the map using API with privacy filtering
   async function loadAllImagesForMap() {
     try {
       console.log('[FullscreenMap] Loading all images for map...');
       
-      const { data, error } = await supabase
-        .from('items')
-        .select('id, path_512, path_2048, path_64, width, height, lat, lon, title, description, keywords')
-        .not('lat', 'is', null)
-        .not('lon', 'is', null)
-        .order('created_at', { ascending: false });
+      const sessionData = get(sessionStore);
       
-      if (error) {
-        console.error('[FullscreenMap] Error loading images:', error);
+      // Use the API endpoint with proper privacy filtering
+      let url = '/api/images?limit=10000&offset=0'; // Load all images at once
+      if (sessionData.isAuthenticated && sessionData.userId) {
+        url += `&current_user_id=${sessionData.userId}`;
+      }
+      
+      console.log(`[FullscreenMap] Fetching from: ${url}`);
+      const response = await fetch(url);
+      const result = await response.json();
+      
+      if (result.status !== 'success') {
+        console.error('[FullscreenMap] Error loading images:', result.message);
         return;
       }
       
-      if (data) {
-        const processedImages = data.map((img: any) => ({
+      if (result.images) {
+        const processedImages = result.images.map((img: any) => ({
           id: img.id,
           src: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${img.path_512}`,
           srcHD: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${img.path_2048}`,
@@ -1018,10 +1040,12 @@
           keywords: img.keywords,
           path_64: img.path_64,
           path_512: img.path_512,
-          path_2048: img.path_2048
+          path_2048: img.path_2048,
+          profile_id: img.profile_id,
+          is_private: img.is_private
         }));
         
-        console.log(`[FullscreenMap] Loaded ${processedImages.length} images for map`);
+        console.log(`[FullscreenMap] Loaded ${processedImages.length} images for map (total available: ${result.totalCount})`);
         
         // Update the internal images array
         allImages = processedImages;
@@ -1045,7 +1069,7 @@
 
 <div class="fullscreen-map">
   <!-- Filter Bar for Map -->
-  <FilterBar showOnMap={true} />
+  <FilterBar showOnMap={true} userLat={userLat} userLon={userLon} isPermalinkMode={false} permalinkImageId={null} showDistance={true} isLoggedIn={true} />
   
   <!-- Map container -->
   <div bind:this={mapEl} class="map-container"></div>

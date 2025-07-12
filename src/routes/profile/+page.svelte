@@ -34,6 +34,7 @@
   let accountnameAvailable = true;
   let accountnameMessage = '';
   let accountnameTimeout: NodeJS.Timeout;
+  let privacy_mode = 'public'; // 'public', 'private', 'all'
 
   let errorLogExists = false;
   let errorLogUrl = '';
@@ -102,6 +103,7 @@
         twitter = data.twitter || '';
         email = data.email || '';
         accountname = data.accountname || '';
+        privacy_mode = data.privacy_mode || 'public';
         show_address = data.show_address ?? false;
         show_phone = data.show_phone ?? false;
         show_website = data.show_website ?? false;
@@ -196,6 +198,11 @@
       if (avatarFile) {
         avatarPath = await uploadAvatar();
       }
+      
+      // Check if privacy mode changed to sync items
+      const oldPrivacyMode = profile?.privacy_mode;
+      const privacyModeChanged = oldPrivacyMode !== privacy_mode;
+      
       const profileData = {
         id: user.id,
         full_name: name,
@@ -206,6 +213,7 @@
         facebook,
         twitter,
         accountname: accountname ? accountname.toLowerCase() : null,
+        privacy_mode: privacy_mode,
         show_address: show_address,
         show_phone: show_phone,
         show_website: show_website,
@@ -215,10 +223,19 @@
         email,
         show_email
       };
+      
+      // Update profile
       const { error } = await supabase
         .from('profiles')
         .upsert(profileData, { onConflict: 'id' });
       if (error) throw error;
+      
+      // Sync is_private field in items table if privacy mode changed
+      if (privacyModeChanged) {
+        console.log('Privacy mode changed, syncing items...');
+        await syncItemsPrivacy();
+      }
+      
       profile = profileData;
       showMessage('Profil erfolgreich gespeichert!', 'success');
       if (avatarPreview) {
@@ -231,6 +248,26 @@
       showMessage('Fehler beim Speichern des Profils', 'error');
     } finally {
       saving = false;
+    }
+  }
+
+  async function syncItemsPrivacy() {
+    try {
+      // Update is_private field in all user's items based on privacy mode
+      // Only 'private' mode makes items private, all other modes (public, closed, all) are public
+      const isPrivate = privacy_mode === 'private';
+      
+      const { error } = await supabase
+        .from('items')
+        .update({ is_private: isPrivate })
+        .eq('profile_id', user.id);
+      
+      if (error) throw error;
+      
+      console.log(`Updated is_private field to ${isPrivate} for all items of user ${user.id} (privacy_mode: ${privacy_mode})`);
+    } catch (error) {
+      console.error('Error syncing items privacy:', error);
+      throw error;
     }
   }
 
@@ -411,6 +448,44 @@
               {:else}
                 <span class="help-text">Optional: Erstelle einen personalisierten Link zu deinem Profil</span>
               {/if}
+            </div>
+          </div>
+
+          <!-- Privatsphäre-Einstellungen -->
+          <div class="card">
+            <h3 class="section-title">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/>
+              </svg>
+              Privatsphäre-Einstellungen
+            </h3>
+            <div class="form-group">
+              <label for="privacy-mode">Permalink-Verhalten</label>
+              <select id="privacy-mode" bind:value={privacy_mode}>
+                <option value="public">Public - Jeder kann dein Profil sehen und Filter entfernen</option>
+                <option value="closed">Closed - User können nur dein Profil sehen</option>
+                <option value="private">Private - Nur du kannst dein Profil sehen</option>
+                <option value="all">All - Besucher sehen alle Inhalte ohne Filter</option>
+              </select>
+              <div class="privacy-explanation">
+                {#if privacy_mode === 'public'}
+                  <p class="help-text">
+                    <strong>Public:</strong> Dein Permalink zeigt nur deine Bilder an. Besucher können den Filter entfernen, um alle Bilder zu sehen.
+                  </p>
+                {:else if privacy_mode === 'closed'}
+                  <p class="help-text">
+                    <strong>Closed:</strong> Dein Permalink zeigt nur deine Bilder an. Besucher können den Filter nicht entfernen - sie sehen nur deine Inhalte.
+                  </p>
+                {:else if privacy_mode === 'private'}
+                  <p class="help-text">
+                    <strong>Private:</strong> So nimmst du sofort alle Bilder aus der Sichtbarkeit, Detailseite wird umgeleitet.
+                  </p>
+                {:else if privacy_mode === 'all'}
+                  <p class="help-text">
+                    <strong>All:</strong> Dein Permalink zeigt alle Bilder der Plattform an. Besucher sehen die komplette Culoca-Galerie.
+                  </p>
+                {/if}
+              </div>
             </div>
           </div>
 
@@ -1114,6 +1189,48 @@
     font-size: 0.875rem;
     color: var(--success-color);
     font-weight: 500;
+  }
+
+  /* Privacy Settings Styles */
+  .privacy-explanation {
+    margin-top: 0.75rem;
+    padding: 0.75rem;
+    background: var(--bg-tertiary);
+    border-radius: 6px;
+    border-left: 4px solid var(--accent-color);
+  }
+
+  .privacy-explanation .help-text {
+    margin: 0;
+    font-style: normal;
+    line-height: 1.5;
+  }
+
+  .privacy-explanation strong {
+    color: var(--text-primary);
+  }
+
+  select {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 1rem;
+    transition: all 0.2s ease;
+  }
+
+  select:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+
+  select option {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    padding: 0.5rem;
   }
 
   /* Responsive Design */
