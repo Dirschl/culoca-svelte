@@ -90,6 +90,9 @@
         containerHeight: layout.containerHeight,
         sampleBoxes: boxes.slice(0, 3)
       });
+      
+      // Debug: Log container height application
+      console.log(`[Justified] Container height set to: ${layout.containerHeight}px`);
     } catch (error) {
       console.error('Error calculating justified layout:', error);
       console.error('Items that caused error:', items.slice(0, 5));
@@ -100,6 +103,11 @@
   // Additional reactive statement to monitor items changes
   $: if (items.length > 0) {
     console.log(`[Justified] Items updated: ${items.length} items`);
+  }
+  
+  // Debug: Monitor container height changes
+  $: if (layout.containerHeight > 0) {
+    console.log(`[Justified] Container height updated: ${layout.containerHeight}px`);
   }
   
   function resize() {
@@ -183,6 +191,7 @@
     position: relative; 
     width: 100%;
     min-height: 200px;
+    height: auto; /* Allow dynamic height */
     padding: 0 !important;
     margin: 0 !important;
     border: none !important;
