@@ -1249,6 +1249,8 @@
       }
       
       // Intelligente Bild-Verwaltung je nach Datenquelle
+      const hasUserFilter = currentFilters.userFilter !== null;
+      
       if ((isLoggedIn && showDistance && userLat !== null && userLon !== null) || hasLocationFilter) {
         if (data[0]?.distance !== undefined) {
           // Optimierte Daten bereits sortiert - APPEND new images for pagination
@@ -1259,6 +1261,11 @@
           pics.update((p: any[]) => {
             // Bei GPS-Modus: Append new images, then sort all
             const allImages = [...p, ...uniqueNewPics];
+            
+            // Always sort by distance, using filter location as reference point if available
+            if (hasUserFilter || hasLocationFilter) {
+              console.log(`[Gallery] Active filter detected, sorting by distance from filter location`);
+            }
             
             // Sortiere alle Bilder nach Entfernung (verwende effektive Koordinaten)
             const sortedImages = allImages.sort((a: any, b: any) => {
@@ -2476,10 +2483,16 @@
     // Get current filter state
     const currentFilters = get(filterStore);
     const hasLocationFilter = currentFilters.locationFilter !== null;
+    const hasUserFilter = currentFilters.userFilter !== null;
     const effectiveLat = hasLocationFilter ? currentFilters.locationFilter!.lat : userLat;
     const effectiveLon = hasLocationFilter ? currentFilters.locationFilter!.lon : userLon;
     
     if ((!effectiveLat || !effectiveLon) || !$pics.length) return;
+    
+    // Always resort by distance, using filter location as reference point if available
+    if (hasUserFilter || hasLocationFilter) {
+      console.log(`[Resort] Active filter detected, resorting by distance from filter location`);
+    }
     
     console.log('Resorting existing images based on new position...');
     
@@ -3248,9 +3261,11 @@
         // If user is logged in and has GPS coordinates or location filter, sort by distance
         const currentFilters = get(filterStore);
         const hasLocationFilter = currentFilters.locationFilter !== null;
+        const hasUserFilter = currentFilters.userFilter !== null;
         const effectiveLat = hasLocationFilter ? currentFilters.locationFilter!.lat : userLat;
         const effectiveLon = hasLocationFilter ? currentFilters.locationFilter!.lon : userLon;
         
+        // Always sort by distance, but use filter location as reference point if available
         if ((isLoggedIn && userLat !== null && userLon !== null) || hasLocationFilter) {
           searchPics.sort((a: any, b: any) => {
             const distA = a.lat && a.lon && effectiveLat && effectiveLon ? getDistanceInMeters(effectiveLat, effectiveLon, a.lat, a.lon) : Number.MAX_VALUE;
