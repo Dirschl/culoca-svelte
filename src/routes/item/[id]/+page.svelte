@@ -1224,12 +1224,12 @@
 </script>
 
 <svelte:head>
-  <title>{image?.title || image?.original_name || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}</title>
+  <title>{image?.title || image?.original_name || `Bild ${imageId} - culoca.com`}</title>
   <meta name="description" content={image?.description || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
 
   <!-- Open Graph -->
   <meta property="og:type" content="article">
-  <meta property="og:title" content={image?.title || image?.original_name || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
+  <meta property="og:title" content={image?.title || image?.original_name || `Bild ${imageId} - culoca.com`}>
   <meta property="og:description" content={image?.description || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
   <meta property="og:url" content={`https://culoca.com/item/${imageId}`}> 
   <meta property="og:image" content={`https://culoca.com/api/og-image/${imageId}`}> 
@@ -1238,7 +1238,7 @@
 
   <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content={image?.title || image?.original_name || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
+  <meta name="twitter:title" content={image?.title || image?.original_name || `Bild ${imageId} - culoca.com`}>
   <meta name="twitter:description" content={image?.description || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
   <meta name="twitter:image" content={`https://culoca.com/api/og-image/${imageId}`}> 
 
