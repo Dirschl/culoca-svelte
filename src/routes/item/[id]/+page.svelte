@@ -9,6 +9,8 @@
   import { filterStore } from '$lib/filterStore';
   import { goto } from '$app/navigation';
   import { authFetch } from '$lib/authFetch';
+  import { sessionStore, sessionReady } from '$lib/sessionStore';
+  import { get } from 'svelte/store';
 
   let image: any = null;
   let loading = true;
@@ -58,9 +60,27 @@
 
   onMount(async () => {
     try {
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
-      currentUser = user;
+      // Wait for session to be ready
+      await new Promise<void>((resolve) => {
+        const unsubscribe = sessionReady.subscribe((ready) => {
+          if (ready) {
+            unsubscribe();
+            resolve();
+          }
+        });
+      });
+
+      // Get current user from session store first, then verify with Supabase
+      const sessionData = get(sessionStore);
+      if (sessionData.isAuthenticated && sessionData.userId) {
+        currentUser = { id: sessionData.userId };
+        console.log('🔐 Using user from session store:', sessionData.userId);
+      } else {
+        // Fallback: Get user directly from Supabase
+        const { data: { user } } = await supabase.auth.getUser();
+        currentUser = user;
+        console.log('🔐 Got user from Supabase:', user?.id);
+      }
 
       // Radius aus localStorage laden (pro User oder anonym)
       if (browser && !radiusLoaded) {

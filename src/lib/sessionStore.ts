@@ -40,6 +40,15 @@ function createSessionStore() {
 	return {
 		subscribe,
 		
+		// Get current state
+		get: () => {
+			let currentState: SessionState;
+			subscribe(state => {
+				currentState = state;
+			})();
+			return currentState!;
+		},
+		
 		// Initialize store
 		init: () => {
 			if (!browser) return;

@@ -5,6 +5,7 @@
   import { sessionStore } from '$lib/sessionStore';
   import { supabase } from '$lib/supabaseClient';
   import { sessionReady } from '$lib/sessionStore';
+  import { browser } from '$app/environment';
 
   // Apply dark mode class to document
   $: if (typeof document !== 'undefined') {
@@ -62,6 +63,21 @@
       }
     });
 
+    // Also listen for session changes from other tabs/windows
+    if (browser) {
+      window.addEventListener('storage', (event) => {
+        if (event.key === 'culoca-session') {
+          console.log('🔄 Session changed in another tab, updating...');
+          try {
+            const newSessionData = JSON.parse(event.newValue || '{}');
+            sessionStore.setUser(newSessionData.userId || null, newSessionData.isAuthenticated || false);
+          } catch (error) {
+            console.error('❌ Failed to parse session data from storage event:', error);
+          }
+        }
+      });
+    }
+
     // Check current session on mount with proper OAuth handling
     const sessionCheckPromise = supabase.auth.getSession().then(({ data: { session } }) => {
       console.log('📋 Session check result:', session?.user?.id || 'no session');
@@ -70,7 +86,25 @@
           sessionStore.setUser(session.user.id, true);
           console.log('✅ Session found and set:', session.user.id);
         } else {
-          console.log('ℹ️ No active session found');
+          // Check if we have a stored session
+          const storedSession = sessionStore.get();
+          if (storedSession.isAuthenticated && storedSession.userId) {
+            console.log('📋 Using stored session:', storedSession.userId);
+            // Verify the stored session is still valid
+            supabase.auth.getUser().then(({ data: { user } }) => {
+              if (user && user.id === storedSession.userId) {
+                console.log('✅ Stored session is still valid');
+              } else {
+                console.log('❌ Stored session is invalid, clearing');
+                sessionStore.setUser(null, false);
+              }
+            }).catch(() => {
+              console.log('❌ Failed to verify stored session, clearing');
+              sessionStore.setUser(null, false);
+            });
+          } else {
+            console.log('ℹ️ No active session found');
+          }
         }
       } catch (error) {
         console.error('❌ Failed to check session:', error);
@@ -104,6 +138,44 @@
       console.log('⚠️ FALLBACK: Setting sessionReady to true after timeout');
       sessionReady.set(true);
     }, timeoutDuration + 1000);
+
+    // Set up navigation listener to maintain session across page changes
+    if (browser) {
+      const handleBeforeUnload = () => {
+        // Save current session state before navigation
+        const currentSession = sessionStore.get();
+        if (currentSession.isAuthenticated) {
+          console.log('💾 Saving session state before navigation');
+          localStorage.setItem('culoca-session-backup', JSON.stringify(currentSession));
+        }
+      };
+
+      const handlePageShow = () => {
+        // Restore session state after navigation
+        const backup = localStorage.getItem('culoca-session-backup');
+        if (backup) {
+          try {
+            const backupSession = JSON.parse(backup);
+            if (backupSession.isAuthenticated && backupSession.userId) {
+              console.log('🔄 Restoring session from backup:', backupSession.userId);
+              sessionStore.setUser(backupSession.userId, true);
+            }
+          } catch (error) {
+            console.error('❌ Failed to restore session from backup:', error);
+          }
+        }
+      };
+
+      window.addEventListener('beforeunload', handleBeforeUnload);
+      window.addEventListener('pageshow', handlePageShow);
+
+      // Cleanup listeners
+      return () => {
+        window.removeEventListener('beforeunload', handleBeforeUnload);
+        window.removeEventListener('pageshow', handlePageShow);
+        subscription.unsubscribe();
+      };
+    }
     
     // Service Worker registrieren für bessere Cache-Kontrolle (temporarily disabled)
     // if ('serviceWorker' in navigator) {
@@ -126,10 +198,6 @@
     //   });
     // }
 
-    // Cleanup subscription on component destroy
-    return () => {
-      subscription.unsubscribe();
-    };
   });
 </script>
 
