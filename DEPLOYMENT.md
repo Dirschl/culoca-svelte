@@ -32,12 +32,19 @@ Füge diese Variablen in Vercel hinzu (Settings → Environment Variables):
 ```
 VITE_SUPABASE_URL=https://your-project-id.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-key-here
+HETZNER_WEBDAV_URL=https://your-hetzner-storage-box.com
+HETZNER_WEBDAV_USER=your-hetzner-username
+HETZNER_WEBDAV_PASSWORD=your-hetzner-password
+HETZNER_WEBDAV_PUBLIC_URL=https://your-public-hetzner-url.com
 ```
 
 **Wo findest du diese Werte?**
-1. Gehe zu deinem Supabase Dashboard
-2. Settings → API
-3. Kopiere die "Project URL" und "anon public" Key
+1. **Supabase Werte**: Gehe zu deinem Supabase Dashboard → Settings → API
+2. **Hetzner Werte**: Diese findest du in deinem Hetzner Storage Box Dashboard
+   - WebDAV URL: `https://u472664.your-storage-box.de`
+   - Username: Dein Hetzner Storage Box Username
+   - Password: Dein Hetzner Storage Box Password
+   - Public URL: Die öffentliche URL für deine Storage Box
 
 #### Schritt 5: Deploy
 1. Klicke auf **"Deploy"**

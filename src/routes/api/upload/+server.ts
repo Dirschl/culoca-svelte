@@ -1,11 +1,12 @@
 import { json, error } from '@sveltejs/kit';
-import { supabase } from '$lib/supabaseClient';
+import { createClient } from '@supabase/supabase-js';
 import { resizeJPG, getImageQualitySettings } from '$lib/image';
 import sharp from 'sharp';
 import exifr from 'exifr';
 import { Buffer } from 'buffer';
-import { createClient } from 'webdav';
+import { createClient as createWebdavClient } from 'webdav';
 import dotenv from 'dotenv';
+import { jwtDecode } from 'jwt-decode'; // npm install jwt-decode, Typ: any
 dotenv.config();
 
 // -- Helper: fix IPTC strings that were decoded as Latin-1 instead of UTF-8
@@ -52,27 +53,89 @@ export const POST = async ({ request }) => {
 
     console.log(`Received ${filenames.length} filenames to process`);
 
-    // Get current user (from Supabase auth cookie) – may be null when using anon key
-    const { data: { user } } = await supabase.auth.getUser();
+    // Supabase-Client dynamisch mit JWT initialisieren
+    const supabaseUrl = process.env.VITE_SUPABASE_URL as string;
+    const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY as string;
+    if (!supabaseUrl || !supabaseAnonKey) {
+      throw error(500, 'Supabase-Umgebungsvariablen fehlen!');
+    }
+    const authHeader = request.headers.get('authorization');
+    const jwt = authHeader ? authHeader.replace('Bearer ', '') : null;
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: {
+          Authorization: jwt ? `Bearer ${jwt}` : undefined
+        }
+      }
+    });
     
     // Debug: Log authentication status
-    console.log('Auth check - User from cookie:', user ? user.id : 'null');
+    console.log('Auth check - User from cookie:', jwt ? 'JWT present' : 'No JWT');
     
     // Check Authorization header as fallback
-    const authHeader = request.headers.get('authorization');
-    console.log('Auth header:', authHeader ? 'present' : 'missing');
+    const authHeaderFallback = request.headers.get('authorization');
+    console.log('Auth header:', authHeaderFallback ? 'present' : 'missing');
     
-    let authenticatedUser = user;
-
-    // --- Profile-Einstellungen laden (insb. save_originals und privacy_mode) ---
+    // JWT im Backend direkt dekodieren
+    let authenticatedUser = null;
+    if (jwt) {
+      try {
+        const decoded: any = jwtDecode(jwt);
+        // Supabase verwendet "sub" als User-ID im JWT
+        authenticatedUser = { id: decoded.sub };
+        console.log('User from JWT:', authenticatedUser.id);
+      } catch (err) {
+        console.log('JWT decode failed:', err);
+      }
+    }
+    // Überall, wo authenticatedUser?.id verwendet wird, prüfe auf null
+    if (!authenticatedUser || !authenticatedUser.id) {
+      console.log('No authenticated user found');
+      throw error(401, 'Nicht angemeldet. Bitte zuerst einloggen.');
+    }
+    
+    // SECURITY: Additional check for user profile completeness
+    let userProfile = null;
+    try {
+      const { data } = await supabase
+        .from('profiles')
+        .select('full_name, accountname, created_at')
+        .eq('id', authenticatedUser.id)
+        .single();
+      userProfile = data;
+    } catch (err) {
+      console.warn('⚠️  Konnte Profil nicht laden:', err);
+    }
+    console.log('DEBUG: userProfile loaded from DB:', userProfile);
+    // Require users to have at least set up their profile with a name
+    if (!userProfile || (!userProfile.full_name && !userProfile.accountname)) {
+      console.log('User has incomplete profile, redirecting to setup');
+      throw error(403, 'Bitte vervollständige dein Profil bevor du Bilder hochlädst. Gehe zu den Einstellungen.');
+    }
+    
+    // Log security-relevant information
+    console.log('Security check passed:', {
+      userId: authenticatedUser?.id,
+      hasName: !!userProfile.full_name,
+      hasAccountname: !!userProfile.accountname,
+      profileCreated: userProfile.created_at
+    });
+    
+    console.log('Authenticated user:', authenticatedUser?.id);
+    console.log('User details:', {
+      id: authenticatedUser?.id
+    });
+    
+    // Nach erfolgreicher Authentifizierung:
     let saveOriginalsPref = true; // Standard: Originale sichern
     let privacyMode = 'public'; // Standard: Public
     try {
       const { data: profileRow } = await supabase
         .from('profiles')
         .select('save_originals, privacy_mode')
-        .eq('id', authenticatedUser?.id)
+        .eq('id', authenticatedUser.id)
         .single();
+      console.log('DEBUG: userProfile loaded from DB:', profileRow);
       if (profileRow) {
         if (typeof profileRow.save_originals === 'boolean') {
           saveOriginalsPref = profileRow.save_originals;
@@ -86,52 +149,7 @@ export const POST = async ({ request }) => {
     }
     console.log('save_originals Pref:', saveOriginalsPref);
     console.log('privacy_mode:', privacyMode);
-    
-    if (!user && authHeader) {
-      // Try to get user from token in Authorization header
-      const token = authHeader.replace('Bearer ', '');
-      const { data: { user: tokenUser }, error: tokenError } = await supabase.auth.getUser(token);
-      if (tokenUser) {
-        console.log('User from token:', tokenUser.id);
-        authenticatedUser = tokenUser;
-      } else {
-        console.log('Token auth failed:', tokenError);
-      }
-    }
-    
-    if (!authenticatedUser) {
-      console.log('No authenticated user found');
-      throw error(401, 'Nicht angemeldet. Bitte zuerst einloggen.');
-    }
-    
-    // SECURITY: Additional check for user profile completeness
-    const { data: userProfile } = await supabase
-      .from('profiles')
-      .select('full_name, accountname, created_at')
-      .eq('id', authenticatedUser.id)
-      .single();
-    
-    // Require users to have at least set up their profile with a name
-    if (!userProfile || (!userProfile.full_name && !userProfile.accountname)) {
-      console.log('User has incomplete profile, redirecting to setup');
-      throw error(403, 'Bitte vervollständige dein Profil bevor du Bilder hochlädst. Gehe zu den Einstellungen.');
-    }
-    
-    // Log security-relevant information
-    console.log('Security check passed:', {
-      userId: authenticatedUser.id,
-      hasName: !!userProfile.full_name,
-      hasAccountname: !!userProfile.accountname,
-      profileCreated: userProfile.created_at
-    });
-    
-    console.log('Authenticated user:', authenticatedUser.id);
-    console.log('User details:', {
-      id: authenticatedUser.id,
-      email: authenticatedUser.email,
-      role: authenticatedUser.role
-    });
-    
+
     // Prefer value coming from form; fall back to authenticated user id, otherwise null
     const profile_id = passedProfileId || authenticatedUser?.id || null;
     console.log('Using profile_id:', profile_id);
@@ -510,12 +528,15 @@ export const POST = async ({ request }) => {
             console.log('  HETZNER_WEBDAV_PUBLIC_URL:', process.env.HETZNER_WEBDAV_PUBLIC_URL ? 'SET' : 'NOT SET');
             
             if (!process.env.HETZNER_WEBDAV_URL || !process.env.HETZNER_WEBDAV_USER || !process.env.HETZNER_WEBDAV_PASSWORD) {
-              console.error('❌ Missing Hetzner environment variables');
+              console.warn('⚠️ Missing Hetzner environment variables - skipping Hetzner upload');
+              console.warn('⚠️ Original will remain in Supabase storage as fallback');
+              originalUrl = null;
+              shouldDeleteOriginal = false; // Keep original in Supabase
               throw new Error('Missing Hetzner environment variables');
             }
             
             console.log('🔍 DEBUG: Creating WebDAV client...');
-            const webdav = createClient(
+            const webdav = createWebdavClient(
               process.env.HETZNER_WEBDAV_URL!,
               {
                 username: process.env.HETZNER_WEBDAV_USER!,
@@ -563,7 +584,8 @@ export const POST = async ({ request }) => {
               stack: hetznerErr instanceof Error ? hetznerErr.stack : 'No stack'
             });
             originalUrl = null;
-            // Bei Fehler kein Löschen, Original bleibt in Supabase als Fallback
+            shouldDeleteOriginal = false; // Bei Fehler kein Löschen, Original bleibt in Supabase als Fallback
+            console.log('ℹ️ Continuing with upload - original remains in Supabase storage');
           }
 
         } else {
@@ -586,8 +608,8 @@ export const POST = async ({ request }) => {
         
         const dbRecord: any = {
           id,
-          profile_id: authenticatedUser.id, // Use authenticatedUser.id as profile_id
-          user_id: authenticatedUser.id,
+          profile_id: authenticatedUser?.id, // Use authenticatedUser.id as profile_id
+          user_id: authenticatedUser?.id,
           path_512: filename512,
           path_2048: upload2048Error ? null : uploadFilename,
           path_64: upload64Error ? null : filename64,
@@ -641,8 +663,8 @@ export const POST = async ({ request }) => {
           console.log('EXIF fields not available, trying without them...');
           const fallbackRecord = {
             id,
-            profile_id: authenticatedUser.id, // Use authenticatedUser.id as profile_id
-            user_id: authenticatedUser.id,
+            profile_id: authenticatedUser?.id, // Use authenticatedUser.id as profile_id
+            user_id: authenticatedUser?.id,
             path_512: filename512,
             path_2048: upload2048Error ? null : uploadFilename,
             path_64: upload64Error ? null : filename64,

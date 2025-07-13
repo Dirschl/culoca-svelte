@@ -22,6 +22,16 @@
 	let cachedLat: number | null = null;
 	let cachedLon: number | null = null;
 	
+	// Reactive GPS status info
+	$: gpsStatusInfo = (() => {
+		try {
+			return getGPSStatusText();
+		} catch (error) {
+			console.error('Error in gpsStatusInfo reactive:', error);
+			return { text: '', isStale: false };
+		}
+	})();
+	
 	// Check for cached GPS coordinates in localStorage
 	if (browser) {
 		const cached = localStorage.getItem('lastKnownPosition');
@@ -44,23 +54,31 @@
 	}
 	
 	// Function to get GPS status with last update time
-	function getGPSStatusText(): string {
-		if (gpsStatus === 'active') {
-			if (lastGPSUpdateTime) {
+	function getGPSStatusText(): { text: string; isStale: boolean } {
+		try {
+			if (gpsStatus === 'active' && lastGPSUpdateTime) {
 				const timeDiff = Date.now() - lastGPSUpdateTime;
-				const minutes = Math.floor(timeDiff / 60000);
-				const seconds = Math.floor((timeDiff % 60000) / 1000);
+				const seconds = Math.floor(timeDiff / 1000);
 				
-				if (minutes > 0) {
-					return `(vor ${minutes}m ${seconds}s)`;
-				} else {
-					return `(vor ${seconds}s)`;
+				// Only show time if GPS is stale (more than 5 seconds old)
+				if (seconds > 5) {
+					const minutes = Math.floor(seconds / 60);
+					const remainingSeconds = seconds % 60;
+					
+					let text = '';
+					if (minutes > 0) {
+						text = `(vor ${minutes}m ${remainingSeconds}s)`;
+					} else {
+						text = `(vor ${remainingSeconds}s)`;
+					}
+					
+					return { text, isStale: true };
 				}
-			} else {
-				return '';
 			}
+		} catch (error) {
+			console.error('Error in getGPSStatusText:', error);
 		}
-		return '';
+		return { text: '', isStale: false };
 	}
 	
 	// Customer branding display (from session store)
@@ -191,19 +209,11 @@
 						<span class="gps-coords">
 							{formatCoordinates(userLat, userLon)}
 						</span>
-						<span class="gps-time">
-							{lastGPSUpdateTime ? (() => {
-								const timeDiff = Date.now() - lastGPSUpdateTime;
-								const minutes = Math.floor(timeDiff / 60000);
-								const seconds = Math.floor((timeDiff % 60000) / 1000);
-								
-								if (minutes > 0) {
-									return `(vor ${minutes}m ${seconds}s)`;
-								} else {
-									return `(vor ${seconds}s)`;
-								}
-							})() : ''}
-						</span>
+						{#if gpsStatusInfo && gpsStatusInfo.text}
+							<span class="gps-time {gpsStatusInfo.isStale ? 'stale' : ''}">
+								{gpsStatusInfo.text}
+							</span>
+						{/if}
 					</div>
 				{:else if gpsStatus === 'checking'}
 					<div class="gps-status checking">
@@ -451,6 +461,12 @@
 		font-weight: 400;
 		opacity: 0.8;
 		margin-left: 8px;
+	}
+	
+	.gps-time.stale {
+		color: var(--culoca-orange, #ee7221);
+		font-weight: 500;
+		opacity: 1;
 	}
 
 	.gps-text {

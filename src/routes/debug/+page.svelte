@@ -1,6 +1,7 @@
 <script lang="ts">
   import { supabase } from '$lib/supabaseClient';
   import { onMount } from 'svelte';
+  import { authFetch } from '$lib/authFetch';
 
   let imagesWithGPS: any[] = [];
   let imagesWithoutGPS: any[] = [];
@@ -84,9 +85,7 @@
     cleanupResults = [];
     
     try {
-      const response = await fetch('/api/cleanup-failed-uploads', {
-        method: 'POST'
-      });
+      const response = await authFetch('/api/cleanup-failed-uploads');
       
       const result = await response.json();
       

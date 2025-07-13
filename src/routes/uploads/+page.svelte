@@ -1,5 +1,6 @@
 <script lang="ts">
   import { supabase } from '$lib/supabaseClient';
+  import { authFetch } from '$lib/authFetch';
   let files: FileList;
   let uploadList = [];
   let loading = false;
@@ -34,7 +35,7 @@
     if (session?.access_token) {
       headers['Authorization'] = `Bearer ${session.access_token}`;
     }
-    const res = await fetch('/api/upload', { method: 'POST', body: fd, headers });
+    const res = await authFetch('/api/upload', { method: 'POST', body: fd, headers });
     alert(await res.text());
   }
 </script>

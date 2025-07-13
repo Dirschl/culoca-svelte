@@ -16,6 +16,7 @@
 
   import { updateGalleryStats, galleryStats } from '$lib/galleryStats';
   import { sessionStore } from '$lib/sessionStore';
+  import { authFetch } from '$lib/authFetch';
 
 
   const pics = writable<any[]>([]);
@@ -91,8 +92,11 @@
   let deviceHeading: number | null = null;
   let showUploadDialog = false;
 
-  let isLoggedIn = false;
+  // Use centralized session store instead of local variables
   let currentUser: any = null;
+  
+  // Get authentication state from session store
+  $: isLoggedIn = $sessionStore.isAuthenticated;
   
   // FilterBar Props
   let isPermalinkMode = false;
@@ -1418,7 +1422,7 @@
       uploading = true;
       uploadMessage = 'Lösche alle Bilder...';
 
-      const response = await fetch('/api/delete-all', { method: 'POST' });
+      const response = await authFetch('/api/delete-all', { method: 'POST' });
       const result = await response.json();
 
       if (result.status === 'success') {
@@ -1586,7 +1590,7 @@
         }
         
         const access_token = session?.access_token;
-        const response = await fetch('/api/upload', {
+        const response = await authFetch('/api/upload', {
           method: 'POST',
           headers: {
             ...(access_token ? { 'Authorization': `Bearer ${access_token}` } : {})
@@ -2611,7 +2615,7 @@
       console.log('🔄 [DEBUG] About to call loadMore from onMount');
       
       // TEST: First test the API directly
-      fetch('/api/images?limit=10&offset=0')
+      authFetch('/api/images?limit=10&offset=0')
         .then(response => response.json())
         .then(result => {
           console.log('🔄 [DEBUG] Direct API test result:', result);
@@ -3223,7 +3227,7 @@
     alt="Culoca" 
     class="culoca-logo"
     class:clickable={isLoggedIn}
-    on:click={isLoggedIn ? toggleSearchField : undefined}
+    on:click|preventDefault={isLoggedIn ? toggleSearchField : undefined}
   />
 {/if}
 

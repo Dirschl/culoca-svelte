@@ -161,6 +161,7 @@ export const currentUserId = derived(sessionStore, $sessionStore => $sessionStor
 export const customerBranding = derived(sessionStore, $sessionStore => $sessionStore.customerBranding);
 export const activeUserFilter = derived(sessionStore, $sessionStore => $sessionStore.activeUserFilter);
 export const isDuplicateDisplay = derived(sessionStore, $sessionStore => $sessionStore.isDuplicateDisplay);
+export const sessionReady = writable(false);
 
 // Check if customer branding should be shown
 export const shouldShowCustomerBranding = derived(sessionStore, $sessionStore => {

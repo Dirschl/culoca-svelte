@@ -8,6 +8,7 @@
   import { darkMode } from '$lib/darkMode';
   import { filterStore } from '$lib/filterStore';
   import { goto } from '$app/navigation';
+  import { authFetch } from '$lib/authFetch';
 
   let image: any = null;
   let loading = true;
@@ -221,7 +222,8 @@
         return;
       }
 
-      const response = await fetch(`/api/download/${imageId}`, {
+      const response = await authFetch(`/api/download/${imageId}`, {
+        method: 'GET',
         headers: {
           'Authorization': `Bearer ${session.access_token}`
         }
@@ -481,7 +483,7 @@
     }
 
     try {
-      const res = await fetch(`/api/item/${imageId}`, { method: 'DELETE' });
+      const res = await authFetch(`/api/item/${imageId}`, { method: 'DELETE' });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         alert('Fehler beim Löschen des Bildes: ' + (data?.message || res.status));

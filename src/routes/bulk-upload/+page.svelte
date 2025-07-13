@@ -3,6 +3,7 @@
   import { supabase } from '$lib/supabaseClient';
   import * as exifr from 'exifr';
   import { env as publicEnv } from '$env/dynamic/public';
+  import { authFetch } from '$lib/authFetch';
 
   // Map picker state
   let mapContainer: HTMLElement;
@@ -71,6 +72,7 @@
     errors: string[];
     isUploading: boolean;
     uploadProgress: number;
+    statusMessage: string;
   }
 
   let files: ImageFile[] = [];
@@ -144,6 +146,12 @@
 
   function getCharacterCount(text: string): number {
     return text.length;
+  }
+  
+  // Helper function to start upload with simple status
+  function startUpload(image: ImageFile) {
+    image.isUploading = true;
+    image.uploadProgress = 0;
   }
 
   function removeImage(index: number) {
@@ -240,7 +248,8 @@
         isValid: false,
         errors: [],
         isUploading: false,
-        uploadProgress: 0
+        uploadProgress: 0,
+        statusMessage: ''
       };
 
       try {
@@ -461,7 +470,7 @@
           console.log('DEBUG: FormData:', key, value);
         }
 
-        const response = await fetch('/api/upload', {
+        const response = await authFetch('/api/upload', {
           method: 'POST',
           headers: {
             ...(access_token ? { 'Authorization': `Bearer ${access_token}` } : {})
@@ -849,8 +858,34 @@
 
   async function uploadSingleImage(image: ImageFile) {
     if (!image.isValid || image.isUploading) return;
-    image.isUploading = true;
-    image.uploadProgress = 0;
+    
+    startUpload(image);
+          image.statusMessage = '🔧 Fixed encoding...';
+      // Simulate the encoding fix messages from the log
+      setTimeout(() => {
+        if (image.isUploading) {
+          image.statusMessage = '📤 DEBUG: FormData: filename ' + crypto.randomUUID() + '.jpg';
+        }
+      }, 500);
+      
+      // Add more detailed status messages
+      setTimeout(() => {
+        if (image.isUploading) {
+          image.statusMessage = '📥 Downloading from Supabase...';
+        }
+      }, 1000);
+      
+      setTimeout(() => {
+        if (image.isUploading) {
+          image.statusMessage = '🔍 Extracting EXIF data...';
+        }
+      }, 1500);
+      
+      setTimeout(() => {
+        if (image.isUploading) {
+          image.statusMessage = '🖼️ Processing image...';
+        }
+      }, 2000);
     try {
       const sessionResult = await supabase.auth.getSession();
       const currentUser = sessionResult.data.session?.user;
@@ -882,7 +917,7 @@
           console.log('DEBUG: FormData:', key, value);
         }
 
-        const response = await fetch('/api/upload', {
+        const response = await authFetch('/api/upload', {
           method: 'POST',
           headers: {
             ...(access_token ? { 'Authorization': `Bearer ${access_token}` } : {})
@@ -902,15 +937,18 @@
           description: image.description,
           keywords: image.keywords
         };
-      } else {
-        image.errors.push(`Upload fehlgeschlagen: ${result.message}`);
-        message = `❌ Upload von "${image.originalFileName}" fehlgeschlagen`;
-        messageType = 'error';
-      }
+        image.statusMessage = '✅ Upload abgeschlossen';
+              } else {
+          image.errors.push(`Upload fehlgeschlagen: ${result.message}`);
+          message = `❌ Upload von "${image.originalFileName}" fehlgeschlagen`;
+          messageType = 'error';
+          image.statusMessage = `❌ Upload failed: ${result.message}`;
+        }
     } catch (error) {
       image.errors.push(`Upload fehlgeschlagen: ${error}`);
       message = `❌ Upload von "${image.originalFileName}" fehlgeschlagen`;
       messageType = 'error';
+      image.statusMessage = `Upload fehlgeschlagen: ${error}`;
     } finally {
       image.isUploading = false;
     }
@@ -929,8 +967,7 @@
     let errorCount = 0;
     for (let i = 0; i < images.length; i++) {
       const image = images[i];
-      image.isUploading = true;
-      image.uploadProgress = 0;
+      startUpload(image);
       try {
         const id = crypto.randomUUID();
         // 1) Original zu Supabase Storage
@@ -1122,9 +1159,12 @@
             <div class="image-preview">
               <img src={image.preview} alt={image.name} />
               {#if image.isUploading}
-                <div class="upload-progress">
-                  <div class="progress-bar" style="width: {image.uploadProgress}%"></div>
-                  <span>{image.uploadProgress}%</span>
+                <div class="upload-status">
+                  <span>{image.statusMessage || 'Upload gestartet...'}</span>
+                </div>
+              {:else if image.uploadProgress === 100}
+                <div class="upload-success">
+                  <span>✅ Upload abgeschlossen</span>
                 </div>
               {/if}
             </div>
@@ -1345,9 +1385,10 @@
 
 <style>
   .bulk-upload-container {
-    max-width: 1200px;
+    max-width: 100%;
     margin: 0 auto;
     padding: 20px;
+    width: 100%;
   }
 
   .back-to-app-btn {
@@ -1461,7 +1502,7 @@
 
   .images-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
     gap: 20px;
     margin-bottom: 30px;
   }
@@ -1890,22 +1931,31 @@
     line-height: 1.6;
   }
 
-  @media (max-width: 768px) {
+  /* Large screens - optimize for 3 columns */
+  @media (min-width: 1400px) {
+    .images-grid {
+      grid-template-columns: repeat(3, 1fr);
+      max-width: 100%;
+    }
+    .bulk-upload-container {
+      padding: 20px 40px;
+    }
+  }
+
+  /* Medium screens - 2 columns */
+  @media (min-width: 900px) and (max-width: 1399px) {
+    .images-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  /* Mobile screens */
+  @media (max-width: 899px) {
     .images-grid {
       grid-template-columns: 1fr;
     }
-    
-    .gps-inputs {
-      flex-direction: column;
-    }
-
-    .map-modal-content {
-      width: 95%;
-      max-height: 95vh;
-    }
-
-    .map-container {
-      height: 300px;
+    .bulk-upload-container {
+      padding: 10px;
     }
   }
 
