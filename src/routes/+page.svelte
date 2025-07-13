@@ -2343,6 +2343,21 @@
     const simulation = urlParams.get('simulation');
     const stopSimulation = urlParams.get('stop');
     const searchParam = urlParams.get('s');
+    const authError = urlParams.get('error');
+    
+    // Handle auth errors from OAuth callback
+    if (authError) {
+      console.log('🔐 Auth error from callback:', authError);
+      if (authError === 'auth_failed') {
+        loginError = 'Anmeldung fehlgeschlagen. Bitte versuche es erneut.';
+      } else if (authError === 'unexpected') {
+        loginError = 'Ein unerwarteter Fehler ist aufgetreten. Bitte versuche es erneut.';
+      }
+      // Clear error from URL
+      const url = new URL(window.location.href);
+      url.searchParams.delete('error');
+      window.history.replaceState({}, '', url.toString());
+    }
     
     // Store search param for later use in auth state change
     initialSearchParam = searchParam || '';
@@ -5076,3 +5091,5 @@
     </div>
   </div>
 {/if}
+
+

@@ -66,7 +66,7 @@
   onMount(async () => {
     const { data: { user: currentUser } } = await supabase.auth.getUser();
     if (!currentUser) {
-      goto('/login');
+      goto('/');
       return;
     }
     user = currentUser;

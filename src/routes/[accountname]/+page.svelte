@@ -44,11 +44,11 @@
         .single();
         
       if (profileError || !profileData) {
-        // If profile not found and user is not logged in, redirect to login with return URL
-        if (!isLoggedIn) {
-          goto(`/login?redirect=${encodeURIComponent($page.url.pathname)}`);
-          return;
-        }
+              // If profile not found and user is not logged in, redirect to main page with return URL
+      if (!isLoggedIn) {
+        goto(`/?redirect=${encodeURIComponent($page.url.pathname)}`);
+        return;
+      }
         
         // If user is logged in but profile not found, create virtual referrer account
         // This handles cases like /tourismusverband where the account is for customer branding

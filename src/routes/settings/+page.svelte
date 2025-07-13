@@ -51,7 +51,7 @@
       // Check if user is authenticated
       const { data: { user: currentUser } } = await supabase.auth.getUser();
       if (!currentUser) {
-        goto('/login');
+        goto('/');
         return;
       }
 

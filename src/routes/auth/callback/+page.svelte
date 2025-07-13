@@ -13,7 +13,7 @@
       
       if (error) {
         console.error('Auth callback error:', error);
-        goto('/login?error=auth_failed');
+        goto('/?error=auth_failed');
         return;
       }
 
@@ -46,12 +46,12 @@
           goto('/');
         }
       } else {
-        // Keine Session - zurück zum Login
-        goto('/login');
+        // Keine Session - zurück zur Hauptseite (Login-Overlay wird dort angezeigt)
+        goto('/');
       }
     } catch (error) {
       console.error('Unexpected error in auth callback:', error);
-      goto('/login?error=unexpected');
+      goto('/?error=unexpected');
     }
   });
 </script>
