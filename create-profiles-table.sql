@@ -65,11 +65,13 @@ CREATE POLICY "Avatars are publicly viewable" ON storage.objects
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO public.profiles (id, full_name, avatar_url)
+  INSERT INTO public.profiles (id, full_name, avatar_url, use_justified_layout, show_welcome)
   VALUES (
     NEW.id,
     COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'name'),
-    NEW.raw_user_meta_data->>'avatar_url'
+    NEW.raw_user_meta_data->>'avatar_url',
+    true, -- Default to justified layout
+    true  -- Default to show welcome
   );
   RETURN NEW;
 END;
