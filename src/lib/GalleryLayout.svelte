@@ -54,7 +54,10 @@
   })();
 
   // Reactive layout calculation for justified layout
-  $: if (layout === 'justified' && items.length > 0 && containerWidth > 0) {
+  $: if (layout === 'justified' && items.length > 0) {
+    // Use a fallback width if containerWidth is not yet available
+    const effectiveWidth = containerWidth > 0 ? containerWidth : 1200;
+    
     try {
       const inputItems = items.map((item) => ({ 
         width: item.width || 400, 
@@ -62,11 +65,11 @@
       }));
       
       layoutResult = justifiedLayout(inputItems, { 
-        containerWidth, 
+        containerWidth: effectiveWidth, 
         targetRowHeight: responsiveTargetRowHeight, 
         boxSpacing: gap,
         containerPadding: 0,
-        maxNumRows: 100,
+        maxNumRows: Infinity, // Unbegrenzt für beliebig viele Bilder
         forceAspectRatio: false,
         showWidows: true,
         fullWidthBreakoutRowCadence: false
@@ -76,7 +79,7 @@
       
       console.log('[GalleryLayout] Justified layout calculated:', {
         itemCount: items.length,
-        containerWidth,
+        containerWidth: effectiveWidth,
         targetRowHeight: responsiveTargetRowHeight,
         boxes: boxes.length,
         containerHeight: layoutResult.containerHeight

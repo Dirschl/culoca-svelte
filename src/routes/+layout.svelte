@@ -34,9 +34,19 @@
       const refresh_token = params.get('refresh_token');
       if (access_token && refresh_token) {
         console.log('🔐 OAuth tokens found, setting session...');
-        supabase.auth.setSession({ access_token, refresh_token }).then(() => {
-          window.location.hash = '';
-          console.log('✅ Supabase session from OAuth fragment set');
+        supabase.auth.setSession({ access_token, refresh_token }).then(({ data, error }) => {
+          if (error) {
+            console.error('❌ Failed to set OAuth session:', error);
+          } else {
+            window.location.hash = '';
+            console.log('✅ Supabase session from OAuth fragment set:', data.session?.user?.id);
+            
+            // Immediately update session store
+            if (data.session?.user) {
+              sessionStore.setUser(data.session.user.id, true);
+              console.log('✅ Session store updated with OAuth user:', data.session.user.id);
+            }
+          }
         }).catch((error) => {
           console.error('❌ Failed to set OAuth session:', error);
         });
@@ -59,25 +69,47 @@
       }
     });
 
-    // Check current session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('📋 Session check result:', session?.user?.id || 'no session');
+    // Check current session after a short delay to allow OAuth processing
+    setTimeout(() => {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        console.log('📋 Session check result:', session?.user?.id || 'no session');
+        
+        if (session?.user) {
+          sessionStore.setUser(session.user.id, true);
+          console.log('✅ Session found and set:', session.user.id);
+        } else {
+          console.log('ℹ️ No active session found');
+        }
+      }).catch((error) => {
+        console.error('❌ Failed to check session:', error);
+      });
+    }, 500);
+
+    // Set session ready immediately when session is available
+    const setSessionReady = async () => {
+      console.log('✅ Setting sessionReady to true');
+      
+      // Final session check before setting ready
+      const { data: { session } } = await supabase.auth.getSession();
+      console.log('🔍 Final session check before ready:', session?.user?.id || 'no session');
       
       if (session?.user) {
         sessionStore.setUser(session.user.id, true);
-        console.log('✅ Session found and set:', session.user.id);
-      } else {
-        console.log('ℹ️ No active session found');
+        console.log('✅ Final session store update:', session.user.id);
       }
-    }).catch((error) => {
-      console.error('❌ Failed to check session:', error);
-    });
-
-    // Set session ready after a short delay
-    setTimeout(() => {
-      console.log('✅ Setting sessionReady to true');
+      
       sessionReady.set(true);
-    }, 1000);
+    };
+
+    // Set ready immediately if session exists, otherwise after auth state change
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setSessionReady();
+      } else {
+        // Wait for auth state change if no session exists
+        setTimeout(setSessionReady, 1000);
+      }
+    });
 
     // Cleanup subscription
     return () => {

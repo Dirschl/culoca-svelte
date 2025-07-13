@@ -1,7 +1,9 @@
 <script lang="ts">
   import { supabase } from '$lib/supabaseClient';
   import { onMount } from 'svelte';
-  import { authFetch } from '$lib/authFetch';
+import { authFetch } from '$lib/authFetch';
+import { get } from 'svelte/store';
+import { sessionStore } from '$lib/sessionStore';
 
   let imagesWithGPS: any[] = [];
   let imagesWithoutGPS: any[] = [];
@@ -9,10 +11,27 @@
   let loading = true;
   let cleanupLoading = false;
   let cleanupResults: any[] = [];
-  let debugInfo: any = {};
+  let debugInfo: any = {
+    imagesWithGPS: 0,
+    imagesWithoutGPS: 0,
+    noGpsError: null,
+    user: null,
+    generalError: null,
+    sessionDebug: {
+      sessionStore: null,
+      supabaseSession: null,
+      authFetchTest: null
+    }
+  };
 
   onMount(async () => {
+    loading = true;
+    
     try {
+      // Check session status first
+      await checkSessionStatus();
+      await testAuthFetch();
+      
       console.log('🔍 Starting debug page data load...');
       
       // First, let's get ALL images to see what's in the database
@@ -142,6 +161,49 @@
       console.error('Error:', error);
     }
   }
+
+  async function testAuthFetch() {
+    try {
+      console.log('🔍 Testing authFetch...');
+      const response = await authFetch('/api/images?limit=1&offset=0');
+      const result = await response.json();
+      debugInfo.sessionDebug.authFetchTest = {
+        status: response.status,
+        hasData: !!result,
+        result: result
+      };
+      console.log('🔍 authFetch test result:', debugInfo.sessionDebug.authFetchTest);
+    } catch (error) {
+      debugInfo.sessionDebug.authFetchTest = { error: (error as Error).message };
+      console.error('🔍 authFetch test error:', error);
+    }
+  }
+
+  async function checkSessionStatus() {
+    try {
+      // Check session store
+      const sessionData = get(sessionStore);
+      debugInfo.sessionDebug.sessionStore = {
+        userId: sessionData.userId,
+        isAuthenticated: sessionData.isAuthenticated,
+        hasCustomerBranding: !!sessionData.customerBranding,
+        hasActiveFilter: !!sessionData.activeUserFilter
+      };
+
+      // Check Supabase session
+      const { data: { session } } = await supabase.auth.getSession();
+      debugInfo.sessionDebug.supabaseSession = {
+        hasSession: !!session,
+        userId: session?.user?.id,
+        hasAccessToken: !!session?.access_token,
+        expiresAt: session?.expires_at
+      };
+
+      console.log('🔍 Session debug info:', debugInfo.sessionDebug);
+    } catch (error) {
+      console.error('🔍 Session check error:', error);
+    }
+  }
 </script>
 
 <svelte:head>
@@ -174,6 +236,25 @@
       </button>
     </div>
   
+  <div class="session-debug-section">
+    <h2>Session Debug</h2>
+    <button on:click={checkSessionStatus} class="debug-button">Refresh Session Status</button>
+    <button on:click={testAuthFetch} class="debug-button">Test AuthFetch</button>
+    
+    {#if debugInfo.sessionDebug}
+      <div class="debug-info">
+        <h3>Session Store:</h3>
+        <pre>{JSON.stringify(debugInfo.sessionDebug.sessionStore, null, 2)}</pre>
+        
+        <h3>Supabase Session:</h3>
+        <pre>{JSON.stringify(debugInfo.sessionDebug.supabaseSession, null, 2)}</pre>
+        
+        <h3>AuthFetch Test:</h3>
+        <pre>{JSON.stringify(debugInfo.sessionDebug.authFetchTest, null, 2)}</pre>
+      </div>
+    {/if}
+  </div>
+
   <div class="cleanup-section">
     <h2>Cleanup Failed Uploads</h2>
     <p>Delete images without GPS data (failed uploads)</p>
@@ -328,5 +409,38 @@
 
   .refresh-button:hover {
     background: #0056b3;
+  }
+
+  .session-debug-section {
+    margin-bottom: 2rem;
+    padding: 1rem;
+    border: 1px solid #28a745;
+    border-radius: 8px;
+    background: #f8fff8;
+  }
+
+  .debug-button {
+    background: #28a745;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+    margin-right: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .debug-button:hover {
+    background: #218838;
+  }
+
+  pre {
+    background: #f8f9fa;
+    padding: 1rem;
+    border-radius: 4px;
+    overflow-x: auto;
+    font-size: 0.875rem;
+    border: 1px solid #dee2e6;
   }
 </style> 

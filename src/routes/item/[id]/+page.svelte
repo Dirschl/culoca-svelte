@@ -20,6 +20,9 @@
   let radius = 500; // meters, default
   let radiusLoaded = false;
   let lastRadius = 500; // track radius changes
+  let nearbyCache: { [key: string]: any[] } = {};
+  let nearbyCacheKey = '';
+  let isDraggingRadius = false;
   let mapEl: HTMLDivElement;
   let map: any;
   let keywordsList: string[] = [];
@@ -59,128 +62,117 @@
   $: imageId = $page.params.id;
 
   onMount(async () => {
+    console.log('[Detail] onMount start');
     try {
-      // Wait for session to be ready
-      await new Promise<void>((resolve) => {
-        const unsubscribe = sessionReady.subscribe((ready) => {
-          if (ready) {
-            unsubscribe();
-            resolve();
-          }
+      if (!get(sessionReady)) {
+        await new Promise<void>((resolve) => {
+          let unsub: (() => void) | null = null;
+          unsub = sessionReady.subscribe((ready) => {
+            if (ready && unsub) {
+              unsub();
+              resolve();
+            }
+          });
         });
-      });
+      }
+      console.log('[Detail] sessionReady true');
 
       // Get current user from session store first, then verify with Supabase
       const sessionData = get(sessionStore);
+      console.log('[Detail] sessionStore:', sessionData);
       if (sessionData.isAuthenticated && sessionData.userId) {
         currentUser = { id: sessionData.userId };
-        console.log('🔐 Using user from session store:', sessionData.userId);
+        console.log('[Detail] Using user from session store:', sessionData.userId);
       } else {
         // Fallback: Get user directly from Supabase
         const { data: { user } } = await supabase.auth.getUser();
         currentUser = user;
-        console.log('🔐 Got user from Supabase:', user?.id);
+        console.log('[Detail] Got user from Supabase:', user?.id);
       }
 
       // Radius aus localStorage laden (pro User oder anonym)
       if (browser && !radiusLoaded) {
         if (currentUser) {
-          // Für eingeloggte User: spezifischer Radius pro User
           const storedRadius = localStorage.getItem(`detailRadius_${currentUser.id}`);
           if (storedRadius) {
             radius = parseInt(storedRadius, 10) || 500;
           }
         } else {
-          // Für anonyme User: allgemeiner Radius
           const storedRadius = localStorage.getItem('detailRadius_anonymous');
           if (storedRadius) {
             radius = parseInt(storedRadius, 10) || 500;
           }
         }
-        lastRadius = radius; // Initialize lastRadius with loaded value
+        lastRadius = radius;
         radiusLoaded = true;
       }
 
-      const { data, error: fetchError } = await supabase
+      console.log('[Detail] Loading image from DB, imageId:', imageId);
+      
+      // First, try to get the item without profile data
+      const { data: itemData, error: itemError } = await supabase
         .from('items')
-        .select(`
-          *,
-          profiles!items_profile_id_fkey (
-            id,
-            full_name,
-            avatar_url,
-            show_address,
-            address,
-            show_phone,
-            phone,
-            show_email,
-            email,
-            show_website,
-            website,
-            show_social,
-            instagram,
-            facebook,
-            twitter
-          )
-        `)
+        .select('*')
         .eq('id', imageId)
         .single();
 
-      if (fetchError) {
-        error = fetchError.message;
-      } else {
-        image = data;
-        
-        // Privacy check: If image is private, only allow access for the owner
-        if (image.is_private === true) {
-          console.log('🔒 Privacy check for private image:', {
-            hasCurrentUser: !!currentUser,
-            currentUserId: currentUser?.id,
-            imageProfileId: image.profile_id,
-            imageId: image.id,
-            idsMatch: currentUser?.id === image.profile_id
-          });
-          
-          if (!currentUser || currentUser.id !== image.profile_id) {
-            console.log('🚫 Access denied - redirecting to main page');
-            // Redirect to main page instead of showing error
-            goto('/');
-            return;
-          }
-          
-          console.log('✅ Access granted for private image');
+      if (itemError) {
+        error = itemError.message;
+        console.error('[Detail] DB fetch error:', itemError);
+        loading = false;
+        return;
+      }
+
+      image = itemData;
+      console.log('[Detail] Image data loaded:', image);
+
+      // Then, if we have a profile_id, get the profile data separately
+      if (image.profile_id) {
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('id, full_name, avatar_url, show_address, address, show_phone, phone, show_email, email, show_website, website, show_social, instagram, facebook, twitter')
+          .eq('id', image.profile_id)
+          .single();
+
+        if (!profileError && profileData) {
+          profile = profileData;
+          console.log('[Detail] Profile data loaded:', profile);
+        } else {
+          console.log('[Detail] No profile data found for profile_id:', image.profile_id);
         }
-        
-        // Extract profile from joined data
-        if (data.profiles) {
-          profile = data.profiles;
-        }
-        
-        console.log('📸 Image loaded:', { 
-          id: image.id, 
-          lat: image.lat, 
-          lon: image.lon, 
-          title: image.title,
-          profile: profile ? profile.full_name : 'No profile'
+      }
+
+      // Privacy check: If image is private, only allow access for the owner
+      if (image.is_private === true) {
+        console.log('[Detail] Privacy check for private image:', {
+          hasCurrentUser: !!currentUser,
+          currentUserId: currentUser?.id,
+          imageProfileId: image.profile_id,
+          imageId: image.id,
+          idsMatch: currentUser?.id === image.profile_id
         });
-        if (!image.exif_data) image.exif_data = {};
-        titleEditValue = image.title || '';
-        filenameEditValue = image.original_name || '';
-        descriptionEditValue = image.description || '';
-        keywordsList = image.keywords || [];
-        
-        // Favicon sofort aktualisieren
-        if (browser) {
-          updateFavicon();
+        if (!currentUser || currentUser.id !== image.profile_id) {
+          console.log('[Detail] Access denied - redirecting to main page');
+          goto('/');
+          return;
         }
+        console.log('[Detail] Access granted for private image');
+      }
 
-
+      if (!image.exif_data) image.exif_data = {};
+      titleEditValue = image.title || '';
+      filenameEditValue = image.original_name || '';
+      descriptionEditValue = image.description || '';
+      keywordsList = image.keywords || [];
+      if (browser) {
+        updateFavicon();
       }
     } catch (err) {
       error = 'Failed to load image';
-      console.error(err);
+      console.error('[Detail] Exception:', err);
     }
     loading = false;
+    console.log('[Detail] onMount finished, loading:', loading, 'error:', error, 'image:', image);
   });
 
   // Scroll to top functionality
@@ -312,6 +304,16 @@
 
 
   async function fetchNearbyImages(lat: number, lon: number, maxRadius: number) {
+    // Create cache key based on coordinates and radius
+    const cacheKey = `${lat.toFixed(4)}_${lon.toFixed(4)}_${maxRadius}`;
+    
+    // Check cache first
+    if (nearbyCache[cacheKey]) {
+      console.log('📸 Using cached nearby images for radius:', maxRadius, 'm');
+      nearby = nearbyCache[cacheKey];
+      return;
+    }
+    
     console.log('🔍 Fetching nearby images for radius:', maxRadius, 'm');
     
     // Build query with privacy filtering
@@ -356,19 +358,75 @@
       .sort((a: any, b: any) => a.distance - b.distance);
     console.log('✅ Nearby images loaded:', nearby.length, 'images within', maxRadius, 'm');
     
+    // Cache the result
+    nearbyCache[cacheKey] = [...nearby];
+    
+    // Clean up old cache entries (keep only last 50 for better performance)
+    const cacheKeys = Object.keys(nearbyCache);
+    if (cacheKeys.length > 50) {
+      const oldestKey = cacheKeys[0];
+      delete nearbyCache[oldestKey];
+    }
+    
     // Initialize lastNearbyCount if not set yet
     if (typeof lastNearbyCount === 'undefined') {
       lastNearbyCount = nearby.length;
     }
+    scheduleMapUpdate();
   }
 
-  // Recompute nearby list whenever radius or image changes
-  $: if (image && image.lat && image.lon) {
+  // Debounced radius change handler
+  $: if (image && image.lat && image.lon && radiusLoaded) {
+    // Only fetch if radius actually changed
+    if (radius !== lastRadius) {
+      console.log('🔄 Radius changed from', lastRadius, 'to', radius, 'm');
+      lastRadius = radius;
+      
+      // Only update if not currently dragging
+      if (!isDraggingRadius) {
+        fetchNearbyImages(image.lat, image.lon, radius);
+      }
+    }
+  }
+  
+  // Radius slider event handlers
+  function onRadiusInput() {
+    isDraggingRadius = true;
+  }
+  
+  function onRadiusChange() {
+    isDraggingRadius = false;
+    // Trigger immediate update when user finishes dragging
+    if (image && image.lat && image.lon) {
+      fetchNearbyImages(image.lat, image.lon, radius);
+    }
+  }
+  
+  // Initial fetch when image loads
+  $: if (image && image.lat && image.lon && radiusLoaded && nearby.length === 0) {
     fetchNearbyImages(image.lat, image.lon, radius);
   }
 
   async function initMap() {
     if (!browser || !image || !image.lat || !image.lon) return;
+    
+    // Check if map element still exists
+    if (!mapEl) {
+      console.log('🗺️ Map element not found, skipping initialization');
+      return;
+    }
+    
+    // Check if map is already initialized
+    if (map) {
+      console.log('🔄 Map already exists, removing old map');
+      try {
+        map.remove();
+      } catch (e) {
+        console.log('🗺️ Error removing old map:', e);
+      }
+      map = null;
+    }
+    
     const leaflet = await import('leaflet');
     if (!document.getElementById('leaflet-css')) {
       const link = document.createElement('link');
@@ -378,7 +436,19 @@
       document.head.appendChild(link);
     }
     await tick();
-    map = leaflet.map(mapEl).setView([image.lat, image.lon], 13);
+    
+    // Double-check map element still exists after tick
+    if (!mapEl) {
+      console.log('🗺️ Map element disappeared after tick, skipping initialization');
+      return;
+    }
+    
+    try {
+      map = leaflet.map(mapEl).setView([image.lat, image.lon], 13);
+    } catch (e) {
+      console.log('🗺️ Error creating map:', e);
+      return;
+    }
     // Standard- und Hybrid-Layer
     const standardLayer = leaflet.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap contributors'
@@ -454,28 +524,44 @@
 
 
   
-  // Initialize map when image is loaded
-  $: if (image && image.lat && image.lon && !map) {
+  // Centralized map management to prevent infinite loops
+  let mapInitialized = false;
+  let lastNearbyCount = 0;
+  let mapUpdateTimeout: ReturnType<typeof setTimeout> | null = null;
+  let mapKey = 0; // For Svelte {#key} block to force map container remount
+  
+  // Debounced map update function
+  function scheduleMapUpdate() {
+    if (mapUpdateTimeout) {
+      clearTimeout(mapUpdateTimeout);
+    }
+    mapUpdateTimeout = setTimeout(() => {
+      mapKey += 1; // Force Svelte to remount the map container
+      mapInitialized = false; // Allow re-init
+      setTimeout(() => initMap(), 100); // Slight delay to allow DOM update
+      mapUpdateTimeout = null;
+    }, 300);
+  }
+  
+  // Single reactive statement for initial map initialization
+  $: if (image && image.lat && image.lon && !mapInitialized) {
+    console.log('🗺️ Initializing map for image');
+    mapInitialized = true;
     setTimeout(() => initMap(), 500);
   }
   
-  // Reinitialize map when radius changes (only if map exists and radius is different)
-  $: if (image && image.lat && image.lon && radiusLoaded && map && radius !== lastRadius) {
+  // Handle radius changes with debouncing
+  $: if (image && image.lat && image.lon && mapInitialized && radiusLoaded && radius !== lastRadius) {
     console.log('🔄 Radius changed from', lastRadius, 'to', radius, 'm, reinitializing map');
     lastRadius = radius;
-    map.remove();
-    map = null;
-    setTimeout(() => initMap(), 100);
+    scheduleMapUpdate();
   }
   
-  // Also reinitialize map when nearby images change (for adding/removing markers)
-  let lastNearbyCount = 0;
-  $: if (image && image.lat && image.lon && map && nearby.length !== lastNearbyCount) {
+  // Handle nearby images changes with debouncing
+  $: if (image && image.lat && image.lon && mapInitialized && nearby.length !== lastNearbyCount) {
     console.log('🔄 Nearby count changed from', lastNearbyCount, 'to', nearby.length, 'reinitializing map');
     lastNearbyCount = nearby.length;
-    map.remove();
-    map = null;
-    setTimeout(() => initMap(), 100);
+    scheduleMapUpdate();
   }
   
 
@@ -1247,7 +1333,7 @@
           {#if image.lat && image.lon}
             <div class="radius-control">
               <div class="radius-value">{formatRadius(radius)}</div>
-              <input id="radius" type="range" min="50" max="5000" step="50" bind:value={radius}>
+              <input id="radius" type="range" min="50" max="5000" step="50" bind:value={radius} on:input={onRadiusInput} on:change={onRadiusChange}>
             </div>
           {/if}
         </div>
@@ -1257,7 +1343,7 @@
       <div class="info-section">
         <div class="centered-content">
 
-          {#if image.lat && image.lon && nearby.length}
+          {#if image.lat && image.lon}
             <div class="edge-to-edge-gallery">
               <GalleryLayout
                 items={nearby}
@@ -1637,7 +1723,9 @@
                   {/if}
                 </button>
               </div>
-              <div bind:this={mapEl} class="map"></div>
+              {#key mapKey}
+                <div bind:this={mapEl} class="map"></div>
+              {/key}
             </div>
           {:else}
             <div class="map-wrapper">
@@ -3211,4 +3299,9 @@
     background: var(--bg-tertiary);
   }
 
+  .nearby-empty {
+    text-align: center;
+    color: #666;
+    font-style: italic;
+  }
 </style> 

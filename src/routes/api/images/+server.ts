@@ -3,9 +3,9 @@ import { supabase } from '$lib/supabaseClient';
 
 export const GET = async ({ url, request }) => {
   try {
-    // Query-Parameter: limit (default 12), user_id (optional), offset (optional)
+    // Query-Parameter: limit (default 100), user_id (optional), offset (optional)
     // New filter parameters: filter_user_id, lat, lon (for GPS-based filtering)
-    const limit = parseInt(url.searchParams.get('limit') || '12', 10);
+    const limit = parseInt(url.searchParams.get('limit') || '100', 10);
     const offset = parseInt(url.searchParams.get('offset') || '0', 10);
     const user_id = url.searchParams.get('user_id');
     const filter_user_id = url.searchParams.get('filter_user_id');

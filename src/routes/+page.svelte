@@ -20,7 +20,7 @@
 
 
   const pics = writable<any[]>([]);
-  let page = 0, size = 50, loading = false, hasMoreImages = true;
+  let page = 0, size = 100, loading = false, hasMoreImages = true;
   let displayedImageCount = 0; // Zähler für tatsächlich angezeigte Bilder
   let removedDuplicatesList: any[] = []; // Liste der entfernten Duplikate
   let showRemovedDuplicates = false; // Flag zum Anzeigen der entfernten Duplikate
@@ -33,6 +33,17 @@
     if (newCount !== displayedImageCount) {
       displayedImageCount = newCount;
       console.log(`📊 Angezeigte Bilder: ${displayedImageCount}/${$galleryStats.totalCount}`);
+      
+      // Test: Zähle tatsächlich sichtbare Bilder im DOM
+      setTimeout(() => {
+        const justifiedImages = document.querySelectorAll('.justified-pic').length;
+        const gridImages = document.querySelectorAll('.grid-item img').length;
+        const totalVisibleImages = justifiedImages + gridImages;
+        console.log(`🔍 DOM-Test: ${totalVisibleImages} Bilder tatsächlich im DOM sichtbar (${justifiedImages} justified, ${gridImages} grid)`);
+        if (totalVisibleImages !== displayedImageCount) {
+          console.warn(`⚠️ DISCREPANCY: ${displayedImageCount} in Store vs ${totalVisibleImages} im DOM`);
+        }
+      }, 100);
       
       // Event für NewsFlash-Komponente
       window.dispatchEvent(new CustomEvent('displayedImageCountChanged', {
@@ -1165,26 +1176,56 @@
     console.log(`[Gallery] Final data result:`, data ? `${data.length} images` : 'null/undefined');
 
     if (data && data.length > 0) {
-      const newPics = data.map((d: any) => ({
-        id: d.id,
-        src: d.path_512 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${d.path_512}` : '',
-        srcHD: d.path_2048 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${d.path_2048}` : '',
-        width: d.width && d.width > 0 ? d.width : 400,  // Use actual width if available
-        height: d.height && d.height > 0 ? d.height : 300, // Use actual height if available
-        lat: d.lat,
-        lon: d.lon,
-        title: d.title,
-        description: d.description,
-        keywords: d.keywords,
-        path_64: d.path_64,
-        path_512: d.path_512,
-        path_2048: d.path_2048,
-        distance: d.distance || null
-      })).filter((pic: any) => pic.path_512);
+      const newPics = data.map((d: any) => {
+        // Try to find the best available image path
+        let bestSrc = '';
+        if (d.path_512) {
+          bestSrc = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${d.path_512}`;
+        } else if (d.path_2048) {
+          bestSrc = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${d.path_2048}`;
+        } else if (d.path_64) {
+          bestSrc = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/${d.path_64}`;
+        }
+        
+        return {
+          id: d.id,
+          src: bestSrc,
+          srcHD: d.path_2048 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${d.path_2048}` : bestSrc,
+          width: d.width && d.width > 0 ? d.width : 400,  // Use actual width if available
+          height: d.height && d.height > 0 ? d.height : 300, // Use actual height if available
+          lat: d.lat,
+          lon: d.lon,
+          title: d.title,
+          description: d.description,
+          keywords: d.keywords,
+          path_64: d.path_64,
+          path_512: d.path_512,
+          path_2048: d.path_2048,
+          distance: d.distance || null
+        };
+      });
+      
+      // Debug: Check how many images have any path
+      const imagesWithAnyPath = newPics.filter((pic: any) => pic.src);
+      const imagesWithoutAnyPath = newPics.filter((pic: any) => !pic.src);
+      
+      console.log(`[Gallery] Image processing: ${newPics.length} total, ${imagesWithAnyPath.length} with any path, ${imagesWithoutAnyPath.length} without any path`);
+      
+      if (imagesWithoutAnyPath.length > 0) {
+        console.log(`[Gallery] Images without any path (first 5):`, imagesWithoutAnyPath.slice(0, 5).map((p: any) => ({
+          id: p.id,
+          path_512: p.path_512,
+          path_2048: p.path_2048,
+          path_64: p.path_64
+        })));
+      }
+      
+      // Filter out images without any path
+      const filteredPics = newPics.filter((pic: any) => pic.src);
       
       // Debug: Log sample dimensions
-      if (newPics.length > 0) {
-        console.log('[Gallery] Sample image dimensions:', newPics.slice(0, 3).map(p => ({
+      if (filteredPics.length > 0) {
+        console.log('[Gallery] Sample image dimensions:', filteredPics.slice(0, 3).map((p: any) => ({
           id: p.id,
           width: p.width,
           height: p.height,
@@ -1192,13 +1233,19 @@
         })));
       }
       
-      // Prüfe auf Duplikate vor dem Hinzufügen
+            // Prüfe auf Duplikate vor dem Hinzufügen
       const currentPics = get(pics);
       const existingIds = new Set(currentPics.map((p: any) => p.id));
-      const uniqueNewPics = newPics.filter((pic: any) => !existingIds.has(pic.id));
+      const uniqueNewPics = filteredPics.filter((pic: any) => !existingIds.has(pic.id));
       
-      if (uniqueNewPics.length !== newPics.length) {
-        console.log(`[Gallery] Filtered out ${newPics.length - uniqueNewPics.length} duplicate images`);
+      if (uniqueNewPics.length !== filteredPics.length) {
+        console.log(`[Gallery] Filtered out ${filteredPics.length - uniqueNewPics.length} duplicate images (${uniqueNewPics.length} unique remaining)`);
+      }
+      
+      // If we're getting too many duplicates, we might have reached the end of available images
+      if (uniqueNewPics.length === 0 && filteredPics.length > 0) {
+        console.log(`[Gallery] All new images were duplicates, likely reached end of available images`);
+        hasMoreImages = false;
       }
       
       // Intelligente Bild-Verwaltung je nach Datenquelle
@@ -1235,11 +1282,20 @@
       updateGalleryStats($pics.length, totalCount);
       
       // Check if we have more images to load - use normal pagination for ALL modes
-      console.log(`[Gallery] Checking pagination: current=${$pics.length}, total=${totalCount}, hasMoreImages=${hasMoreImages}`);
+      console.log(`[Gallery] Checking pagination: current=${$pics.length}, total=${totalCount}, hasMoreImages=${hasMoreImages}, page=${page}, data.length=${data?.length || 0}, uniqueNewPics.length=${uniqueNewPics?.length || 0}`);
       
+      // Only set hasMoreImages to false if we've loaded all available images
       if ($pics.length >= totalCount) {
         hasMoreImages = false;
         console.log(`[Gallery] All images loaded: ${$pics.length} of ${totalCount}`);
+      } else if (data && data.length === 0) {
+        // If API returned no data, we've reached the end
+        hasMoreImages = false;
+        console.log(`[Gallery] No more images available from API`);
+      } else if (uniqueNewPics && uniqueNewPics.length === 0 && data && data.length > 0) {
+        // If we got data but all were duplicates, we've likely reached the end
+        hasMoreImages = false;
+        console.log(`[Gallery] All new images were duplicates, reached end of available images`);
       } else {
         hasMoreImages = true;
         console.log(`[Gallery] More images available: ${$pics.length} of ${totalCount}, hasMoreImages set to true`);
@@ -1666,11 +1722,237 @@
     showScrollToTop = window.scrollY > 100;
 
     const { scrollTop, scrollHeight, clientHeight } = document.documentElement;
-    const scrolledToBottom = scrollTop + clientHeight >= scrollHeight - 1000;
+    const scrolledToBottom = scrollTop + clientHeight >= scrollHeight - 500;
 
     if (scrolledToBottom) {
       console.log(`[Scroll] Reached bottom, loading more images... (current: ${$pics.length}, hasMoreImages: ${hasMoreImages}, loading: ${loading})`);
+      console.log(`[Scroll] Scroll position: ${scrollTop}/${scrollHeight}, clientHeight: ${clientHeight}, threshold: ${scrollHeight - 500}`);
       loadMore('infinite scroll');
+    }
+  }
+
+  // Manual trigger for testing infinite scroll
+  function manualLoadMore() {
+    console.log(`[Manual] Manual load more triggered - current: ${$pics.length}, hasMoreImages: ${hasMoreImages}, loading: ${loading}`);
+    if (!loading && hasMoreImages) {
+      loadMore('manual trigger');
+    } else {
+      console.log(`[Manual] Cannot load more - loading: ${loading}, hasMoreImages: ${hasMoreImages}`);
+    }
+  }
+
+  // Function to check and fix images without path_512
+  async function checkAndFixMissingPath512() {
+    console.log(`[Debug] Checking for images without path_512...`);
+    
+    try {
+      // Get all images without path_512
+      let url = `/api/images?limit=1000&offset=0`;
+      const response = await authFetch(url);
+      const result = await response.json();
+      
+      if (result.status === 'success') {
+        const imagesWithoutPath512 = result.images.filter((img: any) => !img.path_512);
+        console.log(`[Debug] Found ${imagesWithoutPath512.length} images without path_512 out of ${result.images.length} total`);
+        
+        if (imagesWithoutPath512.length > 0) {
+          console.log(`[Debug] Sample images without path_512:`, imagesWithoutPath512.slice(0, 5).map((img: any) => ({
+            id: img.id,
+            path_512: img.path_512,
+            path_2048: img.path_2048,
+            path_64: img.path_64
+          })));
+        }
+      }
+    } catch (error) {
+      console.error('[Debug] Error checking missing path_512:', error);
+    }
+  }
+
+  // Function to load ALL images at once for debugging
+  async function loadAllImagesDebug() {
+    console.log(`[Debug] Loading ALL images at once...`);
+    
+    try {
+      // Reset gallery state
+      pics.set([]);
+      page = 0;
+      hasMoreImages = true;
+      loading = false;
+      
+      // Load all images with a very large limit
+      let url = `/api/images?limit=2000&offset=0`;
+      if (userLat !== null && userLon !== null) {
+        url += `&lat=${userLat}&lon=${userLon}`;
+      }
+      
+      console.log(`[Debug] Fetching all images from: ${url}`);
+      const response = await authFetch(url);
+      const result = await response.json();
+      
+      console.log(`[Debug] API response:`, result);
+      
+      if (result.status === 'success') {
+        console.log(`[Debug] Got ${result.images?.length || 0} images, total available: ${result.totalCount || 0}`);
+        
+        // Process all images
+        const allPics = result.images.map((d: any) => {
+          // Try to find the best available image path
+          let bestSrc = '';
+          if (d.path_512) {
+            bestSrc = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${d.path_512}`;
+          } else if (d.path_2048) {
+            bestSrc = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${d.path_2048}`;
+          } else if (d.path_64) {
+            bestSrc = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/${d.path_64}`;
+          }
+          
+          return {
+            id: d.id,
+            src: bestSrc,
+            srcHD: d.path_2048 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${d.path_2048}` : bestSrc,
+            width: d.width && d.width > 0 ? d.width : 400,
+            height: d.height && d.height > 0 ? d.height : 300,
+            lat: d.lat,
+            lon: d.lon,
+            title: d.title,
+            description: d.description,
+            keywords: d.keywords,
+            path_64: d.path_64,
+            path_512: d.path_512,
+            path_2048: d.path_2048,
+            distance: d.distance || null
+          };
+        });
+        
+        const imagesWithSrc = allPics.filter((pic: any) => pic.src);
+        console.log(`[Debug] Processed images: ${allPics.length} total, ${imagesWithSrc.length} with src`);
+        
+        // Set all images at once
+        pics.set(imagesWithSrc);
+        
+        // Update gallery stats
+        updateGalleryStats(imagesWithSrc.length, result.totalCount);
+        
+        console.log(`[Debug] Set ${imagesWithSrc.length} images in gallery, total count: ${result.totalCount}`);
+      } else {
+        console.error('[Debug] API error:', result.message);
+      }
+    } catch (error) {
+      console.error('[Debug] Error loading all images:', error);
+    }
+  }
+
+  // Function to debug current pagination state
+  function debugPaginationState() {
+    console.log(`[Debug] Current pagination state:`);
+    console.log(`- Current images: ${$pics.length}`);
+    console.log(`- Total count: ${$galleryStats.totalCount}`);
+    console.log(`- Page: ${page}`);
+    console.log(`- Loading: ${loading}`);
+    console.log(`- Has more images: ${hasMoreImages}`);
+    console.log(`- Size: ${size}`);
+    console.log(`- Next offset would be: ${page * size}`);
+    console.log(`- Remaining images: ${$galleryStats.totalCount - $pics.length}`);
+  }
+
+  // Test function to load all images at once
+  async function testLoadAllImages() {
+    console.log(`[Test] Loading ALL images at once...`);
+    
+    try {
+      // Reset gallery state
+      pics.set([]);
+      page = 0;
+      hasMoreImages = true;
+      loading = false;
+      
+      // Load all images with a very large limit
+      let url = `/api/images?limit=2000&offset=0`;
+      if (userLat !== null && userLon !== null) {
+        url += `&lat=${userLat}&lon=${userLon}`;
+      }
+      
+      console.log(`[Test] Fetching all images from: ${url}`);
+      const response = await authFetch(url);
+      const result = await response.json();
+      
+      console.log(`[Test] API response:`, result);
+      
+      if (result.status === 'success') {
+        console.log(`[Test] Got ${result.images?.length || 0} images, total available: ${result.totalCount || 0}`);
+        
+        // Process all images
+        const allPics = result.images.map((d: any) => {
+          // Try to find the best available image path
+          let bestSrc = '';
+          if (d.path_512) {
+            bestSrc = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${d.path_512}`;
+          } else if (d.path_2048) {
+            bestSrc = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${d.path_2048}`;
+          } else if (d.path_64) {
+            bestSrc = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/${d.path_64}`;
+          }
+          
+          return {
+            id: d.id,
+            src: bestSrc,
+            srcHD: d.path_2048 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${d.path_2048}` : bestSrc,
+            width: d.width && d.width > 0 ? d.width : 400,
+            height: d.height && d.height > 0 ? d.height : 300,
+            lat: d.lat,
+            lon: d.lon,
+            title: d.title,
+            description: d.description,
+            keywords: d.keywords,
+            path_64: d.path_64,
+            path_512: d.path_512,
+            path_2048: d.path_2048,
+            distance: d.distance || null
+          };
+        });
+        
+        const imagesWithSrc = allPics.filter((pic: any) => pic.src);
+        console.log(`[Test] Processed images: ${allPics.length} total, ${imagesWithSrc.length} with src`);
+        
+        // Set all images at once
+        pics.set(imagesWithSrc);
+        
+        // Update gallery stats
+        updateGalleryStats(imagesWithSrc.length, result.totalCount);
+        
+        console.log(`[Test] Set ${imagesWithSrc.length} images in gallery, total count: ${result.totalCount}`);
+        
+        // Test DOM count after a delay
+        setTimeout(() => {
+          const visibleImages = document.querySelectorAll('.gallery-item img').length;
+          console.log(`[Test] DOM count after loading: ${visibleImages} images`);
+          if (visibleImages !== imagesWithSrc.length) {
+            console.warn(`[Test] ⚠️ DISCREPANCY: ${imagesWithSrc.length} in Store vs ${visibleImages} im DOM`);
+          }
+        }, 500);
+      } else {
+        console.error('[Test] API error:', result.message);
+      }
+    } catch (error) {
+      console.error('[Test] Error loading all images:', error);
+    }
+  }
+
+  // Function to check for duplicate images
+  function checkForDuplicates() {
+    const currentPics = get(pics);
+    const ids = currentPics.map((p: any) => p.id);
+    const uniqueIds = new Set(ids);
+    const duplicates = ids.filter((id: any, index: number) => ids.indexOf(id) !== index);
+    
+    console.log(`[Debug] Duplicate check:`);
+    console.log(`- Total images: ${currentPics.length}`);
+    console.log(`- Unique IDs: ${uniqueIds.size}`);
+    console.log(`- Duplicate IDs: ${duplicates.length}`);
+    
+    if (duplicates.length > 0) {
+      console.log(`[Debug] Duplicate IDs found:`, duplicates.slice(0, 10));
     }
   }
 
@@ -1741,6 +2023,9 @@
       useJustifiedLayout,
       newsFlashMode
     });
+    
+    // Debug: Log the actual layout being used
+    console.log('[Settings] Layout will be:', useJustifiedLayout ? 'justified' : 'grid');
     
     // Start GPS tracking if distance is enabled
     if (showDistance && navigator.geolocation) {
@@ -3125,6 +3410,7 @@
             >
               🗑️ Alle Bilder löschen
             </button>
+
           </div>
         </form>
         
@@ -3314,6 +3600,8 @@
     getDistanceFromLatLonInMeters={getDistanceFromLatLonInMeters}
   />
   
+
+  
   {#if loading}
     <div class="loading-indicator">
       <div class="spinner"></div>
@@ -3352,6 +3640,9 @@
       <p>Lade deine ersten Bilder hoch, um die Galerie zu starten!</p>
       <button on:click={createSampleImages} style="margin-top: 1rem; padding: 0.5rem 1rem; background: #0066cc; color: white; border: none; border-radius: 4px; cursor: pointer;">
         🧪 Test Justified Layout
+      </button>
+      <button on:click={testLoadAllImages} style="margin-top: 1rem; margin-left: 1rem; padding: 0.5rem 1rem; background: #ff6600; color: white; border: none; border-radius: 4px; cursor: pointer;">
+        🔍 Test: Alle Bilder laden
       </button>
     </div>
   {/if}
@@ -3604,6 +3895,27 @@
 
   .delete-all-btn:disabled {
     background: #999 !important;
+    cursor: not-allowed;
+  }
+
+  .debug-btn {
+    background: #ff6b35;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 0.8rem;
+    transition: background-color 0.2s ease;
+  }
+
+  .debug-btn:hover:not(:disabled) {
+    background: #e55a2b;
+  }
+
+  .debug-btn:disabled {
+    background: #999;
     cursor: not-allowed;
   }
 
