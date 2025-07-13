@@ -11,10 +11,13 @@
   import { authFetch } from '$lib/authFetch';
   import { sessionStore, sessionReady } from '$lib/sessionStore';
   import { get } from 'svelte/store';
+  import type { PageData } from './$types';
 
-  let image: any = null;
-  let loading = true;
-  let error = '';
+  export let data: PageData;
+  
+  let image: any = data.image;
+  let loading = !data.image;
+  let error = data.error || '';
   let profile: any = null;
   let nearby: any[] = [];
   let radius = 500; // meters, default
@@ -133,24 +136,28 @@
         radiusLoaded = true;
       }
 
-      console.log('[Detail] Loading image from DB, imageId:', imageId);
+      console.log('[Detail] Using server-loaded image data:', image);
       
-      // First, try to get the item without profile data
-      const { data: itemData, error: itemError } = await supabase
-        .from('items')
-        .select('*')
-        .eq('id', imageId)
-        .single();
+      // If we don't have image data from server, try to load it client-side
+      if (!image) {
+        console.log('[Detail] No server data, loading image from DB, imageId:', imageId);
+        
+        const { data: itemData, error: itemError } = await supabase
+          .from('items')
+          .select('*')
+          .eq('id', imageId)
+          .single();
 
-      if (itemError) {
-        error = itemError.message;
-        console.error('[Detail] DB fetch error:', itemError);
-        loading = false;
-        return;
+        if (itemError) {
+          error = itemError.message;
+          console.error('[Detail] DB fetch error:', itemError);
+          loading = false;
+          return;
+        }
+
+        image = itemData;
+        console.log('[Detail] Image data loaded client-side:', image);
       }
-
-      image = itemData;
-      console.log('[Detail] Image data loaded:', image);
 
       // Then, if we have a profile_id, get the profile data separately
       if (image.profile_id) {
@@ -1224,12 +1231,12 @@
 </script>
 
 <svelte:head>
-  <title>{image?.title || image?.original_name || `Bild ${imageId} - culoca.com`}</title>
+  <title>{image?.title || image?.original_name || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}</title>
   <meta name="description" content={image?.description || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
 
   <!-- Open Graph -->
   <meta property="og:type" content="article">
-  <meta property="og:title" content={image?.title || image?.original_name || `Bild ${imageId} - culoca.com`}>
+  <meta property="og:title" content={image?.title || image?.original_name || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
   <meta property="og:description" content={image?.description || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
   <meta property="og:url" content={`https://culoca.com/item/${imageId}`}> 
   <meta property="og:image" content={`https://culoca.com/api/og-image/${imageId}`}> 
@@ -1238,7 +1245,7 @@
 
   <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content={image?.title || image?.original_name || `Bild ${imageId} - culoca.com`}>
+  <meta name="twitter:title" content={image?.title || image?.original_name || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
   <meta name="twitter:description" content={image?.description || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
   <meta name="twitter:image" content={`https://culoca.com/api/og-image/${imageId}`}> 
 
