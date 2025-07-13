@@ -1964,15 +1964,9 @@
   }
 
   function updateLayoutFromStorage() {
-    if (typeof localStorage !== 'undefined') {
-      const savedLayout = localStorage.getItem('galleryLayout');
-      // Only update if there's a saved layout preference, otherwise keep justified
-      if (savedLayout) {
-        useJustifiedLayout = savedLayout === 'justified';
-      } else {
-        useJustifiedLayout = true; // Default to justified layout
-      }
-    }
+    // This function is now deprecated - layout is loaded from database in loadShowDistanceAndCompass()
+    // Keeping for backward compatibility but it's no longer used
+    console.log('[Layout] updateLayoutFromStorage called but deprecated - using DB instead');
   }
 
   async function loadProfileAvatar() {

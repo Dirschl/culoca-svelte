@@ -101,15 +101,8 @@
       sessionReady.set(true);
     };
 
-    // Set ready immediately if session exists, otherwise after auth state change
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        setSessionReady();
-      } else {
-        // Wait for auth state change if no session exists
-        setTimeout(setSessionReady, 1000);
-      }
-    });
+    // Set ready immediately - no need to wait for session
+    setSessionReady();
 
     // Cleanup subscription
     return () => {

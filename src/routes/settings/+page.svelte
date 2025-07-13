@@ -117,6 +117,7 @@
         instagram = data.instagram || '';
         twitter = data.twitter || '';
         useJustifiedLayout = data.use_justified_layout ?? true;
+        galleryLayout = useJustifiedLayout ? 'justified' : 'grid';
         showAddress = data.show_address ?? false;
         showPhone = data.show_phone ?? false;
         showWebsite = data.show_website ?? false;
@@ -173,7 +174,7 @@
       
       if (error) throw error;
       
-      // Save layout preference to localStorage
+      // Save layout preference to localStorage for backward compatibility
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem('galleryLayout', useJustifiedLayout ? 'justified' : 'grid');
         localStorage.setItem('showDistance', showDistance ? 'true' : 'false');
@@ -219,9 +220,10 @@
     return null;
   }
 
-  // Whenever useJustifiedLayout changes, update localStorage and fire a custom event
-  if (typeof window !== 'undefined') {
-    localStorage.setItem('galleryLayout', useJustifiedLayout ? 'justified' : 'grid');
+  // Whenever useJustifiedLayout changes, update galleryLayout and localStorage for backward compatibility
+  $: if (typeof window !== 'undefined') {
+    galleryLayout = useJustifiedLayout ? 'justified' : 'grid';
+    localStorage.setItem('galleryLayout', galleryLayout);
     window.dispatchEvent(new Event('galleryLayoutChanged'));
   }
 
