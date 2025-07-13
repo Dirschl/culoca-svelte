@@ -2,11 +2,6 @@
   "redirects": [
     {
       "source": "/(.*)",
-      "has": [
-        {
-          "host": "www.culoca.com"
-        }
-      ],
       "destination": "https://culoca.com/$1",
       "permanent": true
     }
