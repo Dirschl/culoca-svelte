@@ -243,6 +243,9 @@
         avatarPreview = null;
       }
       avatarFile = null;
+      
+      // Nach dem Speichern direkt zur Startseite
+      setTimeout(() => goto('/'), 500);
     } catch (error) {
       console.error('Error saving profile:', error);
       showMessage('Fehler beim Speichern des Profils', 'error');
@@ -630,9 +633,9 @@
             </label>
           </div>
 
-          <!-- Speichern Button -->
-          <div class="form-actions">
-            <button type="submit" class="btn" disabled={saving}>
+          <!-- Actions -->
+          <div class="actions">
+            <button type="submit" class="save-btn" disabled={saving}>
               {#if saving}
                 <div class="spinner-small"></div>
                 Speichern...
@@ -642,6 +645,12 @@
                 </svg>
                 Profil speichern
               {/if}
+            </button>
+            <button type="button" class="back-btn" on:click={goHome} disabled={saving}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M19 12H5M12 19l-7-7 7-7"/>
+              </svg>
+              Zurück zur Startseite
             </button>
           </div>
 
@@ -1002,12 +1011,59 @@
     color: var(--text-secondary);
   }
 
-  .form-actions {
+  .actions {
     display: flex;
     justify-content: center;
+    gap: 1rem;
     margin-top: 2rem;
-    padding-top: 2rem;
-    border-top: 1px solid var(--border-color);
+    flex-wrap: wrap;
+  }
+
+  .save-btn, .back-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1rem 2rem;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: 600;
+    transition: all 0.2s ease;
+    min-width: 200px;
+    justify-content: center;
+  }
+
+  .save-btn {
+    background: var(--accent-color);
+    color: white;
+  }
+
+  .save-btn:hover:not(:disabled) {
+    background: var(--accent-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px var(--shadow);
+  }
+
+  .save-btn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+  }
+
+  .back-btn {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+  }
+
+  .back-btn:hover:not(:disabled) {
+    background: var(--border-color);
+    transform: translateY(-1px);
+  }
+
+  .back-btn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
   }
 
   .btn {
@@ -1266,6 +1322,15 @@
     .btn-secondary,
     .btn-danger {
       justify-content: center;
+    }
+
+    .actions {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .save-btn, .back-btn {
+      width: 100%;
     }
   }
 
