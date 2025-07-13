@@ -9,9 +9,23 @@ export const GET = async ({ url, request }) => {
     const offset = parseInt(url.searchParams.get('offset') || '0', 10);
     const user_id = url.searchParams.get('user_id');
     const filter_user_id = url.searchParams.get('filter_user_id');
-    const current_user_id = url.searchParams.get('current_user_id');
     const lat = url.searchParams.get('lat');
     const lon = url.searchParams.get('lon');
+    
+    // Extract user ID from Authorization header
+    let current_user_id = null;
+    const authHeader = request.headers.get('authorization');
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7);
+      try {
+        const { data: { user }, error: tokenError } = await supabase.auth.getUser(token);
+        if (!tokenError && user) {
+          current_user_id = user.id;
+        }
+      } catch (tokenError) {
+        console.log('Token validation error:', tokenError);
+      }
+    }
     
     console.log('API /api/images - Current user:', current_user_id || 'anonymous');
 
