@@ -1070,10 +1070,21 @@
   function setUserFilter() {
     if (!profile) return;
     
+    // Construct avatar URL
+    let avatarUrl = undefined;
+    if (profile.avatar_url) {
+      if (profile.avatar_url.startsWith('http')) {
+        avatarUrl = profile.avatar_url;
+      } else {
+        avatarUrl = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/avatars/${profile.avatar_url}`;
+      }
+    }
+    
     filterStore.setUserFilter({
       userId: profile.id,
       username: profile.full_name,
-      accountName: profile.accountname || undefined
+      accountName: profile.accountname || undefined,
+      avatarUrl: avatarUrl
     });
     
     // Navigate to gallery with filter

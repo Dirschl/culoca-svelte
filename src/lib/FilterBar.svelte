@@ -83,15 +83,25 @@
 	
 	// Customer branding display (from session store)
 	$: customerBrandInfo = $shouldShowCustomerBranding && $customerBranding && !$isDuplicateDisplay ? {
-		avatarUrl: $customerBranding.avatarUrl,
+		avatarUrl: getAvatarUrl($customerBranding.avatarUrl),
 		name: $customerBranding.fullName,
 		accountName: $customerBranding.accountName,
 		canRemove: $customerBranding.privacyMode !== 'private' && $customerBranding.privacyMode !== 'closed'
 	} : null;
 
+	// Helper function to get correct avatar URL
+	function getAvatarUrl(avatarUrl: string | undefined): string | null {
+		if (!avatarUrl) return null;
+		if (avatarUrl.startsWith('http')) {
+			return avatarUrl; // External URL (e.g., Google avatar)
+		} else {
+			return `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/avatars/${avatarUrl}`;
+		}
+	}
+
 	// Active user filter display (from session store)
 	$: userFilterInfo = $activeUserFilter ? {
-		avatarUrl: $activeUserFilter.avatarUrl,
+		avatarUrl: getAvatarUrl($activeUserFilter.avatarUrl),
 		name: $activeUserFilter.username,
 		accountName: $activeUserFilter.accountName,
 		canRemove: $customerBranding?.privacyMode !== 'private' && $customerBranding?.privacyMode !== 'closed'
@@ -137,7 +147,7 @@
 					<div class="user-filter">
 						{#if $userFilter.avatarUrl}
 							<img 
-								src={$userFilter.avatarUrl} 
+								src={getAvatarUrl($userFilter.avatarUrl)} 
 								alt={$userFilter.username}
 								class="user-avatar"
 							/>
