@@ -168,16 +168,21 @@
         }
       }
 
-      // Privacy check: If image is private, only allow access for the owner
+      // Privacy check: If image is private, only allow access for the owner or developer
       if (image.is_private === true) {
+        const isOwner = currentUser && currentUser.id === image.profile_id;
+        const isDeveloper = currentUser && currentUser.id === '0ceb2320-0553-463b-971a-a0eef5ecdf09';
+        
         console.log('[Detail] Privacy check for private image:', {
           hasCurrentUser: !!currentUser,
           currentUserId: currentUser?.id,
           imageProfileId: image.profile_id,
           imageId: image.id,
-          idsMatch: currentUser?.id === image.profile_id
+          isOwner,
+          isDeveloper
         });
-        if (!currentUser || currentUser.id !== image.profile_id) {
+        
+        if (!isOwner && !isDeveloper) {
           console.log('[Detail] Access denied - redirecting to main page');
           goto('/');
           return;
@@ -862,7 +867,7 @@
   $: keywordsTooMany = keywordsCount > 50;
 
   // Check if user is the creator
-  $: isCreator = currentUser && image && image.profile_id === currentUser.id;
+  $: isCreator = !!currentUser && (currentUser.id === image?.profile_id || currentUser.id === '0ceb2320-0553-463b-971a-a0eef5ecdf09');
 
   // Dynamisches Favicon aktualisieren
   $: if (image && browser) {
@@ -1219,12 +1224,12 @@
 </script>
 
 <svelte:head>
-  <title>{image?.title || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}</title>
+  <title>{image?.title || image?.original_name || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}</title>
   <meta name="description" content={image?.description || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
 
   <!-- Open Graph -->
   <meta property="og:type" content="article">
-  <meta property="og:title" content={image?.title || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
+  <meta property="og:title" content={image?.title || image?.original_name || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
   <meta property="og:description" content={image?.description || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
   <meta property="og:url" content={`https://culoca.com/item/${imageId}`}> 
   <meta property="og:image" content={`https://culoca.com/api/og-image/${imageId}`}> 
@@ -1233,10 +1238,14 @@
 
   <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content={image?.title || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
+  <meta name="twitter:title" content={image?.title || image?.original_name || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
   <meta name="twitter:description" content={image?.description || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
   <meta name="twitter:image" content={`https://culoca.com/api/og-image/${imageId}`}> 
 
+  <!-- Additional SEO -->
+  <meta name="robots" content="index, follow">
+  <meta name="author" content="culoca.com">
+  <link rel="canonical" href={`https://culoca.com/item/${imageId}`}>
 
 </svelte:head>
 
