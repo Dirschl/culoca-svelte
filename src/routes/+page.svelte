@@ -159,10 +159,38 @@
   // Fullscreen map mode
   let showFullscreenMap = false;
   
-  // GPS availability status
+  // GPS availability status with memory and timeout
   let gpsStatus: 'checking' | 'active' | 'denied' | 'unavailable' = 'checking';
   let showGPSMessage = false;
+  let lastGPSUpdateTime: number | null = null;
+  let gpsTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  const GPS_MEMORY_TIMEOUT = 5 * 60 * 1000; // 5 minutes in milliseconds
   
+  // Function to get GPS status with last update time
+  function getGPSStatusText(): string {
+    if (gpsStatus === 'active') {
+      if (lastGPSUpdateTime) {
+        const timeDiff = Date.now() - lastGPSUpdateTime;
+        const minutes = Math.floor(timeDiff / 60000);
+        const seconds = Math.floor((timeDiff % 60000) / 1000);
+        
+        if (minutes > 0) {
+          return `GPS verfügbar (vor ${minutes}m ${seconds}s)`;
+        } else {
+          return `GPS verfügbar (vor ${seconds}s)`;
+        }
+      } else {
+        return 'GPS verfügbar';
+      }
+    } else if (gpsStatus === 'checking') {
+      return 'GPS wird geprüft...';
+    } else if (gpsStatus === 'denied') {
+      return 'GPS nicht erlaubt';
+    } else {
+      return 'GPS nicht verfügbar';
+    }
+  }
+
   // Function to get currently visible image
   function getCurrentlyVisibleImage(): any | null {
     const currentPics = get(pics);
@@ -1950,7 +1978,12 @@
           handlePositionUpdate,
           (error) => {
             console.error('GPS tracking error:', error);
-            gpsStatus = 'unavailable';
+            // Don't immediately mark as unavailable, keep the last known position
+            // Only mark as unavailable if we haven't had an update in 5 minutes
+            if (lastGPSUpdateTime && (Date.now() - lastGPSUpdateTime) > GPS_MEMORY_TIMEOUT) {
+              gpsStatus = 'unavailable';
+              showGPSMessage = true;
+            }
           },
           { enableHighAccuracy: true, maximumAge: 1000, timeout: 3000 }
         );
@@ -1987,11 +2020,22 @@
     userLat = newLat;
     userLon = newLon;
     
-    console.log(`GPS position updated: ${newLat.toFixed(6)}, ${newLon.toFixed(6)}`);
-    console.log(`[GPS Debug] userLat: ${userLat}, userLon: ${userLon}`);
-    
-    // Update GPS status
+    // Update GPS status and timestamp
     gpsStatus = 'active';
+    lastGPSUpdateTime = Date.now();
+    
+    // Clear existing timeout and set new one
+    if (gpsTimeoutId) {
+      clearTimeout(gpsTimeoutId);
+    }
+    gpsTimeoutId = setTimeout(() => {
+      console.log('🔄 [GPS] No updates for 5 minutes, marking as unavailable');
+      gpsStatus = 'unavailable';
+      showGPSMessage = true;
+    }, GPS_MEMORY_TIMEOUT);
+    
+    console.log(`🔄 [GPS] Position updated: ${newLat.toFixed(6)}, ${newLon.toFixed(6)} at ${new Date().toLocaleTimeString()}`);
+    console.log(`[GPS Debug] userLat: ${userLat}, userLon: ${userLon}`);
     
     // Resort existing images immediately for distance display
     resortExistingImages();
@@ -3186,7 +3230,7 @@
 
 
 <!-- Filter Bar - at the very top of the page -->
-        <FilterBar showOnMap={false} userLat={userLat} userLon={userLon} isPermalinkMode={isPermalinkMode} permalinkImageId={permalinkImageId} showDistance={showDistance} isLoggedIn={isLoggedIn} gpsStatus={gpsStatus} />
+        <FilterBar showOnMap={false} userLat={userLat} userLon={userLon} isPermalinkMode={isPermalinkMode} permalinkImageId={permalinkImageId} showDistance={showDistance} isLoggedIn={isLoggedIn} gpsStatus={gpsStatus} lastGPSUpdateTime={lastGPSUpdateTime} />
 
 <!-- NewsFlash Component -->
 {#if isLoggedIn && newsFlashMode !== 'aus'}

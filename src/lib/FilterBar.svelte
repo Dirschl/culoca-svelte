@@ -18,6 +18,7 @@
 	export let showDistance = false; // New prop to show current sorting method
 	export let isLoggedIn = false; // New prop to determine if user is logged in
 	export let gpsStatus: 'active' | 'cached' | 'none' | 'checking' | 'denied' | 'unavailable' = 'none';
+	export let lastGPSUpdateTime: number | null = null; // Add this prop
 	let cachedLat: number | null = null;
 	let cachedLon: number | null = null;
 	
@@ -40,6 +41,26 @@
 	// Format coordinates for display in decimal format
 	function formatCoordinates(lat: number, lon: number): string {
 		return `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+	}
+	
+	// Function to get GPS status with last update time
+	function getGPSStatusText(): string {
+		if (gpsStatus === 'active') {
+			if (lastGPSUpdateTime) {
+				const timeDiff = Date.now() - lastGPSUpdateTime;
+				const minutes = Math.floor(timeDiff / 60000);
+				const seconds = Math.floor((timeDiff % 60000) / 1000);
+				
+				if (minutes > 0) {
+					return `(vor ${minutes}m ${seconds}s)`;
+				} else {
+					return `(vor ${seconds}s)`;
+				}
+			} else {
+				return '';
+			}
+		}
+		return '';
 	}
 	
 	// Customer branding display (from session store)
@@ -169,6 +190,19 @@
 					<div class="gps-status active">
 						<span class="gps-coords">
 							{formatCoordinates(userLat, userLon)}
+						</span>
+						<span class="gps-time">
+							{lastGPSUpdateTime ? (() => {
+								const timeDiff = Date.now() - lastGPSUpdateTime;
+								const minutes = Math.floor(timeDiff / 60000);
+								const seconds = Math.floor((timeDiff % 60000) / 1000);
+								
+								if (minutes > 0) {
+									return `(vor ${minutes}m ${seconds}s)`;
+								} else {
+									return `(vor ${seconds}s)`;
+								}
+							})() : ''}
 						</span>
 					</div>
 				{:else if gpsStatus === 'checking'}
@@ -410,6 +444,13 @@
 	}
 
 	.gps-coords {
+	}
+
+	.gps-time {
+		font-size: 14px;
+		font-weight: 400;
+		opacity: 0.8;
+		margin-left: 8px;
 	}
 
 	.gps-text {
