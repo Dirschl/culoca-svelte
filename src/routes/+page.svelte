@@ -964,12 +964,9 @@
       } else {
         // FIXED: Use API instead of direct database query to ensure consistent privacy filtering
         let url = `/api/images?limit=2000&offset=0`;
-        if (isLoggedIn && currentUser) {
-          url += `&current_user_id=${currentUser.id}`;
-        }
         
         console.log(`[Gallery] LoadAllImages using API: ${url}`);
-        const response = await fetch(url);
+        const response = await authFetch(url);
         const result = await response.json();
         
         if (result.status === 'success') {
@@ -1026,11 +1023,8 @@
     try {
       // Use the API to get the total count that respects privacy filtering
       let url = `/api/images?limit=1&offset=0`;
-      if (isLoggedIn && currentUser) {
-        url += `&current_user_id=${currentUser.id}`;
-      }
       
-      const response = await fetch(url);
+      const response = await authFetch(url);
       const result = await response.json();
       
       if (result.status === 'success') {
@@ -1117,11 +1111,8 @@
             if (hasUserFilter) {
               fallbackUrl += `&filter_user_id=${currentFilters.userFilter!.userId}`;
             }
-            if (isLoggedIn && currentUser) {
-              fallbackUrl += `&current_user_id=${currentUser.id}`;
-            }
             console.log(`[Gallery] GPS fallback from: ${fallbackUrl}`);
-            const response = await fetch(fallbackUrl);
+            const response = await authFetch(fallbackUrl);
             const fallbackResult = await response.json();
             
             if (fallbackResult.status !== 'success') {
@@ -1154,11 +1145,8 @@
       // Normal mode: Use API endpoint with possible user filter
       if (hasUserFilter) {
         let url = `/api/images?limit=${size}&offset=${page * size}&filter_user_id=${currentFilters.userFilter!.userId}`;
-        if (isLoggedIn && currentUser) {
-          url += `&current_user_id=${currentUser.id}`;
-        }
         console.log(`[Gallery] Loading with user filter from: ${url}`);
-        const response = await fetch(url);
+        const response = await authFetch(url);
         const result = await response.json();
         if (result.status === 'success') {
           data = result.images;
@@ -1277,20 +1265,15 @@
     
     // SIMPLIFIED: Use the API endpoint that we know works
     try {
-      // Add current user to query if logged in
-      let url = `/api/images?limit=${size}&offset=${page * size}`;
-      if (isLoggedIn && currentUser) {
-        url += `&current_user_id=${currentUser.id}`;
-      }
-      
       // FIXED: Add GPS parameters for distance sorting if available
+      let url = `/api/images?limit=${size}&offset=${page * size}`;
       if (userLat !== null && userLon !== null) {
         url += `&lat=${userLat}&lon=${userLon}`;
         console.log(`[Gallery Normal] Adding GPS parameters for distance sorting: ${userLat}, ${userLon}`);
       }
       
       console.log(`[Gallery Normal] Fetching from: ${url}`);
-      const response = await fetch(url);
+      const response = await authFetch(url);
       const result = await response.json();
       
       console.log(`[Gallery Normal] API response:`, result);
@@ -1319,12 +1302,9 @@
     try {
       // Use a large limit to get all user images at once
       let url = `/api/images?limit=2000&offset=0&user_id=${currentUser.id}`;
-      if (isLoggedIn && currentUser) {
-        url += `&current_user_id=${currentUser.id}`;
-      }
       
       console.log(`[Gallery AllUser] Fetching from: ${url}`);
-      const response = await fetch(url);
+      const response = await authFetch(url);
       const result = await response.json();
       
       console.log(`[Gallery AllUser] API response:`, result);

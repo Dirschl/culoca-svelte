@@ -3,6 +3,7 @@ import { onMount, onDestroy } from 'svelte';
 import { goto } from '$app/navigation';
 import type { NewsFlashImage } from './types';
 import { galleryStats } from './galleryStats';
+import { authFetch } from './authFetch';
 
 // Modus: 'eigene', 'alle', 'aus'
 export let mode: 'eigene' | 'alle' | 'aus' = 'alle';
@@ -42,13 +43,9 @@ async function fetchImages(isLoadMore = false) {
   if (mode === 'eigene' && userId) {
     url += `&user_id=${userId}`;
   }
-  // Add current user for privacy filtering
-  if (userId) {
-    url += `&current_user_id=${userId}`;
-  }
   console.log('NewsFlash: Fetching images from:', url, 'Mode:', mode, 'UserId:', userId, 'LoadMore:', isLoadMore);
   try {
-    const res = await fetch(url);
+    const res = await authFetch(url);
     const data = await res.json();
     console.log('NewsFlash: Response:', data);
     if (data.status === 'success') {

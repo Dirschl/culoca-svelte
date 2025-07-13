@@ -5,6 +5,7 @@
   import FilterBar from './FilterBar.svelte';
   import { filterStore, userFilter, locationFilter, shouldShowCustomerBranding } from './filterStore';
   import { sessionStore } from './sessionStore';
+  import { authFetch } from './authFetch';
   
   export let images: any[] = [];
   export let userLat: number | null = null;
@@ -1013,12 +1014,9 @@
       
       // Use the API endpoint with proper privacy filtering
       let url = '/api/images?limit=10000&offset=0'; // Load all images at once
-      if (sessionData.isAuthenticated && sessionData.userId) {
-        url += `&current_user_id=${sessionData.userId}`;
-      }
       
       console.log(`[FullscreenMap] Fetching from: ${url}`);
-      const response = await fetch(url);
+      const response = await authFetch(url);
       const result = await response.json();
       
       if (result.status !== 'success') {
