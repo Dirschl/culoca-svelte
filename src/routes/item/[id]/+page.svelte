@@ -63,6 +63,7 @@
   // Keywords editing
   let editingKeywords = false;
   let keywordsEditValue = '';
+  let rotating = false;
   
   // Original filename editing
   let editingFilename = false;
@@ -249,6 +250,43 @@
 
   function getDistanceForJustified(lat1: number, lon1: number, lat2: number, lon2: number): number {
     return getDistanceInMeters(lat1, lon1, lat2, lon2);
+  }
+
+  async function rotateImage() {
+    if (!image || !isCreator || rotating) return;
+    
+    try {
+      rotating = true;
+      console.log('[Detail] Starting image rotation for:', image.id);
+      
+      // Call the rotation API
+      const response = await fetch(`/api/rotate-image/${image.id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      console.log('[Detail] Rotation result:', result);
+      
+      if (result.success) {
+        // Refresh the page to show the rotated image
+        window.location.reload();
+      } else {
+        console.error('[Detail] Rotation failed:', result.error);
+        alert('Fehler beim Drehen des Bildes: ' + (result.error || 'Unbekannter Fehler'));
+      }
+    } catch (error) {
+      console.error('[Detail] Rotation error:', error);
+      alert('Fehler beim Drehen des Bildes: ' + (error instanceof Error ? error.message : 'Unbekannter Fehler'));
+    } finally {
+      rotating = false;
+    }
   }
 
   async function downloadOriginal(imageId: string, originalName: string) {
@@ -1231,12 +1269,12 @@
 </script>
 
 <svelte:head>
-  <title>{image?.title || image?.original_name || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}</title>
+  <title>{image?.title || image?.original_name || `Bild ${imageId} - culoca.com`}</title>
   <meta name="description" content={image?.description || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
 
   <!-- Open Graph -->
   <meta property="og:type" content="article">
-  <meta property="og:title" content={image?.title || image?.original_name || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
+  <meta property="og:title" content={image?.title || image?.original_name || `Bild ${imageId} - culoca.com`}>
   <meta property="og:description" content={image?.description || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
   <meta property="og:url" content={`https://culoca.com/item/${imageId}`}> 
   <meta property="og:image" content={`https://culoca.com/api/og-image/${imageId}`}> 
@@ -1245,7 +1283,7 @@
 
   <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content={image?.title || image?.original_name || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
+  <meta name="twitter:title" content={image?.title || image?.original_name || `Bild ${imageId} - culoca.com`}>
   <meta name="twitter:description" content={image?.description || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
   <meta name="twitter:image" content={`https://culoca.com/api/og-image/${imageId}`}> 
 
@@ -1253,6 +1291,13 @@
   <meta name="robots" content="index, follow">
   <meta name="author" content="culoca.com">
   <link rel="canonical" href={`https://culoca.com/item/${imageId}`}>
+
+  <!-- Immediate fallback for loading state -->
+  {#if !image}
+    <title>Bild {imageId} - culoca.com</title>
+    <meta property="og:title" content="Bild {imageId} - culoca.com">
+    <meta property="twitter:title" content="Bild {imageId} - culoca.com">
+  {/if}
 
 </svelte:head>
 
@@ -1365,6 +1410,11 @@
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
                     <circle cx="12" cy="12" r="10" fill="white" fill-opacity="0.15"/>
                     <path d="M12 6v7m0 0l-3-3m3 3l3-3M6 18h12" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </button>
+                <button class="rotate-btn" on:click={rotateImage} title="Bild 90° nach links drehen" disabled={rotating}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/>
                   </svg>
                 </button>
               {/if}
@@ -1928,6 +1978,13 @@
     background: #f5f5f5;
     margin: 0 auto;
     overflow: hidden;
+  }
+
+  .image-link {
+    display: block;
+    width: 100%;
+    text-decoration: none;
+    color: inherit;
   }
 
   .passepartout-container.dark {
@@ -3281,6 +3338,30 @@
     color: #fff;
     text-decoration: none;
     box-shadow: 0 4px 16px rgba(33, 150, 243, 0.15);
+  }
+
+  .rotate-btn {
+    background: var(--culoca-orange);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .rotate-btn:hover {
+    background: #d65a1a;
+    transform: scale(1.05);
+  }
+
+  .rotate-btn:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    transform: none;
   }
 
   /* Filename editing styles */
