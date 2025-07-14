@@ -13,9 +13,35 @@
   let emailSending = false;
   let emailSuccess = false;
   let emailError = '';
+  let userProfile: any = null;
   
-  trackStore.subscribe(state => {
+  trackStore.subscribe((state: any) => {
     savedTracks = state.savedTracks;
+  });
+  
+  // Load user profile for email pre-fill
+  import { supabase } from '$lib/supabaseClient';
+  import { onMount } from 'svelte';
+  
+  onMount(async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('gps_email, email')
+          .eq('id', user.id)
+          .single();
+        
+        if (profile) {
+          userProfile = profile;
+          // Pre-fill email with GPS email or regular email
+          emailAddress = profile.gps_email || profile.email || '';
+        }
+      }
+    } catch (error) {
+      console.error('Error loading user profile:', error);
+    }
   });
   
   function closeModal() {

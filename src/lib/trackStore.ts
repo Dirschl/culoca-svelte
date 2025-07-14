@@ -39,7 +39,9 @@ function createTrackStore() {
 
   const { subscribe, set, update } = writable<TrackState>(initialState);
 
-  return {
+  let store: any = null;
+
+  store = {
     subscribe,
     
     startTrack: (name: string) => {
@@ -62,7 +64,7 @@ function createTrackStore() {
       });
 
       // Start GPS watching
-      this.startGpsWatching();
+      store.startGpsWatching();
     },
 
     stopTrack: () => {
@@ -88,7 +90,7 @@ function createTrackStore() {
         return state;
       });
 
-      this.stopGpsWatching();
+      store.stopGpsWatching();
     },
 
     addPoint: (position: GeolocationPosition) => {
@@ -105,6 +107,8 @@ function createTrackStore() {
           state.currentTrack.points.push(point);
           state.currentTrack.totalDistance = calculateTotalDistance(state.currentTrack.points);
           
+          console.log(`🔄 [Track] Added point ${state.currentTrack.points.length}: ${point.lat}, ${point.lon}`);
+          
           // Auto-save to localStorage
           saveTracksToStorage(state.savedTracks);
         }
@@ -114,8 +118,12 @@ function createTrackStore() {
 
     startGpsWatching: () => {
       if ('geolocation' in navigator) {
+        console.log('🔄 [Track] Starting GPS watching...');
         const watchId = navigator.geolocation.watchPosition(
-          (position) => this.addPoint(position),
+          (position) => {
+            console.log('🔄 [Track] GPS position received:', position.coords);
+            store.addPoint(position);
+          },
           (error) => console.error('GPS error:', error),
           { enableHighAccuracy: true, maximumAge: 1000 }
         );
@@ -131,6 +139,7 @@ function createTrackStore() {
       update(state => {
         if (state.watchId) {
           navigator.geolocation.clearWatch(state.watchId);
+          console.log('🔄 [Track] Stopped GPS watching');
         }
         return {
           ...state,
@@ -160,6 +169,8 @@ function createTrackStore() {
       });
     }
   };
+
+  return store;
 }
 
 // Helper functions

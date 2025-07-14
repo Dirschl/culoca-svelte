@@ -981,8 +981,8 @@
           userMarker.setLatLng([newPos.lat, newPos.lon]);
         }
         
-        // Force center the map on user position
-        if (map) {
+        // Only center the map if auto-rotate is enabled or if it's the first position
+        if (map && (autoRotateEnabled || !lastPosition)) {
           map.setView([newPos.lat, newPos.lon], map.getZoom(), { animate: false });
         }
         
@@ -1064,8 +1064,8 @@
             userMarker.setLatLng([newPos.lat, newPos.lon]);
           }
           
-          // Force center the map on user position
-          if (map) {
+          // Only center the map if auto-rotate is enabled or if it's the first position
+          if (map && (autoRotateEnabled || !lastSimulatedPosition)) {
             map.setView([newPos.lat, newPos.lon], map.getZoom(), { animate: false });
           }
           

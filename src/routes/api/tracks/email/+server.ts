@@ -1,4 +1,5 @@
-import { json, error } from '@sveltejs/kit';
+import { json } from '@sveltejs/kit';
+import { error } from '@sveltejs/kit';
 import { supabase } from '$lib/supabaseClient';
 
 export const POST = async ({ request, locals }) => {
@@ -56,38 +57,54 @@ Beste Grüße,
 Dein Culoca-Team
     `;
     
-    // Send email (you can use your preferred email service here)
-    // For now, we'll just return success
-    // In production, you'd integrate with SendGrid, AWS SES, etc.
-    
-    console.log('Would send email to:', recipientEmail);
-    console.log('Subject:', subject);
-    console.log('Body:', body);
-    console.log('GPX Content length:', gpxContent.length);
-    
-    // TODO: Implement actual email sending
-    // Example with SendGrid:
-    /*
-    const sgMail = require('@sendgrid/mail');
-    sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-    
-    const msg = {
-      to: recipientEmail,
-      from: 'noreply@culoca.com',
-      subject: subject,
-      text: body,
-      attachments: [
-        {
-          content: Buffer.from(gpxContent).toString('base64'),
-          filename: `${track.name.replace(/[^a-z0-9]/gi, '_')}.gpx`,
-          type: 'application/gpx+xml',
-          disposition: 'attachment'
-        }
-      ]
-    };
-    
-    await sgMail.send(msg);
-    */
+    // Send email using Resend (free tier available)
+    // You can also use SendGrid, AWS SES, or other services
+    try {
+      const emailData = {
+        to: recipientEmail,
+        from: 'noreply@culoca.com',
+        subject: subject,
+        text: body,
+        attachments: [
+          {
+            content: Buffer.from(gpxContent).toString('base64'),
+            filename: `${track.name.replace(/[^a-z0-9]/gi, '_')}.gpx`,
+            type: 'application/gpx+xml',
+            disposition: 'attachment'
+          }
+        ]
+      };
+      
+      // For now, simulate email sending
+      console.log('📧 Email would be sent to:', recipientEmail);
+      console.log('📧 Subject:', subject);
+      console.log('📧 Body length:', body.length);
+      console.log('📧 GPX Content length:', gpxContent.length);
+      
+      // TODO: Replace with actual email service
+      // Example with Resend:
+      /*
+      const response = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(emailData)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Email service error: ${response.statusText}`);
+      }
+      */
+      
+      // Simulate email delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+    } catch (emailError) {
+      console.error('Email service error:', emailError);
+      return error(500, 'Failed to send email');
+    }
     
     return json({ 
       success: true, 
