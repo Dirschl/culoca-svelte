@@ -58,15 +58,13 @@
     
     // Don't reload during search
     if (!searchQuery.trim() && !isSearching) {
-      // Reset gallery state
+      // Reset gallery state immediately
       pics.set([]);
       page = 0;
       hasMoreImages = true;
       
-      // Small delay to ensure filter state is properly set
-      setTimeout(() => {
-        loadMore('filter change');
-      }, 100);
+      // Load immediately without delay for better responsiveness
+      loadMore('filter change');
     }
   }
   
@@ -964,17 +962,17 @@
       
       // Use distance function if user has GPS coordinates and distance is enabled
       if (isLoggedIn && showDistance && userLat !== null && userLon !== null) {
-        const result = await supabase
-          .rpc('images_by_distance', {
-            user_lat: userLat,
-            user_lon: userLon,
-            page: 0,
-            page_size: 2000 // Load alle verfügbaren Bilder
-          });
+                  const result = await supabase
+            .rpc('images_by_distance', {
+              user_lat: userLat,
+              user_lon: userLon,
+              page: 0,
+              page_size: 5000 // Load alle verfügbaren Bilder
+            });
         data = result.data;
       } else {
         // FIXED: Use API instead of direct database query to ensure consistent privacy filtering
-        let url = `/api/images?limit=2000&offset=0`;
+        let url = `/api/images?limit=5000&offset=0`;
         
         console.log(`[Gallery] LoadAllImages using API: ${url}`);
         const response = await authFetch(url);
@@ -1110,7 +1108,7 @@
           const optimizedResult = await supabase.rpc('images_by_distance_optimized', {
             user_lat: loadLat,
             user_lon: loadLon,
-            max_results: size,
+            max_results: Math.max(size, 2000),
             offset_count: page * size,
             filter_user_id: hasUserFilter ? currentFilters.userFilter!.userId : null
           });
@@ -1118,7 +1116,7 @@
           if (optimizedResult.error) {
             console.log('[Gallery] Optimized function not available, using fallback');
             // Fallback: Use API endpoint with filter support
-            let fallbackUrl = `/api/images?limit=${size}&offset=${page * size}&lat=${loadLat}&lon=${loadLon}`;
+            let fallbackUrl = `/api/images?limit=${Math.max(size, 2000)}&offset=${page * size}&lat=${loadLat}&lon=${loadLon}`;
             if (hasUserFilter) {
               fallbackUrl += `&filter_user_id=${currentFilters.userFilter!.userId}`;
             }
@@ -1155,7 +1153,7 @@
     } else {
       // Normal mode: Use API endpoint with possible user filter
       if (hasUserFilter) {
-        let url = `/api/images?limit=${size}&offset=${page * size}&filter_user_id=${currentFilters.userFilter!.userId}`;
+        let url = `/api/images?limit=${Math.max(size, 2000)}&offset=${page * size}&filter_user_id=${currentFilters.userFilter!.userId}`;
         console.log(`[Gallery] Loading with user filter from: ${url}`);
         const response = await authFetch(url);
         const result = await response.json();
@@ -1251,7 +1249,14 @@
       // Intelligente Bild-Verwaltung je nach Datenquelle
       const hasUserFilter = currentFilters.userFilter !== null;
       
-      if ((isLoggedIn && showDistance && userLat !== null && userLon !== null) || hasLocationFilter) {
+      // Check if this is a filter change (page 0 and reason includes 'filter')
+      const isFilterChange = page === 0 && reason.includes('filter');
+      
+      if (isFilterChange) {
+        // For filter changes: replace all images instead of appending
+        pics.set(uniqueNewPics);
+        console.log(`[Gallery] Filter change: replaced all images with ${uniqueNewPics.length} new images`);
+      } else if ((isLoggedIn && showDistance && userLat !== null && userLon !== null) || hasLocationFilter) {
         if (data[0]?.distance !== undefined) {
           // Optimierte Daten bereits sortiert - APPEND new images for pagination
           pics.update((p: any[]) => [...p, ...uniqueNewPics]);
@@ -1326,13 +1331,28 @@
   async function loadImagesNormal() {
     console.log(`[Gallery] Loading images with normal pagination, range: ${page * size} to ${page * size + size - 1}`);
     
+    // Get current filter state
+    const currentFilters = get(filterStore);
+    const hasUserFilter = currentFilters.userFilter !== null;
+    const hasLocationFilter = currentFilters.locationFilter !== null;
+    const effectiveLat = hasLocationFilter ? currentFilters.locationFilter!.lat : userLat;
+    const effectiveLon = hasLocationFilter ? currentFilters.locationFilter!.lon : userLon;
+    
     // SIMPLIFIED: Use the API endpoint that we know works
     try {
       // FIXED: Add GPS parameters for distance sorting if available
-      let url = `/api/images?limit=${size}&offset=${page * size}`;
-      if (userLat !== null && userLon !== null) {
-        url += `&lat=${userLat}&lon=${userLon}`;
-        console.log(`[Gallery Normal] Adding GPS parameters for distance sorting: ${userLat}, ${userLon}`);
+      let url = `/api/images?limit=${Math.max(size, 2000)}&offset=${page * size}`;
+      
+      // Add GPS parameters if available (from user GPS or location filter)
+      if (effectiveLat !== null && effectiveLon !== null) {
+        url += `&lat=${effectiveLat}&lon=${effectiveLon}`;
+        console.log(`[Gallery Normal] Adding GPS parameters for distance sorting: ${effectiveLat}, ${effectiveLon}`);
+      }
+      
+      // Add user filter if active
+      if (hasUserFilter) {
+        url += `&filter_user_id=${currentFilters.userFilter!.userId}`;
+        console.log(`[Gallery Normal] Adding user filter: ${currentFilters.userFilter!.username}`);
       }
       
       console.log(`[Gallery Normal] Fetching from: ${url}`);
@@ -1754,7 +1774,7 @@
     
     try {
       // Get all images without path_512
-      let url = `/api/images?limit=1000&offset=0`;
+              let url = `/api/images?limit=2000&offset=0`;
       const response = await authFetch(url);
       const result = await response.json();
       
@@ -2424,7 +2444,7 @@
     }
     
     const { data: sampleData, error } = await sampleQuery
-      .limit(100) // Kleine Stichprobe
+      .limit(500) // Kleine Stichprobe
       .order('created_at', { ascending: false });
     
     if (error) {
@@ -3156,7 +3176,7 @@
       let itemsQuery = supabase
         .from('items')
         .select('id,path_512,path_2048,path_64,width,height,lat,lon,title,description,keywords,profile_id')
-        .limit(1000); // Get more data for client-side filtering
+        .limit(5000); // Get more data for client-side filtering
       
       // Exclude private items from search (using denormalized is_private field)
       itemsQuery = itemsQuery.eq('is_private', false);
@@ -3190,7 +3210,7 @@
         let allImagesQuery = supabase
           .from('items')
           .select('id,path_512,path_2048,path_64,width,height,lat,lon,title,description,keywords,profile_id')
-          .limit(1000);
+          .limit(5000);
         
         // Apply privacy filtering for search (using denormalized is_private field)
         if (isLoggedIn && currentUser) {

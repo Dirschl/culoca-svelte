@@ -223,13 +223,14 @@
     window.addEventListener('scroll', handleScroll);
   }
 
-  // Determine best image source
+  // Determine best image source with cache buster
   $: imageSource = image ? (() => {
     const baseUrl = 'https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public';
+    const timestamp = Date.now(); // Cache buster
     if (image.path_2048) {
-      return `${baseUrl}/images-2048/${image.path_2048}`;
+      return `${baseUrl}/images-2048/${image.path_2048}?t=${timestamp}`;
     }
-    return `${baseUrl}/images-512/${image.path_512}`;
+    return `${baseUrl}/images-512/${image.path_512}?t=${timestamp}`;
   })() : '';
 
   function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -254,35 +255,44 @@
 
   async function rotateImage() {
     if (!image || !isCreator || rotating) return;
-    
     try {
       rotating = true;
-      console.log('[Detail] Starting image rotation for:', image.id);
+      console.log('Starting rotation for image:', image.id);
       
-      // Call the rotation API
+      // Supabase-Session holen
+      let accessToken = undefined;
+      if (supabase.auth.getSession) {
+        const sessionResult = await supabase.auth.getSession();
+        accessToken = sessionResult?.data?.session?.access_token;
+      }
+      
       const response = await fetch(`/api/rotate-image/${image.id}`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {})
         }
       });
+      
+      console.log('Rotation response status:', response.status);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
       const result = await response.json();
-      console.log('[Detail] Rotation result:', result);
+      console.log('Rotation result:', result);
       
       if (result.success) {
-        // Refresh the page to show the rotated image
-        window.location.reload();
+        console.log('Rotation successful, reloading page...');
+        // Add cache buster to force reload of images
+        const timestamp = Date.now();
+        window.location.href = `${window.location.pathname}?t=${timestamp}`;
       } else {
-        console.error('[Detail] Rotation failed:', result.error);
         alert('Fehler beim Drehen des Bildes: ' + (result.error || 'Unbekannter Fehler'));
       }
     } catch (error) {
-      console.error('[Detail] Rotation error:', error);
+      console.error('Rotation error:', error);
       alert('Fehler beim Drehen des Bildes: ' + (error instanceof Error ? error.message : 'Unbekannter Fehler'));
     } finally {
       rotating = false;
@@ -975,29 +985,42 @@
     mapPickerType = 'standard';
     mapPickerSearch = '';
     mapPickerSearchResults = [];
-    // Default: aktuelle User-Position holen
-    if (navigator.geolocation) {
-      isGettingUserLocation = true;
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          mapPickerLat = pos.coords.latitude;
-          mapPickerLon = pos.coords.longitude;
-          isGettingUserLocation = false;
-          setTimeout(() => initMapPicker(), 100);
-        },
-        () => {
-          // Fallback: München
-          mapPickerLat = startLat ?? 48.1351;
-          mapPickerLon = startLon ?? 11.5820;
-          isGettingUserLocation = false;
-          setTimeout(() => initMapPicker(), 100);
-        },
-        { enableHighAccuracy: true, timeout: 5000 }
-      );
-    } else {
-      mapPickerLat = startLat ?? 48.1351;
-      mapPickerLon = startLon ?? 11.5820;
+    
+    // Verwende die GPS-Koordinaten des Bildes als Startpunkt, falls vorhanden
+    const imageLat = image?.lat;
+    const imageLon = image?.lon;
+    
+    if (imageLat && imageLon) {
+      // Bild hat GPS-Koordinaten - verwende diese
+      mapPickerLat = imageLat;
+      mapPickerLon = imageLon;
+      isGettingUserLocation = false;
       setTimeout(() => initMapPicker(), 100);
+    } else {
+      // Keine GPS-Koordinaten - verwende User-Position oder Fallback
+      if (navigator.geolocation) {
+        isGettingUserLocation = true;
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            mapPickerLat = pos.coords.latitude;
+            mapPickerLon = pos.coords.longitude;
+            isGettingUserLocation = false;
+            setTimeout(() => initMapPicker(), 100);
+          },
+          () => {
+            // Fallback: München
+            mapPickerLat = startLat ?? 48.1351;
+            mapPickerLon = startLon ?? 11.5820;
+            isGettingUserLocation = false;
+            setTimeout(() => initMapPicker(), 100);
+          },
+          { enableHighAccuracy: true, timeout: 5000 }
+        );
+      } else {
+        mapPickerLat = startLat ?? 48.1351;
+        mapPickerLon = startLon ?? 11.5820;
+        setTimeout(() => initMapPicker(), 100);
+      }
     }
   }
 
@@ -1269,34 +1292,34 @@
 </script>
 
 <svelte:head>
-  <title>{image?.title || image?.original_name || `Bild ${imageId} - culoca.com`}</title>
+  <title>{image?.title || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}</title>
   <meta name="description" content={image?.description || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
 
   <!-- Open Graph -->
   <meta property="og:type" content="article">
-  <meta property="og:title" content={image?.title || image?.original_name || `Bild ${imageId} - culoca.com`}>
+  <meta property="og:title" content={image?.title || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
   <meta property="og:description" content={image?.description || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
-  <meta property="og:url" content={`https://culoca.com/item/${imageId}`}> 
-  <meta property="og:image" content={`https://culoca.com/api/og-image/${imageId}`}> 
+  <meta property="og:url" content={`https://culoca.com/item/${$page.params.id}`}> 
+  <meta property="og:image" content={`https://culoca.com/api/og-image/${$page.params.id}`}> 
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
 
   <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content={image?.title || image?.original_name || `Bild ${imageId} - culoca.com`}>
+  <meta name="twitter:title" content={image?.title || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
   <meta name="twitter:description" content={image?.description || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
-  <meta name="twitter:image" content={`https://culoca.com/api/og-image/${imageId}`}> 
+  <meta name="twitter:image" content={`https://culoca.com/api/og-image/${$page.params.id}`}> 
 
   <!-- Additional SEO -->
   <meta name="robots" content="index, follow">
   <meta name="author" content="culoca.com">
-  <link rel="canonical" href={`https://culoca.com/item/${imageId}`}>
+  <link rel="canonical" href={`https://culoca.com/item/${$page.params.id}`}>
 
   <!-- Immediate fallback for loading state -->
   {#if !image}
-    <title>Bild {imageId} - culoca.com</title>
-    <meta property="og:title" content="Bild {imageId} - culoca.com">
-    <meta property="twitter:title" content="Bild {imageId} - culoca.com">
+    <title>Bild {$page.params.id} - culoca.com</title>
+    <meta property="og:title" content="Bild {$page.params.id} - culoca.com">
+    <meta property="twitter:title" content="Bild {$page.params.id} - culoca.com">
   {/if}
 
 </svelte:head>
@@ -3148,19 +3171,17 @@
     margin-top: 0.5rem;
   }
   .map-cancel-btn, .map-confirm-btn {
-    background: linear-gradient(135deg, #007bff, #0056b3);
+    position: relative;
+    background: var(--accent-color);
     color: #fff;
-    border: none;
+    /* border: none; */
     border-radius: 8px;
-    padding: 0.5rem 1.5rem;
-    font-size: 1rem;
+    padding: .5rem 1.5rem;
+    /* font-size: 1rem; */
+    top: -120px;
     font-weight: 600;
     cursor: pointer;
-    transition: background 0.2s, color 0.2s;
-  }
-  .map-cancel-btn:hover, .map-confirm-btn:hover {
-    background: var(--culoca-orange);
-    color: white;
+    /* transition: background .2s, color .2s; */
   }
 
   /* CSS für Map-Picker Fullscreen und Buttons */
@@ -3295,6 +3316,44 @@
     padding: 1.2rem;
     background: #fff;
     z-index: 2;
+  }
+
+  /* Mobile-optimierte Buttons für Map-Picker */
+  @media (max-width: 768px) {
+    .map-modal-footer-fullscreen {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      border-top: 1px solid #eee;
+      padding: 1rem 1.2rem;
+      justify-content: space-between;
+    }
+    
+    .map-cancel-btn, .map-confirm-btn {
+      padding: 0.8rem 1.5rem;
+      font-size: 1.1rem;
+      border-radius: 12px;
+      min-width: 100px;
+    }
+    
+    .map-coords-fullscreen {
+      padding: 0.5rem 1.2rem;
+      font-size: 1rem;
+      background: rgba(255, 255, 255, 0.9);
+      backdrop-filter: blur(5px);
+    }
+    
+    .map-modal-header-fullscreen {
+      padding: 1rem 1.2rem 0.5rem 1.2rem;
+    }
+    
+    .map-search-input {
+      font-size: 1rem;
+      padding: 0.6rem 1rem;
+    }
   }
 
   /* CSS für das Culoca O Editier-Icon */

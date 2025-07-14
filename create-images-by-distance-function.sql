@@ -6,7 +6,7 @@ CREATE OR REPLACE FUNCTION images_by_distance_optimized(
   user_lat DOUBLE PRECISION,
   user_lon DOUBLE PRECISION,
   max_radius_meters INTEGER DEFAULT 5000,
-  max_results INTEGER DEFAULT 100,
+  max_results INTEGER DEFAULT 2000,
   offset_count INTEGER DEFAULT 0
 )
 RETURNS TABLE(

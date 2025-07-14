@@ -5,12 +5,17 @@ export const GET = async ({ url, request }) => {
   try {
     // Query-Parameter: limit (default 100), user_id (optional), offset (optional)
     // New filter parameters: filter_user_id, lat, lon (for GPS-based filtering)
+    // Special parameter: for_map (for map clustering - bypasses limit)
     const limit = parseInt(url.searchParams.get('limit') || '100', 10);
     const offset = parseInt(url.searchParams.get('offset') || '0', 10);
     const user_id = url.searchParams.get('user_id');
     const filter_user_id = url.searchParams.get('filter_user_id');
     const lat = url.searchParams.get('lat');
     const lon = url.searchParams.get('lon');
+    const for_map = url.searchParams.get('for_map') === 'true';
+    
+    // For map clustering, use a much higher limit
+    const effectiveLimit = for_map ? 50000 : limit;
     
     // Extract user ID from Authorization header
     let current_user_id = null;
@@ -38,7 +43,7 @@ export const GET = async ({ url, request }) => {
       const { data, error: dbError } = await supabase.rpc('images_by_distance_optimized', {
         user_lat: parseFloat(lat),
         user_lon: parseFloat(lon),
-        max_results: limit,
+        max_results: effectiveLimit, // Use effectiveLimit for the function
         offset_count: offset,
         filter_user_id: filter_user_id || null
       });
@@ -86,7 +91,7 @@ export const GET = async ({ url, request }) => {
         .not('lon', 'is', null)
         .not('path_512', 'is', null)
         .order('created_at', { ascending: false })
-        .range(offset, offset + limit - 1);
+        .range(offset, offset + effectiveLimit - 1);
 
       // Apply user filtering and privacy filtering
       if (user_id) {

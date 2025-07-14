@@ -1005,27 +1005,45 @@
     }
   }
 
-  // Load all images for the map using API with privacy filtering
+  // Load all images for the map using direct database query for maximum performance
   async function loadAllImagesForMap() {
     try {
       console.log('[FullscreenMap] Loading all images for map...');
       
       const sessionData = get(sessionStore);
+      let current_user_id = null;
       
-      // Use the API endpoint with proper privacy filtering
-      let url = '/api/images?limit=10000&offset=0'; // Load all images at once
+      // Get current user ID from session
+      if (sessionData.isAuthenticated && sessionData.userId) {
+        current_user_id = sessionData.userId;
+      }
       
-      console.log(`[FullscreenMap] Fetching from: ${url}`);
-      const response = await authFetch(url);
-      const result = await response.json();
+      // Direct database query for maximum performance
+      let query = supabase
+        .from('items')
+        .select('id, path_512, path_2048, path_64, original_name, created_at, user_id, profile_id, title, description, lat, lon, width, height, is_private')
+        .not('lat', 'is', null)
+        .not('lon', 'is', null)
+        .not('path_512', 'is', null);
       
-      if (result.status !== 'success') {
-        console.error('[FullscreenMap] Error loading images:', result.message);
+      // Apply privacy filtering
+      if (current_user_id) {
+        // For authenticated users: show their own images (all) + other users' public images
+        query = query.or(`profile_id.eq.${current_user_id},is_private.eq.false,is_private.is.null`);
+      } else {
+        // For anonymous users: only show public images
+        query = query.or('is_private.eq.false,is_private.is.null');
+      }
+      
+      const { data: images, error } = await query;
+      
+      if (error) {
+        console.error('[FullscreenMap] Database error:', error);
         return;
       }
       
-      if (result.images) {
-        const processedImages = result.images.map((img: any) => ({
+      if (images) {
+        const processedImages = images.map((img: any) => ({
           id: img.id,
           src: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${img.path_512}`,
           srcHD: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${img.path_2048}`,
@@ -1043,7 +1061,7 @@
           is_private: img.is_private
         }));
         
-        console.log(`[FullscreenMap] Loaded ${processedImages.length} images for map (total available: ${result.totalCount})`);
+        console.log(`[FullscreenMap] Loaded ${processedImages.length} images for map directly from database`);
         
         // Update the internal images array
         allImages = processedImages;
