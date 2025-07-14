@@ -1,29 +1,20 @@
--- Delete existing 64px thumbnails and reset path_64 field
--- This will force recreation of all 64px thumbnails with higher quality
+-- Recreate 64px thumbnails for all items
+-- This script will regenerate all 64px thumbnails from the 512px versions
 
 -- Step 1: Delete all files from images-64 bucket
--- Note: This requires manual execution in Supabase Storage interface
--- Go to Storage > images-64 bucket and delete all files
+-- (This needs to be done manually in the Supabase dashboard)
 
--- Step 2: Reset path_64 field for all images
-UPDATE images 
-SET path_64 = NULL 
-WHERE path_64 IS NOT NULL;
-
--- Step 3: Verify the reset
+-- Step 2: Get all items that have 512px thumbnails but no 64px thumbnails
 SELECT 
-  COUNT(*) as total_images,
-  COUNT(path_64) as images_with_64px,
-  COUNT(*) - COUNT(path_64) as images_without_64px
-FROM images;
+    id,
+    path_512,
+    path_64
+FROM items
+WHERE path_512 IS NOT NULL 
+    AND (path_64 IS NULL OR path_64 = '');
 
--- Step 4: Show images that will need 64px recreation
-SELECT 
-  id,
-  original_name,
-  path_512,
-  path_64
-FROM images 
-WHERE path_64 IS NULL
-ORDER BY created_at DESC
-LIMIT 10; 
+-- Step 3: Get count of items that need 64px thumbnails
+SELECT COUNT(*) as items_needing_64px
+FROM items
+WHERE path_512 IS NOT NULL 
+    AND (path_64 IS NULL OR path_64 = ''); 

@@ -2,6 +2,7 @@ import { writable, derived } from 'svelte/store';
 import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
 import { page } from '$app/stores';
+import { get } from 'svelte/store';
 
 export interface UserFilter {
 	userId: string;
@@ -37,12 +38,15 @@ export interface FilterState {
 
 // Create the store
 function createFilterStore() {
+	// Lade gespeicherten State aus localStorage, falls vorhanden
+	const storedState = loadFromStorage();
 	const initialState: FilterState = {
 		userFilter: null,
 		locationFilter: null,
 		lastGpsPosition: null,
 		gpsAvailable: false,
-		referrerAccount: null
+		referrerAccount: null,
+		...storedState // Überschreibt ggf. mit gespeicherten Werten
 	};
 
 	const { subscribe, set, update } = writable<FilterState>(initialState);
@@ -251,6 +255,33 @@ function loadFromStorage(): Partial<FilterState> {
 		console.warn('Failed to load filters from localStorage:', error);
 		return {};
 	}
+}
+
+// Hilfsfunktion: Beste verfügbare GPS-Position bestimmen
+export function getEffectiveGpsPosition() {
+	const state = get(filterStore);
+	// 1. Location-Filter (z.B. aus Suchfeld)
+	if (state.locationFilter && state.locationFilter.lat && state.locationFilter.lon) {
+		return { lat: state.locationFilter.lat, lon: state.locationFilter.lon, source: 'locationFilter' };
+	}
+	// 2. Letzte GPS-Position (live)
+	if (state.lastGpsPosition && state.lastGpsPosition.lat && state.lastGpsPosition.lon) {
+		return { lat: state.lastGpsPosition.lat, lon: state.lastGpsPosition.lon, source: 'lastGpsPosition' };
+	}
+	// 3. Persistierter Wert (aus localStorage)
+	if (typeof window !== 'undefined') {
+		const stored = localStorage.getItem('culoca-filters');
+		if (stored) {
+			try {
+				const parsed = JSON.parse(stored);
+				if (parsed.lastGpsPosition && parsed.lastGpsPosition.lat && parsed.lastGpsPosition.lon) {
+					return { lat: parsed.lastGpsPosition.lat, lon: parsed.lastGpsPosition.lon, source: 'persisted' };
+				}
+			} catch (e) {}
+		}
+	}
+	// 4. Kein Wert verfügbar
+	return null;
 }
 
 // Export the store

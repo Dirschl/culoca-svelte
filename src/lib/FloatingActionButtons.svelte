@@ -1,6 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
   import { onMount } from 'svelte';
+  import { trackStore } from './trackStore';
   
   export let showScrollToTop = false;
   export let showTestMode = false;
@@ -8,6 +9,16 @@
   export let simulationMode = false;
   export let profileAvatar: string | null = null;
   export let showMapButton = false;
+  export let showTrackButtons = false;
+  
+  // Track state
+  let isRecording = false;
+  let currentTrack: any = null;
+  
+  trackStore.subscribe(state => {
+    isRecording = state.isRecording;
+    currentTrack = state.currentTrack;
+  });
   
   // Fullscreen state
   let isFullscreen = false;
@@ -63,6 +74,23 @@
     dispatch('map');
   }
   
+  function startTrack() {
+    const trackName = prompt('Name für die Tour eingeben:', `Tour ${new Date().toLocaleDateString()}`);
+    if (trackName) {
+      trackStore.startTrack(trackName);
+    }
+  }
+  
+  function stopTrack() {
+    if (confirm('Tour beenden?')) {
+      trackStore.stopTrack();
+    }
+  }
+  
+  function showTracks() {
+    dispatch('showTracks');
+  }
+  
   function handleFullscreenToggle() {
     if (!document.fullscreenElement) {
       // Enter fullscreen
@@ -114,7 +142,47 @@
 </script>
 
 <div class="fab-container">
-  <!-- Simulation/Test mode button (top) -->
+  <!-- Track Start/Stop FAB -->
+  {#if showTrackButtons}
+    <button
+      class="fab-button track {isRecording ? 'recording' : ''}"
+      aria-label={isRecording ? 'Track beenden' : 'Track starten'}
+      title={isRecording ? 'Track beenden' : 'Track starten'}
+      on:click={isRecording ? stopTrack : startTrack}
+    >
+      {#if isRecording}
+        <!-- Flaggen-Icon (Stop) -->
+        <svg class="track-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 22V2"/>
+          <path d="M4 4h16l-2 5 2 5H4"/>
+        </svg>
+      {:else}
+        <!-- Raketen-Icon (Start) -->
+        <svg class="track-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4.5 16.5L3 21l4.5-1.5"/>
+          <path d="M21 3s-6.5 0-13 6.5A8.38 8.38 0 0 0 3 13l8 8a8.38 8.38 0 0 0 6.5-5.5C21 9.5 21 3 21 3z"/>
+          <path d="M15 9l-6 6"/>
+        </svg>
+      {/if}
+    </button>
+    <!-- Track Übersicht FAB -->
+    <button
+      class="fab-button track-list"
+      aria-label="Track-Übersicht"
+      title="Track-Übersicht"
+      on:click={showTracks}
+    >
+      <!-- Clipboard/List-Icon -->
+      <svg class="track-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="9" y="2" width="6" height="4" rx="1"/>
+        <path d="M4 7h16v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7z"/>
+        <line x1="9" y1="12" x2="15" y2="12"/>
+        <line x1="9" y1="16" x2="15" y2="16"/>
+      </svg>
+    </button>
+  {/if}
+  
+  <!-- Simulation/Test mode button -->
   {#if showTestMode}
     <button 
       class="fab-button test-mode"
@@ -316,6 +384,32 @@
     height: 100%;
     object-fit: cover;
     border-radius: 50%;
+  }
+  
+  /* Track button specific styling */
+  .fab-button.track {
+    background: transparent;
+    border: none;
+  }
+  
+  .fab-button.track.recording {
+    animation: pulse 2s infinite;
+  }
+  
+  .fab-button.track-list {
+    background: transparent;
+    border: none;
+  }
+  
+  .track-icon {
+    font-size: 24px;
+    line-height: 1;
+  }
+  
+  @keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
   }
   
   /* Button specific colors - all transparent now */

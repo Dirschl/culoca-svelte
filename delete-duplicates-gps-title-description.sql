@@ -1,56 +1,41 @@
--- Delete duplicates based on GPS coordinates, title, and description
--- Keep the oldest image (smallest ID) and delete newer duplicates
+-- Delete duplicate items based on GPS coordinates, title, and description
+-- This script removes duplicate items that have the same location and content
 
--- First, let's see what duplicates exist
+-- Step 1: Find duplicate items (same lat/lon, title, and description)
 SELECT 
-    lat, 
-    lon, 
-    title, 
+    lat,
+    lon,
+    title,
     description,
-    COUNT(*) as duplicate_count,
-    array_agg(id ORDER BY id) as image_ids
-FROM images 
+    COUNT(*) as duplicate_count
+FROM items
 WHERE lat IS NOT NULL 
     AND lon IS NOT NULL 
-    AND title IS NOT NULL 
-    AND description IS NOT NULL
+    AND title IS NOT NULL
 GROUP BY lat, lon, title, description
 HAVING COUNT(*) > 1
-ORDER BY duplicate_count DESC, lat, lon;
+ORDER BY duplicate_count DESC;
 
--- Now delete the duplicates, keeping the oldest one (smallest ID)
-DELETE FROM images 
+-- Step 2: Delete duplicate items (keep the oldest one)
+-- WARNING: This will permanently delete items!
+-- Uncomment the following lines to actually delete:
+/*
+DELETE FROM items 
 WHERE id IN (
     SELECT id FROM (
         SELECT id,
                ROW_NUMBER() OVER (
                    PARTITION BY lat, lon, title, description 
-                   ORDER BY id
+                   ORDER BY created_at ASC
                ) as rn
-        FROM images 
+        FROM items
         WHERE lat IS NOT NULL 
             AND lon IS NOT NULL 
-            AND title IS NOT NULL 
-            AND description IS NOT NULL
-    ) ranked
-    WHERE rn > 1
+            AND title IS NOT NULL
+    ) t
+    WHERE t.rn > 1
 );
+*/
 
--- Verify the deletion by checking for remaining duplicates
-SELECT 
-    lat, 
-    lon, 
-    title, 
-    description,
-    COUNT(*) as remaining_count
-FROM images 
-WHERE lat IS NOT NULL 
-    AND lon IS NOT NULL 
-    AND title IS NOT NULL 
-    AND description IS NOT NULL
-GROUP BY lat, lon, title, description
-HAVING COUNT(*) > 1
-ORDER BY remaining_count DESC, lat, lon;
-
--- Show final count
-SELECT COUNT(*) as total_images_after_deletion FROM images; 
+-- Step 3: Show remaining items after deletion
+SELECT COUNT(*) as total_items_after_deletion FROM items; 

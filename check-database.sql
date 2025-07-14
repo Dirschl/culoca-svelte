@@ -1,58 +1,41 @@
--- Check database structure without making any changes
--- This script only queries the current state
+-- Check database structure and content
+-- This script provides an overview of the items table
 
--- Check if images table exists
-SELECT EXISTS (
-    SELECT FROM information_schema.tables 
-    WHERE table_schema = 'public' 
-    AND table_name = 'images'
-) as table_exists;
-
--- If table exists, show its structure
+-- Check table structure
 SELECT 
     column_name,
     data_type,
     is_nullable,
     column_default
 FROM information_schema.columns 
-WHERE table_schema = 'public' 
-AND table_name = 'images'
+WHERE table_name = 'items'
 ORDER BY ordinal_position;
 
--- Check RLS policies
+-- Check total count of items
+SELECT COUNT(*) as total_items FROM items;
+
+-- Check items with GPS coordinates
 SELECT 
-    policyname,
-    permissive,
-    roles,
-    cmd,
-    qual,
-    with_check
-FROM pg_policies 
-WHERE tablename = 'images';
+    COUNT(*) as items_with_gps,
+    COUNT(CASE WHEN lat IS NOT NULL AND lon IS NOT NULL THEN 1 END) as items_with_both_coords,
+    COUNT(CASE WHEN lat IS NULL OR lon IS NULL THEN 1 END) as items_without_gps
+FROM items;
 
--- Check if RLS is enabled
+-- Check items with different image sizes
 SELECT 
-    schemaname,
-    tablename,
-    rowsecurity
-FROM pg_tables 
-WHERE tablename = 'images';
+    COUNT(*) as total_items,
+    COUNT(path_512) as items_with_512px,
+    COUNT(path_2048) as items_with_2048px,
+    COUNT(path_64) as items_with_64px
+FROM items;
 
--- Count existing records
-SELECT COUNT(*) as total_images FROM images;
-
--- Show sample records (if any exist)
+-- Check recent items
 SELECT 
     id,
-    profile_id,
-    user_id,
-    path_512,
-    created_at
-FROM images 
-LIMIT 5;
-
--- Check if the images_by_distance function exists
-SELECT EXISTS (
-    SELECT FROM pg_proc 
-    WHERE proname = 'images_by_distance'
-) as function_exists; 
+    original_name,
+    created_at,
+    lat,
+    lon
+FROM items
+ORDER BY created_at DESC
+LIMIT 10; 

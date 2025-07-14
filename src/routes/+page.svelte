@@ -5,13 +5,14 @@
   import GalleryLayout from '$lib/GalleryLayout.svelte';
   import NewsFlash from '$lib/NewsFlash.svelte';
   import FloatingActionButtons from '$lib/FloatingActionButtons.svelte';
+import TrackModal from '$lib/TrackModal.svelte';
   import FullscreenMap from '$lib/FullscreenMap.svelte';
   import WelcomeSection from '$lib/WelcomeSection.svelte';
   import FilterBar from '$lib/FilterBar.svelte';
   import { beforeNavigate, afterNavigate } from '$app/navigation';
   import { showPublicContentModal } from '$lib/modalStore';
   import { welcomeVisible, hideWelcome, dismissWelcome, isWelcomeDismissed } from '$lib/welcomeStore';
-  import { filterStore, userFilter, locationFilter, hasActiveFilters } from '$lib/filterStore';
+  import { filterStore, userFilter, locationFilter, hasActiveFilters, getEffectiveGpsPosition } from '$lib/filterStore';
   import { page as pageStore } from '$app/stores';
 
   import { updateGalleryStats, galleryStats } from '$lib/galleryStats';
@@ -89,6 +90,122 @@
               pics.set(uniquePics);
     }
   }
+
+  // Funktion um zu prüfen, ob GPS-Daten für die Galerie verfügbar sind
+  function hasValidGpsForGallery(): boolean {
+    // Prüfe Location-Filter (höchste Priorität)
+    if ($filterStore.locationFilter) {
+      return true;
+    }
+    
+    // Prüfe letzten GPS-Wert im FilterStore
+    if ($filterStore.lastGpsPosition) {
+      return true;
+    }
+    
+    // Prüfe aktuellen GPS-Wert
+    if (userLat !== null && userLon !== null) {
+      return true;
+    }
+    
+    // Prüfe gespeicherten GPS-Wert
+    const lastLocation = loadLastKnownLocation();
+    if (lastLocation && lastLocation.lat !== null && lastLocation.lon !== null) {
+      return true;
+    }
+    
+    return false;
+  }
+
+  // Funktion um die besten verfügbaren GPS-Koordinaten zu bekommen
+  function getBestAvailableGps(): { lat: number; lon: number } | null {
+    // Prüfe Location-Filter (höchste Priorität)
+    if ($filterStore.locationFilter) {
+      return { lat: $filterStore.locationFilter.lat, lon: $filterStore.locationFilter.lon };
+    }
+    
+    // Prüfe letzten GPS-Wert im FilterStore
+    if ($filterStore.lastGpsPosition) {
+      return $filterStore.lastGpsPosition;
+    }
+    
+    // Prüfe aktuellen GPS-Wert
+    if (userLat !== null && userLon !== null) {
+      return { lat: userLat, lon: userLon };
+    }
+    
+    // Prüfe gespeicherten GPS-Wert
+    const lastLocation = loadLastKnownLocation();
+    if (lastLocation && lastLocation.lat !== null && lastLocation.lon !== null) {
+      return { lat: lastLocation.lat, lon: lastLocation.lon };
+    }
+    
+    return null;
+  }
+
+  // Neue Funktion: Warte auf GPS und lade dann Galerie
+  async function waitForGpsAndLoadGallery() {
+    console.log('🔄 [GPS] Waiting for GPS data before loading gallery...');
+    
+    // Prüfe zuerst gespeicherte GPS-Daten
+    const lastLocation = loadLastKnownLocation();
+    if (lastLocation && lastLocation.lat !== null && lastLocation.lon !== null) {
+      console.log('🔄 [GPS] Using saved GPS data:', lastLocation);
+      userLat = lastLocation.lat;
+      userLon = lastLocation.lon;
+      gpsStatus = 'active';
+      
+      // Lade Galerie mit gespeicherten GPS-Daten
+      pics.set([]);
+      page = 0;
+      hasMoreImages = true;
+      loadMore('initial mount with saved GPS');
+      return;
+    }
+    
+    // Keine gespeicherten GPS-Daten - warte auf GPS
+    console.log('🔄 [GPS] No saved GPS data, waiting for GPS...');
+    gpsStatus = 'checking';
+    
+    // Starte GPS-Tracking
+    if (!gpsTrackingActive && !gpsSimulationActive) {
+      startGPSTracking();
+    }
+    
+    // Warte bis zu 10 Sekunden auf GPS
+    let attempts = 0;
+    const maxAttempts = 20; // 20 * 500ms = 10 seconds
+    
+    const waitForGps = () => {
+      attempts++;
+      
+      if (userLat !== null && userLon !== null) {
+        console.log('🔄 [GPS] GPS data received, loading gallery...');
+        pics.set([]);
+        page = 0;
+        hasMoreImages = true;
+        loadMore('initial mount with live GPS');
+        return;
+      }
+      
+      if (attempts >= maxAttempts) {
+        console.log('🔄 [GPS] GPS timeout, loading gallery without GPS...');
+        gpsStatus = 'unavailable';
+        // Lade Galerie ohne GPS (normale Sortierung)
+        pics.set([]);
+        page = 0;
+        hasMoreImages = true;
+        loadMore('initial mount without GPS');
+        return;
+      }
+      
+      // Prüfe alle 500ms
+      setTimeout(waitForGps, 500);
+    };
+    
+    waitForGps();
+  }
+
   let useJustifiedLayout = true;
   let profileAvatar: string | null = null;
   let showDistance = false;
@@ -171,6 +288,7 @@
   
   // Fullscreen map mode
   let showFullscreenMap = false;
+  let showTrackModal = false;
   
   // GPS availability status with memory and timeout
   let gpsStatus: 'checking' | 'active' | 'denied' | 'unavailable' = 'checking';
@@ -972,7 +1090,7 @@
         data = result.data;
       } else {
         // FIXED: Use API instead of direct database query to ensure consistent privacy filtering
-        let url = `/api/images?limit=5000&offset=0`;
+        let url = `/api/items?limit=5000&offset=0`;
         
         console.log(`[Gallery] LoadAllImages using API: ${url}`);
         const response = await authFetch(url);
@@ -1031,7 +1149,7 @@
   async function getTotalImageCount() {
     try {
       // Use the API to get the total count that respects privacy filtering
-      let url = `/api/images?limit=1&offset=0`;
+      let url = `/api/items?limit=1&offset=0`;
       
       const response = await authFetch(url);
       const result = await response.json();
@@ -1093,80 +1211,50 @@
     });
     
     // Use GPS-based loading if location is available (from GPS or location filter)
-    if ((isLoggedIn && showDistance && userLat !== null && userLon !== null) || hasLocationFilter) {
+    if (hasValidGpsForGallery()) {
       const loadLat = effectiveLat!;
       const loadLon = effectiveLon!;
       console.log(`[Gallery] Loading images by distance from ${loadLat}, ${loadLon}`);
       
-      // FIXED: For first few pages, use normal loading with GPS parameters for distance sorting
-      if (page < 3) {
-        console.log(`[Gallery] Page ${page} < 3, using normal loading with GPS parameters for distance sorting`);
-        data = await loadImagesNormal();
-      } else {
-        try {
-          // Use the optimized function with filter support for later pages
-          const optimizedResult = await supabase.rpc('images_by_distance_optimized', {
-            user_lat: loadLat,
-            user_lon: loadLon,
-            max_results: Math.max(size, 2000),
-            offset_count: page * size,
-            filter_user_id: hasUserFilter ? currentFilters.userFilter!.userId : null
-          });
-          
-          if (optimizedResult.error) {
-            console.log('[Gallery] Optimized function not available, using fallback');
-            // Fallback: Use API endpoint with filter support
-            let fallbackUrl = `/api/images?limit=${Math.max(size, 2000)}&offset=${page * size}&lat=${loadLat}&lon=${loadLon}`;
-            if (hasUserFilter) {
-              fallbackUrl += `&filter_user_id=${currentFilters.userFilter!.userId}`;
-            }
-            console.log(`[Gallery] GPS fallback from: ${fallbackUrl}`);
-            const response = await authFetch(fallbackUrl);
-            const fallbackResult = await response.json();
-            
-            if (fallbackResult.status !== 'success') {
-              console.error('[Gallery] Fallback API also failed:', fallbackResult.message);
-              data = await loadImagesNormal();
-            } else {
-              data = fallbackResult.images;
-              console.log(`[Gallery] Loaded ${data?.length || 0} images via fallback API`);
-            }
-          } else {
-            data = optimizedResult.data;
-            console.log(`[Gallery] Loaded ${data?.length || 0} images via optimized function (page ${page})`);
-            
-            // FIXED: If GPS mode returns too few images, fall back to normal mode
-            if (data && data.length < 10 && page === 0) {
-              console.log(`[Gallery] GPS mode returned only ${data.length} images, falling back to normal mode`);
-              data = await loadImagesNormal();
-            }
-            
-            // Let the main logic handle hasMoreImages based on total count
-            console.log(`[Gallery] GPS optimized: got ${data?.length || 0} images`);
-            // Don't set hasMoreImages here - let the main logic handle it
-          }
-        } catch (error) {
-          console.error('[Gallery] Error with distance loading:', error);
-          data = await loadImagesNormal();
+      // Always use GPS-based loading for distance sorting
+      try {
+        // Use the API endpoint with GPS parameters for distance sorting
+        let url = `/api/items?limit=${size}&offset=${page * size}&lat=${loadLat}&lon=${loadLon}`;
+        
+        // Add user filter if active
+        if (hasUserFilter) {
+          url += `&filter_user_id=${currentFilters.userFilter!.userId}`;
+          console.log(`[Gallery] Adding user filter: ${currentFilters.userFilter!.username}`);
         }
-      }
-    } else {
-      // Normal mode: Use API endpoint with possible user filter
-      if (hasUserFilter) {
-        let url = `/api/images?limit=${Math.max(size, 2000)}&offset=${page * size}&filter_user_id=${currentFilters.userFilter!.userId}`;
-        console.log(`[Gallery] Loading with user filter from: ${url}`);
+        
+        console.log(`[Gallery] GPS loading from: ${url}`);
         const response = await authFetch(url);
         const result = await response.json();
+        
         if (result.status === 'success') {
           data = result.images;
-          console.log(`[Gallery] Loaded ${data?.length || 0} images with user filter`);
+          console.log(`[Gallery] GPS mode: got ${data?.length || 0} images, GPS mode: ${result.gpsMode}`);
         } else {
-          console.error('[Gallery] Error loading with user filter:', result.message);
+          console.error('[Gallery] GPS API error:', result.message);
           data = await loadImagesNormal();
         }
+      } catch (error) {
+        console.error('[Gallery] Error with GPS loading:', error);
+        data = await loadImagesNormal();
+      }
+
+    } else {
+      // Keine GPS-Daten verfügbar - warte auf GPS statt leeres Array zu laden
+      console.log('[Gallery] No GPS data available, waiting for GPS...');
+      
+      // Wenn wir im Distance-Modus sind, aber keine GPS-Daten haben, warten wir
+      if (showDistance) {
+        console.log('[Gallery] Distance mode enabled but no GPS, waiting...');
+        loading = false;
+        return; // Beende die Funktion und warte auf GPS
       } else {
-        // Normal pagination without filters
-        console.log(`[Gallery] Loading images in normal mode...`);
+        // Normal mode: lade ohne GPS
+        console.log('[Gallery] Normal mode, loading without GPS');
         data = await loadImagesNormal();
       }
     }
@@ -1174,6 +1262,8 @@
     console.log(`[Gallery] Final data result:`, data ? `${data.length} images` : 'null/undefined');
 
     if (data && data.length > 0) {
+      console.log(`[Gallery Debug] Processing ${data.length} images from API`);
+      
       const newPics = data.map((d: any) => {
         // Try to find the best available image path
         let bestSrc = '';
@@ -1203,14 +1293,16 @@
         };
       });
       
+      console.log(`[Gallery Debug] Mapped ${newPics.length} images with paths`);
+      
       // Debug: Check how many images have any path
       const imagesWithAnyPath = newPics.filter((pic: any) => pic.src);
       const imagesWithoutAnyPath = newPics.filter((pic: any) => !pic.src);
       
-      console.log(`[Gallery] Image processing: ${newPics.length} total, ${imagesWithAnyPath.length} with any path, ${imagesWithoutAnyPath.length} without any path`);
+      console.log(`[Gallery Debug] Image processing: ${newPics.length} total, ${imagesWithAnyPath.length} with any path, ${imagesWithoutAnyPath.length} without any path`);
       
       if (imagesWithoutAnyPath.length > 0) {
-        console.log(`[Gallery] Images without any path (first 5):`, imagesWithoutAnyPath.slice(0, 5).map((p: any) => ({
+        console.log(`[Gallery Debug] Images without any path (first 5):`, imagesWithoutAnyPath.slice(0, 5).map((p: any) => ({
           id: p.id,
           path_512: p.path_512,
           path_2048: p.path_2048,
@@ -1221,9 +1313,11 @@
       // Filter out images without any path
       const filteredPics = newPics.filter((pic: any) => pic.src);
       
+      console.log(`[Gallery Debug] After filtering out images without paths: ${filteredPics.length} images`);
+      
       // Debug: Log sample dimensions
       if (filteredPics.length > 0) {
-        console.log('[Gallery] Sample image dimensions:', filteredPics.slice(0, 3).map((p: any) => ({
+        console.log('[Gallery Debug] Sample image dimensions:', filteredPics.slice(0, 3).map((p: any) => ({
           id: p.id,
           width: p.width,
           height: p.height,
@@ -1231,18 +1325,20 @@
         })));
       }
       
-            // Prüfe auf Duplikate vor dem Hinzufügen
+      // Prüfe auf Duplikate vor dem Hinzufügen
       const currentPics = get(pics);
       const existingIds = new Set(currentPics.map((p: any) => p.id));
       const uniqueNewPics = filteredPics.filter((pic: any) => !existingIds.has(pic.id));
       
+      console.log(`[Gallery Debug] Duplicate check: ${filteredPics.length} filtered images, ${uniqueNewPics.length} unique (${filteredPics.length - uniqueNewPics.length} duplicates)`);
+      
       if (uniqueNewPics.length !== filteredPics.length) {
-        console.log(`[Gallery] Filtered out ${filteredPics.length - uniqueNewPics.length} duplicate images (${uniqueNewPics.length} unique remaining)`);
+        console.log(`[Gallery Debug] Filtered out ${filteredPics.length - uniqueNewPics.length} duplicate images (${uniqueNewPics.length} unique remaining)`);
       }
       
       // If we're getting too many duplicates, we might have reached the end of available images
       if (uniqueNewPics.length === 0 && filteredPics.length > 0) {
-        console.log(`[Gallery] All new images were duplicates, likely reached end of available images`);
+        console.log(`[Gallery Debug] All new images were duplicates, likely reached end of available images`);
         hasMoreImages = false;
       }
       
@@ -1252,15 +1348,17 @@
       // Check if this is a filter change (page 0 and reason includes 'filter')
       const isFilterChange = page === 0 && reason.includes('filter');
       
+      console.log(`[Gallery Debug] Processing mode: isFilterChange=${isFilterChange}, hasUserFilter=${hasUserFilter}, hasLocationFilter=${hasLocationFilter}`);
+      
       if (isFilterChange) {
         // For filter changes: replace all images instead of appending
         pics.set(uniqueNewPics);
-        console.log(`[Gallery] Filter change: replaced all images with ${uniqueNewPics.length} new images`);
+        console.log(`[Gallery Debug] Filter change: replaced all images with ${uniqueNewPics.length} new images`);
       } else if ((isLoggedIn && showDistance && userLat !== null && userLon !== null) || hasLocationFilter) {
         if (data[0]?.distance !== undefined) {
           // Optimierte Daten bereits sortiert - APPEND new images for pagination
           pics.update((p: any[]) => [...p, ...uniqueNewPics]);
-          console.log(`[Gallery] Added ${uniqueNewPics.length} optimized images (already sorted by distance, total: ${$pics.length})`);
+          console.log(`[Gallery Debug] Added ${uniqueNewPics.length} optimized images (already sorted by distance, total: ${$pics.length})`);
         } else {
           // GPS-Modus aber normale Daten - sortiere client-seitig nach Entfernung
           pics.update((p: any[]) => {
@@ -1269,7 +1367,7 @@
             
             // Always sort by distance, using filter location as reference point if available
             if (hasUserFilter || hasLocationFilter) {
-              console.log(`[Gallery] Active filter detected, sorting by distance from filter location`);
+              console.log(`[Gallery Debug] Active filter detected, sorting by distance from filter location`);
             }
             
             // Sortiere alle Bilder nach Entfernung (verwende effektive Koordinaten)
@@ -1279,38 +1377,41 @@
               return distA - distB;
             });
             
-            console.log(`[Gallery] Client-side sorted ${sortedImages.length} images by distance from ${effectiveLat}, ${effectiveLon}`);
+            console.log(`[Gallery Debug] Client-side sorted ${sortedImages.length} images by distance from ${effectiveLat}, ${effectiveLon}`);
             return sortedImages;
           });
         }
       } else {
-        // Normaler Modus ohne GPS - einfach anhängen
-        pics.update((p: any[]) => [...p, ...uniqueNewPics]);
-        console.log(`[Gallery] Added ${uniqueNewPics.length} unique images (total: ${$pics.length})`);
+        // Keine GPS-Daten verfügbar - zeige Hinweis
+        console.log('[Gallery Debug] No GPS data available, showing empty gallery with hint');
+        pics.set([]);
+        hasMoreImages = false;
       }
+      
+      console.log(`[Gallery Debug] Final gallery state: ${$pics.length} images in gallery`);
       
       // Update gallery stats
       const totalCount = await getTotalImageCount();
       updateGalleryStats($pics.length, totalCount);
       
       // Check if we have more images to load - use normal pagination for ALL modes
-      console.log(`[Gallery] Checking pagination: current=${$pics.length}, total=${totalCount}, hasMoreImages=${hasMoreImages}, page=${page}, data.length=${data?.length || 0}, uniqueNewPics.length=${uniqueNewPics?.length || 0}`);
+      console.log(`[Gallery Debug] Checking pagination: current=${$pics.length}, total=${totalCount}, hasMoreImages=${hasMoreImages}, page=${page}, data.length=${data?.length || 0}, uniqueNewPics.length=${uniqueNewPics?.length || 0}`);
       
       // Only set hasMoreImages to false if we've loaded all available images
       if ($pics.length >= totalCount) {
         hasMoreImages = false;
-        console.log(`[Gallery] All images loaded: ${$pics.length} of ${totalCount}`);
+        console.log(`[Gallery Debug] All images loaded: ${$pics.length} of ${totalCount}`);
       } else if (data && data.length === 0) {
         // If API returned no data, we've reached the end
         hasMoreImages = false;
-        console.log(`[Gallery] No more images available from API`);
+        console.log(`[Gallery Debug] No more images available from API`);
       } else if (uniqueNewPics && uniqueNewPics.length === 0 && data && data.length > 0) {
         // If we got data but all were duplicates, we've likely reached the end
         hasMoreImages = false;
-        console.log(`[Gallery] All new images were duplicates, reached end of available images`);
+        console.log(`[Gallery Debug] All new images were duplicates, reached end of available images`);
       } else {
         hasMoreImages = true;
-        console.log(`[Gallery] More images available: ${$pics.length} of ${totalCount}, hasMoreImages set to true`);
+        console.log(`[Gallery Debug] More images available: ${$pics.length} of ${totalCount}, hasMoreImages set to true`);
       }
       
       if (autoguide && uniqueNewPics.length > 0) {
@@ -1318,7 +1419,7 @@
       }
     } else {
       hasMoreImages = false;
-      console.log(`[Gallery] No data returned, hasMoreImages set to false (page ${page})`);
+      console.log(`[Gallery Debug] No data returned, hasMoreImages set to false (page ${page})`);
     }
 
     // Erhöhe page für alle Modi (normaler Modus und GPS-Modus)
@@ -1341,7 +1442,7 @@
     // SIMPLIFIED: Use the API endpoint that we know works
     try {
       // FIXED: Add GPS parameters for distance sorting if available
-      let url = `/api/images?limit=${Math.max(size, 2000)}&offset=${page * size}`;
+      let url = `/api/items?limit=${size}&offset=${page * size}`;
       
       // Add GPS parameters if available (from user GPS or location filter)
       if (effectiveLat !== null && effectiveLon !== null) {
@@ -1384,7 +1485,7 @@
     
     try {
       // Use a large limit to get all user images at once
-      let url = `/api/images?limit=2000&offset=0&user_id=${currentUser.id}`;
+      let url = `/api/items?limit=100&offset=0&user_id=${currentUser.id}`;
       
       console.log(`[Gallery AllUser] Fetching from: ${url}`);
       const response = await authFetch(url);
@@ -1774,7 +1875,7 @@
     
     try {
       // Get all images without path_512
-              let url = `/api/images?limit=2000&offset=0`;
+              let url = `/api/items?limit=100&offset=0`;
       const response = await authFetch(url);
       const result = await response.json();
       
@@ -1808,7 +1909,7 @@
       loading = false;
       
       // Load all images with a very large limit
-      let url = `/api/images?limit=2000&offset=0`;
+      let url = `/api/items?limit=100&offset=0`;
       if (userLat !== null && userLon !== null) {
         url += `&lat=${userLat}&lon=${userLon}`;
       }
@@ -1895,7 +1996,7 @@
       loading = false;
       
       // Load all images with a very large limit
-      let url = `/api/images?limit=2000&offset=0`;
+      let url = `/api/items?limit=100&offset=0`;
       if (userLat !== null && userLon !== null) {
         url += `&lat=${userLat}&lon=${userLon}`;
       }
@@ -2256,8 +2357,9 @@
         resortExistingImages();
         
         // Wenn GPS-Koordinaten verfügbar sind, lade Bilder nach Entfernung sortiert
-        // Aber nur wenn keine Suche aktiv ist
-        if (userLat !== null && userLon !== null && !searchQuery.trim()) {
+        // Aber nur wenn keine Suche aktiv ist und die Galerie noch leer ist
+        if (userLat !== null && userLon !== null && !searchQuery.trim() && $pics.length === 0) {
+          console.log('🔄 [GPS] Initial GPS position received, loading gallery...');
           pics.set([]);
           page = 0;
           hasMoreImages = true;
@@ -2346,6 +2448,15 @@
           }
         }
       }
+    }
+    
+    // Wenn die Galerie leer ist und GPS verfügbar wird, lade die Galerie
+    if ($pics.length === 0 && !searchQuery.trim() && showDistance) {
+      console.log('🔄 [GPS] Gallery empty and GPS available, loading gallery...');
+      pics.set([]);
+      page = 0;
+      hasMoreImages = true;
+      loadMore('GPS update with empty gallery');
     }
   }
 
@@ -2812,26 +2923,16 @@
         if (sessionPics) {
           pics.set(JSON.parse(sessionPics));
         } else {
-                   // Load gallery based on distance settings
-                    if (!initialSearchParam.trim()) {
-             if (showDistance) {
-               // For distance mode: only load if GPS is available
-               const lastLocation = loadLastKnownLocation();
-               if (lastLocation && lastLocation.lat !== null && lastLocation.lon !== null) {
-                 userLat = lastLocation.lat;
-                 userLon = lastLocation.lon;
-                           gpsStatus = 'active';
-          setTimeout(() => loadMore('initial mount with last known location'), 100);
-               } else {
-                 // No GPS data available
-                 gpsStatus = 'unavailable';
-                 showGPSMessage = false;
-               }
-             } else {
-               // Normal mode: always load
-               setTimeout(() => loadMore('initial mount normal'), 100);
-             }
-           }
+          // Load gallery based on distance settings
+          if (!initialSearchParam.trim()) {
+            if (showDistance) {
+              // For distance mode: wait for GPS data
+              waitForGpsAndLoadGallery();
+            } else {
+              // Normal mode: always load
+              setTimeout(() => loadMore('initial mount normal'), 100);
+            }
+          }
         }
       }
     });
@@ -2877,16 +2978,8 @@
           console.log('🔄 Reset gallery state for fallback loading');
           
           if (showDistance) {
-            const lastLocation = loadLastKnownLocation();
-            if (lastLocation && lastLocation.lat !== null && lastLocation.lon !== null) {
-              userLat = lastLocation.lat;
-              userLon = lastLocation.lon;
-              gpsStatus = 'active';
-              loadMore('fallback mount with last known location');
-            } else {
-              gpsStatus = 'unavailable';
-              showGPSMessage = false;
-            }
+            // For distance mode: wait for GPS data
+            waitForGpsAndLoadGallery();
           } else {
             loadMore('fallback mount normal');
           }
@@ -2901,36 +2994,7 @@
       showMap = true;
     });
     
-    // SIMPLIFIED: Force gallery load immediately after setup
-    console.log('🔄 [DEBUG] Forcing immediate gallery load after setup');
-    setTimeout(() => {
-      console.log('🔄 [DEBUG] About to call loadMore from onMount');
-      
-      // TEST: First test the API directly
-      authFetch('/api/images?limit=10&offset=0')
-        .then(response => response.json())
-        .then(result => {
-          console.log('🔄 [DEBUG] Direct API test result:', result);
-          if (result.status === 'success') {
-            console.log('🔄 [DEBUG] API works, got', result.images?.length, 'images');
-            loadMore('debug force load');
-          } else {
-            console.error('🔄 [DEBUG] API failed:', result.message);
-          }
-        })
-        .catch(error => {
-          console.error('🔄 [DEBUG] API test failed:', error);
-        });
-    }, 500);
-    
-    // DOUBLE SAFETY: Force another load after 2 seconds
-    setTimeout(() => {
-      console.log('🔄 [DEBUG] Second forced load attempt');
-      if ($pics.length === 0) {
-        console.log('🔄 [DEBUG] No pics loaded yet, forcing another load');
-        loadMore('debug second force load');
-      }
-    }, 2000);
+
     window.addEventListener('profileSaved', loadProfileAvatar);
     window.addEventListener('keydown', handleKeydown);
     if (showCompass && window.DeviceOrientationEvent) {
@@ -3613,6 +3677,7 @@
       }
     }}
   />
+  <TrackModal bind:isOpen={showTrackModal} />
 {/if}
 
 <!-- Galerie bleibt erhalten -->
@@ -3695,6 +3760,45 @@
           <button class="dismiss-btn" on:click={() => showNoItemsMessage = false}>
             Verstanden
           </button>
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  <!-- Keine GPS-Daten verfügbar Meldung -->
+  {#if !hasValidGpsForGallery() && $pics.length === 0 && !searchQuery.trim() && !isSearching}
+    <div class="no-items-message">
+      <div class="no-items-content">
+        <div class="no-items-icon">📡</div>
+        <h3>Keine GPS-Daten verfügbar</h3>
+        <p>Aktuell sind keine verwertbaren GPS-Lokationsdaten verfügbar.</p>
+        <p><strong>Du kannst trotzdem Culoca nutzen:</strong></p>
+        <div class="no-items-benefits">
+          <div class="benefit-item">
+            <span class="benefit-icon">🔍</span>
+            <span>Suche nach Bildern</span>
+          </div>
+          <div class="benefit-item">
+            <span class="benefit-icon">🗺️</span>
+            <span>Kartenmodus verwenden</span>
+          </div>
+        </div>
+        <div class="no-items-actions">
+          <button class="map-nav-btn" on:click={() => showMap = true}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM10 5.47l4 1.4v11.66l-4-1.4V5.47z"/>
+            </svg>
+            Karte öffnen
+          </button>
+          <button class="search-btn" on:click={() => showSearchField = true}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+            </svg>
+            Suche öffnen
+          </button>
+        </div>
+        <div class="no-items-note">
+          <p><strong>Tipp:</strong> Erlaube GPS-Zugriff in deinem Browser, um Bilder nach Entfernung zu sehen.</p>
         </div>
       </div>
     </div>
@@ -5150,7 +5254,7 @@
     flex-direction: column;
   }
 
-  .map-nav-btn, .dismiss-btn {
+  .map-nav-btn, .dismiss-btn, .search-btn {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -5183,6 +5287,16 @@
   .dismiss-btn:hover {
     background: var(--border-color);
     color: var(--text-primary);
+  }
+
+  .search-btn {
+    background: #0066cc;
+    color: white;
+  }
+
+  .search-btn:hover {
+    background: #0052a3;
+    transform: translateY(-1px);
   }
 
   .no-items-benefits {

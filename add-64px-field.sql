@@ -1,8 +1,8 @@
--- Add path_64 field to images table for 64px thumbnails
-ALTER TABLE images ADD COLUMN IF NOT EXISTS path_64 TEXT;
+-- Add 64px thumbnail field to items table
+-- This script adds a path_64 column for 64px thumbnails
 
--- Add index for better performance
-CREATE INDEX IF NOT EXISTS idx_images_path_64 ON images(path_64);
+-- Add path_64 column
+ALTER TABLE items ADD COLUMN IF NOT EXISTS path_64 TEXT;
 
--- Add comment to document the new field
-COMMENT ON COLUMN images.path_64 IS 'Path to 64px thumbnail in storage (for map markers)'; 
+-- Add comment for the new column
+COMMENT ON COLUMN items.path_64 IS 'Path to 64px thumbnail in storage (for map markers)'; 

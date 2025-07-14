@@ -1,53 +1,41 @@
--- Delete all images without GPS coordinates (lat IS NULL or lon IS NULL)
+-- Delete items without GPS coordinates
+-- This script removes items that don't have latitude/longitude data
 
--- First, let's see how many images will be deleted
+-- Step 1: Count items without GPS coordinates
 SELECT 
-    COUNT(*) as images_without_gps,
-    COUNT(CASE WHEN lat IS NULL THEN 1 END) as lat_null_count,
-    COUNT(CASE WHEN lon IS NULL THEN 1 END) as lon_null_count,
-    COUNT(CASE WHEN lat IS NULL AND lon IS NULL THEN 1 END) as both_null_count
-FROM images 
-WHERE lat IS NULL OR lon IS NULL;
+    COUNT(*) as total_items,
+    COUNT(lat) as items_with_lat,
+    COUNT(lon) as items_with_lon,
+    COUNT(*) - COUNT(lat) as items_without_lat,
+    COUNT(*) - COUNT(lon) as items_without_lon
+FROM items;
 
--- Show some examples of images that will be deleted
+-- Step 2: Show items without GPS coordinates (first 10)
 SELECT 
     id,
     original_name,
-    title,
-    description,
+    created_at,
     lat,
-    lon,
-    created_at
-FROM images 
+    lon
+FROM items
 WHERE lat IS NULL OR lon IS NULL
 ORDER BY created_at DESC
 LIMIT 10;
 
--- Now delete all images without GPS coordinates
-DELETE FROM images 
-WHERE lat IS NULL OR lon IS NULL;
+-- Step 3: Delete items without GPS coordinates
+-- WARNING: This will permanently delete items!
+-- Uncomment the following line to actually delete:
+-- DELETE FROM items WHERE lat IS NULL OR lon IS NULL;
 
--- Verify the deletion
+-- Step 4: Verify deletion
 SELECT 
-    COUNT(*) as total_images_after_deletion,
-    COUNT(CASE WHEN lat IS NOT NULL AND lon IS NOT NULL THEN 1 END) as images_with_gps,
-    COUNT(CASE WHEN lat IS NULL OR lon IS NULL THEN 1 END) as images_without_gps
-FROM images;
+    COUNT(*) as total_items_after_deletion,
+    COUNT(lat) as items_with_lat_after,
+    COUNT(lon) as items_with_lon_after
+FROM items;
 
--- Show final statistics
+-- Step 5: Show remaining items without GPS (should be 0)
 SELECT 
-    'Total images remaining' as status,
-    COUNT(*) as count
-FROM images
-UNION ALL
-SELECT 
-    'Images with GPS' as status,
-    COUNT(*) as count
-FROM images
-WHERE lat IS NOT NULL AND lon IS NOT NULL
-UNION ALL
-SELECT 
-    'Images without GPS' as status,
-    COUNT(*) as count
-FROM images
+    COUNT(*) as remaining_items_without_gps
+FROM items
 WHERE lat IS NULL OR lon IS NULL; 

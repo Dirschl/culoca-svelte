@@ -39,9 +39,9 @@ async function fetchImages(isLoadMore = false) {
     hasMoreImages = true;
   }
 
-  let url = `/api/images?limit=${limit}&offset=${currentOffset}`;
+  let url = `/api/items?limit=${limit}&offset=${currentOffset}`;
   if (mode === 'eigene' && userId) {
-    url += `&user_id=${userId}`;
+    url += `&filter_user_id=${userId}`;
   }
   console.log('NewsFlash: Fetching images from:', url, 'Mode:', mode, 'UserId:', userId, 'LoadMore:', isLoadMore);
   try {

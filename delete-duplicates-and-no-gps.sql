@@ -1,78 +1,59 @@
--- SQL Script to delete duplicates and entries without GPS data
--- WARNING: This will permanently delete data. Make sure to backup first!
+-- Delete duplicates and items without GPS coordinates
+-- This script removes duplicate items and items without GPS data
 
--- 1. First, let's see what we're dealing with
-SELECT 
-    COUNT(*) as total_images,
-    COUNT(CASE WHEN lat IS NULL OR lon IS NULL THEN 1 END) as images_without_gps,
-    COUNT(CASE WHEN lat IS NOT NULL AND lon IS NOT NULL THEN 1 END) as images_with_gps
-FROM images;
+-- Step 1: Count total items
+SELECT COUNT(*) as total_items
+FROM items;
 
--- 2. Show duplicates based on path_512 (same image file)
-SELECT 
-    path_512,
-    COUNT(*) as duplicate_count,
-    MIN(id) as keep_id,
-    ARRAY_AGG(id ORDER BY id) as all_ids
-FROM images 
-WHERE path_512 IS NOT NULL
-GROUP BY path_512 
-HAVING COUNT(*) > 1
-ORDER BY duplicate_count DESC;
-
--- 3. Show duplicates based on GPS coordinates (same location)
+-- Step 2: Find duplicate items (same lat/lon and title)
 SELECT 
     lat,
     lon,
-    COUNT(*) as duplicate_count,
-    MIN(id) as keep_id,
-    ARRAY_AGG(id ORDER BY id) as all_ids
-FROM images 
-WHERE lat IS NOT NULL AND lon IS NOT NULL
-GROUP BY lat, lon
+    title,
+    COUNT(*) as duplicate_count
+FROM items
+WHERE lat IS NOT NULL 
+    AND lon IS NOT NULL 
+    AND title IS NOT NULL
+GROUP BY lat, lon, title
 HAVING COUNT(*) > 1
 ORDER BY duplicate_count DESC;
 
--- 4. DELETE entries without GPS data
--- Uncomment the following line to actually delete:
--- DELETE FROM images WHERE lat IS NULL OR lon IS NULL;
-
--- 5. DELETE duplicates based on path_512 (keep the oldest entry)
--- Uncomment the following lines to actually delete:
-/*
-DELETE FROM images 
-WHERE id IN (
-    SELECT id FROM (
-        SELECT id,
-               ROW_NUMBER() OVER (PARTITION BY path_512 ORDER BY created_at ASC) as rn
-        FROM images 
-        WHERE path_512 IS NOT NULL
-    ) t 
-    WHERE t.rn > 1
-);
-*/
-
--- 6. DELETE duplicates based on GPS coordinates (keep the oldest entry)
--- Uncomment the following lines to actually delete:
-/*
-DELETE FROM images 
-WHERE id IN (
-    SELECT id FROM (
-        SELECT id,
-               ROW_NUMBER() OVER (PARTITION BY lat, lon ORDER BY created_at ASC) as rn
-        FROM images 
-        WHERE lat IS NOT NULL AND lon IS NOT NULL
-    ) t 
-    WHERE t.rn > 1
-);
-*/
-
--- 7. Final count after cleanup
--- Run this after the deletions to see the results:
-/*
+-- Step 3: Show items without GPS coordinates
 SELECT 
-    COUNT(*) as total_images_after_cleanup,
-    COUNT(CASE WHEN lat IS NULL OR lon IS NULL THEN 1 END) as images_without_gps_after,
-    COUNT(CASE WHEN lat IS NOT NULL AND lon IS NOT NULL THEN 1 END) as images_with_gps_after
-FROM images;
-*/ 
+    COUNT(*) as items_without_gps
+FROM items
+WHERE lat IS NULL OR lon IS NULL;
+
+-- Step 4: Delete items without GPS coordinates
+-- WARNING: This will permanently delete items!
+-- Uncomment the following line to actually delete:
+-- DELETE FROM items WHERE lat IS NULL OR lon IS NULL;
+
+-- Step 5: Delete duplicate items (keep the oldest one)
+-- WARNING: This will permanently delete items!
+-- Uncomment the following lines to actually delete:
+/*
+DELETE FROM items 
+WHERE id IN (
+    SELECT id FROM (
+        SELECT id,
+               ROW_NUMBER() OVER (
+                   PARTITION BY lat, lon, title 
+                   ORDER BY created_at ASC
+               ) as rn
+        FROM items
+        WHERE lat IS NOT NULL 
+            AND lon IS NOT NULL 
+            AND title IS NOT NULL
+    ) t
+    WHERE t.rn > 1
+);
+*/
+
+-- Step 6: Verify cleanup
+SELECT 
+    COUNT(*) as total_items_after_cleanup,
+    COUNT(CASE WHEN lat IS NOT NULL AND lon IS NOT NULL THEN 1 END) as items_with_gps,
+    COUNT(CASE WHEN lat IS NULL OR lon IS NULL THEN 1 END) as items_without_gps
+FROM items; 

@@ -1,0 +1,12 @@
+{
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [
+        { "type": "host", "value": "www.culoca.com" }
+      ],
+      "destination": "https://culoca.com/:path*",
+      "permanent": true
+    }
+  ]
+} 

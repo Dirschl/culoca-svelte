@@ -35,6 +35,15 @@
   let accountnameMessage = '';
   let accountnameTimeout: NodeJS.Timeout;
   let privacy_mode = 'public'; // 'public', 'private', 'all'
+  
+  // GPS Tracking Settings
+  let homeLat = '';
+  let homeLon = '';
+  let gpsTrackingEnabled = false;
+  let gpxExportEnabled = false;
+  let lastDataShareEnabled = false;
+  let gpsEmail = '';
+  let showGpsSettings = false;
 
   let errorLogExists = false;
   let errorLogUrl = '';
@@ -109,6 +118,14 @@
         show_website = data.show_website ?? false;
         show_social = data.show_social ?? false;
         show_email = data.show_email ?? false;
+        
+        // Load GPS settings
+        homeLat = data.home_lat ? data.home_lat.toString() : '';
+        homeLon = data.home_lon ? data.home_lon.toString() : '';
+        gpsTrackingEnabled = data.gps_tracking_enabled ?? false;
+        gpxExportEnabled = data.gpx_export_enabled ?? false;
+        lastDataShareEnabled = data.last_data_share_enabled ?? false;
+        gpsEmail = data.gps_email || '';
       }
     } catch (error) {
       console.error('Error loading profile:', error);
@@ -221,7 +238,13 @@
         avatar_url: avatarPath,
         updated_at: new Date().toISOString(),
         email,
-        show_email
+        show_email,
+        home_lat: homeLat ? parseFloat(homeLat) : null,
+        home_lon: homeLon ? parseFloat(homeLon) : null,
+        gps_tracking_enabled: gpsTrackingEnabled,
+        gpx_export_enabled: gpxExportEnabled,
+        last_data_share_enabled: lastDataShareEnabled,
+        gps_email: gpsEmail
       };
       
       // Update profile
@@ -489,6 +512,87 @@
                   </p>
                 {/if}
               </div>
+            </div>
+          </div>
+
+          <!-- GPS-Tracking-Einstellungen -->
+          <div class="card">
+            <h3 class="section-title">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+              </svg>
+              GPS-Tracking & Home Base
+            </h3>
+            
+            <div class="form-group">
+              <label for="home-lat">Home Base - Breitengrad</label>
+              <input 
+                id="home-lat" 
+                type="number" 
+                step="0.000001"
+                bind:value={homeLat} 
+                placeholder="48.31934"
+              />
+              <span class="help-text">Deine Standard-Position für GPS-basierte Funktionen</span>
+            </div>
+
+            <div class="form-group">
+              <label for="home-lon">Home Base - Längengrad</label>
+              <input 
+                id="home-lon" 
+                type="number" 
+                step="0.000001"
+                bind:value={homeLon} 
+                placeholder="12.71849"
+              />
+              <span class="help-text">Deine Standard-Position für GPS-basierte Funktionen</span>
+            </div>
+
+            <div class="form-group">
+              <label for="gps-email">GPS-Email für Track-Export</label>
+              <input 
+                id="gps-email" 
+                type="email" 
+                bind:value={gpsEmail} 
+                placeholder="deine-email@example.com"
+              />
+              <span class="help-text">Email-Adresse für automatischen Track-Versand</span>
+            </div>
+
+            <div class="gps-settings">
+              <h4>GPS-Tracking Einstellungen</h4>
+              
+              <label class="toggle-label">
+                <input type="checkbox" bind:checked={gpsTrackingEnabled} />
+                <span class="toggle-switch"></span>
+                <span class="toggle-text">GPS-Tracking aktivieren</span>
+              </label>
+              <span class="help-text">Erlaubt die Aufzeichnung von GPS-Tracks für Touren</span>
+
+              <label class="toggle-label">
+                <input type="checkbox" bind:checked={gpxExportEnabled} />
+                <span class="toggle-switch"></span>
+                <span class="toggle-text">GPX-Export per Email aktivieren</span>
+              </label>
+              <span class="help-text">Erlaubt das Senden von GPS-Tracks per Email</span>
+
+              <label class="toggle-label">
+                <input type="checkbox" bind:checked={lastDataShareEnabled} />
+                <span class="toggle-switch"></span>
+                <span class="toggle-text">Letzte GPS-Daten teilen</span>
+              </label>
+              <span class="help-text">Teilt deine letzte bekannte Position für bessere Navigation</span>
+            </div>
+
+            <div class="gps-explanation">
+              <p class="help-text">
+                <strong>Home Base:</strong> Diese Koordinaten werden als Fallback verwendet, wenn keine aktuelle GPS-Position verfügbar ist. 
+                Sie verbessern die Performance der Galerie und Navigation.
+              </p>
+              <p class="help-text">
+                <strong>GPS-Tracking:</strong> Ermöglicht die Aufzeichnung von Touren und Routen direkt in der App. 
+                Alle Daten werden lokal gespeichert und können exportiert werden.
+              </p>
             </div>
           </div>
 
@@ -1263,6 +1367,51 @@
   }
 
   .privacy-explanation strong {
+    color: var(--text-primary);
+  }
+
+  /* GPS Settings Styles */
+  .gps-settings {
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border-color);
+  }
+
+  .gps-settings h4 {
+    margin: 0 0 1rem 0;
+    font-size: 1.1rem;
+    color: var(--text-primary);
+  }
+
+  .gps-settings .toggle-label {
+    margin-bottom: 0.5rem;
+  }
+
+  .gps-settings .help-text {
+    margin-bottom: 1rem;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+  }
+
+  .gps-explanation {
+    margin-top: 1.5rem;
+    padding: 1rem;
+    background: var(--bg-tertiary);
+    border-radius: 6px;
+    border-left: 4px solid var(--accent-color);
+  }
+
+  .gps-explanation .help-text {
+    margin: 0 0 0.75rem 0;
+    font-style: normal;
+    line-height: 1.5;
+  }
+
+  .gps-explanation .help-text:last-child {
+    margin-bottom: 0;
+  }
+
+  .gps-explanation strong {
     color: var(--text-primary);
   }
 

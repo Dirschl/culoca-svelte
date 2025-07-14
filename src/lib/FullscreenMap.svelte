@@ -6,6 +6,10 @@
   import { filterStore, userFilter, locationFilter, shouldShowCustomerBranding } from './filterStore';
   import { sessionStore } from './sessionStore';
   import { authFetch } from './authFetch';
+  import { trackStore } from './trackStore';
+  import { downloadTrack, emailTrack } from './trackExport';
+  import FloatingActionButtons from './FloatingActionButtons.svelte';
+  import TrackModal from './TrackModal.svelte';
   
   export let images: any[] = [];
   export let userLat: number | null = null;
@@ -20,6 +24,8 @@
   let userMarker: any = null;
   let imageMarkers: any[] = [];
   let markerClusterGroup: any = null;
+  let trackLayers: any[] = [];
+  let currentTrackLayer: any = null;
   let savedZoom = 18; // Default to max zoom
   let savedCenter: [number, number] | null = null;
   let isHybridView = false; // Track current view mode
@@ -36,6 +42,9 @@
   let orientationListener: ((event: DeviceOrientationEvent) => void) | null = null;
   let useCompass = false; // Toggle between GPS and compass mode
   let simulationActive = false; // Track if GPS simulation is active
+  let showTracks = false; // Toggle track visibility
+  let savedTracks: any[] = [];
+  let showTrackModal = false;
   let lastSimulatedPosition: { lat: number; lon: number; timestamp: number } | null = null;
   
   // Previous position for movement tracking
@@ -48,8 +57,14 @@
   // Internal images array for clustering
   let allImages: any[] = [];
   
-  // Load saved map state from localStorage
+    // Load saved map state from localStorage
   function loadMapState() {
+    // Load track visibility state
+    if (typeof window !== 'undefined') {
+      const savedTrackState = localStorage.getItem('culoca-show-tracks');
+      showTracks = savedTrackState === 'true';
+    }
+    
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('culoca-map-state');
       if (saved) {
@@ -78,6 +93,9 @@
         showDistance: showDistance
       };
       localStorage.setItem('culoca-map-state', JSON.stringify(state));
+      
+      // Save track visibility state
+      localStorage.setItem('culoca-show-tracks', showTracks.toString());
     }
   }
   
@@ -95,6 +113,113 @@
   function getDistanceFromLatLonInMeters(lat1: number, lon1: number, lat2: number, lon2: number): string {
     const meters = getDistanceInMeters(lat1, lon1, lat2, lon2);
     return meters >= 1000 ? (meters / 1000).toFixed(1).replace('.', ',') + 'km' : meters + 'm';
+  }
+
+  // Track visualization functions
+  function displayTrackOnMap(track: any, map: any) {
+    if (!track || !track.points || track.points.length < 2) return;
+    
+    const coordinates = track.points.map((p: any) => [p.lat, p.lon]);
+    
+    const trackLine = (window as any).L.polyline(coordinates, {
+      color: '#ff6b6b',
+      weight: 4,
+      opacity: 0.8,
+      dashArray: '5, 10'
+    }).addTo(map);
+    
+    // Add start marker
+    const startPoint = track.points[0];
+    const startMarker = (window as any).L.marker([startPoint.lat, startPoint.lon], {
+      icon: (window as any).L.divIcon({ 
+        className: 'track-start-marker', 
+        html: '🚀',
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
+      })
+    }).addTo(map);
+    
+    // Add end marker if track is finished
+    if (track.points.length > 1 && track.endTime) {
+      const endPoint = track.points[track.points.length - 1];
+      const endMarker = (window as any).L.marker([endPoint.lat, endPoint.lon], {
+        icon: (window as any).L.divIcon({ 
+          className: 'track-end-marker', 
+          html: '🏁',
+          iconSize: [24, 24],
+          iconAnchor: [12, 12]
+        })
+      }).addTo(map);
+      
+      // Add popup with track info
+      const popupContent = `
+        <div class="track-popup">
+          <h4>${track.name}</h4>
+          <p><strong>Distanz:</strong> ${(track.totalDistance / 1000).toFixed(2)}km</p>
+          <p><strong>Dauer:</strong> ${formatDuration(track.totalDuration)}</p>
+          <p><strong>Punkte:</strong> ${track.points.length}</p>
+        </div>
+      `;
+      endMarker.bindPopup(popupContent);
+    }
+    
+    trackLayers.push(trackLine);
+    return trackLine;
+  }
+
+  function formatDuration(ms: number): string {
+    const seconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    
+    if (hours > 0) {
+      return `${hours}h ${minutes % 60}m`;
+    } else if (minutes > 0) {
+      return `${minutes}m ${seconds % 60}s`;
+    } else {
+      return `${seconds}s`;
+    }
+  }
+
+  function toggleTracks() {
+    showTracks = !showTracks;
+    saveMapState();
+    
+    if (showTracks) {
+      // Load and display all saved tracks
+      trackStore.subscribe(state => {
+        savedTracks = state.savedTracks;
+        savedTracks.forEach(track => {
+          displayTrackOnMap(track, map);
+        });
+      })();
+    } else {
+      // Remove all track layers
+      trackLayers.forEach(layer => {
+        if (map && layer) {
+          map.removeLayer(layer);
+        }
+      });
+      trackLayers = [];
+    }
+  }
+
+  function updateCurrentTrack() {
+    trackStore.subscribe(state => {
+      if (state.currentTrack && state.isRecording) {
+        // Remove previous current track layer
+        if (currentTrackLayer && map) {
+          map.removeLayer(currentTrackLayer);
+        }
+        
+        // Display current track
+        currentTrackLayer = displayTrackOnMap(state.currentTrack, map);
+      } else if (currentTrackLayer && map) {
+        // Remove current track layer if not recording
+        map.removeLayer(currentTrackLayer);
+        currentTrackLayer = null;
+      }
+    })();
   }
 
   // Filter images based on active filters and privacy
@@ -1081,20 +1206,68 @@
     console.log(`[FullscreenMap] Reactive update: ${allImages.length} images available`);
     addImageMarkers();
   }
+
+  async function sendLastTrackEmail() {
+    // Sende die letzte gespeicherte Tour per Email (öffnet Mailto-Link mit GPX im Body)
+    if (!savedTracks.length) return alert('Keine gespeicherte Tour gefunden!');
+    const lastTrack = savedTracks[savedTracks.length - 1];
+    const gpx = downloadTrack(lastTrack, 'gpx');
+    // Öffne Email-Client mit GPX als Text (Anhänge via mailto sind nicht möglich)
+    const subject = encodeURIComponent(`GPS-Track: ${lastTrack.name}`);
+    const body = encodeURIComponent('Hier ist dein GPS-Track (GPX):\n\n' + gpx);
+    window.open(`mailto:?subject=${subject}&body=${body}`);
+  }
 </script>
 
 <div class="fullscreen-map">
   <!-- Filter Bar for Map -->
   <FilterBar showOnMap={true} userLat={userLat} userLon={userLon} isPermalinkMode={false} permalinkImageId={null} showDistance={true} isLoggedIn={true} />
-  
   <!-- Map container -->
   <div bind:this={mapEl} class="map-container"></div>
-  
   <!-- Logo (exactly same position as main page) -->
   <img src="/culoca-logo-512px.png" alt="Culoca" class="culoca-logo" />
-  
-  <!-- FAB Container -->
+  <!-- FAB-Leiste -->
   <div class="fab-container">
+    <!-- GPS-Track-FABs (oben, exakt wie die anderen FABs) -->
+    <button
+      class="fab-button track {$trackStore.isRecording ? 'recording' : ''}"
+      aria-label={$trackStore.isRecording ? 'Track beenden' : 'Track starten'}
+      title={$trackStore.isRecording ? 'Track beenden' : 'Track starten'}
+      on:click={$trackStore.isRecording ? trackStore.stopTrack : () => {
+        const trackName = prompt('Name für die Tour eingeben:', `Tour ${new Date().toLocaleDateString()}`);
+        if (trackName) trackStore.startTrack(trackName);
+      }}
+    >
+      {#if $trackStore.isRecording}
+        <!-- Flaggen-Icon (Stop) -->
+        <svg class="track-icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 22V2"/>
+          <path d="M4 4h16l-2 5 2 5H4"/>
+        </svg>
+      {:else}
+        <!-- Raketen-Icon (Start) -->
+        <svg class="track-icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4.5 16.5L3 21l4.5-1.5"/>
+          <path d="M21 3s-6.5 0-13 6.5A8.38 8.38 0 0 0 3 13l8 8a8.38 8.38 0 0 0 6.5-5.5C21 9.5 21 3 21 3z"/>
+          <path d="M15 9l-6 6"/>
+        </svg>
+      {/if}
+    </button>
+    <button
+      class="fab-button track-list"
+      aria-label="Track-Übersicht"
+      title="Track-Übersicht"
+      on:click={() => showTrackModal = true}
+    >
+      <!-- Clipboard/List-Icon -->
+      <svg class="track-icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="9" y="2" width="6" height="4" rx="1"/>
+        <path d="M4 7h16v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7z"/>
+        <line x1="9" y1="12" x2="15" y2="12"/>
+        <line x1="9" y1="16" x2="15" y2="16"/>
+      </svg>
+    </button>
+    <!-- Bestehende Karten-FABs -->
     <!-- View Toggle FAB -->
     <button 
       class="view-toggle-fab"
@@ -1121,7 +1294,6 @@
         </svg>
       {/if}
     </button>
-
     <!-- Display Mode Toggle FAB -->
     <button 
       class="display-toggle-fab"
@@ -1140,7 +1312,6 @@
         </svg>
       {/if}
     </button>
-
     <!-- Auto-Rotate FAB -->
     <button 
       class="auto-rotate-fab"
@@ -1164,7 +1335,6 @@
         </svg>
       {/if}
     </button>
-
     <!-- Grid FAB -->
     <button 
       class="grid-fab"
@@ -1174,17 +1344,13 @@
       <!-- Gallery Grid Icon for back to gallery -->
       <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <rect x="3" y="3" width="6" height="6"/>
-        <rect x="9" y="3" width="6" height="6"/>
         <rect x="15" y="3" width="6" height="6"/>
-        <rect x="3" y="9" width="6" height="6"/>
-        <rect x="9" y="9" width="6" height="6"/>
-        <rect x="15" y="9" width="6" height="6"/>
         <rect x="3" y="15" width="6" height="6"/>
-        <rect x="9" y="15" width="6" height="6"/>
         <rect x="15" y="15" width="6" height="6"/>
       </svg>
     </button>
   </div>
+  <TrackModal bind:isOpen={showTrackModal} />
 </div>
 
 <style>
@@ -1241,7 +1407,9 @@
   .view-toggle-fab,
   .display-toggle-fab,
   .auto-rotate-fab,
-  .grid-fab {
+  .grid-fab,
+  .track,
+  .track-list {
     width: 4rem;
     height: 4rem;
     border-radius: 50%;
@@ -1262,7 +1430,9 @@
   .view-toggle-fab:hover,
   .display-toggle-fab:hover,
   .auto-rotate-fab:hover,
-  .grid-fab:hover {
+  .grid-fab:hover,
+  .track:hover,
+  .track-list:hover {
     transform: scale(1.1);
     background: rgba(255, 255, 255, 0.1);
   }
@@ -1270,7 +1440,9 @@
   .view-toggle-fab:active,
   .display-toggle-fab:active,
   .auto-rotate-fab:active,
-  .grid-fab:active {
+  .grid-fab:active,
+  .track:active,
+  .track-list:active {
     transform: scale(0.95);
   }
   
@@ -1287,7 +1459,9 @@
     .view-toggle-fab,
     .display-toggle-fab,
     .auto-rotate-fab,
-    .grid-fab {
+    .grid-fab,
+    .track,
+    .track-list {
       width: 3.5rem;
       height: 3.5rem;
     }
@@ -1295,7 +1469,9 @@
     .view-toggle-fab svg,
     .display-toggle-fab svg,
     .auto-rotate-fab svg,
-    .grid-fab svg {
+    .grid-fab svg,
+    .track svg,
+    .track-list svg {
       width: 36px;
       height: 36px;
     }

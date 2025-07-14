@@ -165,7 +165,7 @@ import { sessionStore } from '$lib/sessionStore';
   async function testAuthFetch() {
     try {
       console.log('🔍 Testing authFetch...');
-      const response = await authFetch('/api/images?limit=1&offset=0');
+      const response = await authFetch('/api/items?limit=1&offset=0');
       const result = await response.json();
       debugInfo.sessionDebug.authFetchTest = {
         status: response.status,
