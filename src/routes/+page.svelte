@@ -3887,12 +3887,14 @@ import TrackModal from '$lib/TrackModal.svelte';
     <div class="empty-state">
       <h3>Noch keine Bilder vorhanden</h3>
       <p>Lade deine ersten Bilder hoch, um die Galerie zu starten!</p>
-      <button on:click={createSampleImages} style="margin-top: 1rem; padding: 0.5rem 1rem; background: #0066cc; color: white; border: none; border-radius: 4px; cursor: pointer;">
-        🧪 Test Justified Layout
-      </button>
-      <button on:click={testLoadAllImages} style="margin-top: 1rem; margin-left: 1rem; padding: 0.5rem 1rem; background: #ff6600; color: white; border: none; border-radius: 4px; cursor: pointer;">
-        🔍 Test: Alle Bilder laden
-      </button>
+      {#if import.meta.env.DEV}
+        <button on:click={createSampleImages} style="margin-top: 1rem; padding: 0.5rem 1rem; background: #0066cc; color: white; border: none; border-radius: 4px; cursor: pointer;">
+          🧪 Test Justified Layout
+        </button>
+        <button on:click={testLoadAllImages} style="margin-top: 1rem; margin-left: 1rem; padding: 0.5rem 1rem; background: #ff6600; color: white; border: none; border-radius: 4px; cursor: pointer;">
+          🔍 Test: Alle Bilder laden
+        </button>
+      {/if}
     </div>
   {/if}
 
