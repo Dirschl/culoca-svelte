@@ -55,17 +55,31 @@ import TrackModal from '$lib/TrackModal.svelte';
   
   // Reaktive Funktion: Reload gallery when filters change
   $: if ($filterStore && authChecked) {
-    console.log('[Filter Change] Filter store changed, reloading gallery:', $filterStore);
+    // Only reload if there are actual meaningful changes
+    const hasUserFilter = $filterStore.userFilter !== null;
+    const hasLocationFilter = $filterStore.locationFilter !== null;
+    const hasReferrerAccount = $filterStore.referrerAccount !== null;
     
-    // Don't reload during search
-    if (!searchQuery.trim() && !isSearching) {
-      // Reset gallery state immediately
-      pics.set([]);
-      page = 0;
-      hasMoreImages = true;
+    // Check if this is a meaningful change that requires reload
+    const needsReload = hasUserFilter || hasLocationFilter || hasReferrerAccount;
+    
+    if (needsReload) {
+      console.log('[Filter Change] Filter store changed with meaningful filters, reloading gallery:', $filterStore);
       
-      // Load immediately without delay for better responsiveness
-      loadMore('filter change');
+      // Don't reload during search or if already loading
+      if (!searchQuery.trim() && !isSearching && !loading) {
+        // Reset gallery state immediately
+        pics.set([]);
+        page = 0;
+        hasMoreImages = true;
+        
+        // Add a small delay to prevent rapid successive calls
+        setTimeout(() => {
+          if (!loading) {
+            loadMore('filter change');
+          }
+        }, 100);
+      }
     }
   }
   
@@ -190,9 +204,9 @@ import TrackModal from '$lib/TrackModal.svelte';
       startGPSTracking();
     }
     
-    // Warte bis zu 10 Sekunden auf GPS
+    // Warte bis zu 30 Sekunden auf GPS (erhöht für bessere Zuverlässigkeit)
     let attempts = 0;
-    const maxAttempts = 20; // 20 * 500ms = 10 seconds
+    const maxAttempts = 60; // 60 * 500ms = 30 seconds
     
     const waitForGps = () => {
       attempts++;
@@ -207,13 +221,18 @@ import TrackModal from '$lib/TrackModal.svelte';
       }
       
       if (attempts >= maxAttempts) {
-        console.log('🔄 [GPS] GPS timeout, loading gallery without GPS...');
+        console.log('🔄 [GPS] GPS timeout, loading gallery with date sorting...');
         gpsStatus = 'unavailable';
         // Lade Galerie ohne GPS (normale Sortierung)
         pics.set([]);
         page = 0;
         hasMoreImages = true;
         loadMore('initial mount without GPS');
+        
+        // Continue GPS tracking in background for future updates
+        if (!gpsTrackingActive && !gpsSimulationActive) {
+          startGPSTracking();
+        }
         return;
       }
       
@@ -1123,7 +1142,7 @@ import TrackModal from '$lib/TrackModal.svelte';
   }
 
   async function loadMore(reason = 'default') {
-    console.log(`[Gallery] loadMore called, reason: ${reason}, loading: ${loading}, hasMoreImages: ${hasMoreImages}, page: ${page}`);
+    console.log(`[Gallery] loadMore called, reason: ${reason}, loading: ${loading}, hasMoreImages: ${hasMoreImages}, page: ${page}, size: ${size}`);
     console.log(`[Gallery] Current state: isLoggedIn=${isLoggedIn}, currentUser=${currentUser?.id}, authChecked=${authChecked}`);
     
     // Verhindere zu häufiges Neuladen
@@ -1134,7 +1153,7 @@ import TrackModal from '$lib/TrackModal.svelte';
     }
     
     // Allow certain reasons to bypass loading check
-    const bypassLoadingReasons = ['settings load with GPS sorting', 'navigation back with GPS', 'navigation back normal'];
+    const bypassLoadingReasons = ['settings load with GPS sorting', 'navigation back with GPS', 'navigation back normal', 'clear search'];
     if (loading && !bypassLoadingReasons.includes(reason)) {
       console.log(`[Gallery] Skipping loadMore - loading: ${loading}, hasMoreImages: ${hasMoreImages}, reason: ${reason}`);
       return;
@@ -1153,6 +1172,11 @@ import TrackModal from '$lib/TrackModal.svelte';
     
     loading = true;
     lastGalleryLoadTime = now;
+    
+    // Add a small delay to prevent rapid successive calls
+    if (reason.includes('navigation back') || reason.includes('clear search')) {
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
 
     let data;
     
@@ -1212,21 +1236,20 @@ import TrackModal from '$lib/TrackModal.svelte';
       
       // Use client-side GPS-based sorting instead of database function (which has errors)
       console.log(`[Gallery] Using client-side GPS-based sorting`);
-      data = await loadImagesNormal();
+      data = await loadImagesNormal(effectiveLat, effectiveLon);
 
     } else {
-      // Keine GPS-Daten verfügbar - warte auf GPS statt leeres Array zu laden
-      console.log('[Gallery] No GPS data available, waiting for GPS...');
+      // Keine GPS-Daten verfügbar - lade mit Datumssortierung als Fallback
+      console.log('[Gallery] No GPS data available, loading with date sorting as fallback...');
       
-      // Wenn wir im Distance-Modus sind, aber keine GPS-Daten haben, warten wir
-      if (showDistance) {
-        console.log('[Gallery] Distance mode enabled but no GPS, waiting...');
-        loading = false;
-        return; // Beende die Funktion und warte auf GPS
-      } else {
-        // Normal mode: lade ohne GPS
-        console.log('[Gallery] Normal mode, loading without GPS');
-        data = await loadImagesNormal();
+      // Load with date sorting even if GPS is not available yet
+      console.log('[Gallery] Loading with date sorting as fallback');
+      data = await loadImagesNormal(effectiveLat, effectiveLon);
+      
+      // Continue GPS tracking in background for future updates
+      if (showDistance && !gpsTrackingActive && !gpsSimulationActive) {
+        console.log('[Gallery] Starting GPS tracking in background for future updates');
+        startGPSTracking();
       }
     }
     
@@ -1325,6 +1348,12 @@ import TrackModal from '$lib/TrackModal.svelte';
         // For filter changes: replace all images instead of appending
         pics.set(uniqueNewPics);
         console.log(`[Gallery Debug] Filter change: replaced all images with ${uniqueNewPics.length} new images`);
+        
+        // Clear global GPS data on filter change to ensure fresh sorting
+        if ((window as any).gpsSortedData) {
+          delete (window as any).gpsSortedData;
+          console.log(`[Gallery Debug] Cleared GPS sorted data on filter change`);
+        }
       } else if ((isLoggedIn && showDistance && userLat !== null && userLon !== null) || hasLocationFilter) {
         if (data[0]?.distance !== undefined) {
           // Optimierte Daten bereits sortiert - APPEND new images for pagination
@@ -1417,7 +1446,7 @@ import TrackModal from '$lib/TrackModal.svelte';
   }
   
   // Hilfsfunktion für normales Laden
-  async function loadImagesNormal() {
+  async function loadImagesNormal(providedLat?: number | null, providedLon?: number | null) {
     console.log(`[Gallery] Loading images with normal pagination, range: ${page * size} to ${page * size + size - 1}`);
     
     // Get current filter state
@@ -1425,12 +1454,12 @@ import TrackModal from '$lib/TrackModal.svelte';
     const hasUserFilter = currentFilters.userFilter !== null;
     const hasLocationFilter = currentFilters.locationFilter !== null;
     
-    // Use saved GPS coordinates if available, otherwise use current GPS
-    let effectiveLat = userLat;
-    let effectiveLon = userLon;
+    // Use provided GPS coordinates if available, otherwise use saved GPS coordinates, otherwise use current GPS
+    let effectiveLat = providedLat !== undefined ? providedLat : userLat;
+    let effectiveLon = providedLon !== undefined ? providedLon : userLon;
     
-    // Check if we have saved GPS coordinates in the profile
-    if (isLoggedIn && currentUser) {
+    // If no GPS coordinates were provided, check if we have saved GPS coordinates in the profile
+    if (effectiveLat === null && effectiveLon === null && isLoggedIn && currentUser) {
       try {
         const { data: profileData } = await supabase
           .from('profiles')
@@ -1457,9 +1486,15 @@ import TrackModal from '$lib/TrackModal.svelte';
       console.log(`[Gallery Normal] Using location filter GPS: ${effectiveLat}, ${effectiveLon}`);
     }
     
-    // Check if we have GPS data for distance-based sorting
-    const hasGpsForSorting = effectiveLat !== null && effectiveLon !== null && showDistance;
-    console.log(`[Gallery Normal Debug] GPS sorting check: effectiveLat=${effectiveLat}, effectiveLon=${effectiveLon}, showDistance=${showDistance}, hasGpsForSorting=${hasGpsForSorting}`);
+          // Check if we have GPS data for distance-based sorting
+      // For GPS sorting, we need both GPS coordinates AND showDistance enabled
+      const hasGpsForSorting = effectiveLat !== null && effectiveLon !== null && showDistance;
+      console.log(`[Gallery Normal Debug] GPS sorting check: effectiveLat=${effectiveLat}, effectiveLon=${effectiveLon}, showDistance=${showDistance}, hasGpsForSorting=${hasGpsForSorting}`);
+      
+      // If we have GPS coordinates but showDistance is not yet loaded, wait for settings
+      if (effectiveLat !== null && effectiveLon !== null && showDistance === undefined) {
+        console.log(`[Gallery Normal] GPS coordinates available but showDistance not yet loaded, using date sorting temporarily`);
+      }
     
     // DIRECT DATABASE QUERY: Much faster and no limits
     try {
@@ -1468,6 +1503,40 @@ import TrackModal from '$lib/TrackModal.svelte';
       if (hasGpsForSorting) {
         // Use client-side GPS-based sorting instead of database function
         console.log(`[Gallery Normal] Using client-side distance-based sorting from ${effectiveLat}, ${effectiveLon}`);
+        
+        // Check if we already have global sorted data
+        if ((window as any).gpsSortedData && (window as any).gpsSortedData.length > 0) {
+          console.log(`[Gallery Normal] Using existing global sorted data: ${(window as any).gpsSortedData.length} images`);
+          const startIndex = page * size;
+          const endIndex = startIndex + size;
+          
+          console.log(`[Gallery Normal] Pagination debug: page=${page}, size=${size}, startIndex=${startIndex}, endIndex=${endIndex}, totalImages=${(window as any).gpsSortedData.length}`);
+          
+          if (startIndex >= (window as any).gpsSortedData.length) {
+            console.log(`[Gallery Normal] Start index ${startIndex} is out of bounds for ${(window as any).gpsSortedData.length} total images`);
+            data = [] as any[];
+          } else {
+            data = (window as any).gpsSortedData.slice(startIndex, endIndex) as any[];
+          }
+          
+          console.log(`[Gallery Normal] Page ${page}: returning ${data.length} images (range ${startIndex}-${endIndex} of ${(window as any).gpsSortedData.length} total)`);
+          
+          // Debug: Check if we're missing images at the start
+          if (page === 0 && data.length > 0) {
+            console.log(`[Gallery Normal] First page debug: showing images starting from index ${startIndex}`);
+            console.log(`[Gallery Normal] First few images:`, data.slice(0, 3).map((img: any) => ({ id: img.id, distance: img.distance })));
+            
+            // Verify we're getting the closest images first
+            if (data.length > 0 && data[0].distance !== undefined) {
+              console.log(`[Gallery Normal] First image distance: ${data[0].distance}m`);
+              if (data.length > 1) {
+                console.log(`[Gallery Normal] Second image distance: ${data[1].distance}m`);
+              }
+            }
+          }
+          
+          return data || [];
+        }
         
         // Load ALL images for proper GPS-based sorting (not just a small batch)
         // First, get the total count to know how many images to load
@@ -1529,7 +1598,12 @@ import TrackModal from '$lib/TrackModal.svelte';
         
         // Client-side GPS-based sorting of ALL images
         if (rawData && rawData.length > 0) {
-          console.log(`[Gallery Normal] Sorting ${rawData.length} total images by distance`);
+          console.log(`[Gallery Normal] Sorting ${rawData.length} total images by distance from ${effectiveLat}, ${effectiveLon}`);
+          
+          // Debug: Check how many images have GPS coordinates
+          const imagesWithGPS = rawData.filter((img: any) => img.lat && img.lon);
+          const imagesWithoutGPS = rawData.filter((img: any) => !img.lat || !img.lon);
+          console.log(`[Gallery Normal] GPS data check: ${imagesWithGPS.length} with GPS, ${imagesWithoutGPS.length} without GPS`);
           
           const sortedData = rawData.sort((a: any, b: any) => {
             const distA = a.lat && a.lon ? getDistanceInMeters(effectiveLat!, effectiveLon!, a.lat, a.lon) : Number.MAX_VALUE;
@@ -1537,25 +1611,67 @@ import TrackModal from '$lib/TrackModal.svelte';
             return distA - distB;
           });
           
+          // Debug: Log the first few sorted images to verify sorting
+          console.log(`[Gallery Normal] First 5 sorted images:`, sortedData.slice(0, 5).map((img: any) => ({
+            id: img.id,
+            lat: img.lat,
+            lon: img.lon,
+            distance: img.lat && img.lon ? getDistanceInMeters(effectiveLat!, effectiveLon!, img.lat, img.lon) : 'No GPS'
+          })));
+          
           // For GPS-based sorting, we need to handle pagination differently
           // Store the sorted data globally so we can access it for subsequent pages
           if (!(window as any).gpsSortedData) {
             (window as any).gpsSortedData = sortedData;
             console.log(`[Gallery Normal] Stored ${sortedData.length} sorted images globally`);
+          } else {
+            // If global data already exists, make sure it's the same length as our current sorted data
+            if ((window as any).gpsSortedData.length !== sortedData.length) {
+              console.log(`[Gallery Normal] Global data length mismatch: ${(window as any).gpsSortedData.length} vs ${sortedData.length}, updating...`);
+              (window as any).gpsSortedData = sortedData;
+            }
           }
           
           // Apply pagination to the globally stored sorted data
           const startIndex = page * size;
           const endIndex = startIndex + size;
-          data = (window as any).gpsSortedData.slice(startIndex, endIndex) as any[];
+          
+          console.log(`[Gallery Normal] Pagination debug: page=${page}, size=${size}, startIndex=${startIndex}, endIndex=${endIndex}, totalImages=${(window as any).gpsSortedData.length}`);
+          
+          // Ensure we're not going out of bounds
+          if (startIndex >= (window as any).gpsSortedData.length) {
+            console.log(`[Gallery Normal] Start index ${startIndex} is out of bounds for ${(window as any).gpsSortedData.length} total images`);
+            data = [] as any[];
+          } else {
+            data = (window as any).gpsSortedData.slice(startIndex, endIndex) as any[];
+          }
           
           console.log(`[Gallery Normal] Page ${page}: returning ${data.length} images (range ${startIndex}-${endIndex} of ${(window as any).gpsSortedData.length} total)`);
+          
+          // Debug: Check if we're missing images at the start
+          if (page === 0 && data.length > 0) {
+            console.log(`[Gallery Normal] First page debug: showing images starting from index ${startIndex}`);
+            console.log(`[Gallery Normal] First few images:`, data.slice(0, 3).map((img: any) => ({ id: img.id, distance: img.distance })));
+            
+            // Verify we're getting the closest images first
+            if (data.length > 0 && data[0].distance !== undefined) {
+              console.log(`[Gallery Normal] First image distance: ${data[0].distance}m`);
+              if (data.length > 1) {
+                console.log(`[Gallery Normal] Second image distance: ${data[1].distance}m`);
+              }
+            }
+          }
         } else {
           data = [] as any[];
         }
       } else {
         // Use normal database query with date sorting
         console.log(`[Gallery Normal] Using date-based sorting (no GPS data or distance disabled)`);
+        
+        // Check if we should be using GPS sorting but it's not enabled yet
+        if (effectiveLat !== null && effectiveLon !== null && showDistance === undefined) {
+          console.log(`[Gallery Normal] GPS coordinates available but showDistance not loaded yet, using date sorting temporarily`);
+        }
         
         let query = supabase
           .from('items')
@@ -2247,23 +2363,71 @@ import TrackModal from '$lib/TrackModal.svelte';
     
     // Start GPS tracking if distance is enabled
     if (showDistance && navigator.geolocation) {
+      // Check if we have saved GPS coordinates first
+      const savedLocation = loadLastKnownLocation();
+      
       // Nur GPS-Tracking starten, wenn wir noch keine gültigen Koordinaten haben
       if (userLat === null || userLon === null) {
+        console.log('[Settings] GPS coordinates not available, starting GPS tracking...');
+        
+        // Use saved coordinates if available while waiting for fresh GPS
+        if (savedLocation && savedLocation.lat && savedLocation.lon) {
+          console.log('[Settings] Using saved GPS coordinates while waiting for fresh GPS:', savedLocation);
+          userLat = savedLocation.lat;
+          userLon = savedLocation.lon;
+          gpsStatus = 'active';
+        }
+        
         startGPSTracking();
+        
+        // Load gallery with available coordinates (saved or fresh)
+        if (!initialSearchParam.trim()) {
+          console.log('[Settings] Loading gallery with available GPS coordinates...');
+          pics.set([]);
+          page = 0;
+          hasMoreImages = true;
+          loading = false;
+          loadMore('settings load with available GPS');
+        }
       } else {
-        // GPS coordinates already available, reload gallery with GPS-based sorting
-        console.log('[Settings] GPS coordinates available and showDistance enabled, reloading gallery...');
+              // GPS coordinates already available, reload gallery with GPS-based sorting
+      console.log('[Settings] GPS coordinates available and showDistance enabled, reloading gallery...');
+      
+      // Only reload if gallery is empty or if we need to switch to GPS sorting
+      const needsReload = $pics.length === 0 || !(window as any).gpsSortedData;
+      
+      if (needsReload && !loading) {
         pics.set([]);
         page = 0;
         hasMoreImages = true;
+        loading = false; // Ensure loading is false for fresh start
         // Clear any existing GPS sorted data to force fresh loading
         if ((window as any).gpsSortedData) {
           delete (window as any).gpsSortedData;
+          console.log('[Settings] Cleared existing GPS sorted data');
         }
-        loadMore('settings load with GPS sorting');
+        
+        // Add a small delay to prevent rapid successive calls
+        setTimeout(() => {
+          if (!loading) {
+            loadMore('settings load with GPS sorting');
+          }
+        }, 100);
+      } else {
+        console.log('[Settings] Gallery already loaded with GPS sorting, no reload needed');
+      }
       }
     } else {
       stopGPSTracking();
+      // Load gallery with date sorting when GPS is disabled
+      if (!initialSearchParam.trim()) {
+        console.log('[Settings] GPS disabled, loading gallery with date sorting...');
+        pics.set([]);
+        page = 0;
+        hasMoreImages = true;
+        loading = false;
+        loadMore('settings load without GPS');
+      }
     }
     
     // Activate autoguide if enabled
@@ -2449,6 +2613,15 @@ import TrackModal from '$lib/TrackModal.svelte';
     gpsStatus = 'checking';
     gpsTrackingActive = true;
     
+    // Use saved coordinates immediately if available
+    const savedLocation = loadLastKnownLocation();
+    if (savedLocation && savedLocation.lat && savedLocation.lon) {
+      console.log('🔄 [GPS] Using saved coordinates while waiting for fresh GPS:', savedLocation);
+      userLat = savedLocation.lat;
+      userLon = savedLocation.lon;
+      gpsStatus = 'active';
+    }
+    
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         gpsStatus = 'active';
@@ -2480,28 +2653,52 @@ import TrackModal from '$lib/TrackModal.svelte';
           handlePositionUpdate,
           (error) => {
             console.error('GPS tracking error:', error);
-            // Don't immediately mark as unavailable, keep the last known position
-            // Only mark as unavailable if we haven't had an update in 5 minutes
-            if (lastGPSUpdateTime && (Date.now() - lastGPSUpdateTime) > GPS_MEMORY_TIMEOUT) {
-              gpsStatus = 'unavailable';
+            
+            // Handle different error types
+            if (error.code === error.TIMEOUT) {
+              console.log('🔄 [GPS] Timeout error, but keeping last known position');
+              // Don't mark as unavailable for timeout errors, keep trying
+              return;
+            } else if (error.code === error.PERMISSION_DENIED) {
+              console.log('🔄 [GPS] Permission denied');
+              gpsStatus = 'denied';
               showGPSMessage = true;
+            } else {
+              console.log('🔄 [GPS] Other GPS error, but keeping last known position');
+              // For other errors, don't immediately mark as unavailable
+              // Only mark as unavailable if we haven't had an update in 5 minutes
+              if (lastGPSUpdateTime && (Date.now() - lastGPSUpdateTime) > GPS_MEMORY_TIMEOUT) {
+                gpsStatus = 'unavailable';
+                showGPSMessage = true;
+              }
             }
           },
-          { enableHighAccuracy: true, maximumAge: 1000, timeout: 3000 }
+          { enableHighAccuracy: false, maximumAge: 60000, timeout: 60000 }
         );
-        radiusCheckInterval = window.setInterval(checkRadiusForNewImages, RADIUS_CHECK_INTERVAL);
+        // Only start radius check interval if we're in a mode that needs it and have GPS coordinates
+        if (showDistance && !gpsSimulationActive && userLat && userLon) {
+          radiusCheckInterval = window.setInterval(checkRadiusForNewImages, RADIUS_CHECK_INTERVAL);
+        }
       },
       (error) => {
         console.error('Initial GPS error:', error);
-        if (error.code === error.PERMISSION_DENIED) {
+        
+        if (error.code === error.TIMEOUT) {
+          console.log('🔄 [GPS] Initial GPS timeout, but will keep trying with watchPosition');
+          // Don't give up on timeout, let watchPosition try
+          gpsStatus = 'checking';
+        } else if (error.code === error.PERMISSION_DENIED) {
+          console.log('🔄 [GPS] GPS permission denied');
           gpsStatus = 'denied';
+          showGPSMessage = true;
+          gpsTrackingActive = false;
         } else {
-          gpsStatus = 'unavailable';
+          console.log('🔄 [GPS] Other initial GPS error, but will keep trying');
+          gpsStatus = 'checking';
+          // Don't stop tracking for other errors, let watchPosition try
         }
-        showGPSMessage = false;
-        gpsTrackingActive = false;
       },
-      { enableHighAccuracy: true, timeout: 10000 }
+              { enableHighAccuracy: false, timeout: 60000 }
     );
   }
 
@@ -2765,6 +2962,11 @@ import TrackModal from '$lib/TrackModal.svelte';
       return;
     }
 
+    // Don't check if we're already loading or if we have enough images
+    if (loading || $pics.length >= 1000) {
+      return;
+    }
+
     // Sicherstellen, dass $pics ein Array ist
     const currentPics = Array.isArray($pics) ? $pics : [];
 
@@ -2897,6 +3099,20 @@ import TrackModal from '$lib/TrackModal.svelte';
       hasMoreImages = true;
       loading = false; // Ensure loading is false for fresh start
       
+      // Also reset any other gallery-related state
+      if (typeof window !== 'undefined') {
+        // Clear any global state that might interfere
+        if ((window as any).gpsSortedData) {
+          delete (window as any).gpsSortedData;
+        }
+        if ((window as any).allImagesData) {
+          delete (window as any).allImagesData;
+        }
+        if ((window as any).lastSortedImages) {
+          delete (window as any).lastSortedImages;
+        }
+      }
+      
       // Reset gallery stats
       updateGalleryStats(0, 0);
       
@@ -2912,20 +3128,64 @@ import TrackModal from '$lib/TrackModal.svelte';
       // Clear any existing GPS sorted data to force fresh loading
       if ((window as any).gpsSortedData) {
         delete (window as any).gpsSortedData;
+        console.log('[Navigation] Cleared existing GPS sorted data');
+      }
+      
+      // Also clear any other cached data that might interfere
+      if ((window as any).allImagesData) {
+        delete (window as any).allImagesData;
+        console.log('[Navigation] Cleared cached all images data');
       }
       
       // Load gallery based on current state with a small delay to ensure state is reset
-      setTimeout(() => {
-        if (!searchQuery.trim()) {
+      setTimeout(async () => {
+        if (!searchQuery.trim() && !loading) {
+          // Ensure GPS coordinates are available before loading
+          const savedLocation = loadLastKnownLocation();
+          if (savedLocation && savedLocation.lat && savedLocation.lon && (userLat === null || userLon === null)) {
+            console.log('[Navigation] Using saved GPS coordinates for navigation back:', savedLocation);
+            userLat = savedLocation.lat;
+            userLon = savedLocation.lon;
+            gpsStatus = 'active';
+          }
+          
+          // Check if we need to load user settings first
+          if (isLoggedIn && showDistance === undefined) {
+            console.log('[Navigation] Loading user settings before gallery load...');
+            await loadShowDistanceAndCompass();
+          }
+          
+          // Ensure we have the best available GPS coordinates
+          if (userLat === null || userLon === null) {
+            const savedLocation = loadLastKnownLocation();
+            if (savedLocation && savedLocation.lat && savedLocation.lon) {
+              console.log('[Navigation] Using saved GPS coordinates for navigation back:', savedLocation);
+              userLat = savedLocation.lat;
+              userLon = savedLocation.lon;
+              gpsStatus = 'active';
+            }
+          }
+          
+          console.log('[Navigation] Final state before loading:', {
+            showDistance,
+            userLat,
+            userLon,
+            isLoggedIn,
+            searchQuery: searchQuery.trim()
+          });
+          
           if (showDistance && userLat !== null && userLon !== null) {
             // GPS mode: reload with GPS sorting
+            console.log('[Navigation] Loading with GPS sorting from navigation back');
             loadMore('navigation back with GPS');
           } else {
             // Normal mode: reload without GPS
+            console.log('[Navigation] Loading without GPS from navigation back');
             loadMore('navigation back normal');
           }
         } else {
           // Search mode: reload search
+          console.log('[Navigation] Loading search results from navigation back');
           performSearch(searchQuery, false);
         }
       }, 100);
@@ -3051,6 +3311,15 @@ import TrackModal from '$lib/TrackModal.svelte';
       console.log('🔄 [FORCE] Starting GPS tracking as fallback...');
       startGPSTracking();
     }
+    
+    // Load saved GPS coordinates immediately for faster gallery loading
+    const savedLocation = loadLastKnownLocation();
+    if (savedLocation && savedLocation.lat && savedLocation.lon) {
+      console.log('🔄 [GPS] Using saved GPS coordinates for immediate loading:', savedLocation);
+      userLat = savedLocation.lat;
+      userLon = savedLocation.lon;
+      gpsStatus = 'active';
+    }
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       const wasAuthChecked = authChecked;
@@ -3083,13 +3352,24 @@ import TrackModal from '$lib/TrackModal.svelte';
         } else {
           // Load gallery based on distance settings
           if (!initialSearchParam.trim()) {
-            if (showDistance) {
-              // For distance mode: wait for GPS data
-              waitForGpsAndLoadGallery();
+            // Load gallery immediately with fallback strategy
+            console.log('🔐 Loading gallery immediately with fallback strategy...');
+            pics.set([]);
+            page = 0;
+            hasMoreImages = true;
+            loading = false;
+            
+            // Try to load with GPS if available, otherwise fallback to date sorting
+            if (userLat !== null && userLon !== null) {
+              console.log('🔐 GPS coordinates available, loading with GPS sorting...');
+              loadMore('initial mount with GPS');
             } else {
-              // Normal mode: always load
-              setTimeout(() => loadMore('initial mount normal'), 100);
+              console.log('🔐 No GPS coordinates yet, loading with date sorting...');
+              loadMore('initial mount without GPS');
             }
+          } else {
+            // Search parameter present: perform search
+            performSearch(initialSearchParam, false);
           }
         }
       }
@@ -3588,8 +3868,10 @@ import TrackModal from '$lib/TrackModal.svelte';
         }
       }, 100);
     } else {
-      // If hiding search field, clear search
-      clearSearch();
+      // If hiding search field, only clear search if there's an active search
+      if (searchQuery.trim() || searchResults.length > 0) {
+        clearSearch();
+      }
     }
   }
 
@@ -3896,7 +4178,7 @@ import TrackModal from '$lib/TrackModal.svelte';
     </div>
   {/if}
   
-  {#if $pics.length === 0 && !loading}
+  {#if $pics.length === 0 && !loading && !isLoggedIn}
     <div class="empty-state">
       <h3>Noch keine Bilder vorhanden</h3>
       <p>Lade deine ersten Bilder hoch, um die Galerie zu starten!</p>
