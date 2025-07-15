@@ -1133,8 +1133,15 @@ import TrackModal from '$lib/TrackModal.svelte';
       return;
     }
     
-    if (loading || !hasMoreImages) {
+    // Allow certain reasons to bypass loading check
+    const bypassLoadingReasons = ['settings load with GPS sorting', 'navigation back with GPS', 'navigation back normal'];
+    if (loading && !bypassLoadingReasons.includes(reason)) {
       console.log(`[Gallery] Skipping loadMore - loading: ${loading}, hasMoreImages: ${hasMoreImages}, reason: ${reason}`);
+      return;
+    }
+    
+    if (!hasMoreImages) {
+      console.log(`[Gallery] Skipping loadMore - hasMoreImages: ${hasMoreImages}, reason: ${reason}`);
       return;
     } 
     
