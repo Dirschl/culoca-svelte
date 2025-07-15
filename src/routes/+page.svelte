@@ -9,6 +9,7 @@ import TrackModal from '$lib/TrackModal.svelte';
   import FullscreenMap from '$lib/FullscreenMap.svelte';
   import WelcomeSection from '$lib/WelcomeSection.svelte';
   import FilterBar from '$lib/FilterBar.svelte';
+  import SearchResults from '$lib/SearchResults.svelte';
   import { beforeNavigate, afterNavigate } from '$app/navigation';
   import { showPublicContentModal } from '$lib/modalStore';
   import { welcomeVisible, hideWelcome, dismissWelcome, isWelcomeDismissed } from '$lib/welcomeStore';
@@ -271,6 +272,7 @@ import TrackModal from '$lib/TrackModal.svelte';
   let isSearching = false;
   let searchTimeout: ReturnType<typeof setTimeout> | null = null;
   let searchInput: HTMLInputElement;
+  let useSearchResults = false; // Flag to switch between SearchResults component and legacy search
 
   // Login-Overlay Variablen
   let loginEmail = '';
@@ -3639,6 +3641,7 @@ import TrackModal from '$lib/TrackModal.svelte';
     async function performSearch(query: string = searchQuery, updateURL: boolean = false) {
     if (!query.trim()) {
       searchResults = [];
+      useSearchResults = false;
       if (updateURL) {
         // Clear search from URL
         const url = new URL(window.location.href);
@@ -3649,6 +3652,7 @@ import TrackModal from '$lib/TrackModal.svelte';
     }
     
     isSearching = true;
+    useSearchResults = true; // Enable SearchResults component
     console.log('🔍 Performing search for:', query);
     
     // Update URL if requested
@@ -3816,6 +3820,7 @@ import TrackModal from '$lib/TrackModal.svelte';
   function clearSearch() {
     searchQuery = '';
     searchResults = [];
+    useSearchResults = false; // Disable SearchResults component
     
     // Clear search from URL
     const url = new URL(window.location.href);
@@ -4130,19 +4135,33 @@ import TrackModal from '$lib/TrackModal.svelte';
   <TrackModal bind:isOpen={showTrackModal} />
 {/if}
 
-<!-- Galerie bleibt erhalten -->
+<!-- Galerie oder Suchergebnisse -->
 <div class="gallery-container">
-  <GalleryLayout
-    items={$pics}
-    layout={useJustifiedLayout ? 'justified' : 'grid'}
-    gap={2}
-    targetRowHeight={220}
-    showDistance={isLoggedIn && showDistance}
-    showCompass={isLoggedIn && showCompass}
-    userLat={userLat}
-    userLon={userLon}
-    getDistanceFromLatLonInMeters={getDistanceFromLatLonInMeters}
-  />
+  {#if useSearchResults && searchQuery.trim()}
+    <!-- Use SearchResults component with items_search_view -->
+    <SearchResults 
+      searchTerm={searchQuery}
+      userId={currentUser?.id || ''}
+      layout={useJustifiedLayout ? 'justified' : 'grid'}
+      showDistance={isLoggedIn && showDistance}
+      userLat={userLat}
+      userLon={userLon}
+      getDistanceFromLatLonInMeters={getDistanceFromLatLonInMeters}
+    />
+  {:else}
+    <!-- Normal gallery -->
+    <GalleryLayout
+      items={$pics}
+      layout={useJustifiedLayout ? 'justified' : 'grid'}
+      gap={2}
+      targetRowHeight={220}
+      showDistance={isLoggedIn && showDistance}
+      showCompass={isLoggedIn && showCompass}
+      userLat={userLat}
+      userLon={userLon}
+      getDistanceFromLatLonInMeters={getDistanceFromLatLonInMeters}
+    />
+  {/if}
   
 
   
