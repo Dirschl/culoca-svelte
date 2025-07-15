@@ -55,7 +55,7 @@ export const GET = async ({ url, request }) => {
     });
     if (useGpsFiltering) {
       console.log('API Debug - Using GPS filtering with coordinates:', { lat, lon });
-      const maxGpsImages = 2000;
+      const maxGpsImages = 10000; // Erhöht von 2000 auf 10000 für mehr Bilder
       let gpsQuery = supabase
         .from('items')
         .select('id, path_512, path_2048, path_64, original_name, created_at, user_id, profile_id, title, description, lat, lon, width, height, is_private')

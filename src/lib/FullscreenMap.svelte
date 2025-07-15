@@ -33,6 +33,7 @@
   let satelliteLayer: any = null;
   let autoRotateEnabled = false;
   let showDistance = true; // New: Toggle between distance and title display
+  let keepMarkerCentered = true; // New: Always keep user marker centered on map
   let lastPosition: { lat: number; lon: number; accuracy: number; timestamp: number } | null = null;
   let lastPositionTime: number | null = null;
   let currentBearing = 0;
@@ -75,6 +76,7 @@
           autoRotateEnabled = state.autoRotate !== undefined ? state.autoRotate : false;
           isHybridView = state.isHybridView !== undefined ? state.isHybridView : false;
           showDistance = state.showDistance !== undefined ? state.showDistance : true;
+          keepMarkerCentered = state.keepMarkerCentered !== undefined ? state.keepMarkerCentered : true;
         } catch (e) {
           console.error('Error loading map state:', e);
         }
@@ -90,7 +92,8 @@
         center: [map.getCenter().lat, map.getCenter().lng],
         autoRotate: autoRotateEnabled,
         isHybridView: isHybridView,
-        showDistance: showDistance
+        showDistance: showDistance,
+        keepMarkerCentered: keepMarkerCentered
       };
       localStorage.setItem('culoca-map-state', JSON.stringify(state));
       
@@ -187,7 +190,7 @@
     
     if (showTracks) {
       // Load and display all saved tracks
-      trackStore.subscribe(state => {
+      trackStore.subscribe((state: any) => {
         savedTracks = state.savedTracks;
         savedTracks.forEach(track => {
           displayTrackOnMap(track, map);
@@ -205,7 +208,7 @@
   }
 
   function updateCurrentTrack() {
-    trackStore.subscribe(state => {
+    trackStore.subscribe((state: any) => {
       if (state.currentTrack && state.isRecording) {
         // Remove previous current track layer
         if (currentTrackLayer && map) {
@@ -855,6 +858,14 @@
     saveMapState();
   }
   
+  // Toggle marker centering
+  function toggleMarkerCentering() {
+    keepMarkerCentered = !keepMarkerCentered;
+    console.log(`[FullscreenMap] Marker centering ${keepMarkerCentered ? 'enabled' : 'disabled'}`);
+    // Save the new state
+    saveMapState();
+  }
+  
   // Update marker labels based on current display mode
   function updateMarkerLabels() {
     if (!map || !mapInitialized || !allImages.length) return;
@@ -981,8 +992,8 @@
           userMarker.setLatLng([newPos.lat, newPos.lon]);
         }
         
-        // Only center the map if auto-rotate is enabled or if it's the first position
-        if (map && (autoRotateEnabled || !lastPosition)) {
+        // Keep the user marker centered on the map during GPS tracking if enabled
+        if (map && keepMarkerCentered) {
           map.setView([newPos.lat, newPos.lon], map.getZoom(), { animate: false });
         }
         
@@ -1064,8 +1075,8 @@
             userMarker.setLatLng([newPos.lat, newPos.lon]);
           }
           
-          // Only center the map if auto-rotate is enabled or if it's the first position
-          if (map && (autoRotateEnabled || !lastSimulatedPosition)) {
+          // Keep the user marker centered on the map during GPS simulation if enabled
+          if (map && keepMarkerCentered) {
             map.setView([newPos.lat, newPos.lon], map.getZoom(), { animate: false });
           }
           
@@ -1335,6 +1346,26 @@
         </svg>
       {/if}
     </button>
+    <!-- Marker Centering FAB -->
+    <button 
+      class="marker-center-fab"
+      class:active={keepMarkerCentered}
+      on:click={toggleMarkerCentering}
+      title={keepMarkerCentered ? 'Marker-Zentrierung deaktivieren' : 'Marker-Zentrierung aktivieren'}
+    >
+      {#if keepMarkerCentered}
+        <!-- Target with dot in center - centering is active -->
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <circle cx="12" cy="12" r="3" fill="currentColor"/>
+        </svg>
+      {:else}
+        <!-- Target without dot - centering is inactive -->
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+        </svg>
+      {/if}
+    </button>
     <!-- Grid FAB -->
     <button 
       class="grid-fab"
@@ -1407,6 +1438,7 @@
   .view-toggle-fab,
   .display-toggle-fab,
   .auto-rotate-fab,
+  .marker-center-fab,
   .grid-fab,
   .track,
   .track-list {
@@ -1430,6 +1462,7 @@
   .view-toggle-fab:hover,
   .display-toggle-fab:hover,
   .auto-rotate-fab:hover,
+  .marker-center-fab:hover,
   .grid-fab:hover,
   .track:hover,
   .track-list:hover {
@@ -1440,6 +1473,7 @@
   .view-toggle-fab:active,
   .display-toggle-fab:active,
   .auto-rotate-fab:active,
+  .marker-center-fab:active,
   .grid-fab:active,
   .track:active,
   .track-list:active {
@@ -1459,6 +1493,7 @@
     .view-toggle-fab,
     .display-toggle-fab,
     .auto-rotate-fab,
+    .marker-center-fab,
     .grid-fab,
     .track,
     .track-list {
@@ -1469,6 +1504,7 @@
     .view-toggle-fab svg,
     .display-toggle-fab svg,
     .auto-rotate-fab svg,
+    .marker-center-fab svg,
     .grid-fab svg,
     .track svg,
     .track-list svg {

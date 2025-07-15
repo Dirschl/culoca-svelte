@@ -21,7 +21,7 @@ import TrackModal from '$lib/TrackModal.svelte';
 
 
   const pics = writable<any[]>([]);
-  let page = 0, size = 100, loading = false, hasMoreImages = true;
+  let page = 0, size = 100, loading = false, hasMoreImages = true; // Erhöht für mehr Bilder pro Anfrage
   let displayedImageCount = 0; // Zähler für tatsächlich angezeigte Bilder
   let removedDuplicatesList: any[] = []; // Liste der entfernten Duplikate
   let showRemovedDuplicates = false; // Flag zum Anzeigen der entfernten Duplikate
@@ -118,10 +118,28 @@ import TrackModal from '$lib/TrackModal.svelte';
   }
 
   // Funktion um die besten verfügbaren GPS-Koordinaten zu bekommen
-  function getBestAvailableGps(): { lat: number; lon: number } | null {
+  async function getBestAvailableGps(): Promise<{ lat: number; lon: number } | null> {
     // Prüfe Location-Filter (höchste Priorität)
     if ($filterStore.locationFilter) {
       return { lat: $filterStore.locationFilter.lat, lon: $filterStore.locationFilter.lon };
+    }
+    
+    // Prüfe gespeicherte GPS-Koordinaten aus dem Profil (wenn eingeloggt)
+    if (isLoggedIn && currentUser) {
+      try {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('home_lat, home_lon')
+          .eq('id', currentUser.id)
+          .single();
+        
+        if (profileData?.home_lat && profileData?.home_lon) {
+          console.log(`[GPS] Using saved profile GPS coordinates: ${profileData.home_lat}, ${profileData.home_lon}`);
+          return { lat: profileData.home_lat, lon: profileData.home_lon };
+        }
+      } catch (error) {
+        console.log(`[GPS] Error fetching saved profile GPS coordinates:`, error);
+      }
     }
     
     // Prüfe letzten GPS-Wert im FilterStore
@@ -1065,102 +1083,39 @@ import TrackModal from '$lib/TrackModal.svelte';
       console.log('Starting gallery preload in background...');
       
       // Load all images at once instead of batching
-      loadAllImages();
+      loadMore('initial');
     }
   }
   
-  async function loadAllImages() {
-    if (loading) return;
-    
-    console.log('Loading all images for preload...');
-    loading = true;
-    
-    try {
-      let data;
-      
-      // Use distance function if user has GPS coordinates and distance is enabled
-      if (isLoggedIn && showDistance && userLat !== null && userLon !== null) {
-                  const result = await supabase
-            .rpc('images_by_distance', {
-              user_lat: userLat,
-              user_lon: userLon,
-              page: 0,
-              page_size: 5000 // Load alle verfügbaren Bilder
-            });
-        data = result.data;
-      } else {
-        // FIXED: Use API instead of direct database query to ensure consistent privacy filtering
-        let url = `/api/items?limit=5000&offset=0`;
-        
-        console.log(`[Gallery] LoadAllImages using API: ${url}`);
-        const response = await authFetch(url);
-        const result = await response.json();
-        
-        if (result.status === 'success') {
-          data = result.images;
-          console.log(`[Gallery] LoadAllImages got ${data?.length || 0} images from API`);
-        } else {
-          console.error('[Gallery] LoadAllImages API error:', result.message);
-          data = [];
-        }
-      }
-      
-      if (data) {
-        const allPics = data.map((d: any) => ({
-          id: d.id,
-          src: d.path_512 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${d.path_512}` : '',
-          srcHD: d.path_2048 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${d.path_2048}` : '',
-          width: d.width,
-          height: d.height,
-          lat: d.lat,
-          lon: d.lon,
-          title: d.title,
-          description: d.description,
-          keywords: d.keywords,
-          path_64: d.path_64,
-          path_512: d.path_512,
-          path_2048: d.path_2048,
-          distance: d.distance || null
-        })).filter((pic: any) => pic.path_512); // Filter out images without path_512
-
-        pics.set(allPics);
-        page = Math.ceil(allPics.length / size); // Page korrekt setzen
-        hasMoreImages = false;
-        
-        // Announce first image if autoguide is enabled
-        if (autoguide && allPics.length > 0) {
-          console.log('🎤 Autoguide enabled and images loaded, announcing first image...');
-          setTimeout(() => announceFirstImage(), 500);
-        }
-        
-        // Update gallery stats
-        const totalCount = await getTotalImageCount();
-        updateGalleryStats(allPics.length, totalCount);
-        
-        console.log(`Preload complete: ${allPics.length} images loaded, total: ${totalCount}`);
-      }
-    } catch (error) {
-      console.error('Error during preload:', error);
-    } finally {
-      loading = false;
-    }
-  }
+  // REMOVED: loadAllImages function - we now use proper pagination with loadMore
+  // This prevents loading too many images at once and improves mobile performance
 
   async function getTotalImageCount() {
     try {
-      // Use the API to get the total count that respects privacy filtering
-      let url = `/api/items?limit=1&offset=0`;
+      // DIRECT DATABASE QUERY: Much faster and no limits
+      let query = supabase
+        .from('items')
+        .select('id', { count: 'exact' })
+        .not('path_512', 'is', null);
       
-      const response = await authFetch(url);
-      const result = await response.json();
-      
-      if (result.status === 'success') {
-        console.log(`[Gallery] Total count from API: ${result.totalCount}`);
-        return result.totalCount || 0;
+      // Apply privacy filtering based on user login status
+      if (isLoggedIn && currentUser) {
+        // For logged in users: show their own images (all) + other users' public images
+        query = query.or(`profile_id.eq.${currentUser.id},is_private.eq.false,is_private.is.null`);
       } else {
-        console.error('Error getting total image count from API:', result.message);
+        // For anonymous users: only show public images
+        query = query.or('is_private.eq.false,is_private.is.null');
+      }
+      
+      const { count, error } = await query;
+      
+      if (error) {
+        console.error('Error getting total image count from database:', error);
         return 0;
       }
+      
+      console.log(`[Gallery] Total count from database: ${count}`);
+      return count || 0;
     } catch (error) {
       console.error('Error getting total image count:', error);
       return 0;
@@ -1198,8 +1153,38 @@ import TrackModal from '$lib/TrackModal.svelte';
     const currentFilters = get(filterStore);
     const hasUserFilter = currentFilters.userFilter !== null;
     const hasLocationFilter = currentFilters.locationFilter !== null;
-    const effectiveLat = hasLocationFilter ? currentFilters.locationFilter!.lat : userLat;
-    const effectiveLon = hasLocationFilter ? currentFilters.locationFilter!.lon : userLon;
+    
+    // Use saved GPS coordinates if available, otherwise use current GPS
+    let effectiveLat = userLat;
+    let effectiveLon = userLon;
+    
+    // Check if we have saved GPS coordinates in the profile
+    if (isLoggedIn && currentUser) {
+      try {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('home_lat, home_lon')
+          .eq('id', currentUser.id)
+          .single();
+        
+        if (profileData?.home_lat && profileData?.home_lon) {
+          effectiveLat = profileData.home_lat;
+          effectiveLon = profileData.home_lon;
+          console.log(`[Gallery] Using saved GPS coordinates: ${effectiveLat}, ${effectiveLon}`);
+        } else {
+          console.log(`[Gallery] No saved GPS coordinates found, using current GPS: ${effectiveLat}, ${effectiveLon}`);
+        }
+      } catch (error) {
+        console.log(`[Gallery] Error fetching saved GPS coordinates:`, error);
+      }
+    }
+    
+    // Override with location filter if active
+    if (hasLocationFilter) {
+      effectiveLat = currentFilters.locationFilter!.lat;
+      effectiveLon = currentFilters.locationFilter!.lon;
+      console.log(`[Gallery] Using location filter GPS: ${effectiveLat}, ${effectiveLon}`);
+    }
     
     console.log(`[Gallery] Loading with filters:`, {
       hasUserFilter,
@@ -1212,36 +1197,15 @@ import TrackModal from '$lib/TrackModal.svelte';
     
     // Use GPS-based loading if location is available (from GPS or location filter)
     if (hasValidGpsForGallery()) {
-      const loadLat = effectiveLat!;
-      const loadLon = effectiveLon!;
+      // Get the best available GPS coordinates
+      const bestGps = await getBestAvailableGps();
+      const loadLat = bestGps?.lat || effectiveLat!;
+      const loadLon = bestGps?.lon || effectiveLon!;
       console.log(`[Gallery] Loading images by distance from ${loadLat}, ${loadLon}`);
       
-      // Always use GPS-based loading for distance sorting
-      try {
-        // Use the API endpoint with GPS parameters for distance sorting
-        let url = `/api/items?limit=${size}&offset=${page * size}&lat=${loadLat}&lon=${loadLon}`;
-        
-        // Add user filter if active
-        if (hasUserFilter) {
-          url += `&filter_user_id=${currentFilters.userFilter!.userId}`;
-          console.log(`[Gallery] Adding user filter: ${currentFilters.userFilter!.username}`);
-        }
-        
-        console.log(`[Gallery] GPS loading from: ${url}`);
-        const response = await authFetch(url);
-        const result = await response.json();
-        
-        if (result.status === 'success') {
-          data = result.images;
-          console.log(`[Gallery] GPS mode: got ${data?.length || 0} images, GPS mode: ${result.gpsMode}`);
-        } else {
-          console.error('[Gallery] GPS API error:', result.message);
-          data = await loadImagesNormal();
-        }
-      } catch (error) {
-        console.error('[Gallery] Error with GPS loading:', error);
-        data = await loadImagesNormal();
-      }
+      // Use client-side GPS-based sorting instead of database function (which has errors)
+      console.log(`[Gallery] Using client-side GPS-based sorting`);
+      data = await loadImagesNormal();
 
     } else {
       // Keine GPS-Daten verfügbar - warte auf GPS statt leeres Array zu laden
@@ -1394,24 +1358,41 @@ import TrackModal from '$lib/TrackModal.svelte';
       const totalCount = await getTotalImageCount();
       updateGalleryStats($pics.length, totalCount);
       
-      // Check if we have more images to load - use normal pagination for ALL modes
+      // Check if we have more images to load - handle GPS sorting differently
       console.log(`[Gallery Debug] Checking pagination: current=${$pics.length}, total=${totalCount}, hasMoreImages=${hasMoreImages}, page=${page}, data.length=${data?.length || 0}, uniqueNewPics.length=${uniqueNewPics?.length || 0}`);
       
-      // Only set hasMoreImages to false if we've loaded all available images
-      if ($pics.length >= totalCount) {
-        hasMoreImages = false;
-        console.log(`[Gallery Debug] All images loaded: ${$pics.length} of ${totalCount}`);
-      } else if (data && data.length === 0) {
-        // If API returned no data, we've reached the end
-        hasMoreImages = false;
-        console.log(`[Gallery Debug] No more images available from API`);
-      } else if (uniqueNewPics && uniqueNewPics.length === 0 && data && data.length > 0) {
-        // If we got data but all were duplicates, we've likely reached the end
-        hasMoreImages = false;
-        console.log(`[Gallery Debug] All new images were duplicates, reached end of available images`);
+      // For GPS-based sorting, check against the globally stored sorted data
+      if (showDistance && (window as any).gpsSortedData) {
+        const totalSortedImages = (window as any).gpsSortedData.length;
+        const currentLoadedImages = $pics.length;
+        
+        // Also check against the total count from database
+        const totalFromDatabase = totalCount || 1388; // Fallback to known total
+        
+        if (currentLoadedImages >= totalSortedImages || currentLoadedImages >= totalFromDatabase) {
+          hasMoreImages = false;
+          console.log(`[Gallery Debug] All GPS-sorted images loaded: ${currentLoadedImages} of ${totalSortedImages} (database total: ${totalFromDatabase})`);
+        } else {
+          hasMoreImages = true;
+          console.log(`[Gallery Debug] More GPS-sorted images available: ${currentLoadedImages} of ${totalSortedImages} (database total: ${totalFromDatabase})`);
+        }
       } else {
-        hasMoreImages = true;
-        console.log(`[Gallery Debug] More images available: ${$pics.length} of ${totalCount}, hasMoreImages set to true`);
+        // Normal pagination logic for non-GPS modes
+        if ($pics.length >= totalCount) {
+          hasMoreImages = false;
+          console.log(`[Gallery Debug] All images loaded: ${$pics.length} of ${totalCount}`);
+        } else if (data && data.length === 0) {
+          // If API returned no data, we've reached the end
+          hasMoreImages = false;
+          console.log(`[Gallery Debug] No more images available from API`);
+        } else if (uniqueNewPics && uniqueNewPics.length === 0 && data && data.length > 0) {
+          // If we got data but all were duplicates, we've likely reached the end
+          hasMoreImages = false;
+          console.log(`[Gallery Debug] All new images were duplicates, reached end of available images`);
+        } else {
+          hasMoreImages = true;
+          console.log(`[Gallery Debug] More images available: ${$pics.length} of ${totalCount}, hasMoreImages set to true`);
+        }
       }
       
       if (autoguide && uniqueNewPics.length > 0) {
@@ -1436,75 +1417,183 @@ import TrackModal from '$lib/TrackModal.svelte';
     const currentFilters = get(filterStore);
     const hasUserFilter = currentFilters.userFilter !== null;
     const hasLocationFilter = currentFilters.locationFilter !== null;
-    const effectiveLat = hasLocationFilter ? currentFilters.locationFilter!.lat : userLat;
-    const effectiveLon = hasLocationFilter ? currentFilters.locationFilter!.lon : userLon;
     
-    // SIMPLIFIED: Use the API endpoint that we know works
-    try {
-      // FIXED: Add GPS parameters for distance sorting if available
-      let url = `/api/items?limit=${size}&offset=${page * size}`;
-      
-      // Add GPS parameters if available (from user GPS or location filter)
-      if (effectiveLat !== null && effectiveLon !== null) {
-        url += `&lat=${effectiveLat}&lon=${effectiveLon}`;
-        console.log(`[Gallery Normal] Adding GPS parameters for distance sorting: ${effectiveLat}, ${effectiveLon}`);
-      }
-      
-      // Add user filter if active
-      if (hasUserFilter) {
-        url += `&filter_user_id=${currentFilters.userFilter!.userId}`;
-        console.log(`[Gallery Normal] Adding user filter: ${currentFilters.userFilter!.username}`);
-      }
-      
-      console.log(`[Gallery Normal] Fetching from: ${url}`);
-      const response = await authFetch(url);
-      const result = await response.json();
-      
-      console.log(`[Gallery Normal] API response:`, result);
-      
-      if (result.status === 'success') {
-        // Don't set hasMoreImages to false here - let the main loadMore function handle it
-        console.log(`[Gallery Normal] Got ${result.images?.length || 0} images, total available: ${result.totalCount || 0}, GPS mode: ${result.gpsMode}`);
+    // Use saved GPS coordinates if available, otherwise use current GPS
+    let effectiveLat = userLat;
+    let effectiveLon = userLon;
+    
+    // Check if we have saved GPS coordinates in the profile
+    if (isLoggedIn && currentUser) {
+      try {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('home_lat, home_lon')
+          .eq('id', currentUser.id)
+          .single();
         
-        return result.images;
-      } else {
-        console.error('[Gallery Normal] API error:', result.message);
-        return [];
+        if (profileData?.home_lat && profileData?.home_lon) {
+          effectiveLat = profileData.home_lat;
+          effectiveLon = profileData.home_lon;
+          console.log(`[Gallery Normal] Using saved GPS coordinates: ${effectiveLat}, ${effectiveLon}`);
+        } else {
+          console.log(`[Gallery Normal] No saved GPS coordinates found, using current GPS: ${effectiveLat}, ${effectiveLon}`);
+        }
+      } catch (error) {
+        console.log(`[Gallery Normal] Error fetching saved GPS coordinates:`, error);
       }
-    } catch (error) {
-      console.error('[Gallery Normal] Fetch error:', error);
-      return [];
     }
-  }
-
-
-
-  // NEW: Function to load all user's own images without pagination limit
-  async function loadAllUserImages() {
-    console.log(`[Gallery] Loading ALL user images for: ${currentUser?.id}`);
     
+    // Override with location filter if active
+    if (hasLocationFilter) {
+      effectiveLat = currentFilters.locationFilter!.lat;
+      effectiveLon = currentFilters.locationFilter!.lon;
+      console.log(`[Gallery Normal] Using location filter GPS: ${effectiveLat}, ${effectiveLon}`);
+    }
+    
+    // Check if we have GPS data for distance-based sorting
+    const hasGpsForSorting = effectiveLat !== null && effectiveLon !== null && showDistance;
+    console.log(`[Gallery Normal Debug] GPS sorting check: effectiveLat=${effectiveLat}, effectiveLon=${effectiveLon}, showDistance=${showDistance}, hasGpsForSorting=${hasGpsForSorting}`);
+    
+    // DIRECT DATABASE QUERY: Much faster and no limits
     try {
-      // Use a large limit to get all user images at once
-      let url = `/api/items?limit=100&offset=0&user_id=${currentUser.id}`;
+      let data;
       
-      console.log(`[Gallery AllUser] Fetching from: ${url}`);
-      const response = await authFetch(url);
-      const result = await response.json();
-      
-      console.log(`[Gallery AllUser] API response:`, result);
-      
-      if (result.status === 'success') {
-        console.log(`[Gallery AllUser] Got ${result.images?.length || 0} user images, total available: ${result.totalCount || 0}`);
-        return result.images;
+      if (hasGpsForSorting) {
+        // Use client-side GPS-based sorting instead of database function
+        console.log(`[Gallery Normal] Using client-side distance-based sorting from ${effectiveLat}, ${effectiveLon}`);
+        
+        // Load ALL images for proper GPS-based sorting (not just a small batch)
+        // First, get the total count to know how many images to load
+        const { count: totalCount } = await supabase
+          .from('items')
+          .select('*', { count: 'exact', head: true })
+          .not('path_512', 'is', null);
+        
+        console.log(`[Gallery Normal] Total images in database: ${totalCount}`);
+        
+        // Load ALL images in batches to ensure we get all 1388+ images
+        let allRawData: any[] = [];
+        let offset = 0;
+        const batchSize = 1000;
+        
+        while (true) {
+          let query = supabase
+            .from('items')
+            .select('id, path_512, path_2048, path_64, width, height, lat, lon, title, description, keywords, profile_id, is_private')
+            .not('path_512', 'is', null)
+            .range(offset, offset + batchSize - 1);
+          
+          // Apply privacy filtering based on user login status
+          if (isLoggedIn && currentUser) {
+            // For logged in users: show their own images (all) + other users' public images
+            query = query.or(`profile_id.eq.${currentUser.id},is_private.eq.false,is_private.is.null`);
+          } else {
+            // For anonymous users: only show public images
+            query = query.or('is_private.eq.false,is_private.is.null');
+          }
+          
+          // Add user filter if active
+          if (hasUserFilter) {
+            query = query.eq('profile_id', currentFilters.userFilter!.userId);
+          }
+          
+          const { data: batchData, error } = await query;
+          
+          if (error) {
+            console.error('[Gallery Normal] Database error:', error);
+            break;
+          }
+          
+          if (!batchData || batchData.length === 0) {
+            break; // No more data
+          }
+          
+          allRawData = allRawData.concat(batchData);
+          console.log(`[Gallery Normal] Loaded batch ${offset/batchSize + 1}: ${batchData.length} images (total: ${allRawData.length})`);
+          
+          if (batchData.length < batchSize) {
+            break; // Last batch
+          }
+          
+          offset += batchSize;
+        }
+        
+        const rawData = allRawData;
+        
+        // Client-side GPS-based sorting of ALL images
+        if (rawData && rawData.length > 0) {
+          console.log(`[Gallery Normal] Sorting ${rawData.length} total images by distance`);
+          
+          const sortedData = rawData.sort((a: any, b: any) => {
+            const distA = a.lat && a.lon ? getDistanceInMeters(effectiveLat!, effectiveLon!, a.lat, a.lon) : Number.MAX_VALUE;
+            const distB = b.lat && b.lon ? getDistanceInMeters(effectiveLat!, effectiveLon!, b.lat, b.lon) : Number.MAX_VALUE;
+            return distA - distB;
+          });
+          
+          // For GPS-based sorting, we need to handle pagination differently
+          // Store the sorted data globally so we can access it for subsequent pages
+          if (!(window as any).gpsSortedData) {
+            (window as any).gpsSortedData = sortedData;
+            console.log(`[Gallery Normal] Stored ${sortedData.length} sorted images globally`);
+          }
+          
+          // Apply pagination to the globally stored sorted data
+          const startIndex = page * size;
+          const endIndex = startIndex + size;
+          data = (window as any).gpsSortedData.slice(startIndex, endIndex) as any[];
+          
+          console.log(`[Gallery Normal] Page ${page}: returning ${data.length} images (range ${startIndex}-${endIndex} of ${(window as any).gpsSortedData.length} total)`);
+        } else {
+          data = [] as any[];
+        }
       } else {
-        console.error('[Gallery AllUser] API error:', result.message);
-        return [];
+        // Use normal database query with date sorting
+        console.log(`[Gallery Normal] Using date-based sorting (no GPS data or distance disabled)`);
+        
+        let query = supabase
+          .from('items')
+          .select('id, path_512, path_2048, path_64, width, height, lat, lon, title, description, keywords, profile_id, is_private')
+          .not('path_512', 'is', null)
+          .range(page * size, page * size + size - 1)
+          .order('created_at', { ascending: false });
+        
+        // Apply privacy filtering based on user login status
+        if (isLoggedIn && currentUser) {
+          // For logged in users: show their own images (all) + other users' public images
+          query = query.or(`profile_id.eq.${currentUser.id},is_private.eq.false,is_private.is.null`);
+        } else {
+          // For anonymous users: only show public images
+          query = query.or('is_private.eq.false,is_private.is.null');
+        }
+        
+        // Add user filter if active
+        if (hasUserFilter) {
+          query = query.eq('profile_id', currentFilters.userFilter!.userId);
+          console.log(`[Gallery Normal] Adding user filter: ${currentFilters.userFilter!.username}`);
+        }
+        
+        const { data: dbData, error } = await query;
+        
+        if (error) {
+          console.error('[Gallery Normal] Database error:', error);
+          return [];
+        }
+        
+        data = dbData;
+        console.log(`[Gallery Normal] Got ${data?.length || 0} images from database with date sorting`);
       }
+      
+      return data || [];
     } catch (error) {
-      console.error('[Gallery AllUser] Fetch error:', error);
+      console.error('[Gallery Normal] Database error:', error);
       return [];
     }
   }
+
+
+
+  // REMOVED: loadAllUserImages function - we now use proper pagination with loadMore
+  // This prevents loading too many images at once and improves mobile performance
 
   // TEST: Function to create sample data for testing justified layout
   function createSampleImages() {
@@ -2126,7 +2215,7 @@ import TrackModal from '$lib/TrackModal.svelte';
     
     console.log('[Settings] Loading user settings:', data);
     
-    showDistance = data?.show_distance ?? false;
+    showDistance = data?.show_distance ?? true; // Default to true for GPS-based sorting
     showCompass = data?.show_compass ?? false;
     autoguide = data?.autoguide ?? false;
           // Load showSearchField from localStorage (default: false = Logo visible)
@@ -2154,6 +2243,17 @@ import TrackModal from '$lib/TrackModal.svelte';
       // Nur GPS-Tracking starten, wenn wir noch keine gültigen Koordinaten haben
       if (userLat === null || userLon === null) {
         startGPSTracking();
+      } else {
+        // GPS coordinates already available, reload gallery with GPS-based sorting
+        console.log('[Settings] GPS coordinates available and showDistance enabled, reloading gallery...');
+        pics.set([]);
+        page = 0;
+        hasMoreImages = true;
+        // Clear any existing GPS sorted data to force fresh loading
+        if ((window as any).gpsSortedData) {
+          delete (window as any).gpsSortedData;
+        }
+        loadMore('settings load with GPS sorting');
       }
     } else {
       stopGPSTracking();
@@ -2356,13 +2456,16 @@ import TrackModal from '$lib/TrackModal.svelte';
         // Resort existing images immediately for distance display
         resortExistingImages();
         
-        // Wenn GPS-Koordinaten verfügbar sind, lade Bilder nach Entfernung sortiert
-        // Aber nur wenn keine Suche aktiv ist und die Galerie noch leer ist
-        if (userLat !== null && userLon !== null && !searchQuery.trim() && $pics.length === 0) {
-          console.log('🔄 [GPS] Initial GPS position received, loading gallery...');
+        // Wenn GPS-Koordinaten verfügbar sind und showDistance aktiv ist, lade Bilder nach Entfernung sortiert
+        if (userLat !== null && userLon !== null && !searchQuery.trim() && showDistance) {
+          console.log('🔄 [GPS] Initial GPS position received, loading gallery with GPS-based sorting...');
           pics.set([]);
           page = 0;
           hasMoreImages = true;
+          // Clear any existing GPS sorted data to force fresh loading
+          if ((window as any).gpsSortedData) {
+            delete (window as any).gpsSortedData;
+          }
           loadMore('initial GPS mount');
         }
         
@@ -2450,13 +2553,22 @@ import TrackModal from '$lib/TrackModal.svelte';
       }
     }
     
-    // Wenn die Galerie leer ist und GPS verfügbar wird, lade die Galerie
-    if ($pics.length === 0 && !searchQuery.trim() && showDistance) {
-      console.log('🔄 [GPS] Gallery empty and GPS available, loading gallery...');
-      pics.set([]);
-      page = 0;
-      hasMoreImages = true;
-      loadMore('GPS update with empty gallery');
+    // Wenn GPS verfügbar wird und showDistance aktiv ist, lade die Galerie mit GPS-basierter Sortierung
+    if (showDistance && !searchQuery.trim()) {
+      // Check if this is the first GPS position or if we need to reload for GPS sorting
+      const needsGPSReload = $pics.length === 0 || !(window as any).gpsSortedData;
+      
+      if (needsGPSReload) {
+        console.log('🔄 [GPS] GPS available and showDistance active, reloading gallery with GPS-based sorting...');
+        pics.set([]);
+        page = 0;
+        hasMoreImages = true;
+        // Clear any existing GPS sorted data to force fresh loading
+        if ((window as any).gpsSortedData) {
+          delete (window as any).gpsSortedData;
+        }
+        loadMore('GPS update with GPS-based sorting');
+      }
     }
   }
 

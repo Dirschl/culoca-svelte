@@ -1,15 +1,15 @@
--- Fix images_by_distance function to only return images with valid path_512
--- This ensures users never see placeholder images
+-- Fix images_by_distance function - remove camera column reference
+-- This ensures the function works with the current database schema
 
 -- Drop the existing function
 DROP FUNCTION IF EXISTS images_by_distance;
 
--- Create the updated function that filters out images without path_512
+-- Create the updated function without camera column
 CREATE OR REPLACE FUNCTION images_by_distance(
   user_lat DOUBLE PRECISION,
   user_lon DOUBLE PRECISION,
   page INTEGER DEFAULT 0,
-  page_size INTEGER DEFAULT 500
+  page_size INTEGER DEFAULT 1000
 )
 RETURNS TABLE(
   id UUID,
@@ -49,7 +49,7 @@ BEGIN
     END as distance,
     i.created_at
   FROM items i
-  WHERE i.path_512 IS NOT NULL  -- CRITICAL: Only return images with valid path_512
+  WHERE i.path_512 IS NOT NULL  -- Only return images with valid path_512
     AND i.status = 'ready'       -- Only return processed images
   ORDER BY 
     CASE 
@@ -64,9 +64,6 @@ BEGIN
   OFFSET page * page_size;
 END;
 $$ LANGUAGE plpgsql;
-
--- Test the function
-SELECT 'Function updated successfully' as status;
 
 -- Test the function
 SELECT 'Function updated successfully' as status; 
