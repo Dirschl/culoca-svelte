@@ -47,7 +47,7 @@ function createTrackStore() {
     startTrack: (name: string) => {
       update(state => {
         const newTrack: Track = {
-          id: crypto.randomUUID(),
+          id: typeof window !== 'undefined' && crypto ? crypto.randomUUID() : Date.now().toString(),
           name,
           startTime: new Date().toISOString(),
           points: [],
@@ -117,27 +117,30 @@ function createTrackStore() {
     },
 
     startGpsWatching: () => {
-      if ('geolocation' in navigator) {
-        console.log('🔄 [Track] Starting GPS watching...');
-        const watchId = navigator.geolocation.watchPosition(
-          (position) => {
-            console.log('🔄 [Track] GPS position received:', position.coords);
-            store.addPoint(position);
-          },
-          (error) => console.error('GPS error:', error),
-          { enableHighAccuracy: true, maximumAge: 1000 }
-        );
-
-        update(state => ({
-          ...state,
-          watchId
-        }));
+      if (typeof window === 'undefined' || !('geolocation' in navigator)) {
+        console.warn('GPS not available in this environment');
+        return;
       }
+      
+      console.log('🔄 [Track] Starting GPS watching...');
+      const watchId = navigator.geolocation.watchPosition(
+        (position) => {
+          console.log('🔄 [Track] GPS position received:', position.coords);
+          store.addPoint(position);
+        },
+        (error) => console.error('GPS error:', error),
+        { enableHighAccuracy: true, maximumAge: 1000 }
+      );
+
+      update(state => ({
+        ...state,
+        watchId
+      }));
     },
 
     stopGpsWatching: () => {
       update(state => {
-        if (state.watchId) {
+        if (state.watchId && typeof window !== 'undefined' && 'geolocation' in navigator) {
           navigator.geolocation.clearWatch(state.watchId);
           console.log('🔄 [Track] Stopped GPS watching');
         }
@@ -161,7 +164,9 @@ function createTrackStore() {
 
     clearAllTracks: () => {
       update(state => {
-        localStorage.removeItem('culoca_tracks');
+        if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+          localStorage.removeItem('culoca_tracks');
+        }
         return {
           ...state,
           savedTracks: []
@@ -176,6 +181,10 @@ function createTrackStore() {
 // Helper functions
 function loadTracksFromStorage(): Track[] {
   try {
+    // Check if we're in a browser environment
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+      return [];
+    }
     const stored = localStorage.getItem('culoca_tracks');
     return stored ? JSON.parse(stored) : [];
   } catch (error) {
@@ -186,6 +195,10 @@ function loadTracksFromStorage(): Track[] {
 
 function saveTracksToStorage(tracks: Track[]) {
   try {
+    // Check if we're in a browser environment
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+      return;
+    }
     localStorage.setItem('culoca_tracks', JSON.stringify(tracks));
   } catch (error) {
     console.error('Error saving tracks to storage:', error);
