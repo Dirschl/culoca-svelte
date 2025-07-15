@@ -67,7 +67,7 @@ export const load: PageServerLoad = async ({ params }) => {
             })
             .filter((item: any) => item.distance <= maxRadius)
             .sort((a: any, b: any) => a.distance - b.distance)
-            .slice(0, 20); // Limit to 20 items
+            .slice(0, 100); // Limit to 100 items
         }
       } catch (nearbyErr) {
         console.error('Error fetching nearby items:', nearbyErr);

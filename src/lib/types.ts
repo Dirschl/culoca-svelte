@@ -10,4 +10,5 @@ export type NewsFlashImage = {
   description?: string;
   lat?: number;
   lon?: number;
+  keywords?: string[];
 }; 

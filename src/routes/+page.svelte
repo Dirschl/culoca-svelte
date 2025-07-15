@@ -68,15 +68,15 @@ import TrackModal from '$lib/TrackModal.svelte';
       
       // Don't reload during search or if already loading
       if (!searchQuery.trim() && !isSearching && !loading) {
-        // Reset gallery state immediately
-        pics.set([]);
-        page = 0;
-        hasMoreImages = true;
-        
+      // Reset gallery state immediately
+      pics.set([]);
+      page = 0;
+      hasMoreImages = true;
+      
         // Add a small delay to prevent rapid successive calls
         setTimeout(() => {
           if (!loading) {
-            loadMore('filter change');
+      loadMore('filter change');
           }
         }, 100);
       }
@@ -1157,7 +1157,7 @@ import TrackModal from '$lib/TrackModal.svelte';
     if (loading && !bypassLoadingReasons.includes(reason)) {
       console.log(`[Gallery] Skipping loadMore - loading: ${loading}, hasMoreImages: ${hasMoreImages}, reason: ${reason}`);
       return;
-    }
+    } 
     
     if (!hasMoreImages) {
       console.log(`[Gallery] Skipping loadMore - hasMoreImages: ${hasMoreImages}, reason: ${reason}`);
@@ -1238,7 +1238,7 @@ import TrackModal from '$lib/TrackModal.svelte';
       console.log(`[Gallery] Using client-side GPS-based sorting`);
       data = await loadImagesNormal(effectiveLat, effectiveLon);
 
-    } else {
+        } else {
       // Keine GPS-Daten verfügbar - lade mit Datumssortierung als Fallback
       console.log('[Gallery] No GPS data available, loading with date sorting as fallback...');
       
@@ -1414,20 +1414,20 @@ import TrackModal from '$lib/TrackModal.svelte';
         }
       } else {
         // Normal pagination logic for non-GPS modes
-        if ($pics.length >= totalCount) {
-          hasMoreImages = false;
-          console.log(`[Gallery Debug] All images loaded: ${$pics.length} of ${totalCount}`);
-        } else if (data && data.length === 0) {
-          // If API returned no data, we've reached the end
-          hasMoreImages = false;
-          console.log(`[Gallery Debug] No more images available from API`);
-        } else if (uniqueNewPics && uniqueNewPics.length === 0 && data && data.length > 0) {
-          // If we got data but all were duplicates, we've likely reached the end
-          hasMoreImages = false;
-          console.log(`[Gallery Debug] All new images were duplicates, reached end of available images`);
-        } else {
-          hasMoreImages = true;
-          console.log(`[Gallery Debug] More images available: ${$pics.length} of ${totalCount}, hasMoreImages set to true`);
+      if ($pics.length >= totalCount) {
+        hasMoreImages = false;
+        console.log(`[Gallery Debug] All images loaded: ${$pics.length} of ${totalCount}`);
+      } else if (data && data.length === 0) {
+        // If API returned no data, we've reached the end
+        hasMoreImages = false;
+        console.log(`[Gallery Debug] No more images available from API`);
+      } else if (uniqueNewPics && uniqueNewPics.length === 0 && data && data.length > 0) {
+        // If we got data but all were duplicates, we've likely reached the end
+        hasMoreImages = false;
+        console.log(`[Gallery Debug] All new images were duplicates, reached end of available images`);
+      } else {
+        hasMoreImages = true;
+        console.log(`[Gallery Debug] More images available: ${$pics.length} of ${totalCount}, hasMoreImages set to true`);
         }
       }
       
@@ -1566,10 +1566,10 @@ import TrackModal from '$lib/TrackModal.svelte';
           } else {
             // For anonymous users: only show public images
             query = query.or('is_private.eq.false,is_private.is.null');
-          }
-          
-          // Add user filter if active
-          if (hasUserFilter) {
+      }
+      
+      // Add user filter if active
+      if (hasUserFilter) {
             query = query.eq('profile_id', currentFilters.userFilter!.userId);
           }
           
@@ -1684,7 +1684,7 @@ import TrackModal from '$lib/TrackModal.svelte';
         if (isLoggedIn && currentUser) {
           // For logged in users: show their own images (all) + other users' public images
           query = query.or(`profile_id.eq.${currentUser.id},is_private.eq.false,is_private.is.null`);
-        } else {
+      } else {
           // For anonymous users: only show public images
           query = query.or('is_private.eq.false,is_private.is.null');
         }
@@ -1699,8 +1699,8 @@ import TrackModal from '$lib/TrackModal.svelte';
         
         if (error) {
           console.error('[Gallery Normal] Database error:', error);
-          return [];
-        }
+        return [];
+      }
         
         data = dbData;
         console.log(`[Gallery Normal] Got ${data?.length || 0} images from database with date sorting`);
@@ -2666,10 +2666,10 @@ import TrackModal from '$lib/TrackModal.svelte';
             } else {
               console.log('🔄 [GPS] Other GPS error, but keeping last known position');
               // For other errors, don't immediately mark as unavailable
-              // Only mark as unavailable if we haven't had an update in 5 minutes
-              if (lastGPSUpdateTime && (Date.now() - lastGPSUpdateTime) > GPS_MEMORY_TIMEOUT) {
-                gpsStatus = 'unavailable';
-                showGPSMessage = true;
+            // Only mark as unavailable if we haven't had an update in 5 minutes
+            if (lastGPSUpdateTime && (Date.now() - lastGPSUpdateTime) > GPS_MEMORY_TIMEOUT) {
+              gpsStatus = 'unavailable';
+              showGPSMessage = true;
               }
             }
           },
@@ -2677,7 +2677,7 @@ import TrackModal from '$lib/TrackModal.svelte';
         );
         // Only start radius check interval if we're in a mode that needs it and have GPS coordinates
         if (showDistance && !gpsSimulationActive && userLat && userLon) {
-          radiusCheckInterval = window.setInterval(checkRadiusForNewImages, RADIUS_CHECK_INTERVAL);
+        radiusCheckInterval = window.setInterval(checkRadiusForNewImages, RADIUS_CHECK_INTERVAL);
         }
       },
       (error) => {
@@ -2764,9 +2764,9 @@ import TrackModal from '$lib/TrackModal.svelte';
       
       if (needsGPSReload) {
         console.log('🔄 [GPS] GPS available and showDistance active, reloading gallery with GPS-based sorting...');
-        pics.set([]);
-        page = 0;
-        hasMoreImages = true;
+      pics.set([]);
+      page = 0;
+      hasMoreImages = true;
         // Clear any existing GPS sorted data to force fresh loading
         if ((window as any).gpsSortedData) {
           delete (window as any).gpsSortedData;
@@ -3870,7 +3870,7 @@ import TrackModal from '$lib/TrackModal.svelte';
     } else {
       // If hiding search field, only clear search if there's an active search
       if (searchQuery.trim() || searchResults.length > 0) {
-        clearSearch();
+      clearSearch();
       }
     }
   }
@@ -4183,12 +4183,12 @@ import TrackModal from '$lib/TrackModal.svelte';
       <h3>Noch keine Bilder vorhanden</h3>
       <p>Lade deine ersten Bilder hoch, um die Galerie zu starten!</p>
       {#if import.meta.env.DEV}
-        <button on:click={createSampleImages} style="margin-top: 1rem; padding: 0.5rem 1rem; background: #0066cc; color: white; border: none; border-radius: 4px; cursor: pointer;">
-          🧪 Test Justified Layout
-        </button>
-        <button on:click={testLoadAllImages} style="margin-top: 1rem; margin-left: 1rem; padding: 0.5rem 1rem; background: #ff6600; color: white; border: none; border-radius: 4px; cursor: pointer;">
-          🔍 Test: Alle Bilder laden
-        </button>
+      <button on:click={createSampleImages} style="margin-top: 1rem; padding: 0.5rem 1rem; background: #0066cc; color: white; border: none; border-radius: 4px; cursor: pointer;">
+        🧪 Test Justified Layout
+      </button>
+      <button on:click={testLoadAllImages} style="margin-top: 1rem; margin-left: 1rem; padding: 0.5rem 1rem; background: #ff6600; color: white; border: none; border-radius: 4px; cursor: pointer;">
+        🔍 Test: Alle Bilder laden
+      </button>
       {/if}
     </div>
   {/if}
