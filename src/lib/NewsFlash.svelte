@@ -21,7 +21,7 @@ let images: NewsFlashImage[] = [];
 let loading = true;
 let errorMsg = '';
 let mounted = false;
-let refreshInterval: number | null = null;
+let refreshInterval: ReturnType<typeof setInterval> | null = null;
 let lastUpdate = new Date();
 let lastImageId: string | null = null;
 let loadingMore = false;
@@ -66,7 +66,7 @@ async function fetchImages(isLoadMore = false) {
         if (newImages.length > 0 && lastImageId && newImages[0].id !== lastImageId) {
           // Neue Bilder gefunden - nur die neuen vorne dran setzen
           const existingIds = new Set(images.map(img => img.id));
-          const newImagesToAdd = newImages.filter(img => !existingIds.has(img.id));
+          const newImagesToAdd = newImages.filter((img: NewsFlashImage) => !existingIds.has(img.id));
           
           if (newImagesToAdd.length > 0) {
             console.log('NewsFlash: Adding', newImagesToAdd.length, 'new images');
@@ -74,10 +74,15 @@ async function fetchImages(isLoadMore = false) {
             lastUpdate = new Date();
           }
         } else if (newImages.length > 0 && !lastImageId) {
-          // Erster Load
+          // Erster Load - neueste Bilder zuerst
           images = newImages;
           lastUpdate = new Date();
-          console.log('NewsFlash: Initial load of', images.length, 'images');
+          console.log('NewsFlash: Initial load of', images.length, 'images (newest first)');
+        } else if (newImages.length > 0) {
+          // Refresh ohne neue Bilder - trotzdem neueste anzeigen
+          images = newImages;
+          lastUpdate = new Date();
+          console.log('NewsFlash: Refresh with', images.length, 'newest images');
         }
         
         if (newImages.length > 0) {

@@ -62,6 +62,7 @@ export const GET = async ({ url, request }) => {
         .not('lat', 'is', null)
         .not('lon', 'is', null)
         .not('path_512', 'is', null)
+        .order('created_at', { ascending: false }) // Neueste zuerst für NewsFlash
         .limit(maxGpsImages);
       // User-Filter anwenden
       if (user_id) {
@@ -138,6 +139,7 @@ export const GET = async ({ url, request }) => {
       .not('lat', 'is', null)
       .not('lon', 'is', null)
       .not('path_512', 'is', null)
+      .order('created_at', { ascending: false }) // Neueste zuerst
       .range(offset, offset + effectiveLimit - 1);
     if (user_id) {
       imagesQuery = imagesQuery.eq('user_id', user_id);
@@ -155,7 +157,8 @@ export const GET = async ({ url, request }) => {
       .select('id', { count: 'exact' })
       .not('lat', 'is', null)
       .not('lon', 'is', null)
-      .not('path_512', 'is', null);
+      .not('path_512', 'is', null)
+      .order('created_at', { ascending: false }); // Konsistente Sortierung
     if (user_id) {
       totalQuery = totalQuery.eq('user_id', user_id);
     } else if (filter_user_id) {
