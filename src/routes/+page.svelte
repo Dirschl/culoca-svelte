@@ -1134,7 +1134,7 @@ import TrackModal from '$lib/TrackModal.svelte';
     }
     
     if (loading || !hasMoreImages) {
-      console.log(`[Gallery] Skipping loadMore - loading: ${loading}, hasMoreImages: ${hasMoreImages}`);
+      console.log(`[Gallery] Skipping loadMore - loading: ${loading}, hasMoreImages: ${hasMoreImages}, reason: ${reason}`);
       return;
     } 
     
@@ -2888,6 +2888,10 @@ import TrackModal from '$lib/TrackModal.svelte';
       pics.set([]);
       page = 0;
       hasMoreImages = true;
+      loading = false; // Ensure loading is false for fresh start
+      
+      // Reset gallery stats
+      updateGalleryStats(0, 0);
       
       // Clear search state if no search query in URL
       const urlParams = new URLSearchParams(to.url.search);
@@ -2903,19 +2907,21 @@ import TrackModal from '$lib/TrackModal.svelte';
         delete (window as any).gpsSortedData;
       }
       
-      // Load gallery based on current state
-      if (!searchQuery.trim()) {
-        if (showDistance && userLat !== null && userLon !== null) {
-          // GPS mode: reload with GPS sorting
-          loadMore('navigation back with GPS');
+      // Load gallery based on current state with a small delay to ensure state is reset
+      setTimeout(() => {
+        if (!searchQuery.trim()) {
+          if (showDistance && userLat !== null && userLon !== null) {
+            // GPS mode: reload with GPS sorting
+            loadMore('navigation back with GPS');
+          } else {
+            // Normal mode: reload without GPS
+            loadMore('navigation back normal');
+          }
         } else {
-          // Normal mode: reload without GPS
-          loadMore('navigation back normal');
+          // Search mode: reload search
+          performSearch(searchQuery, false);
         }
-      } else {
-        // Search mode: reload search
-        performSearch(searchQuery, false);
-      }
+      }, 100);
     }
   });
 
