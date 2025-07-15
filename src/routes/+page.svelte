@@ -1138,8 +1138,8 @@ import TrackModal from '$lib/TrackModal.svelte';
       return;
     } 
     
-    // Don't load more images if a search is active
-    if (searchQuery.trim() || searchResults.length > 0) {
+    // Don't load more images if a search is active (unless it's a navigation back)
+    if ((searchQuery.trim() || searchResults.length > 0) && !reason.includes('navigation back')) {
       console.log(`[Gallery] Skipping loadMore because search is active: "${searchQuery}"`);
       return;
     }
@@ -2882,7 +2882,40 @@ import TrackModal from '$lib/TrackModal.svelte';
 
   afterNavigate(({ to }) => {
     if (to?.url.pathname === '/') {
-      console.log('Back on main page, preload complete');
+      console.log('Back on main page, reloading gallery...');
+      
+      // Reset gallery state and reload
+      pics.set([]);
+      page = 0;
+      hasMoreImages = true;
+      
+      // Clear search state if no search query in URL
+      const urlParams = new URLSearchParams(to.url.search);
+      const searchParam = urlParams.get('s');
+      if (!searchParam) {
+        searchQuery = '';
+        searchResults = [];
+        console.log('Clearing search state on navigation back');
+      }
+      
+      // Clear any existing GPS sorted data to force fresh loading
+      if ((window as any).gpsSortedData) {
+        delete (window as any).gpsSortedData;
+      }
+      
+      // Load gallery based on current state
+      if (!searchQuery.trim()) {
+        if (showDistance && userLat !== null && userLon !== null) {
+          // GPS mode: reload with GPS sorting
+          loadMore('navigation back with GPS');
+        } else {
+          // Normal mode: reload without GPS
+          loadMore('navigation back normal');
+        }
+      } else {
+        // Search mode: reload search
+        performSearch(searchQuery, false);
+      }
     }
   });
 
@@ -3467,6 +3500,10 @@ import TrackModal from '$lib/TrackModal.svelte';
         searchResults = searchPics;
         pics.set(searchPics);
         
+        // Reset pagination for search results
+        page = 0;
+        hasMoreImages = false; // Search results don't have pagination
+        
         // Update gallery stats
         const totalCount = await getTotalImageCount();
         updateGalleryStats(searchPics.length, totalCount);
@@ -3499,6 +3536,12 @@ import TrackModal from '$lib/TrackModal.svelte';
     pics.set([]);
     page = 0;
     hasMoreImages = true;
+    
+    // Clear any existing GPS sorted data to force fresh loading
+    if ((window as any).gpsSortedData) {
+      delete (window as any).gpsSortedData;
+    }
+    
     loadMore('clear search');
   }
   
