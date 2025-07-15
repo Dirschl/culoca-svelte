@@ -19,7 +19,7 @@
   let loading = !data.image;
   let error = data.error || '';
   let profile: any = null;
-  let nearby: any[] = [];
+  let nearby: any[] = data.nearby || [];
   let radius = 500; // meters, default
   let radiusLoaded = false;
   let lastRadius = 500; // track radius changes
@@ -390,59 +390,66 @@
 
 
   async function fetchNearbyImages(lat: number, lon: number, maxRadius: number) {
+    console.log('🔍 fetchNearbyImages called with:', { lat, lon, maxRadius });
     // Create cache key based on coordinates and radius
     const cacheKey = `${lat.toFixed(4)}_${lon.toFixed(4)}_${maxRadius}`;
     
     // Check cache first
     if (nearbyCache[cacheKey]) {
-      console.log('📸 Using cached nearby images for radius:', maxRadius, 'm');
+      console.log('📸 Using cached nearby items for radius:', maxRadius, 'm');
       nearby = nearbyCache[cacheKey];
       return;
     }
     
-    console.log('🔍 Fetching nearby images for radius:', maxRadius, 'm');
+    console.log('🔍 Calculating nearby items for radius:', maxRadius, 'm');
     
-    // Build query with privacy filtering
-    let nearbyQuery = supabase
-      .from('items')
-      .select('*')
-      .not('lat', 'is', null)
-      .not('lon', 'is', null)
-      .neq('id', imageId);
-    
-    // Apply privacy filtering based on user login status
-    if (currentUser) {
-      // For logged in users: show their own images (all) + other users' public images
-      nearbyQuery = nearbyQuery.or(`profile_id.eq.${currentUser.id},is_private.eq.false,is_private.is.null`);
-    } else {
-      // For anonymous users: only show public images
-      nearbyQuery = nearbyQuery.or('is_private.eq.false,is_private.is.null');
-    }
-    
-    const { data, error: nearErr } = await nearbyQuery;
-    if (nearErr || !data) {
-      console.log('❌ Error fetching nearby images:', nearErr);
-      return;
-    }
-    console.log('📸 Found', data.length, 'images with GPS data');
+    // Use server-side loaded data first, then fallback to global data
     const baseUrl = 'https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public';
-    nearby = data.map((img: any) => {
-      const dist = getDistanceInMeters(lat, lon, img.lat, img.lon);
-      return {
-        id: img.id,
-        lat: img.lat,
-        lon: img.lon,
-        distance: dist,
-        src: `${baseUrl}/images-512/${img.path_512}`,
-        srcHD: `${baseUrl}/images-2048/${img.path_2048}`,
-        src64: img.path_64 ? `${baseUrl}/images-64/${img.path_64}` : `${baseUrl}/images-512/${img.path_512}`,
-        width: img.width,
-        height: img.height,
-        title: img.title || null
-      };
-    }).filter((it: any) => it.distance <= maxRadius)
-      .sort((a: any, b: any) => a.distance - b.distance);
-    console.log('✅ Nearby images loaded:', nearby.length, 'images within', maxRadius, 'm');
+    
+    // Filter server-side loaded nearby items by radius
+    if (data.nearby && data.nearby.length > 0) {
+      console.log('📸 Using server-side loaded nearby items:', data.nearby.length);
+      nearby = data.nearby
+        .filter((item: any) => item.distance <= maxRadius)
+        .sort((a: any, b: any) => a.distance - b.distance);
+    } else if (typeof window !== 'undefined' && (window as any).allImagesData) {
+      // Fallback to global item data if available (from main page)
+      const allItems = (window as any).allImagesData;
+      console.log('📸 Using global item data for nearby calculation, found', allItems?.length || 0, 'items');
+      
+      nearby = allItems
+        .filter((item: any) => item.id !== imageId && item.lat && item.lon)
+        .map((item: any) => {
+          const dist = getDistanceInMeters(lat, lon, item.lat, item.lon);
+          return {
+            id: item.id,
+            lat: item.lat,
+            lon: item.lon,
+            distance: dist,
+            src: `${baseUrl}/images-512/${item.path_512}`,
+            srcHD: `${baseUrl}/images-2048/${item.path_2048}`,
+            src64: item.path_64 ? `${baseUrl}/images-64/${item.path_64}` : `${baseUrl}/images-512/${item.path_512}`,
+            width: item.width,
+            height: item.height,
+            title: item.title || null
+          };
+        })
+        .filter((it: any) => it.distance <= maxRadius)
+        .sort((a: any, b: any) => a.distance - b.distance);
+    } else {
+      // No data available - just return empty array
+      console.log('📸 No nearby data available');
+      nearby = [];
+    }
+    
+    console.log('✅ Nearby items calculated:', nearby.length, 'items within', maxRadius, 'm');
+    
+    // Show distance range info
+    if (nearby.length > 0) {
+      const closest = nearby[0].distance;
+      const farthest = nearby[nearby.length - 1].distance;
+      console.log(`📍 Distance range: ${closest.toFixed(0)}m - ${farthest.toFixed(0)}m`);
+    }
     
     // Cache the result
     nearbyCache[cacheKey] = [...nearby];
@@ -461,7 +468,7 @@
     scheduleMapUpdate();
   }
 
-  // Debounced radius change handler
+  // Debounced radius change handler with improved performance
   $: if (image && image.lat && image.lon && radiusLoaded) {
     // Only fetch if radius actually changed
     if (radius !== lastRadius) {
@@ -470,27 +477,36 @@
       
       // Only update if not currently dragging
       if (!isDraggingRadius) {
-        fetchNearbyImages(image.lat, image.lon, radius);
+        // Add small delay to prevent excessive updates during rapid changes
+        setTimeout(async () => {
+          if (radius === lastRadius) { // Check if radius hasn't changed again
+            await fetchNearbyImages(image.lat, image.lon, radius);
+          }
+        }, 100);
       }
     }
   }
   
-  // Radius slider event handlers
+  // Radius slider event handlers with improved UX
   function onRadiusInput() {
     isDraggingRadius = true;
+    // Show live preview of radius value
+    console.log('🎚️ Radius slider: ${radius}m');
   }
   
-  function onRadiusChange() {
+  async function onRadiusChange() {
     isDraggingRadius = false;
     // Trigger immediate update when user finishes dragging
     if (image && image.lat && image.lon) {
-      fetchNearbyImages(image.lat, image.lon, radius);
+      console.log('✅ Radius slider finished: ${radius}m');
+      await fetchNearbyImages(image.lat, image.lon, radius);
     }
   }
   
   // Initial fetch when image loads
-  $: if (image && image.lat && image.lon && radiusLoaded && nearby.length === 0) {
-    fetchNearbyImages(image.lat, image.lon, radius);
+  $: if (image && image.lat && image.lon && radiusLoaded) {
+    console.log('🚀 Initial nearby fetch for item:', image.id, 'at', image.lat, image.lon);
+    fetchNearbyImages(image.lat, image.lon, radius).catch(console.error);
   }
 
   async function initMap() {
@@ -569,33 +585,33 @@
       currentMarker.bindPopup(`<strong>${image.title}</strong><br><small>Aktuelles Bild</small>`);
     }
 
-    // Add nearby images as individual markers
+    // Add nearby items as individual markers
     if (nearby.length > 0) {
-      nearby.forEach((nearbyImage: any) => {
-        const nearbyThumbnailUrl = nearbyImage.src64 || nearbyImage.src;
+      nearby.forEach((nearbyItem: any) => {
+        const nearbyThumbnailUrl = nearbyItem.src64 || nearbyItem.src;
         const nearbyIcon = leaflet.divIcon({
           className: 'custom-marker nearby-image',
-          html: `<img src="${nearbyThumbnailUrl}" alt="${nearbyImage.title || 'Bild'}" style="width: 48px; height: 48px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3); object-fit: cover; cursor: pointer;">`,
+          html: `<img src="${nearbyThumbnailUrl}" alt="${nearbyItem.title || 'Item'}" style="width: 48px; height: 48px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3); object-fit: cover; cursor: pointer;">`,
           iconSize: [48, 48],
           iconAnchor: [48, 48],
           popupAnchor: [0, -48]
         });
-        const nearbyMarker = leaflet.marker([nearbyImage.lat, nearbyImage.lon], { icon: nearbyIcon }).addTo(map);
+        const nearbyMarker = leaflet.marker([nearbyItem.lat, nearbyItem.lon], { icon: nearbyIcon }).addTo(map);
         nearbyMarker.on('click', () => {
-          window.location.href = `/item/${nearbyImage.id}`;
+          window.location.href = `/item/${nearbyItem.id}`;
         });
         const popupContent = `
           <div style="text-align: center; min-width: 200px;">
-            <strong>${nearbyImage.title || 'Bild'}</strong><br>
-            <small>Entfernung: ${getDistanceFromLatLonInMeters(image.lat, image.lon, nearbyImage.lat, nearbyImage.lon)}</small><br>
-            <a href="/item/${nearbyImage.id}" style="color: #0066cc; text-decoration: none; font-weight: 500;">Bild anzeigen →</a>
+            <strong>${nearbyItem.title || 'Item'}</strong><br>
+            <small>Entfernung: ${getDistanceFromLatLonInMeters(image.lat, image.lon, nearbyItem.lat, nearbyItem.lon)}</small><br>
+            <a href="/item/${nearbyItem.id}" style="color: #0066cc; text-decoration: none; font-weight: 500;">Item anzeigen →</a>
           </div>
         `;
         nearbyMarker.bindPopup(popupContent);
       });
     }
 
-    // Fit map to show all markers if there are nearby images
+    // Fit map to show all markers if there are nearby items
     if (nearby.length > 0) {
       const allMarkers = [currentMarker];
       map.eachLayer((layer: any) => {
@@ -1292,12 +1308,12 @@
 </script>
 
 <svelte:head>
-  <title>{image?.title || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}</title>
+  <title>{image?.title || `Item ${$page.params.id} - culoca.com`}</title>
   <meta name="description" content={image?.description || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
 
   <!-- Open Graph -->
   <meta property="og:type" content="article">
-  <meta property="og:title" content={image?.title || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
+  <meta property="og:title" content={image?.title || `Item ${$page.params.id} - culoca.com`}>
   <meta property="og:description" content={image?.description || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
   <meta property="og:url" content={`https://culoca.com/item/${$page.params.id}`}> 
   <meta property="og:image" content={`https://culoca.com/api/og-image/${$page.params.id}`}> 
@@ -1306,7 +1322,7 @@
 
   <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content={image?.title || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
+  <meta name="twitter:title" content={image?.title || `Item ${$page.params.id} - culoca.com`}>
   <meta name="twitter:description" content={image?.description || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
   <meta name="twitter:image" content={`https://culoca.com/api/og-image/${$page.params.id}`}> 
 
@@ -1317,9 +1333,9 @@
 
   <!-- Immediate fallback for loading state -->
   {#if !image}
-    <title>Bild {$page.params.id} - culoca.com</title>
-    <meta property="og:title" content="Bild {$page.params.id} - culoca.com">
-    <meta property="twitter:title" content="Bild {$page.params.id} - culoca.com">
+    <title>Item {$page.params.id} - culoca.com</title>
+    <meta property="og:title" content="Item {$page.params.id} - culoca.com">
+    <meta property="twitter:title" content="Item {$page.params.id} - culoca.com">
   {/if}
 
 </svelte:head>
@@ -1447,7 +1463,12 @@
           <!-- Radius-Control: Nur Wert, zentriert -->
           {#if image.lat && image.lon}
             <div class="radius-control">
-              <div class="radius-value">{formatRadius(radius)}</div>
+              <div class="radius-value">
+                {formatRadius(radius)}
+                {#if nearby.length > 0}
+                  <span class="nearby-count">• {nearby.length} Items</span>
+                {/if}
+              </div>
               <input id="radius" type="range" min="50" max="5000" step="50" bind:value={radius} on:input={onRadiusInput} on:change={onRadiusChange}>
             </div>
           {/if}
@@ -1460,15 +1481,20 @@
 
           {#if image.lat && image.lon}
             <div class="edge-to-edge-gallery">
-              <GalleryLayout
-                items={nearby}
-                layout={useJustifiedLayout ? 'justified' : 'grid'}
-                gap={2}
-                showDistance={true}
-                userLat={image.lat}
-                userLon={image.lon}
-                getDistanceFromLatLonInMeters={getDistanceFromLatLonInMeters}
-              />
+              <h2>Nearby Items ({nearby.length})</h2>
+              {#if nearby.length > 0}
+                <GalleryLayout
+                  items={nearby}
+                  layout={useJustifiedLayout ? 'justified' : 'grid'}
+                  gap={2}
+                  showDistance={true}
+                  userLat={image.lat}
+                  userLon={image.lon}
+                  getDistanceFromLatLonInMeters={getDistanceFromLatLonInMeters}
+                />
+              {:else}
+                <p class="no-nearby">Keine Items in der Nähe gefunden. Vergrößere den Radius oder es gibt keine anderen Items mit GPS-Koordinaten in der Nähe.</p>
+              {/if}
             </div>
           {/if}
 
@@ -2324,6 +2350,25 @@
     text-align: center;
     background: transparent;
   }
+
+  .nearby-count {
+    font-size: 0.85rem;
+    font-weight: 400;
+    color: var(--text-muted);
+    margin-left: 0.3rem;
+  }
+
+  .no-nearby {
+    text-align: center;
+    color: var(--text-secondary);
+    font-style: italic;
+    padding: 2rem;
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    margin: 1rem 0;
+  }
+
+
   .radius-control input[type="range"] {
     width: 100%;
     background: transparent;

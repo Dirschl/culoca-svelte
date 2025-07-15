@@ -4,7 +4,7 @@ import { supabase } from '$lib/supabaseClient';
 export const GET = async ({ url, request }) => {
   try {
     // Query-Parameter: limit (default 100), user_id (optional), offset (optional)
-    // New filter parameters: filter_user_id, lat, lon (for GPS-based filtering)
+    // New filter parameters: filter_user_id, lat, lon, radius (for GPS-based filtering)
     // Special parameter: for_map (for map clustering - bypasses limit)
     const limit = parseInt(url.searchParams.get('limit') || '100', 10);
     const offset = parseInt(url.searchParams.get('offset') || '0', 10);
@@ -12,6 +12,7 @@ export const GET = async ({ url, request }) => {
     const filter_user_id = url.searchParams.get('filter_user_id');
     const lat = url.searchParams.get('lat');
     const lon = url.searchParams.get('lon');
+    const radius = url.searchParams.get('radius');
     const for_map = url.searchParams.get('for_map') === 'true';
     
     // For map clustering, use a much higher limit
@@ -62,8 +63,7 @@ export const GET = async ({ url, request }) => {
         .not('lat', 'is', null)
         .not('lon', 'is', null)
         .not('path_512', 'is', null)
-        .order('created_at', { ascending: false }) // Neueste zuerst für NewsFlash
-        .limit(maxGpsImages);
+        .limit(maxGpsImages); // Keine Sortierung hier, wird nach Entfernung sortiert
       // User-Filter anwenden
       if (user_id) {
         gpsQuery = gpsQuery.eq('user_id', user_id);
@@ -88,47 +88,68 @@ export const GET = async ({ url, request }) => {
       // Entfernung berechnen und sortieren
       const userLat = parseFloat(lat);
       const userLon = parseFloat(lon);
-      let imagesWithDistance = (gpsData || []).map((image) => {
-        if (image.lat && image.lon) {
+      let itemsWithDistance = (gpsData || []).map((item) => {
+        if (item.lat && item.lon) {
           const R = 6371000;
           const lat1Rad = userLat * Math.PI / 180;
-          const lat2Rad = image.lat * Math.PI / 180;
-          const deltaLatRad = (image.lat - userLat) * Math.PI / 180;
-          const deltaLonRad = (image.lon - userLon) * Math.PI / 180;
+          const lat2Rad = item.lat * Math.PI / 180;
+          const deltaLatRad = (item.lat - userLat) * Math.PI / 180;
+          const deltaLonRad = (item.lon - userLon) * Math.PI / 180;
           const a = Math.sin(deltaLatRad / 2) * Math.sin(deltaLatRad / 2) +
                    Math.cos(lat1Rad) * Math.cos(lat2Rad) *
                    Math.sin(deltaLonRad / 2) * Math.sin(deltaLonRad / 2);
           const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
           const distance = R * c;
-          return { ...image, distance };
+          return { ...item, distance };
         }
-        return image;
+        return item;
       });
       
-      console.log('API Debug - Items with distance calculated:', imagesWithDistance.length);
+      console.log('API Debug - Items with distance calculated:', itemsWithDistance.length);
       
-      imagesWithDistance.sort((a, b) => ((a as any).distance || Infinity) - ((b as any).distance || Infinity));
+      itemsWithDistance.sort((a, b) => ((a as any).distance || Infinity) - ((b as any).distance || Infinity));
       
-      console.log('API Debug - Items after sorting by distance:', imagesWithDistance.length);
-      console.log('API Debug - First 3 items after sorting:', imagesWithDistance.slice(0, 3).map(item => ({ id: item.id, distance: (item as any).distance })));
+      console.log('API Debug - Items after sorting by distance:', itemsWithDistance.length);
+      console.log('API Debug - First 3 items after sorting:', itemsWithDistance.slice(0, 3).map(item => ({ id: item.id, distance: (item as any).distance })));
       
-      const pagedImages = imagesWithDistance.slice(offset, offset + limit);
+      // Apply radius filter if specified
+      if (radius && !isNaN(parseFloat(radius))) {
+        const maxRadius = parseFloat(radius);
+        itemsWithDistance = itemsWithDistance.filter((item) => (item as any).distance <= maxRadius);
+        console.log('API Debug - After radius filtering:', itemsWithDistance.length, 'items within', maxRadius, 'm');
+        console.log('API Debug - Items within radius:', itemsWithDistance.slice(0, 5).map(item => ({ 
+          id: item.id, 
+          distance: (item as any).distance,
+          lat: item.lat,
+          lon: item.lon,
+          title: item.title
+        })));
+      }
+      
+      const pagedItems = itemsWithDistance.slice(offset, offset + limit);
       
       console.log('API Debug - Final paged result:', {
-        totalItems: imagesWithDistance.length,
+        totalItems: itemsWithDistance.length,
         offset,
         limit,
-        returnedItems: pagedImages.length,
-        firstItemId: pagedImages[0]?.id,
-        lastItemId: pagedImages[pagedImages.length - 1]?.id
+        returnedItems: pagedItems.length,
+        firstItemId: pagedItems[0]?.id,
+        lastItemId: pagedItems[pagedItems.length - 1]?.id
       });
       
       return json({
         status: 'success',
-        images: pagedImages,
-        totalCount: imagesWithDistance.length,
-        loadedCount: pagedImages.length,
-        gpsMode: true
+        images: pagedItems,
+        totalCount: itemsWithDistance.length,
+        loadedCount: pagedItems.length,
+        gpsMode: true,
+        debug: {
+          userLat,
+          userLon,
+          radius: radius ? parseFloat(radius) : null,
+          totalItems: itemsWithDistance.length,
+          returnedItems: pagedItems.length
+        }
       });
     }
     // Normale Paginierung ohne GPS
