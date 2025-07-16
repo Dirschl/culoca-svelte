@@ -83,13 +83,21 @@
 
   async function loadAllImages() {
     try {
-      // First, get all images to see the total count
-      const { data: allData, error: allError } = await supabase
-        .from('items')
-        .select('id, path_512, path_2048, path_64, width, height, lat, lon, title, description, keywords, original_url')
-        .or('is_private.eq.false,is_private.is.null'); // Only load non-private images (handle null for legacy data)
-
-      if (allError) throw allError;
+      // Use GPS-based API path with dummy coordinates to get the higher limit
+      const response = await fetch('/api/items?for_map=true&limit=50000&lat=52.5200&lon=13.4050');
+      const result = await response.json();
+      
+      if (result.status !== 'success') {
+        throw new Error(result.message || 'API Error');
+      }
+      
+      const allData = result.images || [];
+      console.log(`🗺️ Simulation loaded ${allData.length} images via API`);
+      
+      // Debug: Check for actual duplicates
+      const allIds = allData.map(img => img.id);
+      const uniqueIds = [...new Set(allIds)];
+      console.log(`🔍 Image ID analysis: ${allIds.length} total, ${uniqueIds.length} unique IDs, ${allIds.length - uniqueIds.length} actual duplicates`);
 
       totalImages = allData?.length || 0;
 
@@ -263,6 +271,26 @@
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap contributors'
     }).addTo(map);
+    
+    // Load MarkerCluster plugin for performance with many markers
+    if (typeof (window as any).L.markerClusterGroup === 'undefined') {
+      const clusterScript = document.createElement('script');
+      clusterScript.src = 'https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js';
+      clusterScript.onload = () => {
+        initializeMarkerClustering();
+      };
+      document.head.appendChild(clusterScript);
+      
+      // Load MarkerCluster CSS
+      if (!document.querySelector('link[href*="markercluster"]')) {
+        const clusterLink = document.createElement('link');
+        clusterLink.rel = 'stylesheet';
+        clusterLink.href = 'https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css';
+        document.head.appendChild(clusterLink);
+      }
+    } else {
+      initializeMarkerClustering();
+    }
 
     // Add user marker (draggable and in front)
     // @ts-ignore
@@ -300,43 +328,84 @@
       updateSimulatedPositionDirect(newLat, newLon);
     });
 
-    // Add image markers (only for unique images with GPS data)
-    const imagesWithGPS = allImages.filter(img => img.lat && img.lon);
-    console.log(`🗺️ Creating ${imagesWithGPS.length} map markers from ${allImages.length} unique images`);
-    
-    imagesWithGPS.forEach(img => {
-      console.log(`📍 Adding marker for unique image ${img.id}:`, {
-        lat: img.lat,
-        lon: img.lon,
-        path_64: img.path_64,
-        path_512: img.path_512,
-        title: img.title
+    // Initialize markers after marker clustering is ready
+    function initializeMarkerClustering() {
+      // Create marker cluster group - optimized for 5000+ objects  
+      const markerClusterGroup = (window as any).L.markerClusterGroup({
+        chunkedLoading: true,
+        maxClusterRadius: 80,
+        spiderfyOnMaxZoom: true,
+        showCoverageOnHover: true,
+        zoomToBoundsOnClick: true,
+        disableClusteringAtZoom: 18,
+        iconCreateFunction: function(cluster: any) {
+          const count = cluster.getChildCount();
+          let className = 'marker-cluster-small';
+          if (count > 500) {
+            className = 'marker-cluster-large';
+          } else if (count > 50) {
+            className = 'marker-cluster-medium';
+          }
+          
+          return (window as any).L.divIcon({
+            html: `<div><span>${count}</span></div>`,
+            className: `marker-cluster ${className}`,
+            iconSize: (window as any).L.point(40, 40)
+          });
+        }
       });
-        
-        // @ts-ignore
-        const marker = L.marker([img.lat, img.lon], {
-          // @ts-ignore
-          icon: L.divIcon({
-            className: 'image-marker',
-            html: `<div style="position: relative; width: 48px; height: 48px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.4); cursor: pointer; overflow: hidden; background: #f0f0f0; display: flex; align-items: center; justify-content: center;" title="${img.title || 'Bild'}">
-              <img src="https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/${img.path_64 || img.path_512}" 
-                   style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;" 
-                   alt="${img.title || 'Bild'}"
-                   onerror="this.style.display='none'; this.parentElement.innerHTML='<div style=\'background: #4CAF50; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px;\'>📷</div>'">
-              <div style="position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; white-space: nowrap; max-width: 120px; overflow: hidden; text-overflow: ellipsis; z-index: 1000;">${img.title || 'Bild'}</div>
-            </div>`,
-            iconSize: [48, 48],
-            iconAnchor: [24, 24]
-          })
-        }).addTo(map);
-
-        marker.on('click', () => {
-          // Navigate to image detail page
-          window.open(`/item/${img.id}`, '_blank');
+      
+      // Add cluster group to map
+      map.addLayer(markerClusterGroup);
+      
+      // Add image markers (only for unique images with GPS data)
+      const imagesWithGPS = allImages.filter(img => img.lat && img.lon);
+      console.log(`🗺️ Creating ${imagesWithGPS.length} clustered map markers from ${allImages.length} unique images`);
+      
+      imagesWithGPS.forEach(img => {
+        console.log(`📍 Adding clustered marker for unique image ${img.id}:`, {
+          lat: img.lat,
+          lon: img.lon,
+          path_64: img.path_64,
+          path_512: img.path_512,
+          title: img.title
         });
+          
+          // @ts-ignore
+          const marker = L.marker([img.lat, img.lon], {
+            // @ts-ignore
+            icon: L.divIcon({
+              className: 'image-marker',
+              html: `<div style="position: relative; width: 48px; height: 48px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.4); cursor: pointer; overflow: hidden; background: #f0f0f0; display: flex; align-items: center; justify-content: center;" title="${img.title || 'Bild'}">
+                <img src="https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/${img.path_64 || img.path_512}" 
+                     style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;" 
+                     alt="${img.title || 'Bild'}"
+                     onerror="this.style.display='none'; this.parentElement.innerHTML='<div style=\'background: #4CAF50; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px;\'>📷</div>'">
+                <div style="position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; white-space: nowrap; max-width: 120px; overflow: hidden; text-overflow: ellipsis; z-index: 1000;">${img.title || 'Bild'}</div>
+              </div>`,
+              iconSize: [48, 48],
+              iconAnchor: [24, 24]
+            })
+          });
 
-        mapMarkers.push(marker);
-    });
+          marker.on('click', () => {
+            // Navigate to image detail page
+            window.open(`/item/${img.id}`, '_blank');
+          });
+
+          // Add to cluster group instead of directly to map
+          markerClusterGroup.addLayer(marker);
+          mapMarkers.push(marker);
+      });
+      
+      // Fit map to show all markers
+      if (mapMarkers.length > 0) {
+        // @ts-ignore
+        const group = new L.featureGroup(mapMarkers);
+        map.fitBounds(group.getBounds().pad(0.1));
+        console.log('Map fitted to show all clustered image markers');
+      }
+    }
 
     // Add map click handler to move user position
     map.on('click', (e: any) => {
@@ -347,14 +416,6 @@
     });
 
     mapInitialized = true;
-    
-    // Fit map to show all markers
-    if (mapMarkers.length > 0) {
-      // @ts-ignore
-      const group = new L.featureGroup(mapMarkers);
-      map.fitBounds(group.getBounds().pad(0.1));
-      console.log('Map fitted to show all image markers');
-    }
   }
 
   function updateSimulatedPosition(lat: number, lon: number) {
@@ -1160,5 +1221,77 @@
     background: var(--accent-color);
     color: white;
     border-color: var(--accent-color);
+  }
+
+  /* Marker Cluster Styles - Culoca Orange */
+  :global(.marker-cluster-small) {
+    background-color: rgba(238, 115, 31, 0.6);
+    border: 2px solid rgba(238, 115, 31, 0.8);
+  }
+  
+  :global(.marker-cluster-small div) {
+    background-color: rgba(238, 115, 31, 0.9);
+    color: white;
+    font-weight: bold;
+    font-size: 12px;
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  }
+  
+  :global(.marker-cluster-medium) {
+    background-color: rgba(238, 115, 31, 0.7);
+    border: 2px solid rgba(238, 115, 31, 0.9);
+  }
+  
+  :global(.marker-cluster-medium div) {
+    background-color: rgba(238, 115, 31, 1);
+    color: white;
+    font-weight: bold;
+    font-size: 13px;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+  }
+  
+  :global(.marker-cluster-large) {
+    background-color: rgba(238, 115, 31, 0.8);
+    border: 3px solid rgba(238, 115, 31, 1);
+  }
+  
+  :global(.marker-cluster-large div) {
+    background-color: rgba(238, 115, 31, 1);
+    color: white;
+    font-weight: bold;
+    font-size: 14px;
+    border-radius: 50%;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  }
+  
+  /* Cluster hover effects */
+  :global(.marker-cluster:hover) {
+    transform: scale(1.1);
+    transition: transform 0.2s ease;
+  }
+  
+  /* Cluster coverage area */
+  :global(.marker-cluster-small),
+  :global(.marker-cluster-medium),
+  :global(.marker-cluster-large) {
+    border-radius: 50%;
+    transition: all 0.3s ease;
   }
 </style> 

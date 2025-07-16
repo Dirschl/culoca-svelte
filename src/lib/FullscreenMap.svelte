@@ -125,10 +125,10 @@
     const coordinates = track.points.map((p: any) => [p.lat, p.lon]);
     
     const trackLine = (window as any).L.polyline(coordinates, {
-      color: '#ff6b6b',
-      weight: 4,
-      opacity: 0.8,
-      dashArray: '5, 10'
+      color: track.isActive ? '#2196F3' : '#ff6b6b', // Blau für aktive Tracks, rot für beendete
+      weight: track.isActive ? 5 : 4, // Dickere Linie für aktive Tracks
+      opacity: track.isActive ? 0.9 : 0.8,
+      dashArray: track.isActive ? null : '5, 10' // Durchgezogene Linie für aktive Tracks
     }).addTo(map);
     
     // Add start marker
@@ -208,21 +208,33 @@
   }
 
   function updateCurrentTrack() {
-    trackStore.subscribe((state: any) => {
-      if (state.currentTrack && state.isRecording) {
-        // Remove previous current track layer
-        if (currentTrackLayer && map) {
-          map.removeLayer(currentTrackLayer);
-        }
-        
-        // Display current track
-        currentTrackLayer = displayTrackOnMap(state.currentTrack, map);
-      } else if (currentTrackLayer && map) {
-        // Remove current track layer if not recording
+    // Use the store value directly instead of subscribing
+    const state: any = get(trackStore);
+    console.log('[FullscreenMap] Updating current track:', { 
+      hasTrack: !!state.currentTrack, 
+      isRecording: state.isRecording,
+      pointsCount: state.currentTrack?.points?.length || 0 
+    });
+    
+    if (state.currentTrack && state.isRecording) {
+      // Remove previous current track layer
+      if (currentTrackLayer && map) {
         map.removeLayer(currentTrackLayer);
-        currentTrackLayer = null;
       }
-    })();
+      
+      // Only display track if it has at least 2 points
+      if (state.currentTrack.points && state.currentTrack.points.length >= 2) {
+        currentTrackLayer = displayTrackOnMap(state.currentTrack, map);
+        console.log('[FullscreenMap] Current track displayed with', state.currentTrack.points.length, 'points');
+      } else {
+        console.log('[FullscreenMap] Track has less than 2 points, not displaying yet');
+      }
+    } else if (currentTrackLayer && map) {
+      // Remove current track layer if not recording
+      map.removeLayer(currentTrackLayer);
+      currentTrackLayer = null;
+      console.log('[FullscreenMap] Current track removed from map');
+    }
   }
 
   // Filter images based on active filters and privacy
@@ -326,20 +338,20 @@
       streetLayer.addTo(map);
     }
     
-    // Initialize marker cluster group
+    // Initialize marker cluster group - optimized for 5000+ objects
     markerClusterGroup = (window as any).L.markerClusterGroup({
       chunkedLoading: true,
-      maxClusterRadius: 60,
+      maxClusterRadius: 80, // Increased from 60 to 80 for better clustering with many objects
       spiderfyOnMaxZoom: true,
       showCoverageOnHover: true,
       zoomToBoundsOnClick: true,
-      disableClusteringAtZoom: 16, // Ab Zoom 16 keine Clustering mehr
+      disableClusteringAtZoom: 18, // Increased from 16 to 18 - keep clustering longer for performance
       iconCreateFunction: function(cluster: any) {
         const count = cluster.getChildCount();
         let className = 'marker-cluster-small';
-        if (count > 100) {
+        if (count > 500) {
           className = 'marker-cluster-large';
-        } else if (count > 10) {
+        } else if (count > 50) {
           className = 'marker-cluster-medium';
         }
         
@@ -885,6 +897,16 @@
   onMount(() => {
     loadMapState();
     initMap();
+    
+    // Subscribe to track store changes for real-time track updates
+    const unsubscribe = trackStore.subscribe((state: any) => {
+      if (mapInitialized && map) {
+        updateCurrentTrack();
+      }
+    });
+    
+    // Clean up subscription on component destroy
+    return unsubscribe;
   });
   
   onDestroy(() => {
@@ -1141,42 +1163,21 @@
     }
   }
 
-  // Load all images for the map using direct database query for maximum performance
+  // Load all images for the map using API to bypass RLS limits
   async function loadAllImagesForMap() {
     try {
       console.log('[FullscreenMap] Loading all images for map...');
       
-      const sessionData = get(sessionStore);
-      let current_user_id = null;
+      // Use API with for_map=true and dummy coordinates to get maximum images
+      const response = await fetch('/api/items?for_map=true&limit=50000&lat=52.5200&lon=13.4050');
+      const result = await response.json();
       
-      // Get current user ID from session
-      if (sessionData.isAuthenticated && sessionData.userId) {
-        current_user_id = sessionData.userId;
-      }
-      
-      // Direct database query for maximum performance
-      let query = supabase
-        .from('items')
-        .select('id, path_512, path_2048, path_64, original_name, created_at, user_id, profile_id, title, description, lat, lon, width, height, is_private')
-        .not('lat', 'is', null)
-        .not('lon', 'is', null)
-        .not('path_512', 'is', null);
-      
-      // Apply privacy filtering
-      if (current_user_id) {
-        // For authenticated users: show their own images (all) + other users' public images
-        query = query.or(`profile_id.eq.${current_user_id},is_private.eq.false,is_private.is.null`);
-      } else {
-        // For anonymous users: only show public images
-        query = query.or('is_private.eq.false,is_private.is.null');
-      }
-      
-      const { data: images, error } = await query;
-      
-      if (error) {
-        console.error('[FullscreenMap] Database error:', error);
+      if (result.status !== 'success') {
+        console.error('[FullscreenMap] API error:', result.message);
         return;
       }
+      
+      const images = result.images || [];
       
       if (images) {
         const processedImages = images.map((img: any) => ({
@@ -1197,7 +1198,7 @@
           is_private: img.is_private
         }));
         
-        console.log(`[FullscreenMap] Loaded ${processedImages.length} images for map directly from database`);
+        console.log(`[FullscreenMap] Loaded ${processedImages.length} images for map via API`);
         
         // Update the internal images array
         allImages = processedImages;
@@ -1216,6 +1217,11 @@
   $: if (mapInitialized && markerClusterGroup && allImages.length > 0) {
     console.log(`[FullscreenMap] Reactive update: ${allImages.length} images available`);
     addImageMarkers();
+  }
+  
+  // Reactive statement to update current track when trackStore changes
+  $: if (mapInitialized && map) {
+    updateCurrentTrack();
   }
 
   async function sendLastTrackEmail() {

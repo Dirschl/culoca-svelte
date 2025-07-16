@@ -1,5 +1,15 @@
 import { json, error } from '@sveltejs/kit';
 import { supabase } from '$lib/supabaseClient';
+import { createClient } from '@supabase/supabase-js';
+
+// Service role client for bypassing RLS limits  
+const supabaseUrl = process.env.VITE_SUPABASE_URL!;
+const supabaseServiceKey = process.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
+
+// Fallback: if service key doesn't exist, use regular client but increase limit
+const supabaseService = supabaseServiceKey 
+  ? createClient(supabaseUrl, supabaseServiceKey)
+  : supabase;
 
 export const GET = async ({ url, request }) => {
   try {
@@ -56,14 +66,22 @@ export const GET = async ({ url, request }) => {
     });
     if (useGpsFiltering) {
       console.log('API Debug - Using GPS filtering with coordinates:', { lat, lon });
-      const maxGpsImages = 10000; // Erhöht von 2000 auf 10000 für mehr Bilder
-      let gpsQuery = supabase
+      const maxGpsImages = for_map ? 50000 : 10000; // Für Karten 50000, sonst 10000 Bilder
+      
+      // For maps, use service role client to bypass RLS 1000-row limit
+      const dbClient = for_map ? supabaseService : supabase;
+      const clientType = for_map ? (supabaseServiceKey ? 'SERVICE ROLE' : 'REGULAR (no service key)') : 'REGULAR';
+      console.log(`API Debug - Using ${clientType} client for query`);
+      console.log(`API Debug - Service key exists: ${!!supabaseServiceKey}, URL exists: ${!!supabaseUrl}`);
+      
+      let gpsQuery = dbClient
         .from('items')
         .select('id, path_512, path_2048, path_64, original_name, created_at, user_id, profile_id, title, description, lat, lon, width, height, is_private')
         .not('lat', 'is', null)
         .not('lon', 'is', null)
         .not('path_512', 'is', null)
-        .limit(maxGpsImages); // Keine Sortierung hier, wird nach Entfernung sortiert
+        .limit(for_map ? 1000 : maxGpsImages); // Use batch loading for maps to bypass RLS limit
+      
       // User-Filter anwenden
       if (user_id) {
         gpsQuery = gpsQuery.eq('user_id', user_id);
@@ -80,15 +98,67 @@ export const GET = async ({ url, request }) => {
           console.log('API Debug - Filtering for anonymous user (public items only)');
         }
       }
-      const { data: gpsData, error: gpsError } = await gpsQuery;
-      if (gpsError) throw error(500, gpsError.message);
       
-      console.log('API Debug - Raw GPS data loaded:', gpsData?.length || 0, 'items');
+      // For maps without service key, use batch loading to get more than 1000 items
+      let allGpsData = [];
+      console.log(`API Debug - Batch loading check: for_map=${for_map}, supabaseServiceKey=${!!supabaseServiceKey}, condition=${for_map && !supabaseServiceKey}`);
+      if (for_map && !supabaseServiceKey) {
+        console.log('API Debug - Using batch loading for maps (no service key available)');
+        const batchSize = 1000;
+        let hasMore = true;
+        let batchOffset = 0;
+        
+        while (hasMore && allGpsData.length < maxGpsImages) {
+          const batchQuery = supabase
+            .from('items')
+            .select('id, path_512, path_2048, path_64, original_name, created_at, user_id, profile_id, title, description, lat, lon, width, height, is_private')
+            .not('lat', 'is', null)
+            .not('lon', 'is', null)
+            .not('path_512', 'is', null)
+            .range(batchOffset, batchOffset + batchSize - 1);
+            
+          // Apply same user filters to batch
+          if (user_id) {
+            batchQuery.eq('user_id', user_id);
+          } else if (filter_user_id) {
+            batchQuery.eq('profile_id', filter_user_id);
+          } else {
+            if (current_user_id) {
+              batchQuery.or(`profile_id.eq.${current_user_id},is_private.eq.false,is_private.is.null`);
+            } else {
+              batchQuery.or('is_private.eq.false,is_private.is.null');
+            }
+          }
+          
+          const { data: batchData, error: batchError } = await batchQuery;
+          if (batchError) throw error(500, batchError.message);
+          
+          if (batchData && batchData.length > 0) {
+            allGpsData.push(...batchData);
+            console.log(`API Debug - Loaded batch ${Math.floor(batchOffset/batchSize) + 1}: ${batchData.length} items, total: ${allGpsData.length}`);
+            
+            // Continue if we got a full batch
+            hasMore = batchData.length === batchSize;
+            batchOffset += batchSize;
+          } else {
+            hasMore = false;
+          }
+        }
+        
+        console.log(`API Debug - Batch loading complete: ${allGpsData.length} total items loaded`);
+      } else {
+        // Regular single query (with or without service key)
+        const { data: gpsData, error: gpsError } = await gpsQuery;
+        if (gpsError) throw error(500, gpsError.message);
+        allGpsData = gpsData || [];
+      }
+      
+      console.log('API Debug - Raw GPS data loaded:', allGpsData?.length || 0, 'items');
       
       // Entfernung berechnen und sortieren
       const userLat = parseFloat(lat);
       const userLon = parseFloat(lon);
-      let itemsWithDistance = (gpsData || []).map((item) => {
+      let itemsWithDistance = (allGpsData || []).map((item) => {
         if (item.lat && item.lon) {
           const R = 6371000;
           const lat1Rad = userLat * Math.PI / 180;
@@ -126,12 +196,14 @@ export const GET = async ({ url, request }) => {
         })));
       }
       
-      const pagedItems = itemsWithDistance.slice(offset, offset + limit);
+      const pagedItems = itemsWithDistance.slice(offset, offset + effectiveLimit);
       
       console.log('API Debug - Final paged result:', {
         totalItems: itemsWithDistance.length,
         offset,
         limit,
+        effectiveLimit,
+        for_map,
         returnedItems: pagedItems.length,
         firstItemId: pagedItems[0]?.id,
         lastItemId: pagedItems[pagedItems.length - 1]?.id
@@ -154,7 +226,12 @@ export const GET = async ({ url, request }) => {
     }
     // Normale Paginierung ohne GPS
     console.log('API Debug - Using normal pagination (no GPS)');
-    let imagesQuery = supabase
+    
+    // For maps, use service role client to bypass RLS 1000-row limit
+    const dbClient = for_map ? supabaseService : supabase;
+    console.log(`API Debug - Using ${for_map ? 'SERVICE ROLE' : 'REGULAR'} client for normal query`);
+    
+    let imagesQuery = dbClient
       .from('items')
       .select('id, path_512, path_2048, path_64, original_name, created_at, user_id, profile_id, title, description, lat, lon, width, height, is_private')
       .not('lat', 'is', null)
@@ -173,7 +250,7 @@ export const GET = async ({ url, request }) => {
         imagesQuery = imagesQuery.or('is_private.eq.false,is_private.is.null');
       }
     }
-    let totalQuery = supabase
+    let totalQuery = dbClient
       .from('items')
       .select('id', { count: 'exact' })
       .not('lat', 'is', null)

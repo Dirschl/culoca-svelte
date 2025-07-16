@@ -52,7 +52,7 @@
         .select('*')
         .ilike('searchtext', `%${searchTerm.toLowerCase()}%`)
         .order('created_at', { ascending: false })
-        .limit(1000);
+        .limit(5000);
         
       if (userId) {
         query = query.or(`is_private.eq.false,user_id.eq.${userId}`);

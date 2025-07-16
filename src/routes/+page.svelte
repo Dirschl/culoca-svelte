@@ -947,7 +947,7 @@ import TrackModal from '$lib/TrackModal.svelte';
     let lastGPSUpdate = 0;
     const GPS_UPDATE_THROTTLE = 500; // 0.5 second throttle
     let lastLoadMoreCheck = 0;
-    const LOAD_MORE_CHECK_INTERVAL = 2000; // Check every 2 seconds
+    const LOAD_MORE_CHECK_INTERVAL = 1000; // Check every 1 second (faster for simulation)
     
         async function updateGPSFromSimulation(lat: number, lon: number) {
       const now = Date.now();
@@ -1025,10 +1025,12 @@ import TrackModal from '$lib/TrackModal.svelte';
         // Check if we need to load more images (throttled)
         if (now - lastLoadMoreCheck > LOAD_MORE_CHECK_INTERVAL) {
           lastLoadMoreCheck = now;
+          console.log(`[GPS Simulation] Triggering checkAndLoadMoreImages - hasMoreImages: ${hasMoreImages}, loading: ${loading}`);
           checkAndLoadMoreImages();
         }
       } else {
         // Only load from server if no images are cached
+        console.log(`[GPS Simulation] No cached images, loading fresh from server`);
         pics.set([]);
         page = 0;
         hasMoreImages = true;
@@ -1036,35 +1038,72 @@ import TrackModal from '$lib/TrackModal.svelte';
       }
     }
     
-    // VEREINFACHTE Check-Funktion: Weniger aggressiv, nur bei echtem Bedarf
+    // VERBESSERTE Check-Funktion: Intelligent für Simulation und echten Betrieb
     async function checkAndLoadMoreImages() {
       if (!userLat || !userLon || loading) {
+        console.log(`[Auto-Load] Skipping check - userLat: ${userLat}, userLon: ${userLon}, loading: ${loading}`);
+        return;
+      }
+      
+      if (!hasMoreImages) {
+        console.log(`[Auto-Load] Skipping check - hasMoreImages: ${hasMoreImages}`);
         return;
       }
       
       const currentPics = get(pics);
       
-      // Prüfe nur Bilder im direkten Umkreis
+      // Prüfe Bilder im direkten Umkreis (5km)
       const nearbyImages = currentPics.filter((pic: any) => {
         if (!pic.lat || !pic.lon) return false;
         const distance = getDistanceInMeters(userLat as number, userLon as number, pic.lat, pic.lon);
         return distance <= 5000; // 5km radius
       });
       
-      console.log(`[Check] Position: ${userLat}, ${userLon}`);
-      console.log(`[Check] Nearby images (5km): ${nearbyImages.length}/${currentPics.length}`);
+      // Prüfe Bilder im erweiterten Umkreis (10km) für proaktives Nachladen
+      const widerRadiusImages = currentPics.filter((pic: any) => {
+        if (!pic.lat || !pic.lon) return false;
+        const distance = getDistanceInMeters(userLat as number, userLon as number, pic.lat, pic.lon);
+        return distance <= 10000; // 10km radius
+      });
       
-      // Nur laden wenn wir gar keine Bilder in der Nähe haben
+      console.log(`[Simulation Check] Position: ${userLat}, ${userLon}`);
+      console.log(`[Simulation Check] Nearby images (5km): ${nearbyImages.length}/${currentPics.length}`);
+      console.log(`[Simulation Check] Wider radius (10km): ${widerRadiusImages.length}/${currentPics.length}`);
+      
+      // Priorität 1: Proaktives Nachladen bei weniger als 500 Bildern im 10km Umkreis
+      if (widerRadiusImages.length < 500 && hasMoreImages) {
+        console.log(`[Simulation Check] Only ${widerRadiusImages.length} images in 10km radius (< 500 threshold), proactively loading more...`);
+        await loadMore('simulation-auto-load-proactive-500-threshold');
+        return;
+      }
+      
+      // Priorität 2: Standard-Check für 5km Radius
+      if (nearbyImages.length < 100 && hasMoreImages) {
+        console.log(`[Simulation Check] Only ${nearbyImages.length} images in 5km radius, loading more...`);
+        await loadMore('simulation-auto-load-standard');
+        return;
+      }
+      
+      // Priorität 3: Prüfe 1km Umkreis - wenn auch da nichts ist, versuche nochmal nachzuladen
       if (nearbyImages.length === 0 && currentPics.length > 0) {
-        console.log(`[Check] No nearby images found, loading from new position...`);
-        showNoItemsMessage = true;
+        // Noch enger: 1km Radius prüfen
+        const veryNearbyImages = currentPics.filter((pic: any) => {
+          if (!pic.lat || !pic.lon) return false;
+          const distance = getDistanceInMeters(userLat as number, userLon as number, pic.lat, pic.lon);
+          return distance <= 1000; // 1km radius
+        });
         
-        // Nur komplett neu laden wenn optimierte Funktion verfügbar ist
-        if (isLoggedIn && showDistance) {
+        if (veryNearbyImages.length === 0 && hasMoreImages) {
+          console.log(`[Simulation Check] No images in 1km radius, trying to load more...`);
+          // Komplett neu laden von neuer Position
           pics.set([]);
           page = 0;
           hasMoreImages = true;
-          await loadMore('auto-load-new-area');
+          await loadMore('simulation-auto-load-1km-empty');
+        } else if (veryNearbyImages.length === 0 && !hasMoreImages) {
+          // Kein Nachladen mehr möglich - zeige dezenten Hinweis
+          console.log(`[Simulation Check] No more images to load and empty 1km radius - show gentle hint`);
+          showNoItemsMessage = true;
         }
       } else if (nearbyImages.length > 0) {
         // Wir haben Bilder in der Nähe - alles gut
@@ -1407,29 +1446,58 @@ import TrackModal from '$lib/TrackModal.svelte';
         // Also check against the total count from database
         const totalFromDatabase = totalCount || 1388; // Fallback to known total
         
-        if (currentLoadedImages >= totalSortedImages || currentLoadedImages >= totalFromDatabase) {
-          hasMoreImages = false;
-          console.log(`[Gallery Debug] All GPS-sorted images loaded: ${currentLoadedImages} of ${totalSortedImages} (database total: ${totalFromDatabase})`);
+        // In GPS simulation mode, be more generous with hasMoreImages to allow auto-loading
+        if (gpsSimulationActive) {
+          // For simulation: allow loading until we have at least 5000 images or reach database limit
+          if (currentLoadedImages >= Math.max(5000, totalFromDatabase)) {
+            hasMoreImages = false;
+            console.log(`[Gallery Debug] GPS Simulation - All images loaded: ${currentLoadedImages} of ${totalFromDatabase} (simulation limit reached)`);
+          } else {
+            hasMoreImages = true;
+            console.log(`[Gallery Debug] GPS Simulation - More images available: ${currentLoadedImages} of ${totalFromDatabase} (simulation loading)`);
+          }
         } else {
-          hasMoreImages = true;
-          console.log(`[Gallery Debug] More GPS-sorted images available: ${currentLoadedImages} of ${totalSortedImages} (database total: ${totalFromDatabase})`);
+          // Normal mode: use standard logic
+          if (currentLoadedImages >= totalSortedImages || currentLoadedImages >= totalFromDatabase) {
+            hasMoreImages = false;
+            console.log(`[Gallery Debug] All GPS-sorted images loaded: ${currentLoadedImages} of ${totalSortedImages} (database total: ${totalFromDatabase})`);
+          } else {
+            hasMoreImages = true;
+            console.log(`[Gallery Debug] More GPS-sorted images available: ${currentLoadedImages} of ${totalSortedImages} (database total: ${totalFromDatabase})`);
+          }
         }
       } else {
         // Normal pagination logic for non-GPS modes
-      if ($pics.length >= totalCount) {
-        hasMoreImages = false;
-        console.log(`[Gallery Debug] All images loaded: ${$pics.length} of ${totalCount}`);
-      } else if (data && data.length === 0) {
-        // If API returned no data, we've reached the end
-        hasMoreImages = false;
-        console.log(`[Gallery Debug] No more images available from API`);
-      } else if (uniqueNewPics && uniqueNewPics.length === 0 && data && data.length > 0) {
-        // If we got data but all were duplicates, we've likely reached the end
-        hasMoreImages = false;
-        console.log(`[Gallery Debug] All new images were duplicates, reached end of available images`);
-      } else {
-        hasMoreImages = true;
-        console.log(`[Gallery Debug] More images available: ${$pics.length} of ${totalCount}, hasMoreImages set to true`);
+        if (gpsSimulationActive) {
+          // In simulation mode: allow loading until we have many images
+          if ($pics.length >= Math.max(2000, totalCount)) {
+            hasMoreImages = false;
+            console.log(`[Gallery Debug] GPS Simulation - All images loaded: ${$pics.length} of ${totalCount} (simulation complete)`);
+          } else if (data && data.length === 0) {
+            // If API returned no data, try once more in simulation
+            console.log(`[Gallery Debug] GPS Simulation - No data received, but keeping hasMoreImages=true for retry`);
+            hasMoreImages = true;
+          } else {
+            hasMoreImages = true;
+            console.log(`[Gallery Debug] GPS Simulation - More images available: ${$pics.length} of ${totalCount}, continuing simulation loading`);
+          }
+        } else {
+          // Normal mode
+          if ($pics.length >= totalCount) {
+            hasMoreImages = false;
+            console.log(`[Gallery Debug] All images loaded: ${$pics.length} of ${totalCount}`);
+          } else if (data && data.length === 0) {
+            // If API returned no data, we've reached the end
+            hasMoreImages = false;
+            console.log(`[Gallery Debug] No more images available from API`);
+          } else if (uniqueNewPics && uniqueNewPics.length === 0 && data && data.length > 0) {
+            // If we got data but all were duplicates, we've likely reached the end
+            hasMoreImages = false;
+            console.log(`[Gallery Debug] All new images were duplicates, reached end of available images`);
+          } else {
+            hasMoreImages = true;
+            console.log(`[Gallery Debug] More images available: ${$pics.length} of ${totalCount}, hasMoreImages set to true`);
+          }
         }
       }
       
@@ -1437,8 +1505,14 @@ import TrackModal from '$lib/TrackModal.svelte';
         setTimeout(() => announceFirstImage(), 500);
       }
     } else {
-      hasMoreImages = false;
-      console.log(`[Gallery Debug] No data returned, hasMoreImages set to false (page ${page})`);
+      // In simulation mode, don't give up too early
+      if (gpsSimulationActive && page < 5) {
+        hasMoreImages = true;
+        console.log(`[Gallery Debug] GPS Simulation - No data returned but retrying (page ${page})`);
+      } else {
+        hasMoreImages = false;
+        console.log(`[Gallery Debug] No data returned, hasMoreImages set to false (page ${page})`);
+      }
     }
 
     // Erhöhe page für alle Modi (normaler Modus und GPS-Modus)
@@ -1540,63 +1614,43 @@ import TrackModal from '$lib/TrackModal.svelte';
           return data || [];
         }
         
-        // Load ALL images for proper GPS-based sorting (not just a small batch)
-        // First, get the total count to know how many images to load
-        const { count: totalCount } = await supabase
-          .from('items')
-          .select('*', { count: 'exact', head: true })
-          .not('path_512', 'is', null);
+        // Use API instead of direct database queries to bypass RLS limits
+        console.log(`[Gallery Normal] Using API for GPS-based sorting from ${effectiveLat}, ${effectiveLon}`);
         
-        console.log(`[Gallery Normal] Total images in database: ${totalCount}`);
+        // Build API URL with GPS coordinates
+        let apiUrl = `/api/items?for_map=true&limit=50000&lat=${effectiveLat}&lon=${effectiveLon}&offset=${page * size}`;
         
-        // Load ALL images in batches to ensure we get all 1388+ images
-        let allRawData: any[] = [];
-        let offset = 0;
-        const batchSize = 1000;
-        
-        while (true) {
-          let query = supabase
-            .from('items')
-            .select('id, path_512, path_2048, path_64, width, height, lat, lon, title, description, keywords, profile_id, is_private')
-            .not('path_512', 'is', null)
-            .range(offset, offset + batchSize - 1);
-          
-          // Apply privacy filtering based on user login status
-          if (isLoggedIn && currentUser) {
-            // For logged in users: show their own images (all) + other users' public images
-            query = query.or(`profile_id.eq.${currentUser.id},is_private.eq.false,is_private.is.null`);
-          } else {
-            // For anonymous users: only show public images
-            query = query.or('is_private.eq.false,is_private.is.null');
-      }
-      
-      // Add user filter if active
-      if (hasUserFilter) {
-            query = query.eq('profile_id', currentFilters.userFilter!.userId);
-          }
-          
-          const { data: batchData, error } = await query;
-          
-          if (error) {
-            console.error('[Gallery Normal] Database error:', error);
-            break;
-          }
-          
-          if (!batchData || batchData.length === 0) {
-            break; // No more data
-          }
-          
-          allRawData = allRawData.concat(batchData);
-          console.log(`[Gallery Normal] Loaded batch ${offset/batchSize + 1}: ${batchData.length} images (total: ${allRawData.length})`);
-          
-          if (batchData.length < batchSize) {
-            break; // Last batch
-          }
-          
-          offset += batchSize;
+        // Add user filters if active
+        if (hasUserFilter) {
+          apiUrl += `&filter_user_id=${currentFilters.userFilter!.userId}`;
         }
         
-        const rawData = allRawData;
+        console.log(`[Gallery Normal] API URL: ${apiUrl}`);
+        
+        const response = await fetch(apiUrl);
+        const result = await response.json();
+        
+        if (result.status !== 'success') {
+          console.error('[Gallery Normal] API error:', result.message);
+          return [];
+        }
+        
+        const rawData = result.images || [];
+        
+        console.log(`[Gallery Normal] Loaded ${rawData?.length || 0} regional images within 50km`);
+        
+        // Check if we have any images in the region
+        if (!rawData || rawData.length === 0) {
+          console.log(`[Gallery Normal] No images found via API`);
+          
+          // Show "region not covered" message
+          showNoItemsMessage = true;
+          setTimeout(() => {
+            showNoItemsMessage = false;
+          }, 15000); // Hide after 15 seconds
+          
+          return [];
+        }
         
         // Client-side GPS-based sorting of ALL images
         if (rawData && rawData.length > 0) {
@@ -1667,45 +1721,35 @@ import TrackModal from '$lib/TrackModal.svelte';
           data = [] as any[];
         }
       } else {
-        // Use normal database query with date sorting
-        console.log(`[Gallery Normal] Using date-based sorting (no GPS data or distance disabled)`);
+        // Use API for date-based sorting too
+        console.log(`[Gallery Normal] Using API for date-based sorting (no GPS data or distance disabled)`);
         
         // Check if we should be using GPS sorting but it's not enabled yet
         if (effectiveLat !== null && effectiveLon !== null && showDistance === undefined) {
           console.log(`[Gallery Normal] GPS coordinates available but showDistance not loaded yet, using date sorting temporarily`);
         }
         
-        let query = supabase
-          .from('items')
-          .select('id, path_512, path_2048, path_64, width, height, lat, lon, title, description, keywords, profile_id, is_private')
-          .not('path_512', 'is', null)
-          .range(page * size, page * size + size - 1)
-          .order('created_at', { ascending: false });
+        // Build API URL without GPS coordinates for date sorting
+        let apiUrl = `/api/items?limit=${size}&offset=${page * size}`;
         
-        // Apply privacy filtering based on user login status
-        if (isLoggedIn && currentUser) {
-          // For logged in users: show their own images (all) + other users' public images
-          query = query.or(`profile_id.eq.${currentUser.id},is_private.eq.false,is_private.is.null`);
-      } else {
-          // For anonymous users: only show public images
-          query = query.or('is_private.eq.false,is_private.is.null');
-        }
-        
-        // Add user filter if active
+        // Add user filters if active
         if (hasUserFilter) {
-          query = query.eq('profile_id', currentFilters.userFilter!.userId);
+          apiUrl += `&filter_user_id=${currentFilters.userFilter!.userId}`;
           console.log(`[Gallery Normal] Adding user filter: ${currentFilters.userFilter!.username}`);
         }
         
-        const { data: dbData, error } = await query;
+        console.log(`[Gallery Normal] API URL: ${apiUrl}`);
         
-        if (error) {
-          console.error('[Gallery Normal] Database error:', error);
-        return [];
-      }
+        const response = await fetch(apiUrl);
+        const result = await response.json();
         
-        data = dbData;
-        console.log(`[Gallery Normal] Got ${data?.length || 0} images from database with date sorting`);
+        if (result.status !== 'success') {
+          console.error('[Gallery Normal] API error:', result.message);
+          return [];
+        }
+        
+        data = result.images || [];
+        console.log(`[Gallery Normal] Got ${data?.length || 0} images from API with date sorting`);
       }
       
       return data || [];
@@ -2965,7 +3009,7 @@ import TrackModal from '$lib/TrackModal.svelte';
     }
 
     // Don't check if we're already loading or if we have enough images
-    if (loading || $pics.length >= 1000) {
+    if (loading || $pics.length >= 5000) {
       return;
     }
 
@@ -2985,15 +3029,15 @@ import TrackModal from '$lib/TrackModal.svelte';
       return distance <= 10000; // 10km radius für 100-Bilder-Check
     });
 
-    // Priorität 1: Proaktives Nachladen bei weniger als 100 Bildern im 10km Umkreis
-    if (widerRadiusImages.length < 100) {
-      console.log(`[Radius Check] Only ${widerRadiusImages.length} images in 10km radius (< 100 threshold), proactively loading more for offline capability...`);
-      loadMore('radius-check-proactive-100-threshold');
+    // Priorität 1: Proaktives Nachladen bei weniger als 500 Bildern im 10km Umkreis
+    if (widerRadiusImages.length < 500) {
+      console.log(`[Radius Check] Only ${widerRadiusImages.length} images in 10km radius (< 500 threshold), proactively loading more for offline capability...`);
+      loadMore('radius-check-proactive-500-threshold');
       return;
     }
 
     // Priorität 2: Standard-Check für 5km Radius
-    if (visibleImages.length < 20) {
+    if (visibleImages.length < 100) {
       console.log(`[Radius Check] Only ${visibleImages.length} images in 5km radius, loading more...`);
       loadMore('radius-check-standard');
     }
@@ -3613,14 +3657,14 @@ import TrackModal from '$lib/TrackModal.svelte';
       return;
     }
     
-    // NEUE PRÜFUNG: Proaktives Nachladen bei weniger als 100 Bildern im Umkreis
+        // NEUE PRÜFUNG: Proaktives Nachladen bei weniger als 500 Bildern im Umkreis
     // Dies passiert BEVOR der Benutzer den aktuellen Radius verlässt
-    if (widerRadiusImages.length < 100 && hasMoreImages) {
-      console.log(`[Auto-Load] Only ${widerRadiusImages.length} images in 10km radius (< 100 threshold), proactively loading more for offline capability...`);
-      await loadMore('auto-load-proactive-100-threshold');
+    if (widerRadiusImages.length < 500 && hasMoreImages) {
+      console.log(`[Auto-Load] Only ${widerRadiusImages.length} images in 10km radius (< 500 threshold), proactively loading more for offline capability...`);
+      await loadMore('auto-load-proactive-500-threshold');
       return;
     }
-    
+
     // If we have uncovered directions, load more to fill the gaps
     if (uncoveredDirections.length > 0 && hasMoreImages) {
       console.log(`[Auto-Load] Uncovered directions detected: ${uncoveredDirections.join(', ')}, loading more to fill gaps...`);
@@ -3628,8 +3672,8 @@ import TrackModal from '$lib/TrackModal.svelte';
       return;
     }
     
-    // If we have less than 10 nearby images, load more
-    if (nearbyImages.length < 10 && hasMoreImages) {
+    // If we have less than 50 nearby images, load more
+    if (nearbyImages.length < 50 && hasMoreImages) {
       console.log(`[Auto-Load] Only ${nearbyImages.length} nearby images, loading more...`);
       await loadMore('auto-load-nearby');
     }
@@ -4135,8 +4179,34 @@ import TrackModal from '$lib/TrackModal.svelte';
   <TrackModal bind:isOpen={showTrackModal} />
 {/if}
 
+
+
 <!-- Galerie oder Suchergebnisse -->
 <div class="gallery-container">
+  <!-- Dezenter Hinweis für leere Regionen -->
+  {#if showNoItemsMessage}
+    <div class="gentle-no-items-hint">
+      <div class="hint-content">
+        <span class="hint-icon">📸</span>
+        <span class="hint-text">Noch keine Bilder in dieser Region erfasst</span>
+        <button 
+          class="hint-action-btn" 
+          on:click={() => location.href = '/bulk-upload'}
+          title="Erstes Foto dieser Region hochladen"
+        >
+          Erstes Foto erstellen
+        </button>
+        <button 
+          class="hint-dismiss-btn" 
+          on:click={() => showNoItemsMessage = false}
+          title="Hinweis ausblenden"
+        >
+          ✕
+        </button>
+      </div>
+    </div>
+  {/if}
+
   {#if useSearchResults && searchQuery.trim()}
     <!-- Use SearchResults component with items_search_view -->
     <SearchResults 
@@ -5672,57 +5742,71 @@ import TrackModal from '$lib/TrackModal.svelte';
 
 
 
-  /* Keine Items in der Nähe Meldung */
-  .no-items-message {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.8);
-    backdrop-filter: blur(8px);
+  /* Dezenter Hinweis für leere Regionen */
+  .gentle-no-items-hint {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    margin: 1rem 0;
+    padding: 0.75rem 1rem;
+    position: relative;
+  }
+
+  .hint-content {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .hint-icon {
+    font-size: 1.25rem;
+    flex-shrink: 0;
+  }
+
+  .hint-text {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    flex: 1;
+    min-width: 200px;
+  }
+
+  .hint-action-btn {
+    background: var(--accent-color);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 0.5rem 1rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .hint-action-btn:hover {
+    background: var(--accent-hover);
+    transform: translateY(-1px);
+  }
+
+  .hint-dismiss-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 1.1rem;
+    padding: 0.25rem;
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 1000;
-    padding: 1rem;
+    transition: all 0.2s ease;
   }
 
-  .no-items-content {
-    background: var(--bg-secondary);
-    border-radius: 16px;
-    padding: 2rem;
-    max-width: 400px;
-    width: 100%;
-    text-align: center;
-    border: 1px solid var(--border-color);
-    box-shadow: 0 8px 32px var(--shadow);
-  }
-
-  .no-items-icon {
-    font-size: 3rem;
-    margin-bottom: 1rem;
-    display: block;
-  }
-
-  .no-items-content h3 {
-    margin: 0 0 1rem 0;
-    font-size: 1.5rem;
-    font-weight: 700;
+  .hint-dismiss-btn:hover {
+    background: var(--bg-tertiary);
     color: var(--text-primary);
-  }
-
-  .no-items-content p {
-    margin: 0 0 1rem 0;
-    color: var(--text-secondary);
-    line-height: 1.5;
-  }
-
-  .no-items-actions {
-    display: flex;
-    gap: 0.75rem;
-    margin-top: 1.5rem;
-    flex-direction: column;
   }
 
   .map-nav-btn, .dismiss-btn, .search-btn {
@@ -5852,6 +5936,91 @@ import TrackModal from '$lib/TrackModal.svelte';
   }
   
 
+  }
+
+  /* Region nicht abgedeckt Meldung */
+  .no-items-message {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    backdrop-filter: blur(5px);
+  }
+
+  .no-items-content {
+    background: var(--card-bg);
+    color: var(--text-primary);
+    padding: 2rem;
+    border-radius: 16px;
+    max-width: 500px;
+    margin: 1rem;
+    text-align: center;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--border-color);
+  }
+
+  .no-items-content h2 {
+    margin: 0 0 1rem 0;
+    font-size: 1.5rem;
+    color: var(--accent-color);
+  }
+
+  .no-items-content p {
+    margin: 0.5rem 0;
+    line-height: 1.5;
+    color: var(--text-secondary);
+  }
+
+  .no-items-content p strong {
+    color: var(--text-primary);
+  }
+
+  .no-items-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1.5rem;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .upload-btn {
+    background: var(--accent-color);
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 500;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: all 0.2s ease;
+  }
+
+  .upload-btn:hover {
+    background: var(--accent-hover);
+    transform: translateY(-1px);
+  }
+
+  .dismiss-btn {
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 500;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: all 0.2s ease;
+  }
+
+  .dismiss-btn:hover {
+    background: var(--card-bg-secondary);
+    color: var(--text-primary);
   }
 </style>
 
