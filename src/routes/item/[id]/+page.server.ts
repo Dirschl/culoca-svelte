@@ -31,7 +31,8 @@ export const load: PageServerLoad = async ({ params }) => {
       .from('items')
       .select('*')
       .eq('id', id)
-      .single();
+      .or('is_private.eq.false,is_private.is.null');
+    const img = Array.isArray(image) ? image[0] : image;
 
     if (error) {
       return {
@@ -43,15 +44,15 @@ export const load: PageServerLoad = async ({ params }) => {
 
     // Fetch nearby items if image has GPS coordinates
     let nearby: any[] = [];
-    if (image && image.lat && image.lon) {
+    if (img && img.lat && img.lon) {
       try {
         // Bounding box to reduce row count before distance calculation
         const maxRadius = 1000; // meters – initial radius; client can filter smaller later
         const degOffset = maxRadius / 111000; // rough deg per meter
-        const latMin = image.lat - degOffset;
-        const latMax = image.lat + degOffset;
-        const lonMin = image.lon - degOffset;
-        const lonMax = image.lon + degOffset;
+        const latMin = img.lat - degOffset;
+        const latMax = img.lat + degOffset;
+        const lonMin = img.lon - degOffset;
+        const lonMax = img.lon + degOffset;
 
         const pageSize = 1000;
         let offset = 0;
@@ -83,7 +84,7 @@ export const load: PageServerLoad = async ({ params }) => {
         nearby = fetched
           .filter((item: any) => item.id !== id && item.lat && item.lon)
           .map((item: any) => {
-            const distance = getDistanceInMeters(image.lat, image.lon, item.lat, item.lon);
+            const distance = getDistanceInMeters(img.lat, img.lon, item.lat, item.lon);
             return {
               id: item.id,
               lat: item.lat,
@@ -105,7 +106,7 @@ export const load: PageServerLoad = async ({ params }) => {
     }
 
     return {
-      image,
+      image: img,
       error: null,
       nearby
     };
