@@ -2663,7 +2663,7 @@
     );
   }
 
-  function handlePositionUpdate(pos: GeolocationPosition) {
+  async function handlePositionUpdate(pos: GeolocationPosition) {
     // Ignore real GPS updates if GPS simulation is active
     if (gpsSimulationActive) {
       console.log('GPS simulation active, ignoring real GPS update');
@@ -2699,6 +2699,21 @@
     
     // Resort existing images immediately for distance display
     resortExistingImages();
+    
+    // Check if we moved into a new grid cell (10km grid)
+    try {
+      const movedOutsideCenter = !dynamicLoader.isInCenterCell(newLat, newLon);
+      if (movedOutsideCenter) {
+        console.log('🗺️ Grid center changed – loading new 3×3 grid for main page');
+        // Reset gallery and load fresh 3×3 grid
+        pics.set([]);
+        page = 0;
+        hasMoreImages = true;
+        await loadInitialGridImages(newLat, newLon);
+      }
+    } catch (err) {
+      console.warn('Grid detection failed', err);
+    }
     
     // Only check for significant movement for reloading
     if (lastKnownLat !== null && lastKnownLon !== null) {
