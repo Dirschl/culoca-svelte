@@ -1266,8 +1266,21 @@
   async function loadInitialGridImages(lat: number, lon: number) {
     console.log(`[Gallery Grid] Loading initial 3×3 grid around ${lat},${lon}`);
 
-    // Pull images from the dynamic loader
-    const gridImages = await dynamicLoader.loadImagesForPosition(lat, lon);
+    // Starte Ladevorgang für alle 9 Zellen
+    await dynamicLoader.loadImagesForPosition(lat, lon);
+
+    // Warte, bis DynamicLoader keine Ladejobs mehr in der Queue hat, um sicherzustellen, dass wir wirklich ALLE Bilder haben
+    let previousCount = -1;
+    for (let i = 0; i < 20; i++) { // max ~2 s (20×100 ms)
+      await new Promise(res => setTimeout(res, 100));
+      const currentCount = dynamicLoader.getImageCount();
+      if (currentCount === previousCount && !dynamicLoader.getDebugInfo().isLoading) {
+        break; // Keine neuen Bilder mehr + Loader idle
+      }
+      previousCount = currentCount;
+    }
+
+    const gridImages = dynamicLoader.getAllImages();
     console.log(`[Gallery Grid] Loaded ${gridImages.length} images from grid loader`);
     // Neue Debug-Ausgabe: Anzahl der Items, die im 3×3-Raster geladen wurden
     console.log(`[Debug] 3x3-Gitter geladene Items: ${gridImages.length}`);
