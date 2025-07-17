@@ -34,6 +34,8 @@ export const load: PageServerLoad = async ({ params }) => {
       .or('is_private.eq.false,is_private.is.null');
     const img = Array.isArray(image) ? image[0] : image;
 
+    console.log('SSR loader fetched image:', img ? img.id : null);
+
     if (error) {
       return {
         image: null,
