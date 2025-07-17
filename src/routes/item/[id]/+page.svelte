@@ -1305,6 +1305,8 @@
     // Navigate to gallery with filter
     goto('/');
   }
+
+  export const prerender = false;
 </script>
 
 <svelte:head>
