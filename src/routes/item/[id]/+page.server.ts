@@ -36,38 +36,60 @@ export const load: PageServerLoad = async ({ params }) => {
     let nearby: any[] = [];
     if (image && image.lat && image.lon) {
       try {
-        // Get all items with GPS coordinates
-        const { data: allItems, error: nearbyError } = await supabase
-          .from('items')
-          .select('id, path_512, path_2048, path_64, original_name, title, description, lat, lon, width, height, is_private')
-          .not('lat', 'is', null)
-          .not('lon', 'is', null)
-          .not('path_512', 'is', null)
-          .or('is_private.eq.false,is_private.is.null'); // Only public items
+        // Bounding box to reduce row count before distance calculation
+        const maxRadius = 1000; // meters – initial radius; client can filter smaller later
+        const degOffset = maxRadius / 111000; // rough deg per meter
+        const latMin = image.lat - degOffset;
+        const latMax = image.lat + degOffset;
+        const lonMin = image.lon - degOffset;
+        const lonMax = image.lon + degOffset;
 
-        if (!nearbyError && allItems) {
-          // Calculate distances and filter by radius (default 1000m)
-          const maxRadius = 1000;
-          nearby = allItems
-            .filter((item: any) => item.id !== id && item.lat && item.lon)
-            .map((item: any) => {
-              const distance = getDistanceInMeters(image.lat, image.lon, item.lat, item.lon);
-              return {
-                id: item.id,
-                lat: item.lat,
-                lon: item.lon,
-                distance,
-                src: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${item.path_512}`,
-                srcHD: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${item.path_2048}`,
-                src64: item.path_64 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/${item.path_64}` : `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${item.path_512}`,
-                width: item.width,
-                height: item.height,
-                title: item.title || null
-              };
-            })
-            .filter((item: any) => item.distance <= maxRadius)
-            .sort((a: any, b: any) => a.distance - b.distance); // Return all items within radius
+        const pageSize = 1000;
+        let offset = 0;
+        let fetched: any[] = [];
+        while (true) {
+          const { data: batch, error: nearbyError } = await supabase
+            .from('items')
+            .select('id, path_512, path_2048, path_64, original_name, title, description, lat, lon, width, height, is_private')
+            .not('lat', 'is', null)
+            .not('lon', 'is', null)
+            .not('path_512', 'is', null)
+            .or('is_private.eq.false,is_private.is.null')
+            .gte('lat', latMin)
+            .lte('lat', latMax)
+            .gte('lon', lonMin)
+            .lte('lon', lonMax)
+            .range(offset, offset + pageSize - 1);
+
+          if (nearbyError) {
+            console.error('Nearby fetch error:', nearbyError);
+            break;
+          }
+          if (!batch || batch.length === 0) break;
+          fetched = fetched.concat(batch);
+          if (batch.length < pageSize) break;
+          offset += pageSize;
         }
+
+        nearby = fetched
+          .filter((item: any) => item.id !== id && item.lat && item.lon)
+          .map((item: any) => {
+            const distance = getDistanceInMeters(image.lat, image.lon, item.lat, item.lon);
+            return {
+              id: item.id,
+              lat: item.lat,
+              lon: item.lon,
+              distance,
+              src: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${item.path_512}`,
+              srcHD: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${item.path_2048}`,
+              src64: item.path_64 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/${item.path_64}` : `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${item.path_512}`,
+              width: item.width,
+              height: item.height,
+              title: item.title || null
+            };
+          })
+          .filter((item: any) => item.distance <= maxRadius)
+          .sort((a: any, b: any) => a.distance - b.distance);
       } catch (nearbyErr) {
         console.error('Error fetching nearby items:', nearbyErr);
       }
