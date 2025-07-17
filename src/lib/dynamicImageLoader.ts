@@ -12,6 +12,11 @@ export class DynamicImageLoader {
   private loadedImages = new Map<string, any>(); // ID -> Image
   private loadedCells: LoadedCell[] = [];
   private currentUserId: string | null = null;
+
+  // Allow host app to define current user for privacy filtering
+  setCurrentUserId(uid: string | null) {
+    this.currentUserId = uid;
+  }
   private isLoading = false;
   private loadQueue: Array<{ lat: number; lon: number }> = [];
   private currentCenterCell: { x: number; y: number } | null = null;
@@ -22,7 +27,8 @@ export class DynamicImageLoader {
   private readonly GRID_SIZE = 3; // 3x3 grid around current position
 
   constructor() {
-    this.initialize();
+    // Removed automatic initial load to avoid race conditions.
+    // The host app should explicitly call loadImagesForPosition with the desired coordinates.
   }
 
   private initialize() {
@@ -179,6 +185,7 @@ export class DynamicImageLoader {
       console.log(`🗺️ Position ${lat},${lon} is still in center cell ${this.currentCenterCell.x},${this.currentCenterCell.y} - no grid movement needed`);
     }
 
+    console.log(`[DynamicLoader] Total images currently loaded (3x3 grid context): ${this.loadedImages.size}`);
     return this.getAllImages();
   }
 
@@ -197,46 +204,62 @@ export class DynamicImageLoader {
       
       console.log(`🗺️ Loading cell ${cell.x},${cell.y} at ${cellCenterLat}, ${cellCenterLon}`);
       
-      // Query images in this cell
-      const { data: images, error } = await supabase
-        .from('items')
-        .select(`
-          id,
-          title,
-          description,
-          keywords,
-          lat,
-          lon,
-          path_2048,
-          path_512,
-          path_64,
-          created_at,
-          user_id,
-          is_private
-        `)
-        .not('lat', 'is', null)
-        .not('lon', 'is', null)
-        .gte('lat', cellCenterLat - this.CELL_SIZE_DEG / 2)
-        .lte('lat', cellCenterLat + this.CELL_SIZE_DEG / 2)
-        .gte('lon', cellCenterLon - this.CELL_SIZE_DEG / 2)
-        .lte('lon', cellCenterLon + this.CELL_SIZE_DEG / 2)
-        .eq('is_private', false)
-        .order('created_at', { ascending: false });
-      
-      if (error) {
-        console.error('Error loading cell:', error);
-        return;
-      }
-      
-      // Add images to loaded images
-      let newImagesCount = 0;
-      images?.forEach(image => {
-        if (!this.loadedImages.has(image.id)) {
-          this.loadedImages.set(image.id, image);
-          newImagesCount++;
+      const pageSize = 1000;
+      let offset = 0;
+      let fetchedTotal = 0;
+
+      while (true) {
+        const { data: batch, error } = await supabase
+          .from('items')
+          .select(`
+            id,
+            title,
+            description,
+            keywords,
+            lat,
+            lon,
+            path_2048,
+            path_512,
+            path_64,
+            created_at,
+            user_id,
+            is_private
+          `)
+          .not('lat', 'is', null)
+          .not('lon', 'is', null)
+          .gte('lat', cellCenterLat - this.CELL_SIZE_DEG / 2)
+          .lte('lat', cellCenterLat + this.CELL_SIZE_DEG / 2)
+          .gte('lon', cellCenterLon - this.CELL_SIZE_DEG / 2)
+          .lte('lon', cellCenterLon + this.CELL_SIZE_DEG / 2)
+          .or(this.currentUserId ? `profile_id.eq.${this.currentUserId},is_private.eq.false,is_private.is.null` : 'is_private.eq.false,is_private.is.null')
+          .order('created_at', { ascending: false })
+          .range(offset, offset + pageSize - 1);
+
+        if (error) {
+          console.error('Error loading cell batch:', error);
+          break;
         }
-      });
-      
+
+        if (!batch || batch.length === 0) {
+          break;
+        }
+
+        batch.forEach(image => {
+          if (!this.loadedImages.has(image.id)) {
+            this.loadedImages.set(image.id, image);
+            fetchedTotal++;
+          }
+        });
+
+        if (batch.length < pageSize) {
+          // last batch fetched
+          break;
+        }
+        offset += pageSize;
+      }
+
+      console.log(`🗺️ Loaded ${fetchedTotal} new images from cell ${cell.x},${cell.y}`);
+       
       // Mark cell as loaded
       this.loadedCells.push({
         gridX: cell.x,
@@ -245,8 +268,6 @@ export class DynamicImageLoader {
         centerLon: cellCenterLon,
         timestamp: Date.now()
       });
-      
-      console.log(`🗺️ Loaded ${newImagesCount} new images from cell ${cell.x},${cell.y} (total in cell: ${images?.length || 0})`);
       
     } catch (error) {
       console.error('Error loading cell:', error);

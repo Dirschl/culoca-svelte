@@ -20,10 +20,10 @@
   import { sessionStore } from '$lib/sessionStore';
   import { intelligentImageLoader } from '$lib/intelligentImageLoader';
   import { authFetch } from '$lib/authFetch';
-  import { DynamicImageLoader } from '$lib/dynamicImageLoader';
+  import { dynamicImageLoader } from '$lib/dynamicImageLoader';
 
   const pics = writable<any[]>([]);
-  let dynamicLoader: DynamicImageLoader | null = null;
+  const dynamicLoader = dynamicImageLoader;
   let page = 0, size = 100, loading = false, hasMoreImages = true; // Erhöht für mehr Bilder pro Anfrage
   let displayedImageCount = 0; // Zähler für tatsächlich angezeigte Bilder
   let removedDuplicatesList: any[] = []; // Liste der entfernten Duplikate
@@ -182,6 +182,23 @@
   async function waitForGpsAndLoadGallery() {
     console.log('🔄 [GPS] Waiting for GPS data before loading gallery...');
     
+    // In Simulation-Modus müssen wir nicht auf echtes GPS warten –
+    // die Koordinaten werden via postMessage geliefert oder stehen
+    // bereits in userLat/userLon.  Lade daher sofort das 3×3-Raster.
+    if (simulationMode || gpsSimulationActive) {
+      console.log('🔄 [GPS] Simulation mode detected – skipping real GPS wait');
+
+      if (userLat !== null && userLon !== null) {
+        await loadInitialGridImages(userLat, userLon);
+      } else if (simulatedLat !== null && simulatedLon !== null) {
+        await loadInitialGridImages(simulatedLat, simulatedLon);
+      } else {
+        // Fallback: use Germany center
+        await loadInitialGridImages(48.1351, 11.5820);
+      }
+      return;
+    }
+    
     // Prüfe zuerst gespeicherte GPS-Daten
     const lastLocation = loadLastKnownLocation();
     if (lastLocation && lastLocation.lat !== null && lastLocation.lon !== null) {
@@ -194,7 +211,7 @@
       pics.set([]);
       page = 0;
       hasMoreImages = true;
-      loadMore('initial mount with saved GPS');
+      await loadInitialGridImages(userLat!, userLon!);
       return;
     }
     
@@ -203,7 +220,7 @@
     gpsStatus = 'checking';
     
     // Starte GPS-Tracking
-    if (!gpsTrackingActive && !gpsSimulationActive) {
+    if (!gpsTrackingActive && !gpsSimulationActive && !simulationMode) {
       startGPSTracking();
     }
     
@@ -211,7 +228,7 @@
     let attempts = 0;
     const maxAttempts = 60; // 60 * 500ms = 30 seconds
     
-    const waitForGps = () => {
+    const waitForGps = async () => {
       attempts++;
       
       if (userLat !== null && userLon !== null) {
@@ -219,7 +236,7 @@
         pics.set([]);
         page = 0;
         hasMoreImages = true;
-        loadMore('initial mount with live GPS');
+        await loadInitialGridImages(userLat!, userLon!);
         return;
       }
       
@@ -233,7 +250,7 @@
         loadMore('initial mount without GPS');
         
         // Continue GPS tracking in background for future updates
-        if (!gpsTrackingActive && !gpsSimulationActive) {
+        if (!gpsTrackingActive && !gpsSimulationActive && !simulationMode) {
           startGPSTracking();
         }
         return;
@@ -298,7 +315,6 @@
   let gpsTrackingActive = false;
   const GPS_UPDATE_THRESHOLD = 100; // meters - erhöht von 10m auf 100m
   const GPS_UPDATE_INTERVAL = 30000; // 30 seconds - erhöht von 5s auf 30s
-  const RADIUS_CHECK_INTERVAL = 60000; // 60 seconds - erhöht von 10s auf 60s
   let radiusCheckInterval: number | null = null;
   let lastGalleryLoadTime = 0; // Verhindert zu häufiges Neuladen
   const MIN_RELOAD_INTERVAL = 30000; // Mindestabstand zwischen Neuladungen: 30s
@@ -1031,12 +1047,20 @@
           checkAndLoadMoreImages();
         }
       } else {
-        // Only load from server if no images are cached
-        console.log(`[GPS Simulation] No cached images, loading fresh from server`);
+        // No images cached yet – load initial 3×3 grid first
+        console.log(`[GPS Simulation] No cached images – loading initial 3×3 grid`);
+
         pics.set([]);
         page = 0;
         hasMoreImages = true;
-        loadMore('gps simulation - no cached images');
+
+        await loadInitialGridImages(userLat!, userLon!);
+
+        // After grid is set we can still rely on normal auto-load logic for further pages
+        if (get(pics).length < 100) {
+          // kick off first pagination batch so scrolling has something to work with
+          await loadMore('gps simulation - after grid load');
+        }
       }
     }
     
@@ -1178,6 +1202,8 @@
   }
 
   // Fallback: Direkte Datenbankabfrage (vereinfacht)
+  // Radius-based query that backs up the 3×3 grid once the user scrolls further
+  // Uses the items_search_view for consistency with search and to avoid hitting raw table limits
   async function loadImagesDirectFromDB(lat: number, lon: number, requestedCount: number): Promise<any[]> {
     try {
       console.log(`[Gallery DirectDB] Loading ${requestedCount} images directly from DB for position: ${lat}, ${lon}`);
@@ -1185,15 +1211,15 @@
       const sessionData = get(sessionStore);
       const currentUserId = sessionData.isAuthenticated ? sessionData.userId : null;
       
-      // Begrenze auf einen sinnvollen Radius (50km)
-      const radiusKm = 50;
+      // Use a tight ~5 km safety radius that fully contains the current 3×3 grid
+      const radiusKm = 5;
       const kmToDegLat = 1 / 111.0;
       const kmToDegLon = 1 / (111.0 * Math.cos(lat * Math.PI / 180));
       const latMargin = radiusKm * kmToDegLat;
       const lonMargin = radiusKm * kmToDegLon;
       
       let query = supabase
-        .from('items')
+        .from('items_search_view')
         .select('id, lat, lon, path_512, path_2048, path_64, title, description, width, height, is_private, profile_id')
         .not('lat', 'is', null)
         .not('lon', 'is', null)
@@ -1234,6 +1260,67 @@
     }
   }
 
+  /* -------------------------------------------------------------
+   * Initial 3×3-grid loader (shared logic with /simulation page)
+   * -----------------------------------------------------------*/
+  async function loadInitialGridImages(lat: number, lon: number) {
+    console.log(`[Gallery Grid] Loading initial 3×3 grid around ${lat},${lon}`);
+
+    // Pull images from the dynamic loader
+    const gridImages = await dynamicLoader.loadImagesForPosition(lat, lon);
+    console.log(`[Gallery Grid] Loaded ${gridImages.length} images from grid loader`);
+    // Neue Debug-Ausgabe: Anzahl der Items, die im 3×3-Raster geladen wurden
+    console.log(`[Debug] 3x3-Gitter geladene Items: ${gridImages.length}`);
+
+    // Map to gallery representation & compute distance for sorting
+    const converted = gridImages.map((img: any) => {
+      let bestSrc = '';
+      if (img.path_512) {
+        bestSrc = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${img.path_512}`;
+      } else if (img.path_2048) {
+        bestSrc = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${img.path_2048}`;
+      } else if (img.path_64) {
+        bestSrc = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/${img.path_64}`;
+      }
+
+      const distance = (img.lat && img.lon && lat !== null && lon !== null)
+        ? getDistanceInMeters(lat, lon, img.lat, img.lon)
+        : null;
+
+      return {
+        id: img.id,
+        src: bestSrc,
+        srcHD: img.path_2048 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${img.path_2048}` : bestSrc,
+        width: img.width && img.width > 0 ? img.width : 400,
+        height: img.height && img.height > 0 ? img.height : 300,
+        lat: img.lat,
+        lon: img.lon,
+        title: img.title,
+        description: img.description,
+        keywords: img.keywords,
+        path_64: img.path_64,
+        path_512: img.path_512,
+        path_2048: img.path_2048,
+        distance
+      };
+    }).filter((p: any) => p.src);
+
+    // Sort by distance (closest first)
+    if (lat !== null && lon !== null) {
+      converted.sort((a: any, b: any) => {
+        const da = a.distance ?? Number.MAX_VALUE;
+        const db = b.distance ?? Number.MAX_VALUE;
+        return da - db;
+      });
+    }
+
+    pics.set(converted);
+
+    // Advance pagination so subsequent loadMore starts AFTER the grid set
+    page = Math.ceil(converted.length / size);
+    console.log(`[Gallery Grid] Set ${converted.length} items, next page will start at index ${page * size}`);
+  }
+  
   function startGalleryPreload() {
     // Only preload if we're not already on the main page
     if (typeof window !== 'undefined' && window.location.pathname !== '/') {
@@ -1244,9 +1331,6 @@
     }
   }
   
-  // REMOVED: loadAllImages function - we now use proper pagination with loadMore
-  // This prevents loading too many images at once and improves mobile performance
-
   async function getTotalImageCount() {
     try {
       // DIRECT DATABASE QUERY: Much faster and no limits
@@ -1492,7 +1576,7 @@
           delete (window as any).gpsSortedData;
           console.log(`[Gallery Debug] Cleared GPS sorted data on filter change`);
         }
-      } else if ((isLoggedIn && showDistance && userLat !== null && userLon !== null) || hasLocationFilter) {
+      } else if ((userLat !== null && userLon !== null) || hasLocationFilter) {
         if (data[0]?.distance !== undefined) {
           // Optimierte Daten bereits sortiert - APPEND new images for pagination
           pics.update((p: any[]) => [...p, ...uniqueNewPics]);
@@ -1870,75 +1954,6 @@
     }
   }
 
-
-
-  // REMOVED: loadAllUserImages function - we now use proper pagination with loadMore
-  // This prevents loading too many images at once and improves mobile performance
-
-  // TEST: Function to create sample data for testing justified layout
-  function createSampleImages() {
-    const sampleImages = [
-      {
-        id: 'test1',
-        src: 'https://picsum.photos/400/300?random=1',
-        width: 400,
-        height: 300,
-        lat: 52.5200,
-        lon: 13.4050,
-        title: 'Sample Image 1',
-        description: 'Test image for justified layout',
-        distance: 150
-      },
-      {
-        id: 'test2',
-        src: 'https://picsum.photos/600/400?random=2',
-        width: 600,
-        height: 400,
-        lat: 52.5201,
-        lon: 13.4051,
-        title: 'Sample Image 2',
-        description: 'Test image for justified layout',
-        distance: 250
-      },
-      {
-        id: 'test3',
-        src: 'https://picsum.photos/500/350?random=3',
-        width: 500,
-        height: 350,
-        lat: 52.5202,
-        lon: 13.4052,
-        title: 'Sample Image 3',
-        description: 'Test image for justified layout',
-        distance: 350
-      },
-      {
-        id: 'test4',
-        src: 'https://picsum.photos/450/300?random=4',
-        width: 450,
-        height: 300,
-        lat: 52.5203,
-        lon: 13.4053,
-        title: 'Sample Image 4',
-        description: 'Test image for justified layout',
-        distance: 450
-      },
-      {
-        id: 'test5',
-        src: 'https://picsum.photos/550/400?random=5',
-        width: 550,
-        height: 400,
-        lat: 52.5204,
-        lon: 13.4054,
-        title: 'Sample Image 5',
-        description: 'Test image for justified layout',
-        distance: 550
-      }
-    ];
-    
-    pics.set(sampleImages);
-    console.log('[TEST] Added sample images for justified layout testing');
-  }
-
   let uploading = false;
   let uploadMessage = '';
   let uploadProgress = 0;
@@ -2237,8 +2252,6 @@
       console.log(`[Manual] Cannot load more - loading: ${loading}, hasMoreImages: ${hasMoreImages}`);
     }
   }
-
-  // Debug functions removed - no longer needed
 
   function updateLayoutFromStorage() {
     // This function is now deprecated - layout is loaded from database in loadShowDistanceAndCompass()
@@ -2548,6 +2561,10 @@
   }
 
   function startGPSTracking() {
+    if (simulationMode || gpsSimulationActive) {
+      console.log('🔄 [GPS] Simulation active – skipping real GPS tracking');
+      return;
+    }
     if (!navigator.geolocation || gpsTrackingActive) {
       console.log('🔄 [GPS] Already tracking or geolocation not available');
       return;
@@ -3251,7 +3268,7 @@
     }
     
     // FORCE GPS START: Ensure GPS tracking starts even if simulation mode is not set
-    if (!gpsTrackingActive && !gpsSimulationActive) {
+    if (!gpsTrackingActive && !gpsSimulationActive && !simulationMode) {
       console.log('🔄 [FORCE] Starting GPS tracking as fallback...');
       startGPSTracking();
     }
@@ -3274,6 +3291,7 @@
       console.log(`🔐 Auth state changed: ${event}, isLoggedIn: ${isLoggedIn}, wasAuthChecked: ${wasAuthChecked}`);
       
       if (isLoggedIn) {
+        dynamicLoader.setCurrentUserId(currentUser?.id || null);
         await loadShowDistanceAndCompass();
         await loadProfileAvatar();
       } else {
@@ -3283,6 +3301,7 @@
         autoguide = false;
         newsFlashMode = 'alle';
         profileAvatar = null;
+        dynamicLoader.setCurrentUserId(null);
       }
       
       // Only load gallery on first auth check, not on subsequent auth changes
@@ -3346,7 +3365,9 @@
           autoguide = false;
           newsFlashMode = 'alle';
           profileAvatar = null;
+          dynamicLoader.setCurrentUserId(null);
         } else {
+          dynamicLoader.setCurrentUserId(currentUser?.id || null);
           await loadShowDistanceAndCompass();
           await loadProfileAvatar();
         }
@@ -3835,6 +3856,15 @@
 
   let showImpressum = false;
   let showDatenschutz = false;
+
+  // ----------------------------------------------------------------------------------
+  // DEV-ONLY helper – prevents ReferenceError when the "Test Justified Layout" button
+  // (visible only with import.meta.env.DEV) is rendered. In production this has no
+  // effect because the block is tree-shaken.
+  export function createSampleImages() {
+    if (!import.meta.env.DEV) return;
+    console.log('[DEV] createSampleImages placeholder – add sample data here if needed');
+  }
 </script>
 
 <!-- Dialoge für Upload und EXIF Upload -->
@@ -6076,7 +6106,7 @@
         <p>Eine Zusammenführung dieser Daten mit anderen Datenquellen wird nicht vorgenommen. Die Erfassung dieser Daten erfolgt auf Grundlage von Art. 6 Abs. 1 lit. f DSGVO. Der Websitebetreiber hat ein berechtigtes Interesse an der technisch fehlerfreien Darstellung und der Optimierung seiner Website – hierzu müssen die Server-Log-Dateien erfasst werden.</p>
         
         <h4>Kontaktformular</h4>
-        <p>Wenn Sie uns per Kontaktformular Anfragen zukommen lassen, werden Ihre Angaben aus dem Anfrageformular inklusive der von Ihnen dort angegebenen Kontaktdaten zwecks Bearbeitung der Anfrage und für den Fall von Anschlussfragen bei uns gespeichert. Diese Daten geben wir nicht ohne Ihre Einwilligung weiter. Die Verarbeitung dieser Daten erfolgt auf Grundlage von Art. 6 Abs. 1 lit. b DSGVO, sofern Ihre Anfrage mit der Erfüllung eines Vertrags zusammenhängt oder zur Durchführung vorvertraglicher Maßnahmen erforderlich ist. In allen übrigen Fällen beruht die Verarbeitung auf unserem berechtigten Interesse an der effektiven Bearbeitung der an uns gerichteten Anfragen (Art. 6 Abs. 1 lit. f DSGVO) oder auf Ihrer Einwilligung (Art. 6 Abs. 1 lit. a DSGVO), sofern diese abgefragt wurde; die Einwilligung ist jederzeit widerrufbar. Die von Ihnen im Kontaktformular eingegebenen Daten verbleiben bei uns, bis Sie uns zur Löschung auffordern, Ihre Einwilligung zur Speicherung widerrufen oder der Zweck für die Datenspeicherung entfällt (z. B. nach abgeschlossener Bearbeitung Ihrer Anfrage). Zwingende gesetzliche Bestimmungen – insbesondere Aufbewahrungsfristen – bleiben unberührt.</p>
+        <p>Wenn Sie uns per Kontaktformular Anfragen zukommen lassen, werden Ihre Angaben aus dem Anfrageformular inklusive der von Ihnen dort angegebenen Kontaktdaten zwecks Bearbeitung der Anfrage und für den Fall von Anschlussfragen bei uns gespeichert. Diese Daten geben wir nicht ohne Ihre Einwilligung weiter. Die Verarbeitung dieser Daten erfolgt auf Grundlage von Art. 6 Abs. 1 lit. b DSGVO, sofern Ihre Anfrage mit der Erfüllung eines Vertrags zusammenhängt oder zur Durchführung vorvertraglicher Maßnahmen erforderlich ist. In allen übrigen Fällen beruht die Verarbeitung auf unserem berechtigten Interesse an der effektiven Bearbeitung der an uns gerichteten Anfragen (Art. 6 Abs. 1 lit. f DSGVO) oder auf Ihrer Einwilligung (Art. 6 Abs. 1 lit. a DSGVO), sofern diese abgefragt wurde; die Einwilligung ist jederzeit widerrufbar. Die von Ihnen im Kontaktformular eingegebenen Daten verbleiben bei uns, bis Sie uns zur Löschung auffordern, Ihre Einwilligung zur Speicherung widerrufen oder der Zweck für die Datenspeicherung entfällt (z. B. nach abgeschlossener Bearbeitung Ihres Anliegens). Zwingende gesetzliche Bestimmungen – insbesondere Aufbewahrungsfristen – bleiben unberührt.</p>
         
         <h4>Anfrage per E-Mail, Telefon oder Telefax</h4>
         <p>Wenn Sie uns per E-Mail, Telefon oder Telefax kontaktieren, wird Ihre Anfrage inklusive aller daraus abgeleiteten personenbezogenen Daten (Name, Anfrage) zum Zwecke der Bearbeitung Ihres Anliegens bei uns gespeichert und verarbeitet. Diese Daten geben wir nicht ohne Ihre Einwilligung weiter. Die Verarbeitung dieser Daten erfolgt auf Grundlage von Art. 6 Abs. 1 lit. b DSGVO, sofern Ihre Anfrage mit der Erfüllung eines Vertrags zusammenhängt oder zur Durchführung vorvertraglicher Maßnahmen erforderlich ist. In allen übrigen Fällen beruht die Verarbeitung auf unserem berechtigten Interesse an der effektiven Bearbeitung der an uns gerichteten Anfragen (Art. 6 Abs. 1 lit. f DSGVO) oder auf Ihrer Einwilligung (Art. 6 Abs. 1 lit. a DSGVO), sofern diese abgefragt wurde; die Einwilligung ist jederzeit widerrufbar. Die von Ihnen an uns übermittelten Daten verbleiben bei uns, bis Sie uns zur Löschung auffordern, Ihre Einwilligung zur Speicherung widerrufen oder der Zweck für die Datenspeicherung entfällt (z. B. nach abgeschlossener Bearbeitung Ihres Anliegens). Zwingende gesetzliche Bestimmungen – insbesondere gesetzliche Aufbewahrungsfristen – bleiben unberührt.</p>
