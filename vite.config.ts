@@ -16,6 +16,8 @@ export default defineConfig({
 		// Entwicklungs-Cache-Kontrolle
 		headers: {
 			'Cache-Control': 'no-cache'
-		}
+		},
+		port: 5173,
+		strictPort: true
 	}
 });

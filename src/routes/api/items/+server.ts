@@ -43,13 +43,27 @@ export const GET = async ({ url, request }) => {
       }
     }
     
-    console.log('API /api/items - Current user:', current_user_id || 'anonymous');
-    console.log('API Debug - Query params:', { lat, lon, limit, offset, user_id, filter_user_id, for_map });
-    console.log('API Debug - GPS filtering check:', { lat, lon, latType: typeof lat, lonType: typeof lon, latIsNull: lat === 'null', lonIsNull: lon === 'null' });
+    console.log('🔍 API /api/items - Current user:', current_user_id || 'anonymous');
+    console.log('🔍 API Debug - Query params:', { lat, lon, limit, offset, user_id, filter_user_id, for_map });
+    console.log('🔍 API Debug - GPS filtering check:', { lat, lon, latType: typeof lat, lonType: typeof lon, latIsNull: lat === 'null', lonIsNull: lon === 'null' });
+    console.log('🔍 API Debug - Request URL:', url.toString());
+    console.log('🔍 API Debug - Request headers:', Object.fromEntries(request.headers.entries()));
+    console.log('🔍 API Debug - Request method:', request.method);
+    // --- Erweiterte Debug-Logs für Herkunftsanalyse ---
+    const referer = request.headers.get('referer');
+    const userAgent = request.headers.get('user-agent');
+    if (for_map) {
+      console.log('🔍 API Debug - for_map=true: Referer:', referer);
+      console.log('🔍 API Debug - for_map=true: User-Agent:', userAgent);
+      console.log('🔍 API Debug - for_map=true: Stacktrace:', new Error().stack?.split('\n').slice(1, 10).join('\n'));
+    } else {
+      console.log('🔍 API Debug - Referer:', referer);
+      console.log('🔍 API Debug - User-Agent:', userAgent);
+    }
 
     // GPS-Filtering: Load all matching images, sort by distance, then paginate
     const useGpsFiltering = lat && lon && lat !== 'null' && lon !== 'null' && !isNaN(parseFloat(lat)) && !isNaN(parseFloat(lon));
-    console.log('API Debug - GPS filtering decision:', { 
+    console.log('🔍 API Debug - GPS filtering decision:', { 
       lat, 
       lon, 
       latExists: !!lat, 
@@ -65,14 +79,14 @@ export const GET = async ({ url, request }) => {
       lonStartsWith: lon?.substring(0, 5)
     });
     if (useGpsFiltering) {
-      console.log('API Debug - Using GPS filtering with coordinates:', { lat, lon });
+      console.log('🔍 API Debug - Using GPS filtering with coordinates:', { lat, lon });
       const maxGpsImages = for_map ? 50000 : 10000; // Für Karten 50000, sonst 10000 Bilder
       
       // For maps, use service role client to bypass RLS 1000-row limit
       const dbClient = for_map ? supabaseService : supabase;
       const clientType = for_map ? (supabaseServiceKey ? 'SERVICE ROLE' : 'REGULAR (no service key)') : 'REGULAR';
-      console.log(`API Debug - Using ${clientType} client for query`);
-      console.log(`API Debug - Service key exists: ${!!supabaseServiceKey}, URL exists: ${!!supabaseUrl}`);
+      console.log(`🔍 API Debug - Using ${clientType} client for query`);
+      console.log(`🔍 API Debug - Service key exists: ${!!supabaseServiceKey}, URL exists: ${!!supabaseUrl}`);
       
       let gpsQuery = dbClient
         .from('items')
@@ -85,25 +99,25 @@ export const GET = async ({ url, request }) => {
       // User-Filter anwenden
       if (user_id) {
         gpsQuery = gpsQuery.eq('user_id', user_id);
-        console.log('API Debug - Filtering by user_id:', user_id);
+        console.log('🔍 API Debug - Filtering by user_id:', user_id);
       } else if (filter_user_id) {
         gpsQuery = gpsQuery.eq('profile_id', filter_user_id);
-        console.log('API Debug - Filtering by profile_id:', filter_user_id);
+        console.log('🔍 API Debug - Filtering by profile_id:', filter_user_id);
       } else {
         if (current_user_id) {
           gpsQuery = gpsQuery.or(`profile_id.eq.${current_user_id},is_private.eq.false,is_private.is.null`);
-          console.log('API Debug - Filtering for authenticated user:', current_user_id);
+          console.log('🔍 API Debug - Filtering for authenticated user:', current_user_id);
         } else {
           gpsQuery = gpsQuery.or('is_private.eq.false,is_private.is.null');
-          console.log('API Debug - Filtering for anonymous user (public items only)');
+          console.log('🔍 API Debug - Filtering for anonymous user (public items only)');
         }
       }
       
       // For maps without service key, use batch loading to get more than 1000 items
       let allGpsData = [];
-      console.log(`API Debug - Batch loading check: for_map=${for_map}, supabaseServiceKey=${!!supabaseServiceKey}, condition=${for_map && !supabaseServiceKey}`);
+      console.log(`🔍 API Debug - Batch loading check: for_map=${for_map}, supabaseServiceKey=${!!supabaseServiceKey}, condition=${for_map && !supabaseServiceKey}`);
       if (for_map && !supabaseServiceKey) {
-        console.log('API Debug - Using batch loading for maps (no service key available)');
+        console.log('🔍 API Debug - Using batch loading for maps (no service key available)');
         const batchSize = 1000;
         let hasMore = true;
         let batchOffset = 0;
@@ -135,7 +149,7 @@ export const GET = async ({ url, request }) => {
           
           if (batchData && batchData.length > 0) {
             allGpsData.push(...batchData);
-            console.log(`API Debug - Loaded batch ${Math.floor(batchOffset/batchSize) + 1}: ${batchData.length} items, total: ${allGpsData.length}`);
+            console.log(`🔍 API Debug - Loaded batch ${Math.floor(batchOffset/batchSize) + 1}: ${batchData.length} items, total: ${allGpsData.length}`);
             
             // Continue if we got a full batch
             hasMore = batchData.length === batchSize;
@@ -145,7 +159,7 @@ export const GET = async ({ url, request }) => {
           }
         }
         
-        console.log(`API Debug - Batch loading complete: ${allGpsData.length} total items loaded`);
+        console.log(`🔍 API Debug - Batch loading complete: ${allGpsData.length} total items loaded`);
       } else {
         // Regular single query (with or without service key)
         const { data: gpsData, error: gpsError } = await gpsQuery;
@@ -153,7 +167,7 @@ export const GET = async ({ url, request }) => {
         allGpsData = gpsData || [];
       }
       
-      console.log('API Debug - Raw GPS data loaded:', allGpsData?.length || 0, 'items');
+      console.log('🔍 API Debug - Raw GPS data loaded:', allGpsData?.length || 0, 'items');
       
       // Entfernung berechnen und sortieren
       const userLat = parseFloat(lat);
@@ -175,19 +189,19 @@ export const GET = async ({ url, request }) => {
         return item;
       });
       
-      console.log('API Debug - Items with distance calculated:', itemsWithDistance.length);
+      console.log('🔍 API Debug - Items with distance calculated:', itemsWithDistance.length);
       
       itemsWithDistance.sort((a, b) => ((a as any).distance || Infinity) - ((b as any).distance || Infinity));
       
-      console.log('API Debug - Items after sorting by distance:', itemsWithDistance.length);
-      console.log('API Debug - First 3 items after sorting:', itemsWithDistance.slice(0, 3).map(item => ({ id: item.id, distance: (item as any).distance })));
+      console.log('🔍 API Debug - Items after sorting by distance:', itemsWithDistance.length);
+      console.log('🔍 API Debug - First 3 items after sorting:', itemsWithDistance.slice(0, 3).map(item => ({ id: item.id, distance: (item as any).distance })));
       
       // Apply radius filter if specified
       if (radius && !isNaN(parseFloat(radius))) {
         const maxRadius = parseFloat(radius);
         itemsWithDistance = itemsWithDistance.filter((item) => (item as any).distance <= maxRadius);
-        console.log('API Debug - After radius filtering:', itemsWithDistance.length, 'items within', maxRadius, 'm');
-        console.log('API Debug - Items within radius:', itemsWithDistance.slice(0, 5).map(item => ({ 
+        console.log('🔍 API Debug - After radius filtering:', itemsWithDistance.length, 'items within', maxRadius, 'm');
+        console.log('🔍 API Debug - Items within radius:', itemsWithDistance.slice(0, 5).map(item => ({ 
           id: item.id, 
           distance: (item as any).distance,
           lat: item.lat,
@@ -198,7 +212,7 @@ export const GET = async ({ url, request }) => {
       
       const pagedItems = itemsWithDistance.slice(offset, offset + effectiveLimit);
       
-      console.log('API Debug - Final paged result:', {
+      console.log('🔍 API Debug - Final paged result:', {
         totalItems: itemsWithDistance.length,
         offset,
         limit,
@@ -225,11 +239,11 @@ export const GET = async ({ url, request }) => {
       });
     }
     // Normale Paginierung ohne GPS
-    console.log('API Debug - Using normal pagination (no GPS)');
+    console.log('🔍 API Debug - Using normal pagination (no GPS)');
     
     // For maps, use service role client to bypass RLS 1000-row limit
     const dbClient = for_map ? supabaseService : supabase;
-    console.log(`API Debug - Using ${for_map ? 'SERVICE ROLE' : 'REGULAR'} client for normal query`);
+    console.log(`🔍 API Debug - Using ${for_map ? 'SERVICE ROLE' : 'REGULAR'} client for normal query`);
     
     let imagesQuery = dbClient
       .from('items')
@@ -279,7 +293,7 @@ export const GET = async ({ url, request }) => {
       throw error(500, countError.message);
     }
     
-    console.log('API Debug - Normal pagination result:', {
+    console.log('🔍 API Debug - Normal pagination result:', {
       totalCount: count || 0,
       returnedItems: data?.length || 0,
       offset,

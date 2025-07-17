@@ -48,11 +48,22 @@
   let noGpsImagesList: any[] = [];
   let incompleteImagesList: any[] = [];
   let showWithoutGpsList = false;
+  
+  // Dynamic loading tracking
+  let dynamicLoader: any = null;
+  let lastLoadCheckPosition: { lat: number; lon: number } | null = null;
+  let loadCheckInterval: number | null = null;
 
   onMount(async () => {
     await loadAllImages();
     initializeMap();
     startSimulation();
+    
+    // Center map on user's position if available
+    if (userLat && userLon && map) {
+      map.setView([userLat, userLon], 13);
+      console.log(`🗺️ Centered simulation map on user position: ${userLat}, ${userLon}`);
+    }
     setupKeyboardNavigation();
     
     // Initialize GPS simulation immediately
@@ -79,20 +90,193 @@
     
     // Stop continuous GPS updates
     stopContinuousGPSUpdates();
+    
+    // Stop position monitoring
+    if (loadCheckInterval) {
+      clearInterval(loadCheckInterval);
+    }
   });
+
+  // Start position monitoring for dynamic loading
+  function startPositionMonitoring() {
+    // Monitor position changes and dynamically load images
+    setInterval(async () => {
+      const currentPos = { lat: simulatedLat, lon: simulatedLon };
+      
+      // Skip if position hasn't changed significantly
+      if (lastLoadCheckPosition && 
+          Math.abs(currentPos.lat - lastLoadCheckPosition.lat) < 0.001 &&
+          Math.abs(currentPos.lon - lastLoadCheckPosition.lon) < 0.001) {
+        return;
+      }
+      
+      lastLoadCheckPosition = { ...currentPos };
+      
+      const isInCenter = dynamicLoader.isInCenterCell(currentPos.lat, currentPos.lon);
+      if (!isInCenter) {
+        // Load new images from dynamic loader
+        const newImages = await dynamicLoader.loadImagesForPosition(currentPos.lat, currentPos.lon);
+        
+        // Update allImages with the new data from dynamic loader
+        allImages = newImages;
+        
+        console.log(`🗺️ Updated allImages with ${newImages.length} images from dynamic loader`);
+      }
+      
+      // Update image counts
+      const imagesWithGPSData = allImages.filter((img: any) => img.lat && img.lon);
+      const imagesWithoutGPSData = allImages.filter((img: any) => !img.lat || !img.lon);
+      imagesWithGPS = imagesWithGPSData.length;
+      imagesWithoutGPS = imagesWithoutGPSData.length;
+      
+      // Update map markers and grid overlay if map is initialized
+      if (mapInitialized && map) {
+        console.log(`🗺️ Updating map markers and grid overlay with ${imagesWithGPS} images with GPS`);
+        // Force a small delay to ensure DOM is ready
+        setTimeout(() => {
+          addImageMarkers();
+        }, 100);
+      }
+      
+      // Update gallery
+      updateGalleryWithNewImages(allImages);
+      
+      console.log(`📊 Dynamic load complete: ${allImages.length} total images (${imagesWithGPS} with GPS)`);
+    }, 2000) as any; // Check every 2 seconds
+  }
+
+  function updateGalleryWithNewImages(newImages: any[]) {
+    // Update pics store with current nearby images based on simulation position
+    const nearbyImages = newImages
+      .filter((img: any) => img.lat && img.lon)
+      .map((img: any) => {
+        const distance = getDistanceInMeters(simulatedLat, simulatedLon, img.lat, img.lon);
+        return {
+          ...img,
+          distance: distance,
+          src: img.path_512 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${img.path_512}` : '',
+          srcHD: img.path_2048 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${img.path_2048}` : ''
+        };
+      })
+      .sort((a: any, b: any) => a.distance - b.distance)
+      .slice(0, 50); // Show closest 50 images
+    
+    pics.set(nearbyImages);
+  }
+
+  function updateMapMarkers() {
+    // Use the new addImageMarkers function instead
+    addImageMarkers();
+  }
+
+
+
+  // Direct database query for simulation images (bypasses all API limitations)
+  async function loadSimulationImagesDirectFromDB(): Promise<any[]> {
+    try {
+      console.log('[Simulation DirectDB] Loading simulation images directly from database...');
+      
+      // Get current session to determine privacy filtering
+      const { data: { session } } = await supabase.auth.getSession();
+      const currentUserId = session?.user?.id || null;
+      
+      let query = supabase
+        .from('items')
+        .select('id, lat, lon, path_512, path_2048, path_64, title, description, width, height, is_private, profile_id, keywords, original_name')
+        .not('path_512', 'is', null)
+        .limit(3000); // Higher limit for simulation to load more data
+      
+      // Apply privacy filtering
+      if (currentUserId) {
+        // For logged in users: show their own images (all) + other users' public images
+        query = query.or(`profile_id.eq.${currentUserId},is_private.eq.false,is_private.is.null`);
+      } else {
+        // For anonymous users: only show public images
+        query = query.or('is_private.eq.false,is_private.is.null');
+      }
+      
+      const { data, error } = await query;
+      
+      if (error) {
+        console.error('[Simulation DirectDB] Database error:', error);
+        return [];
+      }
+      
+      const images = (data || []).map(item => ({
+        ...item,
+        // Ensure we have proper types and default values
+        lat: item.lat || null,
+        lon: item.lon || null,
+        path_512: item.path_512!,
+        path_64: item.path_64 || item.path_512, // Fallback to 512 if 64 not available
+        keywords: item.keywords || [],
+        title: item.title || item.original_name || 'Untitled',
+        description: item.description || ''
+      }));
+      
+      console.log(`[Simulation DirectDB] Successfully loaded ${images.length} images`);
+      return images;
+      
+    } catch (error) {
+      console.error('[Simulation DirectDB] Error:', error);
+      return [];
+    }
+  }
 
   async function loadAllImages() {
     try {
-      // Use GPS-based API path with dummy coordinates to get the higher limit
-      const response = await fetch('/api/items?for_map=true&limit=50000&lat=52.5200&lon=13.4050');
-      const result = await response.json();
+      // Use dynamic loader for intelligent position-based loading
+      const { dynamicImageLoader } = await import('$lib/dynamicImageLoader');
+      dynamicLoader = dynamicImageLoader; // Store reference for later use
       
-      if (result.status !== 'success') {
-        throw new Error(result.message || 'API Error');
+      // Try to get user's current GPS position, fallback to Germany center
+      let startLat = 48.1351; // Germany center fallback
+      let startLon = 11.5820; // Germany center fallback
+      
+      try {
+        // Check if we can get user's current position
+        if (navigator.geolocation) {
+          console.log('🌍 Attempting to get user GPS position for simulation...');
+          
+          const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(
+              (pos) => resolve(pos),
+              (error) => reject(error),
+              { 
+                enableHighAccuracy: true, 
+                timeout: 5000, // 5 second timeout
+                maximumAge: 300000 // Accept position up to 5 minutes old
+              }
+            );
+          });
+          
+          startLat = position.coords.latitude;
+          startLon = position.coords.longitude;
+          
+          console.log(`📍 Using user GPS position: ${startLat}, ${startLon}`);
+          
+          // Update simulation position to match user's actual location
+          simulatedLat = startLat;
+          simulatedLon = startLon;
+          
+          // Also update user position variables for map centering
+          userLat = startLat;
+          userLon = startLon;
+          
+        } else {
+          console.log('📍 Geolocation not supported, using Germany center fallback');
+        }
+      } catch (error) {
+        console.log('📍 GPS position unavailable, using Germany center fallback:', error);
       }
       
-      const allData = result.images || [];
-      console.log(`🗺️ Simulation loaded ${allData.length} images via API`);
+      // Use the new grid-based loading logic with even smaller radius for better performance
+      // This will only load nearby cells initially, not 1000 images at once
+      const allData = await dynamicImageLoader.loadImagesForPosition(startLat, startLon); // Grid-based loading
+      console.log(`🗺️ Simulation loaded ${allData.length} images via Grid-based DynamicLoader from position ${startLat}, ${startLon}`);
+      
+      // Start position monitoring for dynamic loading
+      startPositionMonitoring();
       
       // Debug: Check for actual duplicates
       const allIds = allData.map(img => img.id);
@@ -102,8 +286,8 @@
       totalImages = allData?.length || 0;
 
       // Filter for images with GPS data
-      const imagesWithGPSData = allData?.filter(img => img.lat && img.lon) || [];
-      const imagesWithoutGPSData = allData?.filter(img => !img.lat || !img.lon) || [];
+      const imagesWithGPSData = allData?.filter((img: any) => img.lat && img.lon) || [];
+      const imagesWithoutGPSData = allData?.filter((img: any) => !img.lat || !img.lon) || [];
 
       imagesWithGPS = imagesWithGPSData.length;
       imagesWithoutGPS = imagesWithoutGPSData.length;
@@ -113,7 +297,7 @@
       console.log(`Images without GPS data: ${imagesWithoutGPS}`);
       
       // Debug: Log specific image if it exists
-      const specificImage = allData?.find(img => img.id === '2c6407f6-1ca5-4e82-afb1-0e0fe37db0ea');
+      const specificImage = allData?.find((img: any) => img.id === '2c6407f6-1ca5-4e82-afb1-0e0fe37db0ea');
       if (specificImage) {
         console.log('🔍 Found specific image:', {
           id: specificImage.id,
@@ -152,10 +336,21 @@
         !img.title || 
         !img.description || 
         !img.keywords || 
-        img.keywords.length === 0 ||
+        (Array.isArray(img.keywords) && img.keywords.length === 0) ||
         !img.path_2048 || // Fehlende 2048px Version
         !img.path_512   // Fehlende 512px Version
       );
+
+      // Debug: Check keywords for first few images
+      console.log('🔍 Keywords debug - first 5 images:');
+      uniqueImages.slice(0, 5).forEach((img, index) => {
+        console.log(`  Image ${index + 1}:`, {
+          id: img.id,
+          keywords: img.keywords,
+          keywordsType: typeof img.keywords,
+          keywordsLength: Array.isArray(img.keywords) ? img.keywords.length : 'not array'
+        });
+      });
 
       imagesWithGPS = gpsImages.length;
       imagesWithoutGPS = noGpsImages.length;
@@ -271,26 +466,6 @@
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap contributors'
     }).addTo(map);
-    
-    // Load MarkerCluster plugin for performance with many markers
-    if (typeof (window as any).L.markerClusterGroup === 'undefined') {
-      const clusterScript = document.createElement('script');
-      clusterScript.src = 'https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js';
-      clusterScript.onload = () => {
-        initializeMarkerClustering();
-      };
-      document.head.appendChild(clusterScript);
-      
-      // Load MarkerCluster CSS
-      if (!document.querySelector('link[href*="markercluster"]')) {
-        const clusterLink = document.createElement('link');
-        clusterLink.rel = 'stylesheet';
-        clusterLink.href = 'https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css';
-        document.head.appendChild(clusterLink);
-      }
-    } else {
-      initializeMarkerClustering();
-    }
 
     // Add user marker (draggable and in front)
     // @ts-ignore
@@ -328,94 +503,113 @@
       updateSimulatedPositionDirect(newLat, newLon);
     });
 
-    // Initialize markers after marker clustering is ready
-    function initializeMarkerClustering() {
-      // Create marker cluster group - optimized for 5000+ objects  
-      const markerClusterGroup = (window as any).L.markerClusterGroup({
-        chunkedLoading: true,
-        maxClusterRadius: 80,
-        spiderfyOnMaxZoom: true,
-        showCoverageOnHover: true,
-        zoomToBoundsOnClick: true,
-        disableClusteringAtZoom: 18,
-        iconCreateFunction: function(cluster: any) {
-          const count = cluster.getChildCount();
-          let className = 'marker-cluster-small';
-          if (count > 500) {
-            className = 'marker-cluster-large';
-          } else if (count > 50) {
-            className = 'marker-cluster-medium';
-          }
-          
-          return (window as any).L.divIcon({
-            html: `<div><span>${count}</span></div>`,
-            className: `marker-cluster ${className}`,
-            iconSize: (window as any).L.point(40, 40)
-          });
-        }
-      });
-      
-      // Add cluster group to map
-      map.addLayer(markerClusterGroup);
-      
-      // Add image markers (only for unique images with GPS data)
-      const imagesWithGPS = allImages.filter(img => img.lat && img.lon);
-      console.log(`🗺️ Creating ${imagesWithGPS.length} clustered map markers from ${allImages.length} unique images`);
-      
-      imagesWithGPS.forEach(img => {
-        console.log(`📍 Adding clustered marker for unique image ${img.id}:`, {
-          lat: img.lat,
-          lon: img.lon,
-          path_64: img.path_64,
-          path_512: img.path_512,
-          title: img.title
-        });
-          
-          // @ts-ignore
-          const marker = L.marker([img.lat, img.lon], {
-            // @ts-ignore
-            icon: L.divIcon({
-              className: 'image-marker',
-              html: `<div style="position: relative; width: 48px; height: 48px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.4); cursor: pointer; overflow: hidden; background: #f0f0f0; display: flex; align-items: center; justify-content: center;" title="${img.title || 'Bild'}">
-                <img src="https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/${img.path_64 || img.path_512}" 
-                     style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;" 
-                     alt="${img.title || 'Bild'}"
-                     onerror="this.style.display='none'; this.parentElement.innerHTML='<div style=\'background: #4CAF50; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px;\'>📷</div>'">
-                <div style="position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; white-space: nowrap; max-width: 120px; overflow: hidden; text-overflow: ellipsis; z-index: 1000;">${img.title || 'Bild'}</div>
-              </div>`,
-              iconSize: [48, 48],
-              iconAnchor: [24, 24]
-            })
-          });
-
-          marker.on('click', () => {
-            // Navigate to image detail page
-            window.open(`/item/${img.id}`, '_blank');
-          });
-
-          // Add to cluster group instead of directly to map
-          markerClusterGroup.addLayer(marker);
-          mapMarkers.push(marker);
-      });
-      
-      // Fit map to show all markers
-      if (mapMarkers.length > 0) {
-        // @ts-ignore
-        const group = new L.featureGroup(mapMarkers);
-        map.fitBounds(group.getBounds().pad(0.1));
-        console.log('Map fitted to show all clustered image markers');
-      }
-    }
+    // Add image markers and grid overlay
+    addImageMarkers();
 
     // Add map click handler to move user position
     map.on('click', (e: any) => {
       const newLat = e.latlng.lat;
       const newLon = e.latlng.lng;
       
+      console.log(`🗺️ Map clicked at: ${newLat}, ${newLon}`);
+      
+      // Update user marker position
+      if (userMarker) {
+        userMarker.setLatLng([newLat, newLon]);
+      }
+      
+      // Update simulation position
       updateSimulatedPosition(newLat, newLon);
     });
 
     mapInitialized = true;
+  }
+
+  function addImageMarkers() {
+    if (!map || !allImages) {
+      console.log(`🗺️ addImageMarkers: map=${!!map}, allImages=${!!allImages}`);
+      return;
+    }
+    
+    // Clear existing image markers and grid overlays
+    let clearedCount = 0;
+    map.eachLayer((layer: any) => {
+      if (layer.options && (layer.options.isImageMarker || layer.options.isGridOverlay)) {
+        map.removeLayer(layer);
+        clearedCount++;
+      }
+    });
+    console.log(`🗺️ Cleared ${clearedCount} existing markers and grid overlays`);
+    
+    // Add grid visualization
+    addGridOverlay();
+    
+    // Filter images to only those in the current 3x3 grid
+    let imagesWithGPS = allImages.filter(img => img.lat && img.lon);
+    if (dynamicLoader && simulatedLat && simulatedLon) {
+      const currentGrid = dynamicLoader.latLonToGrid(simulatedLat, simulatedLon);
+      const requiredCells = dynamicLoader.getRequiredCells(currentGrid);
+      const requiredCellKeys = new Set(requiredCells.map(cell => `${cell.x},${cell.y}`));
+      imagesWithGPS = imagesWithGPS.filter(img => {
+        const grid = dynamicLoader.latLonToGrid(img.lat, img.lon);
+        return requiredCellKeys.has(`${grid.x},${grid.y}`);
+      });
+    }
+    console.log(`🗺️ Creating ${imagesWithGPS.length} individual map markers (no clustering, only current 3x3 grid)`);
+    
+    imagesWithGPS.forEach(img => {
+      console.log(`📍 Adding individual marker for image ${img.id}:`, {
+        lat: img.lat,
+        lon: img.lon,
+        path_64: img.path_64,
+        path_512: img.path_512,
+        title: img.title
+      });
+          
+      // @ts-ignore
+      const marker = L.marker([img.lat, img.lon], {
+        isImageMarker: true, // Flag to identify image markers
+        // @ts-ignore
+        icon: L.divIcon({
+          className: 'image-marker',
+          html: `<div style="position: relative; width: 48px; height: 48px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.4); cursor: pointer; overflow: hidden; background: #f0f0f0; display: flex; align-items: center; justify-content: center;" title="${img.title || 'Bild'}">
+            <img src="https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/${img.path_64}" 
+                 style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;" 
+                 alt="${img.title || 'Bild'}"
+                 onerror="this.style.display='none'; this.parentElement.innerHTML='<div style=\'background: #4CAF50; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px;\'>📷</div>'">
+            <div style="position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; white-space: nowrap; max-width: 120px; overflow: hidden; text-overflow: ellipsis; z-index: 1000;">${img.title || 'Bild'}</div>
+          </div>`,
+          iconSize: [48, 48],
+          iconAnchor: [24, 24]
+        })
+      });
+
+      marker.on('click', () => {
+        // Navigate to image detail page
+        window.open(`/item/${img.id}`, '_blank');
+      });
+
+      marker.addTo(map);
+    });
+    
+    // Fit map to show all markers if we have any
+    if (imagesWithGPS.length > 0) {
+      // Create a feature group with all image markers
+      // @ts-ignore
+      const group = new L.featureGroup();
+      
+      // Add all image markers to the group
+      map.eachLayer((layer: any) => {
+        if (layer.options && layer.options.isImageMarker) {
+          group.addLayer(layer);
+        }
+      });
+      
+      if (group.getLayers().length > 0) {
+        map.fitBounds(group.getBounds().pad(0.1));
+        console.log('Map fitted to show all individual image markers');
+      }
+    }
   }
 
   function updateSimulatedPosition(lat: number, lon: number) {
@@ -441,6 +635,18 @@
 
     // Resort images by distance (local sort only)
     resortImagesByDistance();
+    
+    // Check if we need to update the grid (center cell changed)
+    if (dynamicLoader && !dynamicLoader.isInCenterCell(lat, lon)) {
+      console.log(`🗺️ Position ${lat},${lon} is outside center cell - triggering grid update`);
+      
+      // Update grid overlay if map is initialized
+      if (mapInitialized && map) {
+        setTimeout(() => {
+          addGridOverlay();
+        }, 100);
+      }
+    }
     
     // Update URL hash for iframe communication
     updateURLHash(lat, lon, simulationActive);
@@ -495,6 +701,75 @@
     } else {
       return meters + 'm';
     }
+  }
+
+  // Grid visualization functions
+  function addGridOverlay() {
+    if (!map || !dynamicLoader) return;
+    
+    // Get current position and convert to grid coordinates
+    const currentGrid = dynamicLoader.latLonToGrid(simulatedLat, simulatedLon);
+    const requiredCells = dynamicLoader.getRequiredCells(currentGrid);
+    const currentCenterCell = dynamicLoader.getCurrentCenterCell();
+    
+    console.log(`🗺️ Drawing 3x3 overlay for center: ${currentGrid.x},${currentGrid.y}`);
+    console.log(`🗺️ Current center cell: ${currentCenterCell?.x},${currentCenterCell?.y}`);
+    console.log(`🗺️ Required cells:`, requiredCells);
+    
+    // Draw each cell
+    requiredCells.forEach((cell, index) => {
+      const cellCenter = dynamicLoader.gridToLatLon(cell.x, cell.y);
+      const isLoaded = dynamicLoader.isCellLoaded(cell.x, cell.y);
+      const isCenter = currentCenterCell && cell.x === currentCenterCell.x && cell.y === currentCenterCell.y;
+      
+      // Calculate cell boundaries (1010)
+      const cellSizeDeg = 10 / 111.0; // 10km in degrees
+      const halfCell = cellSizeDeg / 2;
+      
+      const bounds = [
+        [cellCenter.lat - halfCell, cellCenter.lon - halfCell],
+        [cellCenter.lat + halfCell, cellCenter.lon + halfCell]
+      ];
+      
+      // Determine cell color based on status
+      let color = '#ff0000'; // Red = not loaded
+      let weight = 2;
+      let opacity = 0.3;
+      
+      if (isLoaded) {
+        if (isCenter) {
+          color = '#6666ff'; // Blue = center cell
+          opacity = 0.6;
+          weight = 3;
+        } else {
+          color = '#00ff00'; // Green = loaded outer cells
+          opacity = 0.4;
+        }
+      }
+      
+      // Create rectangle for cell
+      // @ts-ignore
+      const rect = L.rectangle(bounds, {
+        color: color,
+        weight: weight,
+        fillOpacity: opacity,
+        isGridOverlay: true
+      });
+      
+      // Add tooltip with cell info
+      const tooltipText = `
+        <strong>Cell ${cell.x},${cell.y}</strong><br>
+        Status: ${isLoaded ? (isCenter ? 'Center (Blue)' : 'Loaded (Green)') : 'Not Loaded (Red)'}<br>
+        Center: ${cellCenter.lat.toFixed(4)}, ${cellCenter.lon.toFixed(4)}<br>
+        ${isCenter ? '🎯 Current Position' : ''}
+      `;
+      
+      rect.bindTooltip(tooltipText, {
+        permanent: false,
+        direction: 'top'
+      });
+      rect.addTo(map);
+    });
   }
 
   function startSimulation() {

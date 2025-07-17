@@ -1163,42 +1163,54 @@
     }
   }
 
-  // Load all images for the map using API to bypass RLS limits
+  // Load all images for the map using direct database query (no API limits)
   async function loadAllImagesForMap() {
     try {
-      console.log('[FullscreenMap] Loading all images for map...');
+      console.log('[FullscreenMap] Loading all images for map with direct DB query...');
       
-      // Use API with for_map=true and dummy coordinates to get maximum images
-      const response = await fetch('/api/items?for_map=true&limit=50000&lat=52.5200&lon=13.4050');
-      const result = await response.json();
+      // Use direct database query to bypass API issues entirely
+      const images = await loadMapImagesDirectFromDB();
       
-      if (result.status !== 'success') {
-        console.error('[FullscreenMap] API error:', result.message);
-        return;
-      }
-      
-      const images = result.images || [];
-      
-      if (images) {
-        const processedImages = images.map((img: any) => ({
-          id: img.id,
-          src: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${img.path_512}`,
-          srcHD: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${img.path_2048}`,
-          width: img.width,
-          height: img.height,
-          lat: img.lat,
-          lon: img.lon,
-          title: img.title,
-          description: img.description,
-          keywords: img.keywords,
-          path_64: img.path_64,
-          path_512: img.path_512,
-          path_2048: img.path_2048,
-          profile_id: img.profile_id,
-          is_private: img.is_private
-        }));
+      if (images && images.length > 0) {
+        const processedImages = images.map((img: any) => {
+          // Try to find the best available image path
+          let src = '';
+          let srcHD = '';
+          
+          if (img.path_512) {
+            src = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${img.path_512}`;
+          } else if (img.path_2048) {
+            src = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${img.path_2048}`;
+          } else if (img.path_64) {
+            src = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/${img.path_64}`;
+          }
+          
+          if (img.path_2048) {
+            srcHD = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${img.path_2048}`;
+          } else {
+            srcHD = src;
+          }
+          
+          return {
+            id: img.id,
+            src: src,
+            srcHD: srcHD,
+            width: img.width && img.width > 0 ? img.width : 400,
+            height: img.height && img.height > 0 ? img.height : 300,
+            lat: img.lat,
+            lon: img.lon,
+            title: img.title,
+            description: img.description,
+            keywords: img.keywords,
+            path_64: img.path_64,
+            path_512: img.path_512,
+            path_2048: img.path_2048,
+            profile_id: img.profile_id,
+            is_private: img.is_private
+          };
+        }).filter(img => img.src); // Only include images with valid paths
         
-        console.log(`[FullscreenMap] Loaded ${processedImages.length} images for map via API`);
+        console.log(`[FullscreenMap] Loaded ${processedImages.length} images for map via direct DB query`);
         
         // Update the internal images array
         allImages = processedImages;
@@ -1207,9 +1219,62 @@
         if (mapInitialized && markerClusterGroup) {
           addImageMarkers();
         }
+      } else {
+        console.log('[FullscreenMap] No images found via direct DB query');
+        allImages = [];
       }
     } catch (err) {
       console.error('[FullscreenMap] Error in loadAllImagesForMap:', err);
+      allImages = [];
+    }
+  }
+
+  // Direct database query for map images (bypasses all API limitations)
+  async function loadMapImagesDirectFromDB(): Promise<any[]> {
+    try {
+      console.log('[FullscreenMap DirectDB] Loading map images directly from database...');
+      
+      // Get current session to determine privacy filtering
+      const { data: { session } } = await supabase.auth.getSession();
+      const currentUserId = session?.user?.id || null;
+      
+      let query = supabase
+        .from('items')
+        .select('id, lat, lon, path_512, path_2048, path_64, title, description, width, height, is_private, profile_id')
+        .not('lat', 'is', null)
+        .not('lon', 'is', null)
+        .not('path_512', 'is', null)
+        .limit(2000); // Limit for performance, but still much more than API allows
+      
+      // Apply privacy filtering
+      if (currentUserId) {
+        // For logged in users: show their own images (all) + other users' public images
+        query = query.or(`profile_id.eq.${currentUserId},is_private.eq.false,is_private.is.null`);
+      } else {
+        // For anonymous users: only show public images
+        query = query.or('is_private.eq.false,is_private.is.null');
+      }
+      
+      const { data, error } = await query;
+      
+      if (error) {
+        console.error('[FullscreenMap DirectDB] Database error:', error);
+        return [];
+      }
+      
+      const images = (data || []).map(item => ({
+        ...item,
+        lat: item.lat!,
+        lon: item.lon!,
+        path_512: item.path_512!
+      }));
+      
+      console.log(`[FullscreenMap DirectDB] Successfully loaded ${images.length} images`);
+      return images;
+      
+    } catch (error) {
+      console.error('[FullscreenMap DirectDB] Error:', error);
+      return [];
     }
   }
   

@@ -18,6 +18,7 @@ import TrackModal from '$lib/TrackModal.svelte';
 
   import { updateGalleryStats, galleryStats } from '$lib/galleryStats';
   import { sessionStore } from '$lib/sessionStore';
+  import { intelligentImageLoader } from '$lib/intelligentImageLoader';
   import { authFetch } from '$lib/authFetch';
 
 
@@ -1137,6 +1138,101 @@ import TrackModal from '$lib/TrackModal.svelte';
 
 
 
+  // Intelligenter Bildlader mit direkter Datenbankabfrage (ersetzt API)
+  async function loadImagesWithIntelligentLoader(lat: number, lon: number, requestedCount: number): Promise<any[]> {
+    try {
+      console.log(`[Gallery IntelligentLoader] Loading ${requestedCount} images for position: ${lat}, ${lon}`);
+      
+      const loadedImages = await intelligentImageLoader.loadImagesForPosition(lat, lon, requestedCount);
+      
+      console.log(`[Gallery IntelligentLoader] Loaded ${loadedImages.length} images`);
+      
+      // Konvertiere zu Gallery-Format
+      const galleryImages = loadedImages.map(img => ({
+        id: img.id,
+        path_512: img.path_512,
+        path_2048: img.path_2048,
+        path_64: img.path_64,
+        width: img.width,
+        height: img.height,
+        lat: img.lat,
+        lon: img.lon,
+        title: img.title,
+        description: img.description,
+        is_private: img.is_private,
+        profile_id: img.profile_id,
+        distance: img.distance
+      }));
+      
+      // Statistiken ausgeben
+      const stats = intelligentImageLoader.getStats();
+      console.log(`[Gallery IntelligentLoader] Cache stats:`, stats);
+      
+      return galleryImages;
+      
+    } catch (error) {
+      console.error('[Gallery IntelligentLoader] Error:', error);
+      return [];
+    }
+  }
+
+  // Fallback: Direkte Datenbankabfrage (vereinfacht)
+  async function loadImagesDirectFromDB(lat: number, lon: number, requestedCount: number): Promise<any[]> {
+    try {
+      console.log(`[Gallery DirectDB] Loading ${requestedCount} images directly from DB for position: ${lat}, ${lon}`);
+      
+      const sessionData = get(sessionStore);
+      const currentUserId = sessionData.isAuthenticated ? sessionData.userId : null;
+      
+      // Begrenze auf einen sinnvollen Radius (50km)
+      const radiusKm = 50;
+      const kmToDegLat = 1 / 111.0;
+      const kmToDegLon = 1 / (111.0 * Math.cos(lat * Math.PI / 180));
+      const latMargin = radiusKm * kmToDegLat;
+      const lonMargin = radiusKm * kmToDegLon;
+      
+      let query = supabase
+        .from('items')
+        .select('id, lat, lon, path_512, path_2048, path_64, title, description, width, height, is_private, profile_id')
+        .not('lat', 'is', null)
+        .not('lon', 'is', null)
+        .not('path_512', 'is', null)
+        .gte('lat', lat - latMargin)
+        .lte('lat', lat + latMargin)
+        .gte('lon', lon - lonMargin)
+        .lte('lon', lon + lonMargin)
+        .limit(Math.min(requestedCount, 2000)); // Begrenze auf 2000 für Performance
+      
+      // Privacy-Filter anwenden
+      if (currentUserId) {
+        query = query.or(`profile_id.eq.${currentUserId},is_private.eq.false,is_private.is.null`);
+      } else {
+        query = query.or('is_private.eq.false,is_private.is.null');
+      }
+      
+      const { data, error } = await query;
+      
+      if (error) {
+        console.error('[Gallery DirectDB] Database error:', error);
+        return [];
+      }
+      
+      const images = (data || []).map(item => ({
+        ...item,
+        lat: item.lat!,
+        lon: item.lon!,
+        path_512: item.path_512!
+      }));
+      
+      console.log(`[Gallery DirectDB] Loaded ${images.length} images directly from DB`);
+      return images;
+      
+    } catch (error) {
+      console.error('[Gallery DirectDB] Error:', error);
+      return [];
+    }
+  }
+
   function startGalleryPreload() {
     // Only preload if we're not already on the main page
     if (typeof window !== 'undefined' && window.location.pathname !== '/') {
@@ -1614,28 +1710,32 @@ import TrackModal from '$lib/TrackModal.svelte';
           return data || [];
         }
         
-        // Use API instead of direct database queries to bypass RLS limits
-        console.log(`[Gallery Normal] Using API for GPS-based sorting from ${effectiveLat}, ${effectiveLon}`);
+        // Use intelligent loader for direct database access (bypasses API limits)
+        console.log(`[Gallery Normal] Using IntelligentLoader for GPS-based sorting from ${effectiveLat}, ${effectiveLon}`);
         
-        // Build API URL with GPS coordinates
-        let apiUrl = `/api/items?for_map=true&limit=50000&lat=${effectiveLat}&lon=${effectiveLon}&offset=${page * size}`;
+        // Calculate how many images we want to load
+        const requestedCount = Math.max(1000, (page + 1) * size + 500); // Load extra for smooth scrolling
         
-        // Add user filters if active
-        if (hasUserFilter) {
-          apiUrl += `&filter_user_id=${currentFilters.userFilter!.userId}`;
-        }
+        console.log(`[Gallery Normal] Requesting ${requestedCount} images from IntelligentLoader`);
         
-        console.log(`[Gallery Normal] API URL: ${apiUrl}`);
-        
-        const response = await fetch(apiUrl);
-        const result = await response.json();
-        
-        if (result.status !== 'success') {
-          console.error('[Gallery Normal] API error:', result.message);
+        // Ensure coordinates are valid numbers
+        if (effectiveLat === null || effectiveLon === null) {
+          console.error('[Gallery Normal] Invalid GPS coordinates, cannot load images');
           return [];
         }
         
-        const rawData = result.images || [];
+        // Try intelligent loader with fallback to direct DB query
+        let rawData;
+        try {
+          rawData = await loadImagesWithIntelligentLoader(effectiveLat, effectiveLon, requestedCount);
+          if (!rawData || rawData.length === 0) {
+            console.log('[Gallery Normal] IntelligentLoader returned no data, falling back to direct DB');
+            rawData = await loadImagesDirectFromDB(effectiveLat, effectiveLon, requestedCount);
+          }
+        } catch (error) {
+          console.error('[Gallery Normal] IntelligentLoader failed, falling back to direct DB:', error);
+          rawData = await loadImagesDirectFromDB(effectiveLat, effectiveLon, requestedCount);
+        }
         
         console.log(`[Gallery Normal] Loaded ${rawData?.length || 0} regional images within 50km`);
         
@@ -1721,35 +1821,45 @@ import TrackModal from '$lib/TrackModal.svelte';
           data = [] as any[];
         }
       } else {
-        // Use API for date-based sorting too
-        console.log(`[Gallery Normal] Using API for date-based sorting (no GPS data or distance disabled)`);
+        // Use direct database query for date-based sorting
+        console.log(`[Gallery Normal] Using direct DB for date-based sorting (no GPS data or distance disabled)`);
         
         // Check if we should be using GPS sorting but it's not enabled yet
         if (effectiveLat !== null && effectiveLon !== null && showDistance === undefined) {
           console.log(`[Gallery Normal] GPS coordinates available but showDistance not loaded yet, using date sorting temporarily`);
         }
         
-        // Build API URL without GPS coordinates for date sorting
-        let apiUrl = `/api/items?limit=${size}&offset=${page * size}`;
+        const sessionData = get(sessionStore);
+        const currentUserId = sessionData.isAuthenticated ? sessionData.userId : null;
         
-        // Add user filters if active
-        if (hasUserFilter) {
-          apiUrl += `&filter_user_id=${currentFilters.userFilter!.userId}`;
-          console.log(`[Gallery Normal] Adding user filter: ${currentFilters.userFilter!.username}`);
+        let query = supabase
+          .from('items')
+          .select('id, path_512, path_2048, path_64, width, height, lat, lon, title, description, keywords, profile_id, is_private')
+          .not('path_512', 'is', null)
+          .range(page * size, page * size + size - 1)
+          .order('created_at', { ascending: false });
+        
+        // Apply privacy filtering based on user login status
+        if (hasUserFilter && currentFilters.userFilter) {
+          query = query.eq('profile_id', currentFilters.userFilter.userId);
+          console.log(`[Gallery Normal] Adding user filter: ${currentFilters.userFilter.username}`);
+        } else if (currentUserId) {
+          query = query.or(`profile_id.eq.${currentUserId},is_private.eq.false,is_private.is.null`);
+        } else {
+          query = query.or('is_private.eq.false,is_private.is.null');
         }
         
-        console.log(`[Gallery Normal] API URL: ${apiUrl}`);
+        console.log(`[Gallery Normal] Direct DB query for date sorting, page ${page}, size ${size}`);
         
-        const response = await fetch(apiUrl);
-        const result = await response.json();
+        const { data: dbData, error } = await query;
         
-        if (result.status !== 'success') {
-          console.error('[Gallery Normal] API error:', result.message);
+        if (error) {
+          console.error('[Gallery Normal] Database error:', error);
           return [];
         }
         
-        data = result.images || [];
-        console.log(`[Gallery Normal] Got ${data?.length || 0} images from API with date sorting`);
+        data = dbData || [];
+        console.log(`[Gallery Normal] Got ${data?.length || 0} images from direct DB with date sorting`);
       }
       
       return data || [];
@@ -2127,220 +2237,7 @@ import TrackModal from '$lib/TrackModal.svelte';
     }
   }
 
-  // Function to check and fix images without path_512
-  async function checkAndFixMissingPath512() {
-    console.log(`[Debug] Checking for images without path_512...`);
-    
-    try {
-      // Get all images without path_512
-              let url = `/api/items?limit=100&offset=0`;
-      const response = await authFetch(url);
-      const result = await response.json();
-      
-      if (result.status === 'success') {
-        const imagesWithoutPath512 = result.images.filter((img: any) => !img.path_512);
-        console.log(`[Debug] Found ${imagesWithoutPath512.length} images without path_512 out of ${result.images.length} total`);
-        
-        if (imagesWithoutPath512.length > 0) {
-          console.log(`[Debug] Sample images without path_512:`, imagesWithoutPath512.slice(0, 5).map((img: any) => ({
-            id: img.id,
-            path_512: img.path_512,
-            path_2048: img.path_2048,
-            path_64: img.path_64
-          })));
-        }
-      }
-    } catch (error) {
-      console.error('[Debug] Error checking missing path_512:', error);
-    }
-  }
-
-  // Function to load ALL images at once for debugging
-  async function loadAllImagesDebug() {
-    console.log(`[Debug] Loading ALL images at once...`);
-    
-    try {
-      // Reset gallery state
-      pics.set([]);
-      page = 0;
-      hasMoreImages = true;
-      loading = false;
-      
-      // Load all images with a very large limit
-      let url = `/api/items?limit=100&offset=0`;
-      if (userLat !== null && userLon !== null) {
-        url += `&lat=${userLat}&lon=${userLon}`;
-      }
-      
-      console.log(`[Debug] Fetching all images from: ${url}`);
-      const response = await authFetch(url);
-      const result = await response.json();
-      
-      console.log(`[Debug] API response:`, result);
-      
-      if (result.status === 'success') {
-        console.log(`[Debug] Got ${result.images?.length || 0} images, total available: ${result.totalCount || 0}`);
-        
-        // Process all images
-        const allPics = result.images.map((d: any) => {
-          // Try to find the best available image path
-          let bestSrc = '';
-          if (d.path_512) {
-            bestSrc = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${d.path_512}`;
-          } else if (d.path_2048) {
-            bestSrc = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${d.path_2048}`;
-          } else if (d.path_64) {
-            bestSrc = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/${d.path_64}`;
-          }
-          
-          return {
-            id: d.id,
-            src: bestSrc,
-            srcHD: d.path_2048 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${d.path_2048}` : bestSrc,
-            width: d.width && d.width > 0 ? d.width : 400,
-            height: d.height && d.height > 0 ? d.height : 300,
-            lat: d.lat,
-            lon: d.lon,
-            title: d.title,
-            description: d.description,
-            keywords: d.keywords,
-            path_64: d.path_64,
-            path_512: d.path_512,
-            path_2048: d.path_2048,
-            distance: d.distance || null
-          };
-        });
-        
-        const imagesWithSrc = allPics.filter((pic: any) => pic.src);
-        console.log(`[Debug] Processed images: ${allPics.length} total, ${imagesWithSrc.length} with src`);
-        
-        // Set all images at once
-        pics.set(imagesWithSrc);
-        
-        // Update gallery stats
-        updateGalleryStats(imagesWithSrc.length, result.totalCount);
-        
-        console.log(`[Debug] Set ${imagesWithSrc.length} images in gallery, total count: ${result.totalCount}`);
-      } else {
-        console.error('[Debug] API error:', result.message);
-      }
-    } catch (error) {
-      console.error('[Debug] Error loading all images:', error);
-    }
-  }
-
-  // Function to debug current pagination state
-  function debugPaginationState() {
-    console.log(`[Debug] Current pagination state:`);
-    console.log(`- Current images: ${$pics.length}`);
-    console.log(`- Total count: ${$galleryStats.totalCount}`);
-    console.log(`- Page: ${page}`);
-    console.log(`- Loading: ${loading}`);
-    console.log(`- Has more images: ${hasMoreImages}`);
-    console.log(`- Size: ${size}`);
-    console.log(`- Next offset would be: ${page * size}`);
-    console.log(`- Remaining images: ${$galleryStats.totalCount - $pics.length}`);
-  }
-
-  // Test function to load all images at once
-  async function testLoadAllImages() {
-    console.log(`[Test] Loading ALL images at once...`);
-    
-    try {
-      // Reset gallery state
-      pics.set([]);
-      page = 0;
-      hasMoreImages = true;
-      loading = false;
-      
-      // Load all images with a very large limit
-      let url = `/api/items?limit=100&offset=0`;
-      if (userLat !== null && userLon !== null) {
-        url += `&lat=${userLat}&lon=${userLon}`;
-      }
-      
-      console.log(`[Test] Fetching all images from: ${url}`);
-      const response = await authFetch(url);
-      const result = await response.json();
-      
-      console.log(`[Test] API response:`, result);
-      
-      if (result.status === 'success') {
-        console.log(`[Test] Got ${result.images?.length || 0} images, total available: ${result.totalCount || 0}`);
-        
-        // Process all images
-        const allPics = result.images.map((d: any) => {
-          // Try to find the best available image path
-          let bestSrc = '';
-          if (d.path_512) {
-            bestSrc = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${d.path_512}`;
-          } else if (d.path_2048) {
-            bestSrc = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${d.path_2048}`;
-          } else if (d.path_64) {
-            bestSrc = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/${d.path_64}`;
-          }
-          
-          return {
-            id: d.id,
-            src: bestSrc,
-            srcHD: d.path_2048 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${d.path_2048}` : bestSrc,
-            width: d.width && d.width > 0 ? d.width : 400,
-            height: d.height && d.height > 0 ? d.height : 300,
-            lat: d.lat,
-            lon: d.lon,
-            title: d.title,
-            description: d.description,
-            keywords: d.keywords,
-            path_64: d.path_64,
-            path_512: d.path_512,
-            path_2048: d.path_2048,
-            distance: d.distance || null
-          };
-        });
-        
-        const imagesWithSrc = allPics.filter((pic: any) => pic.src);
-        console.log(`[Test] Processed images: ${allPics.length} total, ${imagesWithSrc.length} with src`);
-        
-        // Set all images at once
-        pics.set(imagesWithSrc);
-        
-        // Update gallery stats
-        updateGalleryStats(imagesWithSrc.length, result.totalCount);
-        
-        console.log(`[Test] Set ${imagesWithSrc.length} images in gallery, total count: ${result.totalCount}`);
-        
-        // Test DOM count after a delay
-        setTimeout(() => {
-          const visibleImages = document.querySelectorAll('.gallery-item img').length;
-          console.log(`[Test] DOM count after loading: ${visibleImages} images`);
-          if (visibleImages !== imagesWithSrc.length) {
-            console.warn(`[Test] ⚠️ DISCREPANCY: ${imagesWithSrc.length} in Store vs ${visibleImages} im DOM`);
-          }
-        }, 500);
-      } else {
-        console.error('[Test] API error:', result.message);
-      }
-    } catch (error) {
-      console.error('[Test] Error loading all images:', error);
-    }
-  }
-
-  // Function to check for duplicate images
-  function checkForDuplicates() {
-    const currentPics = get(pics);
-    const ids = currentPics.map((p: any) => p.id);
-    const uniqueIds = new Set(ids);
-    const duplicates = ids.filter((id: any, index: number) => ids.indexOf(id) !== index);
-    
-    console.log(`[Debug] Duplicate check:`);
-    console.log(`- Total images: ${currentPics.length}`);
-    console.log(`- Unique IDs: ${uniqueIds.size}`);
-    console.log(`- Duplicate IDs: ${duplicates.length}`);
-    
-    if (duplicates.length > 0) {
-      console.log(`[Debug] Duplicate IDs found:`, duplicates.slice(0, 10));
-    }
-  }
+  // Debug functions removed - no longer needed
 
   function updateLayoutFromStorage() {
     // This function is now deprecated - layout is loaded from database in loadShowDistanceAndCompass()
@@ -4274,9 +4171,6 @@ import TrackModal from '$lib/TrackModal.svelte';
       {#if import.meta.env.DEV}
       <button on:click={createSampleImages} style="margin-top: 1rem; padding: 0.5rem 1rem; background: #0066cc; color: white; border: none; border-radius: 4px; cursor: pointer;">
         🧪 Test Justified Layout
-      </button>
-      <button on:click={testLoadAllImages} style="margin-top: 1rem; margin-left: 1rem; padding: 0.5rem 1rem; background: #ff6600; color: white; border: none; border-radius: 4px; cursor: pointer;">
-        🔍 Test: Alle Bilder laden
       </button>
       {/if}
     </div>

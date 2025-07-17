@@ -3,7 +3,7 @@ import { onMount, onDestroy } from 'svelte';
 import { goto } from '$app/navigation';
 import type { NewsFlashImage } from './types';
 import { galleryStats } from './galleryStats';
-import { authFetch } from './authFetch';
+import { supabase } from './supabaseClient';
 
 // Modus: 'eigene', 'alle', 'aus'
 export let mode: 'eigene' | 'alle' | 'aus' = 'alle';
@@ -15,21 +15,77 @@ export let showDistance: boolean = false;
 export let userLat: number | null = null;
 export let userLon: number | null = null;
 export let getDistanceFromLatLonInMeters: ((lat1: number, lon1: number, lat2: number, lon2: number) => string) | null = null;
-export let displayedImageCount: number = 0; // Anzahl der tatsächlich angezeigten Bilder
+export let displayedImageCount: number = 0;
 
 let images: NewsFlashImage[] = [];
 let loading = true;
+let loadingMore = false;
 let errorMsg = '';
-let mounted = false;
-let refreshInterval: ReturnType<typeof setInterval> | null = null;
 let lastUpdate = new Date();
 let lastImageId: string | null = null;
-let loadingMore = false;
 let hasMoreImages = true;
 let currentOffset = 0;
+let refreshInterval: number | null = null;
+let mounted = false;
 
+// Direct database query for NewsFlash images (bypasses API limitations)
+async function loadNewsFlashImagesDirectFromDB(): Promise<NewsFlashImage[]> {
+  try {
+    console.log('[NewsFlash DirectDB] Loading images directly from database...');
+    
+    // Get current session to determine privacy filtering
+    const { data: { session } } = await supabase.auth.getSession();
+    const currentUserId = session?.user?.id || null;
+    
+    let query = supabase
+      .from('items')
+      .select('id, lat, lon, path_512, title, description, original_name, profile_id, is_private, created_at')
+      .not('path_512', 'is', null)
+      .order('created_at', { ascending: false })
+      .range(currentOffset, currentOffset + limit - 1);
+    
+    // Apply privacy filtering based on mode and user
+    if (currentUserId && mode !== 'aus') {
+      if (mode === 'eigene') {
+        // For 'eigene' mode: only show user's own images
+        query = query.eq('profile_id', currentUserId);
+      } else if (mode === 'alle') {
+        // For 'alle' mode: show user's own images + other users' public images
+        query = query.or(`profile_id.eq.${currentUserId},is_private.eq.false,is_private.is.null`);
+      }
+    } else {
+      // For anonymous users or 'aus' mode: only show public images
+      query = query.or('is_private.eq.false,is_private.is.null');
+    }
+    
+    const { data, error } = await query;
+    
+    if (error) {
+      console.error('[NewsFlash DirectDB] Database error:', error);
+      return [];
+    }
+    
+    const images = (data || []).map(item => ({
+      id: item.id,
+      lat: item.lat,
+      lon: item.lon,
+      path_512: item.path_512!,
+      title: item.title,
+      description: item.description,
+      original_name: item.original_name
+    }));
+    
+    console.log(`[NewsFlash DirectDB] Successfully loaded ${images.length} images`);
+    return images;
+    
+  } catch (error) {
+    console.error('[NewsFlash DirectDB] Error:', error);
+    return [];
+  }
+}
 
-async function fetchImages(isLoadMore = false) {
+async function fetchImages(isLoadMore: boolean = false) {
+  // Paging Steuerung
   if (isLoadMore) {
     if (loadingMore || !hasMoreImages) return;
     loadingMore = true;
@@ -39,72 +95,29 @@ async function fetchImages(isLoadMore = false) {
     hasMoreImages = true;
   }
 
-  let url = `/api/items?limit=${limit}&offset=${currentOffset}`;
-  if (mode === 'eigene' && userId) {
-    url += `&filter_user_id=${userId}`;
-  }
-  console.log('NewsFlash: Fetching images from:', url, 'Mode:', mode, 'UserId:', userId, 'LoadMore:', isLoadMore);
   try {
-    const res = await authFetch(url);
-    const data = await res.json();
-    console.log('NewsFlash: Response:', data);
-    if (data.status === 'success') {
-      const newImages = data.images || [];
+    // Use direct database query instead of API
+    const newImages = await loadNewsFlashImagesDirectFromDB();
 
-      if (isLoadMore) {
-        // Mehr Bilder laden - ans Ende anhängen
-        if (newImages.length > 0) {
-          console.log('NewsFlash: Loading more images:', newImages.length);
-          images = [...images, ...newImages];
-          hasMoreImages = newImages.length === limit;
-        } else {
-          hasMoreImages = false;
-        }
-        loadingMore = false;
-      } else {
-        // Incremental Update: Nur neue Bilder vorne dran setzen
-        if (newImages.length > 0 && lastImageId && newImages[0].id !== lastImageId) {
-          // Neue Bilder gefunden - nur die neuen vorne dran setzen
-          const existingIds = new Set(images.map(img => img.id));
-          const newImagesToAdd = newImages.filter((img: NewsFlashImage) => !existingIds.has(img.id));
-          
-          if (newImagesToAdd.length > 0) {
-            console.log('NewsFlash: Adding', newImagesToAdd.length, 'new images');
-            images = [...newImagesToAdd, ...images].slice(0, limit);
-            lastUpdate = new Date();
-          }
-        } else if (newImages.length > 0 && !lastImageId) {
-          // Erster Load - neueste Bilder zuerst
-          images = newImages;
-          lastUpdate = new Date();
-          console.log('NewsFlash: Initial load of', images.length, 'images (newest first)');
-        } else if (newImages.length > 0) {
-          // Refresh ohne neue Bilder - trotzdem neueste anzeigen
-          images = newImages;
-          lastUpdate = new Date();
-          console.log('NewsFlash: Refresh with', images.length, 'newest images');
-        }
-        
-        if (newImages.length > 0) {
-          lastImageId = newImages[0].id;
-        }
-        
-        loading = false;
-        errorMsg = '';
-      }
-    } else {
-      errorMsg = data.message || 'Fehler beim Laden der Bilder.';
-      console.log('NewsFlash: Error:', errorMsg);
-      if (isLoadMore) {
-        loadingMore = false;
-      }
-    }
-  } catch (e) {
-    errorMsg = 'Netzwerkfehler beim Laden der NewsFlash-Bilder.';
-    console.log('NewsFlash: Network error:', e);
     if (isLoadMore) {
+      if (newImages.length > 0) {
+        images = [...images, ...newImages];
+        hasMoreImages = newImages.length === limit;
+      } else {
+        hasMoreImages = false;
+      }
       loadingMore = false;
+    } else {
+      images = newImages;
+      lastImageId = images[0]?.id || null;
+      lastUpdate = new Date();
+      loading = false;
+      errorMsg = '';
     }
+  } catch (err) {
+    console.error('NewsFlash: Unexpected error', err);
+    errorMsg = 'Fehler beim Laden der Bilder.';
+    if (isLoadMore) loadingMore = false;
   }
 }
 
