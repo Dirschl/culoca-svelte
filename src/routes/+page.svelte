@@ -994,8 +994,29 @@
       
       console.log('GPS Simulation active:', { lat: userLat, lon: userLon });
       
-      // Only resort existing images, don't reload from server
-      if ($pics.length > 0) {
+      // Prüfen, ob wir in eine neue Grid-Zelle gewechselt sind
+      let gridReloaded = false;
+      try {
+        const movedOutsideCenter = !dynamicLoader.isInCenterCell(lat, lon);
+        if (movedOutsideCenter) {
+          console.log('🗺️ [Sim] Grid center changed – loading new 3×3 grid');
+          pics.set([]);
+          page = 0;
+          hasMoreImages = true;
+          await loadInitialGridImages(lat, lon);
+          gridReloaded = true;
+        }
+      } catch (err) {
+        console.warn('[Sim] Grid detection failed', err);
+      }
+      
+      // Resort existing images (or newly loaded grid) for distance display
+      if (!$pics.length || gridReloaded) {
+        // After grid reload, no need to resort here—the mapping function already computed distances.
+      }
+      
+      // Only resort existing images, don't reload from server if grid not reloaded
+      if (!gridReloaded && $pics.length > 0) {
         // Get current filter state for effective coordinates
         const currentFilters = get(filterStore);
         const hasLocationFilter = currentFilters.locationFilter !== null;

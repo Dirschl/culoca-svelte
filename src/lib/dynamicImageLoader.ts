@@ -221,6 +221,8 @@ export class DynamicImageLoader {
             path_2048,
             path_512,
             path_64,
+            width,
+            height,
             created_at,
             user_id,
             is_private
