@@ -1,5 +1,14 @@
 import type { PageServerLoad } from './$types';
-import { supabase } from '$lib/supabaseClient';
+import { createClient } from '@supabase/supabase-js';
+
+// Use dedicated server-side client with Service Role key for unrestricted read access (RLS still applies)
+const supabase = createClient(
+  process.env.VITE_SUPABASE_URL as string,
+  process.env.SUPABASE_SERVICE_ROLE_KEY as string,
+  {
+    auth: { persistSession: false }
+  }
+);
 
 // Helper function to calculate distance between two points
 function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
