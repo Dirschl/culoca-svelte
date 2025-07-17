@@ -5,7 +5,7 @@
   import GalleryLayout from '$lib/GalleryLayout.svelte';
   import NewsFlash from '$lib/NewsFlash.svelte';
   import FloatingActionButtons from '$lib/FloatingActionButtons.svelte';
-import TrackModal from '$lib/TrackModal.svelte';
+  import TrackModal from '$lib/TrackModal.svelte';
   import FullscreenMap from '$lib/FullscreenMap.svelte';
   import WelcomeSection from '$lib/WelcomeSection.svelte';
   import FilterBar from '$lib/FilterBar.svelte';
@@ -20,9 +20,10 @@ import TrackModal from '$lib/TrackModal.svelte';
   import { sessionStore } from '$lib/sessionStore';
   import { intelligentImageLoader } from '$lib/intelligentImageLoader';
   import { authFetch } from '$lib/authFetch';
-
+  import { DynamicImageLoader } from '$lib/dynamicImageLoader';
 
   const pics = writable<any[]>([]);
+  let dynamicLoader: DynamicImageLoader | null = null;
   let page = 0, size = 100, loading = false, hasMoreImages = true; // Erhöht für mehr Bilder pro Anfrage
   let displayedImageCount = 0; // Zähler für tatsächlich angezeigte Bilder
   let removedDuplicatesList: any[] = []; // Liste der entfernten Duplikate
