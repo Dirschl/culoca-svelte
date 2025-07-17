@@ -1481,7 +1481,6 @@
 
           {#if image.lat && image.lon}
             <div class="edge-to-edge-gallery">
-              <h2>Nearby Items ({nearby.length})</h2>
               {#if nearby.length > 0}
                 <GalleryLayout
                   items={nearby}
