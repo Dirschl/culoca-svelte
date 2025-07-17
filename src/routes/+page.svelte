@@ -1002,9 +1002,16 @@
         const effectiveLat = hasLocationFilter ? currentFilters.locationFilter!.lat : userLat;
         const effectiveLon = hasLocationFilter ? currentFilters.locationFilter!.lon : userLon;
         
-        const sortedPics = [...$pics].sort((a, b) => {
-          const distA = a.lat && a.lon ? getDistanceInMeters(effectiveLat!, effectiveLon!, a.lat, a.lon) : Number.MAX_VALUE;
-          const distB = b.lat && b.lon ? getDistanceInMeters(effectiveLat!, effectiveLon!, b.lat, b.lon) : Number.MAX_VALUE;
+        const sortedPics = [...$pics].map((p: any) => {
+          if (p.lat && p.lon && effectiveLat && effectiveLon) {
+            p.distance = getDistanceInMeters(effectiveLat, effectiveLon, p.lat, p.lon);
+          } else {
+            p.distance = null;
+          }
+          return p; // distance updated
+        }).sort((a: any, b: any) => {
+          const distA = a.distance ?? Number.MAX_VALUE;
+          const distB = b.distance ?? Number.MAX_VALUE;
           return distA - distB;
         });
         
@@ -1267,7 +1274,7 @@
     console.log(`[Gallery Grid] Loading initial 3×3 grid around ${lat},${lon}`);
 
     // Starte Ladevorgang für alle 9 Zellen
-    await dynamicLoader.loadImagesForPosition(lat, lon);
+    dynamicLoader.loadImagesForPosition(lat, lon);
 
     // Warte, bis DynamicLoader keine Ladejobs mehr in der Queue hat, um sicherzustellen, dass wir wirklich ALLE Bilder haben
     let previousCount = -1;
