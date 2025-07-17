@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 // Use dedicated server-side client with Service Role key for unrestricted read access (RLS still applies)
 const supabase = createClient(
   (process.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL) as string,
-  (process.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY) as string,
+  (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY) as string,
   {
     auth: { persistSession: false }
   }
