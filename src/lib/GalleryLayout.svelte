@@ -355,14 +355,14 @@
                 />
                 {#if showDistance && userLat !== null && userLon !== null && item.lat && item.lon}
                   <div class="distance-label">
-                    {#if item.distance !== undefined && item.distance !== null}
+                    {#if getDistanceFromLatLonInMeters}
+                      {getDistanceFromLatLonInMeters(userLat, userLon, item.lat, item.lon)}
+                    {:else if item.distance !== undefined && item.distance !== null}
                       {#if item.distance < 1000}
                         {Math.round(item.distance)}m
                       {:else}
                         {(item.distance / 1000).toFixed(1)}km
                       {/if}
-                    {:else if getDistanceFromLatLonInMeters}
-                      {getDistanceFromLatLonInMeters(userLat, userLon, item.lat, item.lon)}
                     {/if}
                   </div>
                 {/if}
@@ -402,14 +402,14 @@
           <img src={item.src} alt={item.title || 'Bild'} />
           {#if showDistance && userLat !== null && userLon !== null && item.lat && item.lon}
             <div class="distance-label">
-              {#if item.distance !== undefined && item.distance !== null}
+              {#if getDistanceFromLatLonInMeters}
+                {getDistanceFromLatLonInMeters(userLat, userLon, item.lat, item.lon)}
+              {:else if item.distance !== undefined && item.distance !== null}
                 {#if item.distance < 1000}
                   {Math.round(item.distance)}m
                 {:else}
                   {(item.distance / 1000).toFixed(1)}km
                 {/if}
-              {:else if getDistanceFromLatLonInMeters}
-                {getDistanceFromLatLonInMeters(userLat, userLon, item.lat, item.lon)}
               {/if}
             </div>
           {/if}

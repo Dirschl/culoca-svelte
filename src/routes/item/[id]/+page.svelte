@@ -13,13 +13,13 @@
   import { get } from 'svelte/store';
   import type { PageData } from './$types';
 
-  export let data: PageData;
+  export let data: any;
   
-  let image: any = data.image;
-  let loading = !data.image;
-  let error = data.error || '';
+  let image: any = null;
+  let loading = true;
+  let error = '';
   let profile: any = null;
-  let nearby: any[] = data.nearby || [];
+  let nearby: any[] = [];
   let radius = 500; // meters, default
   let radiusLoaded = false;
   let lastRadius = 500; // track radius changes
@@ -465,11 +465,13 @@
     if (typeof lastNearbyCount === 'undefined') {
       lastNearbyCount = nearby.length;
     }
+    if (browser) {
     scheduleMapUpdate();
+    }
   }
 
   // Debounced radius change handler with improved performance
-  $: if (image && image.lat && image.lon && radiusLoaded) {
+  $: if (image && image.lat && image.lon && radiusLoaded && browser) {
     // Only fetch if radius actually changed
     if (radius !== lastRadius) {
       console.log('🔄 Radius changed from', lastRadius, 'to', radius, 'm');
@@ -504,13 +506,16 @@
   }
   
   // Initial fetch when image loads
-  $: if (image && image.lat && image.lon && radiusLoaded) {
+  $: if (image && image.lat && image.lon && radiusLoaded && browser) {
     console.log('🚀 Initial nearby fetch for item:', image.id, 'at', image.lat, image.lon);
     fetchNearbyImages(image.lat, image.lon, radius).catch(console.error);
   }
 
   async function initMap() {
     if (!browser || !image || !image.lat || !image.lon) return;
+    
+    // Skip map initialization during SSR
+    if (typeof window === 'undefined') return;
     
     // Check if map element still exists
     if (!mapEl) {
@@ -547,6 +552,16 @@
     
     try {
       map = leaflet.map(mapEl).setView([image.lat, image.lon], 13);
+      // Wait until Leaflet signals readiness, then ensure container dimensions are measured
+      if (map.whenReady) {
+        map.whenReady(() => {
+          try {
+            map.invalidateSize();
+          } catch (err) {
+            console.warn('🗺️ invalidateSize failed:', err);
+          }
+        });
+      }
     } catch (e) {
       console.log('🗺️ Error creating map:', e);
       return;
@@ -620,7 +635,21 @@
         }
       });
       const group = leaflet.featureGroup(allMarkers);
-      map.fitBounds(group.getBounds().pad(0.1));
+      const adjustView = () => {
+        try {
+          map.invalidateSize();
+          map.fitBounds(group.getBounds().pad(0.1), { animate: false });
+        } catch (err) {
+          console.warn('🗺️ fitBounds failed:', err);
+        }
+      };
+
+      if (map.whenReady) {
+        map.whenReady(adjustView);
+      } else {
+        // Fallback – call immediately if whenReady not available
+        adjustView();
+      }
     }
   }
 
@@ -653,14 +682,14 @@
   }
   
   // Handle radius changes with debouncing
-  $: if (image && image.lat && image.lon && mapInitialized && radiusLoaded && radius !== lastRadius) {
+  $: if (image && image.lat && image.lon && mapInitialized && radiusLoaded && radius !== lastRadius && browser) {
     console.log('🔄 Radius changed from', lastRadius, 'to', radius, 'm, reinitializing map');
     lastRadius = radius;
     scheduleMapUpdate();
   }
   
   // Handle nearby images changes with debouncing
-  $: if (image && image.lat && image.lon && mapInitialized && nearby.length !== lastNearbyCount) {
+  $: if (image && image.lat && image.lon && mapInitialized && nearby.length !== lastNearbyCount && browser) {
     console.log('🔄 Nearby count changed from', lastNearbyCount, 'to', nearby.length, 'reinitializing map');
     lastNearbyCount = nearby.length;
     scheduleMapUpdate();
@@ -1307,38 +1336,55 @@
   }
 
   export const prerender = false;
+
+  // Update state when server data changes (SSR-friendly)
+  $: if (data) {
++    console.log('[SSR] reactive data assignment', typeof window === 'undefined', data.image?.id);
+     image = data.image;
+     loading = !data.image;
+     error = data.error || '';
+     nearby = data.nearby || [];
+   }
+
+  // Extract itemId for SEO tags without relying on $page store
+  let itemId: string = '';
+  $: if (image?.id) {
+    itemId = image.id;
+  }
 </script>
 
 <svelte:head>
-  <title>{image?.title || `Item ${$page.params.id} - culoca.com`}</title>
+  <title>{image?.title || `Item ${itemId} - culoca.com`}</title>
   <meta name="description" content={image?.description || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
 
   <!-- Open Graph -->
   <meta property="og:type" content="article">
-  <meta property="og:title" content={image?.title || `Item ${$page.params.id} - culoca.com`}>
+  <meta property="og:title" content={image?.title || `Item ${itemId} - culoca.com`}>
   <meta property="og:description" content={image?.description || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
-  <meta property="og:url" content={`https://culoca.com/item/${$page.params.id}`}> 
-  <meta property="og:image" content={`https://culoca.com/api/og-image/${$page.params.id}`}> 
+  <meta property="og:url" content={`https://culoca.com/item/${itemId}`}> 
+  <meta property="og:image" content={`https://culoca.com/api/og-image/${itemId}`}>
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
 
   <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content={image?.title || `Item ${$page.params.id} - culoca.com`}>
+  <meta name="twitter:title" content={image?.title || `Item ${itemId} - culoca.com`}>
   <meta name="twitter:description" content={image?.description || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
-  <meta name="twitter:image" content={`https://culoca.com/api/og-image/${$page.params.id}`}> 
+  <meta name="twitter:image" content={`https://culoca.com/api/og-image/${itemId}`}>
 
   <!-- Additional SEO -->
   <meta name="robots" content="index, follow">
   <meta name="author" content="culoca.com">
-  <link rel="canonical" href={`https://culoca.com/item/${$page.params.id}`}>
+  <link rel="canonical" href={`https://culoca.com/item/${itemId}`}>
 
   <!-- Immediate fallback for loading state -->
   {#if !image}
-    <title>Item {$page.params.id} - culoca.com</title>
-    <meta property="og:title" content="Item {$page.params.id} - culoca.com">
-    <meta property="twitter:title" content="Item {$page.params.id} - culoca.com">
+    <title>Item {itemId} - culoca.com</title>
+    <meta property="og:title" content="Item {itemId} - culoca.com">
+    <meta property="twitter:title" content="Item {itemId} - culoca.com">
   {/if}
+
+  <meta name="debug-test" content="true">
 
 </svelte:head>
 

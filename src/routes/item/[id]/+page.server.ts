@@ -61,11 +61,11 @@ export const load: PageServerLoad = async ({ params }) => {
         let fetched: any[] = [];
         while (true) {
           const { data: batch, error: nearbyError } = await supabase
-            .from('items')
-            .select('id, path_512, path_2048, path_64, original_name, title, description, lat, lon, width, height, is_private')
-            .not('lat', 'is', null)
-            .not('lon', 'is', null)
-            .not('path_512', 'is', null)
+          .from('items')
+          .select('id, path_512, path_2048, path_64, original_name, title, description, lat, lon, width, height, is_private')
+          .not('lat', 'is', null)
+          .not('lon', 'is', null)
+          .not('path_512', 'is', null)
             .or('is_private.eq.false,is_private.is.null')
             .gte('lat', latMin)
             .lte('lat', latMax)
@@ -84,23 +84,23 @@ export const load: PageServerLoad = async ({ params }) => {
         }
 
         nearby = fetched
-          .filter((item: any) => item.id !== id && item.lat && item.lon)
-          .map((item: any) => {
+            .filter((item: any) => item.id !== id && item.lat && item.lon)
+            .map((item: any) => {
             const distance = getDistanceInMeters(img.lat, img.lon, item.lat, item.lon);
-            return {
-              id: item.id,
-              lat: item.lat,
-              lon: item.lon,
-              distance,
-              src: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${item.path_512}`,
-              srcHD: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${item.path_2048}`,
-              src64: item.path_64 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/${item.path_64}` : `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${item.path_512}`,
-              width: item.width,
-              height: item.height,
-              title: item.title || null
-            };
-          })
-          .filter((item: any) => item.distance <= maxRadius)
+              return {
+                id: item.id,
+                lat: item.lat,
+                lon: item.lon,
+                distance,
+                src: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${item.path_512}`,
+                srcHD: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${item.path_2048}`,
+                src64: item.path_64 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/${item.path_64}` : `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${item.path_512}`,
+                width: item.width,
+                height: item.height,
+                title: item.title || null
+              };
+            })
+            .filter((item: any) => item.distance <= maxRadius)
           .sort((a: any, b: any) => a.distance - b.distance);
       } catch (nearbyErr) {
         console.error('Error fetching nearby items:', nearbyErr);

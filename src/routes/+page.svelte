@@ -1023,16 +1023,12 @@
         const effectiveLat = hasLocationFilter ? currentFilters.locationFilter!.lat : userLat;
         const effectiveLon = hasLocationFilter ? currentFilters.locationFilter!.lon : userLon;
         
-        const sortedPics = [...$pics].map((p: any) => {
-          if (p.lat && p.lon && effectiveLat && effectiveLon) {
-            p.distance = getDistanceInMeters(effectiveLat, effectiveLon, p.lat, p.lon);
-          } else {
-            p.distance = null;
-          }
-          return p; // distance updated
-        }).sort((a: any, b: any) => {
-          const distA = a.distance ?? Number.MAX_VALUE;
-          const distB = b.distance ?? Number.MAX_VALUE;
+        const sortedPics = [...$pics].sort((a: any, b: any) => {
+          if (!a.lat || !a.lon || !b.lat || !b.lon) return 0;
+          
+          const distA = a.lat && a.lon && effectiveLat && effectiveLon ? getDistanceInMeters(effectiveLat, effectiveLon, a.lat, a.lon) : Number.MAX_VALUE;
+          const distB = b.lat && b.lon && effectiveLat && effectiveLon ? getDistanceInMeters(effectiveLat, effectiveLon, b.lat, b.lon) : Number.MAX_VALUE;
+          
           return distA - distB;
         });
         
@@ -1324,10 +1320,6 @@
         bestSrc = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/${img.path_64}`;
       }
 
-      const distance = (img.lat && img.lon && lat !== null && lon !== null)
-        ? getDistanceInMeters(lat, lon, img.lat, img.lon)
-        : null;
-
       return {
         id: img.id,
         src: bestSrc,
@@ -1341,16 +1333,17 @@
         keywords: img.keywords,
         path_64: img.path_64,
         path_512: img.path_512,
-        path_2048: img.path_2048,
-        distance
+        path_2048: img.path_2048
       };
     }).filter((p: any) => p.src);
 
     // Sort by distance (closest first)
     if (lat !== null && lon !== null) {
       converted.sort((a: any, b: any) => {
-        const da = a.distance ?? Number.MAX_VALUE;
-        const db = b.distance ?? Number.MAX_VALUE;
+        if (!a.lat || !a.lon || !b.lat || !b.lon) return 0;
+        
+        const da = a.lat && a.lon ? getDistanceInMeters(lat, lon, a.lat, a.lon) : Number.MAX_VALUE;
+        const db = b.lat && b.lon ? getDistanceInMeters(lat, lon, b.lat, b.lon) : Number.MAX_VALUE;
         return da - db;
       });
     }

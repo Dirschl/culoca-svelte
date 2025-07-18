@@ -112,10 +112,6 @@
 </script>
 
 <svelte:head>
-  <title>Culoca - Deine Bilder auf der Karte</title>
-  <meta name="description" content="Teile deine Bilder mit GPS-Koordinaten auf einer interaktiven Karte. Culoca macht es einfach, deine Erinnerungen zu organisieren und zu teilen." />
-  <meta name="keywords" content="Bilder, Karte, GPS, Fotografie, Teilen, Erinnerungen" />
-  <meta name="author" content="Culoca" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta charset="UTF-8" />
   <link rel="icon" type="image/png" href="/culoca-icon.png" />
