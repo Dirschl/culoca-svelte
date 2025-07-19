@@ -366,7 +366,7 @@
   .gallery-toggle-btn.active {
     background: var(--bg-secondary);
     color: var(--text-primary);
-    border-color: var(--text-primary);
+    border-color: var(--border-color);
   }
 
   .gallery-toggle-btn.active:hover {

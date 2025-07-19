@@ -1552,31 +1552,41 @@
         <div class="controls-section">
           {#if image.lat && image.lon}
             <div class="action-buttons">
-              <a class="gmaps-btn" href={`https://www.google.com/maps?q=${image.lat},${image.lon}`} target="_blank" rel="noopener">Google Maps</a>
-              <button class="share-btn" on:click={copyLink}>Link kopieren</button>
+              <a class="square-btn gmaps-btn" href={`https://www.google.com/maps?q=${image.lat},${image.lon}`} target="_blank" rel="noopener" title="Google Maps öffnen">
+                <svg width="80" height="80" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                </svg>
+              </a>
+              <button class="square-btn share-btn" on:click={copyLink} title="Link kopieren">
+                <svg width="35" height="35" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                </svg>
+              </button>
               {#if isCreator}
-                <button class="delete-btn" on:click={deleteImage} title="Bild löschen">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <button class="square-btn delete-btn" on:click={deleteImage} title="Bild löschen">
+                  <svg width="35" height="35" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
                   </svg>
                 </button>
               {/if}
               {#if isCreator}
-                <button class="gmaps-btn" data-download-id={image.id} on:click={() => downloadOriginal(image.id, image.original_name)} title="Original herunterladen">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                    <circle cx="12" cy="12" r="10" fill="white" fill-opacity="0.15"/>
-                    <path d="M12 6v7m0 0l-3-3m3 3l3-3M6 18h12" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <button class="square-btn download-btn" data-download-id={image.id} on:click={() => downloadOriginal(image.id, image.original_name)} title="Original herunterladen">
+                  <svg width="35" height="35" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 6v7m0 0l-3-3m3 3l3-3M6 18h12"/>
                   </svg>
                 </button>
-                <button class="rotate-btn" on:click={rotateImage} title="Bild 90° nach links drehen" disabled={rotating}>
+                <!-- Rotate button auskommentiert - gefährlich -->
+                <!--
+                <button class="square-btn rotate-btn" on:click={rotateImage} title="Bild 90° nach links drehen" disabled={rotating}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/>
                   </svg>
                 </button>
-                <button class="gallery-toggle-btn" on:click={toggleGallery} title="Aus Galerie entfernen/hinzufügen" class:active={image.gallery ?? true}>
+                -->
+                <button class="square-btn gallery-toggle-btn" on:click={toggleGallery} title="Aus Galerie entfernen/hinzufügen" class:active={image.gallery ?? true}>
                   {#if image.gallery ?? true}
                     <!-- 3x3 Grid für Gallery true -->
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <svg width="25" height="25" viewBox="0 0 24 24" fill="currentColor">
                       <rect x="3" y="3" width="4" height="4"/>
                       <rect x="10" y="3" width="4" height="4"/>
                       <rect x="17" y="3" width="4" height="4"/>
@@ -1589,7 +1599,7 @@
                     </svg>
                   {:else}
                     <!-- Einfaches Rechteck für Gallery false -->
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <svg width="25" height="25" viewBox="0 0 24 24" fill="currentColor">
                       <rect x="4" y="4" width="16" height="16" stroke="currentColor" stroke-width="1" fill="none"/>
                     </svg>
                   {/if}
@@ -3557,55 +3567,89 @@
     vertical-align: middle;
   }
 
-  .download-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background: linear-gradient(135deg, #2196f3, #1565c0);
-    color: #fff;
-    border: none;
+  /* Quadratische Buttons mit Symbolen - Dark/Light Mode Design */
+  .square-btn {
+    width: 50px;
+    height: 50px;
+    border: 1px solid var(--border-color);
     border-radius: 8px;
-    padding: 0.5rem 1.2rem;
-    font-size: 1.1rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background 0.2s, color 0.2s, box-shadow 0.2s;
-    box-shadow: 0 2px 8px rgba(33, 150, 243, 0.08);
-    margin-left: 0.5rem;
-    text-decoration: none;
-    gap: 0.5rem;
-  }
-  .download-btn svg {
-    fill: #fff;
-    margin-right: 0.2rem;
-  }
-  .download-btn:hover, .download-btn:focus {
-    background: linear-gradient(135deg, #1565c0, #0d47a1);
-    color: #fff;
-    text-decoration: none;
-    box-shadow: 0 4px 16px rgba(33, 150, 243, 0.15);
-  }
-
-  .rotate-btn {
-    background: var(--culoca-orange);
-    color: white;
-    border: none;
-    border-radius: 8px;
-    padding: 8px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
     cursor: pointer;
     transition: all 0.2s ease;
     display: flex;
     align-items: center;
     justify-content: center;
+    margin-left: 8px;
+    text-decoration: none;
+    font-size: 0;
+    padding: 0;
   }
 
-  .rotate-btn:hover {
-    background: #d65a1a;
+  .square-btn:hover {
+    background: var(--bg-tertiary);
+    border-color: var(--text-primary);
     transform: scale(1.05);
   }
 
+  .square-btn:focus {
+    outline: none;
+    border-color: var(--accent-color);
+  }
+
+  .square-btn svg {
+    width: 35px;
+    height: 35px;
+    fill: currentColor;
+  }
+
+  /* Spezifische Button-Styles */
+  .gmaps-btn {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+  }
+
+  .share-btn {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+  }
+
+  .delete-btn {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+  }
+
+  .delete-btn:hover {
+    background: #dc3545;
+    color: white;
+    border-color: #dc3545;
+  }
+
+  .download-btn {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+  }
+
+  .download-btn:hover {
+    background: #28a745;
+    color: white;
+    border-color: #28a745;
+  }
+
+  .rotate-btn {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+  }
+
+  .rotate-btn:hover {
+    background: #ffc107;
+    color: #212529;
+    border-color: #ffc107;
+  }
+
   .rotate-btn:disabled {
-    background: #ccc;
+    background: #6c757d;
+    color: #adb5bd;
     cursor: not-allowed;
     transform: none;
   }
@@ -3613,27 +3657,17 @@
   .gallery-toggle-btn {
     background: var(--bg-secondary);
     color: var(--text-primary);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    padding: 8px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-left: 8px;
   }
 
   .gallery-toggle-btn:hover {
     background: var(--bg-tertiary);
     border-color: var(--text-primary);
-    transform: scale(1.05);
   }
 
   .gallery-toggle-btn.active {
     background: var(--bg-primary);
     color: var(--text-primary);
-    border-color: var(--text-primary);
+    border-color: var(--border-color);
   }
 
   .gallery-toggle-btn.active:hover {
