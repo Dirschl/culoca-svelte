@@ -1252,7 +1252,7 @@
         .lte('lat', lat + latMargin)
         .gte('lon', lon - lonMargin)
         .lte('lon', lon + lonMargin)
-        .limit(Math.min(requestedCount, 2000)); // Begrenze auf 2000 für Performance
+        .limit(Math.min(requestedCount, 5000)); // Begrenze auf 5000 für Performance
       
       // Privacy-Filter anwenden
       if (currentUserId) {

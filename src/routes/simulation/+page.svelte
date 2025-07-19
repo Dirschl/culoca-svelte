@@ -184,7 +184,7 @@
         .from('items')
         .select('id, lat, lon, path_512, path_2048, path_64, title, description, width, height, is_private, profile_id, keywords, original_name')
         .not('path_512', 'is', null)
-        .limit(3000); // Higher limit for simulation to load more data
+        .limit(5000); // Higher limit for simulation to load more data
       
       // Apply privacy filtering
       if (currentUserId) {

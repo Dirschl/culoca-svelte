@@ -1244,7 +1244,7 @@
         .not('lat', 'is', null)
         .not('lon', 'is', null)
         .not('path_512', 'is', null)
-        .limit(2000); // Limit for performance, but still much more than API allows
+        .limit(5000); // Limit for performance, but still much more than API allows
       
       // Apply privacy filtering
       if (currentUserId) {
