@@ -79,14 +79,6 @@
       });
       
       boxes = layoutResult.boxes || [];
-      
-      console.log('[GalleryLayout] Justified layout calculated:', {
-        itemCount: items.length,
-        containerWidth: effectiveWidth,
-        targetRowHeight: responsiveTargetRowHeight,
-        boxes: boxes.length,
-        containerHeight: layoutResult.containerHeight
-      });
     } catch (error) {
       console.error('[GalleryLayout] Error calculating justified layout:', error);
       boxes = [];

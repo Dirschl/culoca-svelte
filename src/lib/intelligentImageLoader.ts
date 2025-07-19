@@ -54,7 +54,6 @@ class IntelligentImageLoader {
     
     // 2. Bestimme optimalen Laderadius
     const loadRadius = this.calculateOptimalRadius(lat, lon, requestedCount);
-    console.log(`[IntelligentLoader] Using load radius: ${loadRadius}km`);
     
     // 3. Lade neue Bilder aus Datenbank
     const newImages = await this.loadFromDatabase(lat, lon, loadRadius, requestedCount);
@@ -98,14 +97,13 @@ class IntelligentImageLoader {
     const minLon = lon - lonMargin;
     const maxLon = lon + lonMargin;
     
-    console.log(`[IntelligentLoader] DB query bounds: lat ${minLat}-${maxLat}, lon ${minLon}-${maxLon}`);
-    
     let query = supabase
       .from('items')
       .select('id, lat, lon, path_512, path_2048, path_64, title, description, width, height, is_private, profile_id')
       .not('lat', 'is', null)
       .not('lon', 'is', null)
       .not('path_512', 'is', null)
+      .eq('gallery', true) // Only show images with gallery = true
       .gte('lat', minLat)
       .lte('lat', maxLat)
       .gte('lon', minLon)
@@ -216,8 +214,6 @@ class IntelligentImageLoader {
       imageIds: new Set(imageIds),
       loadedAt: Date.now()
     });
-    
-    console.log(`[IntelligentLoader] Registered region: ${lat}, ${lon} (${radius}km, ${imageIds.length} images)`);
   }
   
   /**

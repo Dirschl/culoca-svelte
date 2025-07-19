@@ -1,0 +1,797 @@
+<script lang="ts">
+  import { supabase } from '$lib/supabaseClient';
+  import { createClient } from '@supabase/supabase-js';
+
+  // Service role client for unlimited data loading
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const supabaseServiceKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
+  const supabaseService = supabaseServiceKey 
+    ? createClient(supabaseUrl, supabaseServiceKey)
+    : supabase;
+  import { onMount } from 'svelte';
+  import { writable, get } from 'svelte/store';
+  import GalleryLayout from '$lib/GalleryLayout.svelte';
+  import NewsFlash from '$lib/NewsFlash.svelte';
+  import FloatingActionButtons from '$lib/FloatingActionButtons.svelte';
+  import TrackModal from '$lib/TrackModal.svelte';
+  import FullscreenMap from '$lib/FullscreenMap.svelte';
+  import WelcomeSection from '$lib/WelcomeSection.svelte';
+  import FilterBar from '$lib/FilterBar.svelte';
+  import SearchResults from '$lib/SearchResults.svelte';
+  import { beforeNavigate, afterNavigate } from '$app/navigation';
+  import { showPublicContentModal } from '$lib/modalStore';
+  import { welcomeVisible, hideWelcome, dismissWelcome, isWelcomeDismissed } from '$lib/welcomeStore';
+  import { filterStore, userFilter, locationFilter, hasActiveFilters, getEffectiveGpsPosition } from '$lib/filterStore';
+  import { page as pageStore } from '$app/stores';
+
+  import { updateGalleryStats, galleryStats } from '$lib/galleryStats';
+  import { sessionStore } from '$lib/sessionStore';
+  import { intelligentImageLoader } from '$lib/intelligentImageLoader';
+  import { authFetch } from '$lib/authFetch';
+  import { dynamicImageLoader } from '$lib/dynamicImageLoader';
+
+  const pics = writable<any[]>([]);
+  const dynamicLoader = dynamicImageLoader;
+  let page = 0, size = 100, loading = false, hasMoreImages = true;
+  let displayedImageCount = 0;
+  let removedDuplicatesList: any[] = [];
+  let showRemovedDuplicates = false;
+  let longPressTimeout: number | null = null;
+  let longPressTarget: HTMLElement | null = null;
+  
+  // Bewegungserkennung für Gallery-Modi
+  let isMoving = false; // Bewegungsmodus aktiv
+  let lastPosition: { lat: number; lon: number; timestamp: number } | null = null;
+  let settingsIconRotation = 0; // Rotation des Settings-Icons
+  
+  // Reaktive Funktion: Update displayed count whenever pics store changes
+  let displayUpdateTimeout: number | null = null;
+  
+  $: if ($pics) {
+    const newCount = $pics.length;
+    if (newCount !== displayedImageCount) {
+      if (displayUpdateTimeout) {
+        clearTimeout(displayUpdateTimeout);
+      }
+      
+      displayUpdateTimeout = setTimeout(() => {
+        if (newCount === $pics.length) {
+          displayedImageCount = newCount;
+          console.log(`📊 Angezeigte Bilder: ${displayedImageCount}/${$galleryStats.totalCount}`);
+          
+          // Event für NewsFlash-Komponente
+          window.dispatchEvent(new CustomEvent('displayedImageCountChanged', {
+            detail: { displayedCount: displayedImageCount, totalCount: $galleryStats.totalCount }
+          }));
+        }
+      }, 200);
+    }
+  }
+  
+  // Reaktive Funktion: Reload gallery when filters change
+  let filterUpdateInProgress = false;
+  let lastFilterState = '';
+  let filterChangeTimeout: number | null = null;
+  
+  $: if ($filterStore && authChecked && !filterUpdateInProgress) {
+    const hasUserFilter = $filterStore.userFilter !== null;
+    const hasLocationFilter = $filterStore.locationFilter !== null;
+    const hasReferrerAccount = $filterStore.referrerAccount !== null;
+    
+    const needsReload = hasUserFilter || hasLocationFilter || hasReferrerAccount;
+    
+    const currentFilterState = JSON.stringify({
+      userFilter: $filterStore.userFilter,
+      locationFilter: $filterStore.locationFilter,
+      referrerAccount: $filterStore.referrerAccount
+    });
+    
+    if (needsReload && currentFilterState !== lastFilterState) {
+      console.log('[Filter Change] Filter store changed with meaningful filters, reloading gallery:', $filterStore);
+      lastFilterState = currentFilterState;
+      
+      if (filterChangeTimeout) {
+        clearTimeout(filterChangeTimeout);
+      }
+      
+      if (!searchQuery.trim() && !isSearching && !loading) {
+        pics.set([]);
+        page = 0;
+        hasMoreImages = true;
+        
+        filterChangeTimeout = setTimeout(() => {
+          if (!loading) {
+            loadMore('filter change');
+          }
+        }, 300);
+      }
+    }
+  }
+  
+  // Funktion zum Entfernen von Duplikaten aus der Galerie
+  function removeDuplicates() {
+    const currentPics = get(pics);
+    const uniquePics = currentPics.filter((pic, index, self) => 
+      index === self.findIndex(p => p.id === pic.id)
+    );
+    
+    if (uniquePics.length !== currentPics.length) {
+      const removedDuplicates = currentPics.filter((pic, index, self) => 
+        index !== self.findIndex(p => p.id === pic.id)
+      );
+      
+      console.log(`🧹 Removed ${removedDuplicates.length} duplicate images from gallery:`, removedDuplicates);
+      
+      removedDuplicatesList = removedDuplicates;
+      showRemovedDuplicates = true;
+      
+      pics.set(uniquePics);
+    }
+  }
+
+  // Funktion um zu prüfen, ob GPS-Daten für die Galerie verfügbar sind
+  function hasValidGpsForGallery(): boolean {
+    if ($filterStore.locationFilter) {
+      return true;
+    }
+    
+    if ($filterStore.lastGpsPosition) {
+      return true;
+    }
+    
+    if (userLat !== null && userLon !== null) {
+      return true;
+    }
+    
+    const lastLocation = loadLastKnownLocation();
+    if (lastLocation && lastLocation.lat !== null && lastLocation.lon !== null) {
+      return true;
+    }
+    
+    console.log('🔄 [GPS] No GPS data available, but allowing gallery to load with fallback');
+    return true;
+  }
+
+  // Bewegungserkennung und Modus-Management
+  function checkMovement(newLat: number, newLon: number) {
+    if (!lastPosition) {
+      lastPosition = { lat: newLat, lon: newLon, timestamp: Date.now() };
+      return;
+    }
+    
+    const distance = getDistanceInMeters(lastPosition.lat, lastPosition.lon, newLat, newLon);
+    const timeDiff = Date.now() - lastPosition.timestamp;
+    
+    // Bewegung erkannt wenn > 10m in < 5 Sekunden (für Fußgänger optimiert)
+    if (distance > 10 && timeDiff < 5000) {
+      if (!isMoving) {
+        console.log(`🚶 Bewegung erkannt: ${distance.toFixed(0)}m in ${(timeDiff/1000).toFixed(1)}s`);
+        isMoving = true;
+        settingsIconRotation += 360;
+        updateGalleryMode();
+      }
+    } else if (distance < 5 && timeDiff > 5000) { // Stillstand: < 5m in > 5s
+      if (isMoving) {
+        console.log(`🛑 Stillstand erkannt: ${distance.toFixed(0)}m in ${(timeDiff/1000).toFixed(1)}s`);
+        isMoving = false;
+        settingsIconRotation += 360;
+        updateGalleryMode();
+      }
+    }
+    
+    lastPosition = { lat: newLat, lon: newLon, timestamp: Date.now() };
+  }
+  
+  function updateGalleryMode() {
+    if (isMoving) {
+      console.log('🎯 Bewegungsmodus: Lade 3x3 Grid');
+      // Im Bewegungsmodus: Lade nur nahe Bilder in 3x3 Grid
+      pics.set([]);
+      page = 0;
+      hasMoreImages = true;
+      loadMore('movement mode - 3x3 grid');
+      
+      showModeStatus('Bewegungsmodus: 3x3 Grid', 3000);
+    } else {
+      console.log('📋 Statischer Modus: Lade komplette Liste nach Entfernung');
+      // Im statischen Modus: Lade alle Bilder nach Entfernung sortiert
+      pics.set([]);
+      page = 0;
+      hasMoreImages = true;
+      loadMore('static mode - full distance list');
+      
+      showModeStatus('Statischer Modus: Komplette Liste', 3000);
+    }
+  }
+  
+  // Status-Nachricht für Modus-Wechsel
+  let modeStatusMessage = '';
+  let modeStatusVisible = false;
+  
+  function showModeStatus(message: string, duration: number = 3000) {
+    modeStatusMessage = message;
+    modeStatusVisible = true;
+    
+    setTimeout(() => {
+      modeStatusVisible = false;
+    }, duration);
+  }
+
+  // Long press functions for gallery toggle (nur für eingeloggte Benutzer)
+  function handleMouseDown(event: MouseEvent, imageId: string) {
+    if (!isLoggedIn || !currentUser) return;
+    
+    longPressTarget = event.currentTarget as HTMLElement;
+    longPressTimeout = setTimeout(() => {
+      if (longPressTarget) {
+        toggleGalleryStatus(imageId);
+        longPressTarget = null;
+      }
+    }, 800);
+  }
+
+  function handleMouseUp() {
+    if (longPressTimeout) {
+      clearTimeout(longPressTimeout);
+      longPressTimeout = null;
+    }
+    longPressTarget = null;
+  }
+
+  function handleMouseLeave() {
+    if (longPressTimeout) {
+      clearTimeout(longPressTimeout);
+      longPressTimeout = null;
+    }
+    longPressTarget = null;
+  }
+
+  async function toggleGalleryStatus(imageId: string) {
+    try {
+      const currentPics = get(pics);
+      const image = currentPics.find(pic => pic.id === imageId);
+      if (!image) return;
+
+      const newGalleryStatus = !image.gallery;
+      
+      const response = await fetch(`/api/item/${imageId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ gallery: newGalleryStatus })
+      });
+
+      if (response.ok) {
+        const updatedPics = currentPics.map(pic => 
+          pic.id === imageId ? { ...pic, gallery: newGalleryStatus } : pic
+        );
+        pics.set(updatedPics);
+        
+        console.log(`🎨 Image ${imageId} gallery status changed to: ${newGalleryStatus}`);
+        
+        const status = newGalleryStatus ? 'zur Galerie hinzugefügt' : 'aus Galerie entfernt';
+        showToast(`${image.original_name || 'Bild'} ${status}`);
+      } else {
+        console.error('Failed to toggle gallery status');
+        showToast('Fehler beim Ändern des Galerie-Status');
+      }
+    } catch (error) {
+      console.error('Error toggling gallery status:', error);
+      showToast('Fehler beim Ändern des Galerie-Status');
+    }
+  }
+
+  function showToast(message: string) {
+    const toast = document.createElement('div');
+    toast.textContent = message;
+    toast.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: var(--bg-primary, #ffffff);
+      color: var(--text-primary, #1f2937);
+      padding: 12px 16px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      z-index: 10000;
+      font-size: 14px;
+      font-weight: 500;
+    `;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+      if (toast.parentNode) {
+        toast.parentNode.removeChild(toast);
+      }
+    }, 3000);
+  }
+
+  // Funktion um die besten verfügbaren GPS-Koordinaten zu bekommen
+  async function getBestAvailableGps(): Promise<{ lat: number; lon: number } | null> {
+    if ($filterStore.locationFilter) {
+      return { lat: $filterStore.locationFilter.lat, lon: $filterStore.locationFilter.lon };
+    }
+    
+    if (isLoggedIn && currentUser) {
+      try {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('home_lat, home_lon')
+          .eq('id', currentUser.id)
+          .single();
+        
+        if (profileData?.home_lat && profileData?.home_lon) {
+          console.log(`[GPS] Using saved profile GPS coordinates: ${profileData.home_lat}, ${profileData.home_lon}`);
+          return { lat: profileData.home_lat, lon: profileData.home_lon };
+        }
+      } catch (error) {
+        console.log(`[GPS] Error fetching saved profile GPS coordinates:`, error);
+      }
+    }
+    
+    if ($filterStore.lastGpsPosition) {
+      return $filterStore.lastGpsPosition;
+    }
+    
+    if (userLat !== null && userLon !== null) {
+      return { lat: userLat, lon: userLon };
+    }
+    
+    const lastLocation = loadLastKnownLocation();
+    if (lastLocation && lastLocation.lat !== null && lastLocation.lon !== null) {
+      return lastLocation;
+    }
+    
+    return null;
+  }
+
+  // Funktion um auf GPS zu warten und dann die Galerie zu laden
+  async function waitForGpsAndLoadGallery() {
+    console.log('[GPS] Waiting for GPS data...');
+    
+    // Warte bis zu 10 Sekunden auf GPS-Daten
+    for (let i = 0; i < 100; i++) {
+      const gpsData = await getBestAvailableGps();
+      if (gpsData) {
+        console.log('[GPS] GPS data available, loading gallery');
+        await loadMore('GPS available');
+        return;
+      }
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    
+    console.log('[GPS] No GPS data after 10 seconds, loading with fallback');
+    await loadMore('GPS timeout - fallback');
+  }
+
+  // Funktion um zu prüfen, ob mehr Bilder geladen werden können
+  function checkAndLoadMoreImages() {
+    if (!loading && hasMoreImages) {
+      loadMore('scroll trigger');
+    }
+  }
+
+  // Intelligenter Bildlader mit direkter Datenbankabfrage
+  async function loadImagesWithIntelligentLoader(lat: number, lon: number, requestedCount: number): Promise<any[]> {
+    try {
+      console.log(`[Gallery IntelligentLoader] Loading ${requestedCount} images for position: ${lat}, ${lon}`);
+      
+      const loadedImages = await intelligentImageLoader.loadImagesForPosition(lat, lon, requestedCount);
+      
+      console.log(`[Gallery IntelligentLoader] Loaded ${loadedImages.length} images`);
+      
+      // Konvertiere zu Gallery-Format
+      const galleryImages = loadedImages.map(img => ({
+        id: img.id,
+        path_512: img.path_512,
+        path_2048: img.path_2048,
+        path_64: img.path_64,
+        width: img.width,
+        height: img.height,
+        lat: img.lat,
+        lon: img.lon,
+        title: img.title,
+        description: img.description,
+        is_private: img.is_private,
+        profile_id: img.profile_id,
+        distance: img.distance
+      }));
+      
+      const stats = intelligentImageLoader.getStats();
+      console.log(`[Gallery IntelligentLoader] Cache stats:`, stats);
+      
+      return galleryImages;
+      
+    } catch (error) {
+      console.error('[Gallery IntelligentLoader] Error:', error);
+      return [];
+    }
+  }
+
+  // Load last known location from localStorage
+  function loadLastKnownLocation(): { lat: number; lon: number } | null {
+    try {
+      const stored = localStorage.getItem('lastKnownLocation');
+      if (stored) {
+        const location = JSON.parse(stored);
+        if (location && typeof location.lat === 'number' && typeof location.lon === 'number') {
+          return location;
+        }
+      }
+    } catch (error) {
+      console.error('Error loading last known location:', error);
+    }
+    return null;
+  }
+
+  // Save last known location to localStorage
+  function saveLastKnownLocation(lat: number, lon: number) {
+    try {
+      localStorage.setItem('lastKnownLocation', JSON.stringify({ lat, lon }));
+    } catch (error) {
+      console.error('Error saving last known location:', error);
+    }
+  }
+
+  // Calculate distance between two points in meters
+  function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    const R = 6371e3; // Earth's radius in meters
+    const φ1 = lat1 * Math.PI / 180;
+    const φ2 = lat2 * Math.PI / 180;
+    const Δφ = (lat2 - lat1) * Math.PI / 180;
+    const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c;
+  }
+
+  // LoadMore function to load gallery images
+  async function loadMore(reason: string = 'unknown') {
+    if (loading || !hasMoreImages) {
+      console.log(`[Gallery] Skipping loadMore - loading: ${loading}, hasMoreImages: ${hasMoreImages}, reason: ${reason}`);
+      return;
+    }
+
+    loading = true;
+    console.log(`[Gallery] Loading more images - reason: ${reason}, page: ${page}`);
+
+    try {
+      // Get current GPS position
+      const currentLat = userLat || simulatedLat;
+      const currentLon = userLon || simulatedLon;
+
+      if (!currentLat || !currentLon) {
+        console.log('[Gallery] No GPS position available, loading with date sorting');
+        // Load images without GPS (date-based sorting)
+        const offset = page * size;
+        const response = await fetch(`/api/items?offset=${offset}&limit=${size}`);
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+          const newPics = get(pics);
+          pics.set([...newPics, ...data.images]);
+          hasMoreImages = data.images.length === size;
+          page++;
+        } else {
+          console.error('[Gallery] Failed to load images:', data.error);
+        }
+      } else {
+        // Load images with GPS-based sorting
+        const images = await loadImagesWithIntelligentLoader(currentLat, currentLon, size);
+        
+        if (images.length > 0) {
+          const newPics = get(pics);
+          pics.set([...newPics, ...images]);
+          hasMoreImages = images.length === size;
+          page++;
+        } else {
+          hasMoreImages = false;
+        }
+      }
+    } catch (error) {
+      console.error('[Gallery] Error loading images:', error);
+    } finally {
+      loading = false;
+    }
+  }
+
+  // Initialize gallery on mount
+  onMount(async () => {
+    console.log('[Gallery] onMount - Initializing gallery');
+    
+    if (!authChecked) {
+      console.log('[Gallery] Waiting for auth check...');
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    
+    if (hasValidGpsForGallery()) {
+      console.log('[Gallery] Loading initial gallery with GPS');
+      await loadMore('initial mount with GPS');
+    } else {
+      console.log('[Gallery] Loading initial gallery without GPS');
+      await loadMore('initial mount without GPS');
+    }
+  });
+
+  let useJustifiedLayout = true;
+  let targetRowHeight = 200;
+  let showDistance = true;
+  let showCompass = false;
+  let userLat: number | null = null;
+  let userLon: number | null = null;
+  let deviceHeading: number | null = null;
+  let isLoggedIn = false;
+  let currentUser: any = null;
+  let profileAvatar: string | null = null;
+  let showSearchField = false;
+  let searchQuery = '';
+  let isSearching = false;
+  let searchResults: any[] = [];
+  let useSearchResults = false;
+  let showUploadDialog = false;
+  let showLoginOverlay = false;
+  let loginEmail = '';
+  let loginPassword = '';
+  let loginLoading = false;
+  let loginError = '';
+  let loginInfo = '';
+  let showRegister = false;
+  let authChecked = false;
+  let welcomeVisible = false;
+  let hideWelcome = () => {};
+  let dismissWelcome = () => {};
+  let isWelcomeDismissed = false;
+  let showFullscreenMap = false;
+  let showTrackModal = false;
+  let showRemovedDuplicates = false;
+  let removedDuplicatesList: any[] = [];
+  let showNoItemsMessage = false;
+  let gpsStatus = '';
+  let getGPSStatusText = () => '';
+  let showGPSMessage = false;
+  let gpsTimeoutId: number | null = null;
+  let GPS_MEMORY_TIMEOUT = 30000;
+  let gpsTrackingActive = false;
+  let gpsSimulationActive = false;
+  let simulationMode = false;
+  let simulatedLat: number | null = null;
+  let simulatedLon: number | null = null;
+  let autoguide = false;
+  let audioActivated = false;
+  let currentImageTitle = '';
+  let autoguideText = '';
+  let autoguideBarVisible = false;
+  let speechSynthesis: any = null;
+  let currentSpeech: any = null;
+  let newsFlashMode = 'all';
+  
+  // Session store integration
+  $: isLoggedIn = $sessionStore.isAuthenticated;
+  $: currentUser = $sessionStore.user;
+  $: authChecked = $sessionStore.authChecked;
+  
+  // Enable distance display for anonymous users when GPS is available
+  $: if (!isLoggedIn && userLat !== null && userLon !== null) {
+    showDistance = true;
+  }
+  
+  // GPS tracking variables
+  let gpsWatchId: number | null = null;
+  let lastKnownLat: number | null = null;
+  let lastKnownLon: number | null = null;
+  let lastGPSUpdateTime: number | null = null;
+  
+  // GPS tracking functions
+  function startGPSTracking() {
+    if (gpsTrackingActive) return;
+    
+    console.log('[GPS] Starting GPS tracking...');
+    gpsTrackingActive = true;
+    gpsStatus = 'checking';
+    
+    if ('geolocation' in navigator) {
+      gpsWatchId = navigator.geolocation.watchPosition(
+        (position) => {
+          const newLat = position.coords.latitude;
+          const newLon = position.coords.longitude;
+          
+          // Check if position changed significantly
+          if (lastKnownLat && lastKnownLon) {
+            const distance = getDistanceInMeters(lastKnownLat, lastKnownLon, newLat, newLon);
+            if (distance < 10) return; // Ignore small changes
+          }
+          
+          userLat = newLat;
+          userLon = newLon;
+          lastKnownLat = newLat;
+          lastKnownLon = newLon;
+          lastGPSUpdateTime = Date.now();
+          gpsStatus = 'active';
+          
+          console.log(`[GPS] Position updated: ${newLat}, ${newLon}`);
+          
+          // Save to localStorage
+          saveLastKnownLocation(newLat, newLon);
+          
+          // Check movement and update gallery mode
+          checkMovement(newLat, newLon);
+        },
+        (error) => {
+          console.error('[GPS] Error:', error);
+          gpsStatus = error.code === 1 ? 'denied' : 'unavailable';
+          gpsTrackingActive = false;
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 30000
+        }
+      );
+    } else {
+      console.log('[GPS] Geolocation not supported');
+      gpsStatus = 'unavailable';
+      gpsTrackingActive = false;
+    }
+  }
+  
+  function stopGPSTracking() {
+    if (gpsWatchId) {
+      navigator.geolocation.clearWatch(gpsWatchId);
+      gpsWatchId = null;
+    }
+    gpsTrackingActive = false;
+  }
+  
+  // Start GPS tracking on mount
+  onMount(() => {
+    if (!gpsTrackingActive && !gpsSimulationActive) {
+      startGPSTracking();
+    }
+  });
+  
+  // Cleanup on unmount
+  onMount(() => {
+    return () => {
+      stopGPSTracking();
+    };
+  });
+</script>
+
+<!-- Main Content -->
+<main class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
+  <!-- Header with FilterBar -->
+  <header class="sticky top-0 z-40 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700">
+    <FilterBar 
+      {showDistance}
+      {userLat}
+      {userLon}
+      {isLoggedIn}
+      {gpsStatus}
+      {lastGPSUpdateTime}
+    />
+  </header>
+
+  <!-- Gallery Content -->
+  <div class="relative">
+    <!-- Welcome Section -->
+    {#if welcomeVisible && !isWelcomeDismissed}
+      <WelcomeSection 
+        visible={welcomeVisible}
+        onClose={hideWelcome}
+        onDismiss={dismissWelcome}
+        userName={currentUser?.full_name || currentUser?.username || 'Benutzer'}
+        currentUserId={currentUser?.id || ''}
+      />
+    {/if}
+
+    <!-- NewsFlash Component -->
+    <NewsFlash 
+      userId={currentUser?.id}
+      mode={newsFlashMode}
+      {displayedImageCount}
+    />
+
+    <!-- Search Results -->
+    {#if useSearchResults && searchResults.length > 0}
+      <SearchResults 
+        searchTerm={searchQuery}
+        userId={currentUser?.id || ''}
+        {showDistance}
+        {userLat}
+        {userLon}
+      />
+    {:else}
+      <!-- Main Gallery -->
+      <GalleryLayout 
+        items={pics}
+        layout={isMoving ? 'grid' : 'justified'}
+        {showDistance}
+        {showCompass}
+        {userLat}
+        {userLon}
+        {targetRowHeight}
+        {isLoggedIn}
+        {currentUser}
+        onMouseDown={handleMouseDown}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseLeave}
+      />
+    {/if}
+
+    <!-- Floating Action Buttons -->
+    <FloatingActionButtons 
+      {isLoggedIn}
+      {profileAvatar}
+      {settingsIconRotation}
+      {simulationMode}
+    />
+
+    <!-- Track Modal -->
+    {#if showTrackModal}
+      <TrackModal 
+        isOpen={showTrackModal}
+      />
+    {/if}
+
+    <!-- Fullscreen Map -->
+    {#if showFullscreenMap}
+      <FullscreenMap 
+        images={pics}
+        {userLat}
+        {userLon}
+        {deviceHeading}
+      />
+    {/if}
+  </div>
+</main>
+
+<style>
+  /* Global styles */
+  :global(body) {
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  /* Dark mode support */
+  :global(.dark) {
+    color-scheme: dark;
+  }
+
+  /* Smooth scrolling */
+  :global(html) {
+    scroll-behavior: smooth;
+  }
+
+  /* Custom scrollbar */
+  :global(::-webkit-scrollbar) {
+    width: 8px;
+  }
+
+  :global(::-webkit-scrollbar-track) {
+    background: transparent;
+  }
+
+  :global(::-webkit-scrollbar-thumb) {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+  }
+
+  :global(::-webkit-scrollbar-thumb:hover) {
+    background: rgba(0, 0, 0, 0.3);
+  }
+
+  /* Dark mode scrollbar */
+  :global(.dark ::-webkit-scrollbar-thumb) {
+    background: rgba(255, 255, 255, 0.2);
+  }
+
+  :global(.dark ::-webkit-scrollbar-thumb:hover) {
+    background: rgba(255, 255, 255, 0.3);
+  }
+</style>
