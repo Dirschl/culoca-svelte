@@ -1225,12 +1225,12 @@
     }
   }
 
-  // Fallback: Direkte Datenbankabfrage (vereinfacht)
+  // Fallback: Direkte Datenbankabfrage mit Batch-Loading
   // Radius-based query that backs up the 3×3 grid once the user scrolls further
   // Uses the items_search_view for consistency with search and to avoid hitting raw table limits
   async function loadImagesDirectFromDB(lat: number, lon: number, requestedCount: number): Promise<any[]> {
     try {
-      console.log(`[Gallery DirectDB] Loading ${requestedCount} images directly from DB for position: ${lat}, ${lon}`);
+      console.log(`[Gallery DirectDB] Loading ${requestedCount} images with batch loading for position: ${lat}, ${lon}`);
       
       const sessionData = get(sessionStore);
       const currentUserId = sessionData.isAuthenticated ? sessionData.userId : null;
@@ -1242,40 +1242,62 @@
       const latMargin = radiusKm * kmToDegLat;
       const lonMargin = radiusKm * kmToDegLon;
       
-      let query = supabase
-        .from('items_search_view')
-        .select('id, lat, lon, path_512, path_2048, path_64, title, description, width, height, is_private, profile_id')
-        .not('lat', 'is', null)
-        .not('lon', 'is', null)
-        .not('path_512', 'is', null)
-        .gte('lat', lat - latMargin)
-        .lte('lat', lat + latMargin)
-        .gte('lon', lon - lonMargin)
-        .lte('lon', lon + lonMargin)
-        .limit(Math.min(requestedCount, 5000)); // Begrenze auf 5000 für Performance
+      // Batch loading to get more than 1000 items
+      const batchSize = 1000;
+      let allImages = [];
+      let hasMore = true;
+      let offset = 0;
+      const maxBatches = Math.ceil(requestedCount / batchSize);
       
-      // Privacy-Filter anwenden
-      if (currentUserId) {
-        query = query.or(`profile_id.eq.${currentUserId},is_private.eq.false,is_private.is.null`);
-      } else {
-        query = query.or('is_private.eq.false,is_private.is.null');
+      while (hasMore && allImages.length < requestedCount && offset < maxBatches * batchSize) {
+        console.log(`[Gallery DirectDB] Loading batch ${Math.floor(offset/batchSize) + 1}, offset: ${offset}`);
+        
+        let query = supabase
+          .from('items_search_view')
+          .select('id, lat, lon, path_512, path_2048, path_64, title, description, width, height, is_private, profile_id')
+          .not('lat', 'is', null)
+          .not('lon', 'is', null)
+          .not('path_512', 'is', null)
+          .gte('lat', lat - latMargin)
+          .lte('lat', lat + latMargin)
+          .gte('lon', lon - lonMargin)
+          .lte('lon', lon + lonMargin)
+          .range(offset, offset + batchSize - 1);
+        
+        // Privacy-Filter anwenden
+        if (currentUserId) {
+          query = query.or(`profile_id.eq.${currentUserId},is_private.eq.false,is_private.is.null`);
+        } else {
+          query = query.or('is_private.eq.false,is_private.is.null');
+        }
+        
+        const { data, error } = await query;
+        
+        if (error) {
+          console.error('[Gallery DirectDB] Database error:', error);
+          break;
+        }
+        
+        if (data && data.length > 0) {
+          allImages.push(...data);
+          console.log(`[Gallery DirectDB] Batch ${Math.floor(offset/batchSize) + 1}: loaded ${data.length} images, total: ${allImages.length}`);
+          
+          // Continue if we got a full batch
+          hasMore = data.length === batchSize;
+          offset += batchSize;
+        } else {
+          hasMore = false;
+        }
       }
       
-      const { data, error } = await query;
-      
-      if (error) {
-        console.error('[Gallery DirectDB] Database error:', error);
-        return [];
-      }
-      
-      const images = (data || []).map(item => ({
+      const images = allImages.map(item => ({
         ...item,
         lat: item.lat!,
         lon: item.lon!,
         path_512: item.path_512!
       }));
       
-      console.log(`[Gallery DirectDB] Loaded ${images.length} images directly from DB`);
+      console.log(`[Gallery DirectDB] Loaded ${images.length} images via batch loading`);
       return images;
       
     } catch (error) {
@@ -6164,7 +6186,7 @@
         <p>Beim Besuch dieser Website kann Ihr Surf-Verhalten statistisch ausgewertet werden. Das geschieht vor allem mit sogenannten Analyseprogrammen. Detaillierte Informationen zu diesen Analyseprogrammen finden Sie in der folgenden Datenschutzerklärung.</p>
         
         <h3>6. Newsletter</h3>
-        <p>Falls Sie den auf der Website angebotenen Newsletter beziehen möchten, benötigen wir von Ihnen eine E-Mail-Adresse sowie Informationen, welche uns die Überprüfung gestatten, dass Sie der Inhaber der angegebenen E-Mail-Adresse sind und mit dem Empfang des Newsletters einverstanden sind (sog. Double-Opt-In). Weitere Daten werden nicht bzw. nur auf freiwilliger Basis erhoben. Diese Daten verwenden wir ausschließlich für den Versand der angeforderten Informationen und geben diese nicht an Dritte weiter. Die Verarbeitung der in das Newsletter-Anmeldeformular eingegebenen Daten erfolgt ausschließlich auf Grundlage Ihrer Einwilligung (Art. 6 Abs. 1 lit. a DSGVO). Die erteilte Einwilligung zur Speicherung der Daten, der E-Mail-Adresse sowie deren Nutzung zum Versand des Newsletters können Sie jederzeit widerrufen, etwa über den „Austragen"-Link im Newsletter. Die Rechtmäßigkeit der bereits erfolgten Datenverarbeitungsvorgänge bleibt vom Widerruf unberührt. Die von Ihnen zum Zwecke des Newsletter-Bezugs bei uns hinterlegten Daten werden von uns bis zu Ihrer Austragung gespeichert und nach der Abmeldung des Newsletters sowohl von unseren Servern als auch von den Servern des Newsletter-Dienstleisters gelöscht. Sofern wir Ihnen Newsletter-Dienstleister mitteilen, erfolgt dies nur, wenn dies gesetzlich erforderlich ist oder eine gerichtliche Anordnung vorliegt.</p>
+        <p>Falls Sie den auf der Website angebotenen Newsletter beziehen möchten, benötigen wir von Ihnen eine E-Mail-Adresse sowie Informationen, welche uns die Überprüfung gestatten, dass Sie der Inhaber der angegebenen E-Mail-Adresse sind und mit dem Empfang des Newsletters einverstanden sind (sog. Double-Opt-In). Weitere Daten werden nicht bzw. nur auf freiwilliger Basis erhoben. Diese Daten werden ausschließlich für den Versand der angeforderten Informationen und ggf. für die personalisierte Gestaltung des Newsletters verwendet. Die Verarbeitung der in das Newsletter-Anmeldeformular eingegebenen Daten erfolgt ausschließlich auf Grundlage Ihrer Einwilligung (Art. 6 Abs. 1 lit. a DSGVO). Die erteilte Einwilligung zur Speicherung der Daten, der E-Mail-Adresse sowie deren Nutzung zum Versand des Newsletters können Sie jederzeit widerrufen, etwa über den „Austragen"-Link im Newsletter. Die Rechtmäßigkeit der bereits erfolgten Datenverarbeitungsvorgänge bleibt vom Widerruf unberührt. Die von Ihnen zum Zwecke des Newsletter-Bezugs bei uns hinterlegten Daten werden von uns bis zu Ihrer Austragung gespeichert und nach der Abmeldung des Newsletters sowohl von unseren Servern als auch von den Servern des Newsletter-Dienstleisters gelöscht. Sofern wir Ihnen Newsletter-Dienstleister mitteilen, erfolgt dies nur, wenn dies gesetzlich erforderlich ist oder eine gerichtliche Anordnung vorliegt.</p>
         
         <h3>7. Plugins und Tools</h3>
         

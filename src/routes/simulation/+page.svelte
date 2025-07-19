@@ -171,38 +171,60 @@
 
 
 
-  // Direct database query for simulation images (bypasses all API limitations)
+  // Direct database query for simulation images with batch loading (bypasses all API limitations)
   async function loadSimulationImagesDirectFromDB(): Promise<any[]> {
     try {
-      console.log('[Simulation DirectDB] Loading simulation images directly from database...');
+      console.log('[Simulation DirectDB] Loading simulation images with batch loading...');
       
       // Get current session to determine privacy filtering
       const { data: { session } } = await supabase.auth.getSession();
       const currentUserId = session?.user?.id || null;
       
-      let query = supabase
-        .from('items')
-        .select('id, lat, lon, path_512, path_2048, path_64, title, description, width, height, is_private, profile_id, keywords, original_name')
-        .not('path_512', 'is', null)
-        .limit(5000); // Higher limit for simulation to load more data
+      // Batch loading to get more than 1000 items
+      const batchSize = 1000;
+      let allImages = [];
+      let hasMore = true;
+      let offset = 0;
+      const maxBatches = 10; // Load up to 10,000 images
       
-      // Apply privacy filtering
-      if (currentUserId) {
-        // For logged in users: show their own images (all) + other users' public images
-        query = query.or(`profile_id.eq.${currentUserId},is_private.eq.false,is_private.is.null`);
-      } else {
-        // For anonymous users: only show public images
-        query = query.or('is_private.eq.false,is_private.is.null');
+      while (hasMore && allImages.length < maxBatches * batchSize) {
+        console.log(`[Simulation DirectDB] Loading batch ${Math.floor(offset/batchSize) + 1}, offset: ${offset}`);
+        
+        let query = supabase
+          .from('items')
+          .select('id, lat, lon, path_512, path_2048, path_64, title, description, width, height, is_private, profile_id, keywords, original_name')
+          .not('path_512', 'is', null)
+          .range(offset, offset + batchSize - 1);
+        
+        // Apply privacy filtering
+        if (currentUserId) {
+          // For logged in users: show their own images (all) + other users' public images
+          query = query.or(`profile_id.eq.${currentUserId},is_private.eq.false,is_private.is.null`);
+        } else {
+          // For anonymous users: only show public images
+          query = query.or('is_private.eq.false,is_private.is.null');
+        }
+        
+        const { data, error } = await query;
+        
+        if (error) {
+          console.error('[Simulation DirectDB] Database error:', error);
+          break;
+        }
+        
+        if (data && data.length > 0) {
+          allImages.push(...data);
+          console.log(`[Simulation DirectDB] Batch ${Math.floor(offset/batchSize) + 1}: loaded ${data.length} images, total: ${allImages.length}`);
+          
+          // Continue if we got a full batch
+          hasMore = data.length === batchSize;
+          offset += batchSize;
+        } else {
+          hasMore = false;
+        }
       }
       
-      const { data, error } = await query;
-      
-      if (error) {
-        console.error('[Simulation DirectDB] Database error:', error);
-        return [];
-      }
-      
-      const images = (data || []).map(item => ({
+      const images = allImages.map(item => ({
         ...item,
         // Ensure we have proper types and default values
         lat: item.lat || null,
@@ -214,7 +236,7 @@
         description: item.description || ''
       }));
       
-      console.log(`[Simulation DirectDB] Successfully loaded ${images.length} images`);
+      console.log(`[Simulation DirectDB] Successfully loaded ${images.length} images via batch loading`);
       return images;
       
     } catch (error) {
