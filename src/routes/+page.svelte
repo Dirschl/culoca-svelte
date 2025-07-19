@@ -29,30 +29,30 @@
   let removedDuplicatesList: any[] = []; // Liste der entfernten Duplikate
   let showRemovedDuplicates = false; // Flag zum Anzeigen der entfernten Duplikate
   
-
   
+
   // Reaktive Funktion: Update displayed count whenever pics store changes
   $: if ($pics) {
     const newCount = $pics.length;
     if (newCount !== displayedImageCount) {
-      displayedImageCount = newCount;
-      console.log(`📊 Angezeigte Bilder: ${displayedImageCount}/${$galleryStats.totalCount}`);
-      
+          displayedImageCount = newCount;
+          console.log(`📊 Angezeigte Bilder: ${displayedImageCount}/${$galleryStats.totalCount}`);
+          
       // Test: Zähle tatsächlich sichtbare Bilder im DOM
-      setTimeout(() => {
-        const justifiedImages = document.querySelectorAll('.justified-pic').length;
-        const gridImages = document.querySelectorAll('.grid-item img').length;
-        const totalVisibleImages = justifiedImages + gridImages;
-        console.log(`🔍 DOM-Test: ${totalVisibleImages} Bilder tatsächlich im DOM sichtbar (${justifiedImages} justified, ${gridImages} grid)`);
+          setTimeout(() => {
+            const justifiedImages = document.querySelectorAll('.justified-pic').length;
+            const gridImages = document.querySelectorAll('.grid-item img').length;
+            const totalVisibleImages = justifiedImages + gridImages;
+            console.log(`🔍 DOM-Test: ${totalVisibleImages} Bilder tatsächlich im DOM sichtbar (${justifiedImages} justified, ${gridImages} grid)`);
         if (totalVisibleImages !== displayedImageCount) {
           console.warn(`⚠️ DISCREPANCY: ${displayedImageCount} in Store vs ${totalVisibleImages} im DOM`);
         }
       }, 100);
-      
-      // Event für NewsFlash-Komponente
-      window.dispatchEvent(new CustomEvent('displayedImageCountChanged', {
-        detail: { displayedCount: displayedImageCount, totalCount: $galleryStats.totalCount }
-      }));
+          
+          // Event für NewsFlash-Komponente
+          window.dispatchEvent(new CustomEvent('displayedImageCountChanged', {
+            detail: { displayedCount: displayedImageCount, totalCount: $galleryStats.totalCount }
+          }));
     }
   }
   
@@ -71,15 +71,15 @@
       
       // Don't reload during search or if already loading
       if (!searchQuery.trim() && !isSearching && !loading) {
-      // Reset gallery state immediately
-      pics.set([]);
-      page = 0;
-      hasMoreImages = true;
-      
+        // Reset gallery state immediately
+        pics.set([]);
+        page = 0;
+        hasMoreImages = true;
+        
         // Add a small delay to prevent rapid successive calls
         setTimeout(() => {
           if (!loading) {
-      loadMore('filter change');
+            loadMore('filter change');
           }
         }, 100);
       }
@@ -1561,7 +1561,8 @@
           path_64: d.path_64,
           path_512: d.path_512,
           path_2048: d.path_2048,
-          distance: d.distance || null
+          distance: d.distance || null,
+          gallery: d.gallery ?? true
         };
       });
       
@@ -1975,8 +1976,9 @@
         
         let query = supabase
           .from('items')
-          .select('id, path_512, path_2048, path_64, width, height, lat, lon, title, description, keywords, profile_id, is_private')
+          .select('id, path_512, path_2048, path_64, width, height, lat, lon, title, description, keywords, profile_id, is_private, gallery')
           .not('path_512', 'is', null)
+          .eq('gallery', true) // Only show images with gallery = true
           .range(page * size, page * size + size - 1)
           .order('created_at', { ascending: false });
         
@@ -2589,6 +2591,12 @@
     }
     
     loginLoading = false;
+  }
+
+  // Anonymous mode function
+  function setAnonymousMode() {
+    sessionStore.setAnonymous(true);
+    console.log('🔓 Anonymous mode activated');
   }
 
   // ESC key handler
@@ -4016,7 +4024,7 @@
               <div class="progress-fill" style="width: {uploadProgress}%"></div>
             </div>
           </div>
-        {/if}
+    {/if}
 
         <!-- Upload Previews -->
         {#if uploadPreviews.length > 0}
@@ -4093,11 +4101,11 @@
 <!-- Filter Bar - at the very top of the page -->
         <FilterBar showOnMap={false} userLat={userLat} userLon={userLon} isPermalinkMode={isPermalinkMode} permalinkImageId={permalinkImageId} showDistance={showDistance} isLoggedIn={isLoggedIn} gpsStatus={gpsStatus} lastGPSUpdateTime={lastGPSUpdateTime} />
 
-<!-- NewsFlash Component -->
+    <!-- NewsFlash Component -->
 {#if isLoggedIn && newsFlashMode !== 'aus'}
-  <NewsFlash 
+    <NewsFlash 
     mode={newsFlashMode}
-    userId={currentUser?.id}
+      userId={currentUser?.id}
     layout={useJustifiedLayout ? 'justified' : 'grid'}
     limit={15}
     showToggles={false}
@@ -4105,7 +4113,7 @@
     userLat={userLat}
     userLon={userLon}
     getDistanceFromLatLonInMeters={getDistanceFromLatLonInMeters}
-    {displayedImageCount}
+      {displayedImageCount}
   />
 {/if}
 
@@ -4117,8 +4125,8 @@
     currentUserId={currentUser?.id || ''}
     onClose={() => hideWelcome()}
     onDismiss={() => dismissWelcome()}
-  />
-{/if}
+      />
+    {/if}
 
 <!-- Autoguide Bar -->
 {#if isLoggedIn && autoguide}
@@ -4151,15 +4159,15 @@
   </div>
 {/if}
 
-<!-- Floating Action Buttons -->
+    <!-- Floating Action Buttons -->
 {#if isLoggedIn}
-  <FloatingActionButtons 
+    <FloatingActionButtons 
     {showScrollToTop}
     showTestMode={true}
     showMapButton={$pics.some(pic => pic.lat && pic.lon)}
-    {isLoggedIn}
-    {simulationMode}
-    {profileAvatar}
+      {isLoggedIn}
+      {simulationMode}
+        {profileAvatar}
     on:upload={() => location.href = '/bulk-upload'}
     on:publicContent={() => showPublicContentModal.set(true)}
     on:bulkUpload={() => location.href = '/bulk-upload'}
@@ -4176,7 +4184,7 @@
     }}
   />
   <TrackModal bind:isOpen={showTrackModal} />
-{/if}
+    {/if}
 
 
 
@@ -4229,8 +4237,8 @@
       userLat={userLat}
       userLon={userLon}
       getDistanceFromLatLonInMeters={getDistanceFromLatLonInMeters}
-    />
-  {/if}
+      />
+    {/if}
   
 
   
@@ -4238,7 +4246,7 @@
     <div class="loading-indicator">
       <div class="spinner"></div>
       <span>Lade weitere Bilder...</span>
-    </div>
+  </div>
   {:else if $pics.length > 0}
     <div class="end-indicator">
       <span>✅ {displayedImageCount} Bilder angezeigt</span>
@@ -4406,6 +4414,19 @@
             </button>
           </form>
         {/if}
+
+        <!-- Anonymous Access -->
+        <div class="modern-anonymous-section">
+          <div class="modern-anonymous-divider">
+            <span>oder</span>
+          </div>
+          <button class="modern-anonymous-btn" on:click={() => setAnonymousMode()}>
+            Anonym weiter
+          </button>
+          <p class="modern-anonymous-info">
+            Anonyme Benutzer können die Galerie ansehen, aber keine Bilder hochladen.
+          </p>
+        </div>
 
         <!-- Footer Links -->
         <div class="modern-login-footer">
@@ -5419,6 +5440,65 @@
   .modern-footer-separator {
     color: rgba(255, 255, 255, 0.5);
     font-weight: bold;
+  }
+
+  /* Anonymous section styles */
+  .modern-anonymous-section {
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+  }
+
+  .modern-anonymous-divider {
+    text-align: center;
+    margin-bottom: 1rem;
+    position: relative;
+  }
+
+  .modern-anonymous-divider::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.2);
+  }
+
+  .modern-anonymous-divider span {
+    background: #1a1a1a;
+    padding: 0 1rem;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.875rem;
+    position: relative;
+  }
+
+  .modern-anonymous-btn {
+    width: 100%;
+    padding: 0.875rem 1rem;
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-bottom: 0.75rem;
+  }
+
+  .modern-anonymous-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.3);
+    color: white;
+  }
+
+  .modern-anonymous-info {
+    margin: 0;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 0.8rem;
+    text-align: center;
+    line-height: 1.4;
   }
 
   @keyframes fadeIn {

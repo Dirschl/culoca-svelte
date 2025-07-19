@@ -62,7 +62,7 @@ export const load: PageServerLoad = async ({ params }) => {
         while (true) {
           const { data: batch, error: nearbyError } = await supabase
           .from('items')
-          .select('id, path_512, path_2048, path_64, original_name, title, description, lat, lon, width, height, is_private')
+          .select('id, path_512, path_2048, path_64, original_name, title, description, lat, lon, width, height, is_private, gallery')
           .not('lat', 'is', null)
           .not('lon', 'is', null)
           .not('path_512', 'is', null)
@@ -97,7 +97,8 @@ export const load: PageServerLoad = async ({ params }) => {
                 src64: item.path_64 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/${item.path_64}` : `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${item.path_512}`,
                 width: item.width,
                 height: item.height,
-                title: item.title || null
+                title: item.title || null,
+                gallery: item.gallery ?? true
               };
             })
             .filter((item: any) => item.distance <= maxRadius)

@@ -20,6 +20,8 @@
   let error = '';
   let profile: any = null;
   let nearby: any[] = [];
+  
+
   let radius = 500; // meters, default
   let radiusLoaded = false;
   let lastRadius = 500; // track radius changes
@@ -68,6 +70,8 @@
   // Original filename editing
   let editingFilename = false;
   let filenameEditValue = '';
+  
+
   
   // EXIF toggle
   let showFullExif = false;
@@ -202,6 +206,7 @@
       titleEditValue = image.title || '';
       filenameEditValue = image.original_name || '';
       descriptionEditValue = image.description || '';
+
       keywordsList = image.keywords || [];
       if (browser) {
         updateFavicon();
@@ -411,6 +416,10 @@
       console.log('📸 Using server-side loaded nearby items:', data.nearby.length);
       nearby = data.nearby
         .filter((item: any) => item.distance <= maxRadius)
+        .map((item: any) => ({
+          ...item,
+          gallery: item.gallery ?? true
+        }))
         .sort((a: any, b: any) => a.distance - b.distance);
     } else if (typeof window !== 'undefined' && (window as any).allImagesData) {
       // Fallback to global item data if available (from main page)
@@ -431,7 +440,8 @@
             src64: item.path_64 ? `${baseUrl}/images-64/${item.path_64}` : `${baseUrl}/images-512/${item.path_512}`,
             width: item.width,
             height: item.height,
-            title: item.title || null
+            title: item.title || null,
+            gallery: item.gallery ?? true
           };
         })
         .filter((it: any) => it.distance <= maxRadius)
@@ -961,6 +971,8 @@
     }
   }
 
+
+
   // Count keywords for validation
   $: keywordsCount = keywordsEditValue ? keywordsEditValue.split(',').filter(k => k.trim().length > 0).length : 0;
   $: keywordsValid = keywordsCount >= 10 && keywordsCount <= 50;
@@ -1351,6 +1363,63 @@
   $: if (image?.id) {
     itemId = image.id;
   }
+
+  // Gallery toggle function
+  async function toggleGallery() {
+    if (!isCreator || !image) return;
+    
+    try {
+      const newGalleryValue = !(image.gallery ?? true);
+      const { error } = await supabase
+        .from('items')
+        .update({ gallery: newGalleryValue })
+        .eq('id', image.id);
+      
+      if (error) {
+        console.error('Failed to toggle gallery flag:', error);
+        alert('Fehler beim Ändern des Gallery-Status: ' + error.message);
+        return;
+      }
+      
+      image.gallery = newGalleryValue;
+      console.log('Gallery flag toggled:', newGalleryValue);
+    } catch (err) {
+      console.error('Failed to toggle gallery flag:', err);
+      alert('Fehler beim Ändern des Gallery-Status');
+    }
+  }
+
+  // Funktionen für Nearby Gallery Toggle
+  async function handleNearbyGalleryToggle(itemId: string, newGalleryValue: boolean) {
+    if (!isCreator) return;
+    try {
+      const { error } = await supabase
+        .from('items')
+        .update({ gallery: newGalleryValue })
+        .eq('id', itemId);
+      if (error) {
+        console.error('Failed to toggle nearby gallery flag:', error);
+        alert('Fehler beim Ändern des Gallery-Status: ' + error.message);
+        return;
+      }
+      
+      // Update nearby items array - force reactivity by creating new array
+      const updatedNearby = nearby.map(item => 
+        item.id === itemId ? { ...item, gallery: newGalleryValue } : item
+      );
+      nearby = updatedNearby;
+      
+      console.log('Nearby gallery flag toggled:', itemId, newGalleryValue);
+    } catch (err) {
+      console.error('Failed to toggle nearby gallery flag:', err);
+      alert('Fehler beim Ändern des Gallery-Status');
+    }
+  }
+
+  function getNearbyGalleryStatus(itemId: string): boolean {
+    const item = nearby.find(n => n.id === itemId);
+    return item?.gallery ?? true;
+  }
 </script>
 
 <svelte:head>
@@ -1504,6 +1573,27 @@
                     <path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/>
                   </svg>
                 </button>
+                <button class="gallery-toggle-btn" on:click={toggleGallery} title="Aus Galerie entfernen/hinzufügen" class:active={image.gallery ?? true}>
+                  {#if image.gallery ?? true}
+                    <!-- 3x3 Grid für Gallery true -->
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                      <rect x="3" y="3" width="4" height="4"/>
+                      <rect x="10" y="3" width="4" height="4"/>
+                      <rect x="17" y="3" width="4" height="4"/>
+                      <rect x="3" y="10" width="4" height="4"/>
+                      <rect x="10" y="10" width="4" height="4"/>
+                      <rect x="17" y="10" width="4" height="4"/>
+                      <rect x="3" y="17" width="4" height="4"/>
+                      <rect x="10" y="17" width="4" height="4"/>
+                      <rect x="17" y="17" width="4" height="4"/>
+                    </svg>
+                  {:else}
+                    <!-- Einfaches Rechteck für Gallery false -->
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                      <rect x="4" y="4" width="16" height="16" stroke="currentColor" stroke-width="1" fill="none"/>
+                    </svg>
+                  {/if}
+                </button>
               {/if}
             </div>
           {/if}
@@ -1538,6 +1628,9 @@
                   userLat={image.lat}
                   userLon={image.lon}
                   getDistanceFromLatLonInMeters={getDistanceFromLatLonInMeters}
+                  showGalleryToggle={isCreator}
+                  onGalleryToggle={handleNearbyGalleryToggle}
+                  getGalleryStatus={getNearbyGalleryStatus}
                 />
               {:else}
                 <p class="no-nearby">Keine Items in der Nähe gefunden. Vergrößere den Radius oder es gibt keine anderen Items mit GPS-Koordinaten in der Nähe.</p>
@@ -3166,6 +3259,8 @@
     color: #dc3545; /* Red for too many */
   }
 
+
+
   /* CSS für Map-Picker und Buttons (an Bulk-Upload orientieren) */
   .map-edit-btn {
     background: linear-gradient(135deg, #ff9800, #ffc107);
@@ -3513,6 +3608,36 @@
     background: #ccc;
     cursor: not-allowed;
     transform: none;
+  }
+
+  .gallery-toggle-btn {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 8px;
+  }
+
+  .gallery-toggle-btn:hover {
+    background: var(--bg-tertiary);
+    border-color: var(--text-primary);
+    transform: scale(1.05);
+  }
+
+  .gallery-toggle-btn.active {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    border-color: var(--text-primary);
+  }
+
+  .gallery-toggle-btn.active:hover {
+    background: var(--bg-secondary);
   }
 
   /* Filename editing styles */

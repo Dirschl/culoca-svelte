@@ -21,6 +21,7 @@ export interface ActiveUserFilter {
 export interface SessionState {
 	userId: string | null;
 	isAuthenticated: boolean;
+	isAnonymous: boolean; // New field for anonymous users
 	customerBranding: CustomerBranding | null;
 	activeUserFilter: ActiveUserFilter | null;
 	isDuplicateDisplay: boolean;
@@ -30,6 +31,7 @@ function createSessionStore() {
 	const initialState: SessionState = {
 		userId: null,
 		isAuthenticated: false,
+		isAnonymous: true, // Default to anonymous
 		customerBranding: null,
 		activeUserFilter: null,
 		isDuplicateDisplay: false
@@ -70,7 +72,12 @@ function createSessionStore() {
 		// Set user authentication
 		setUser: (userId: string | null, isAuthenticated: boolean) => {
 			update(state => {
-				const newState = { ...state, userId, isAuthenticated };
+				const newState = { 
+					...state, 
+					userId, 
+					isAuthenticated,
+					isAnonymous: !isAuthenticated // Set anonymous based on authentication
+				};
 				saveToStorage(newState);
 				return newState;
 			});
@@ -140,6 +147,20 @@ function createSessionStore() {
 			});
 		},
 
+		// Set anonymous mode
+		setAnonymous: (isAnonymous: boolean) => {
+			update(state => {
+				const newState = { 
+					...state, 
+					isAnonymous,
+					isAuthenticated: !isAnonymous,
+					userId: isAnonymous ? null : state.userId
+				};
+				saveToStorage(newState);
+				return newState;
+			});
+		},
+
 		// Clear session
 		clearSession: () => {
 			if (browser) {
@@ -167,6 +188,7 @@ export const sessionStore = createSessionStore();
 // Derived stores
 export const isAuthenticated = derived(sessionStore, $sessionStore => $sessionStore.isAuthenticated);
 export const currentUserId = derived(sessionStore, $sessionStore => $sessionStore.userId);
+export const isAnonymous = derived(sessionStore, $sessionStore => $sessionStore.isAnonymous);
 export const customerBranding = derived(sessionStore, $sessionStore => $sessionStore.customerBranding);
 export const activeUserFilter = derived(sessionStore, $sessionStore => $sessionStore.activeUserFilter);
 export const isDuplicateDisplay = derived(sessionStore, $sessionStore => $sessionStore.isDuplicateDisplay);

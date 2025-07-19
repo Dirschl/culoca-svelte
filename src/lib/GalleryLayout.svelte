@@ -37,6 +37,9 @@
   export let getDistanceFromLatLonInMeters: ((lat1: number, lon1: number, lat2: number, lon2: number) => string) | null = null;
   export let showCompass: boolean = false;
   export let onImageClick: ((itemId: string) => void) | null = null;
+  export let showGalleryToggle: boolean = false;
+  export let onGalleryToggle: ((itemId: string, newGalleryValue: boolean) => void) | null = null;
+  export let getGalleryStatus: ((itemId: string) => boolean) | null = null;
 
   let boxes: LayoutBox[] = [];
   let layoutResult: JustifiedLayoutResult = { boxes: [], containerHeight: 0, widowCount: 0 };
@@ -144,6 +147,17 @@
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       handleImageClick(itemId);
+    }
+  }
+
+  function handleGalleryToggle(event: Event, itemId: string) {
+    event.preventDefault();
+    event.stopPropagation();
+    
+    if (onGalleryToggle && getGalleryStatus) {
+      const currentStatus = getGalleryStatus(itemId);
+      const newStatus = !currentStatus;
+      onGalleryToggle(itemId, newStatus);
     }
   }
 
@@ -277,20 +291,21 @@
     transform: scale(1.04);
   }
 
-  /* Distance Label Styles */
+  /* Distance Label Styles - Dark/Light Mode Design */
   .distance-label {
     position: absolute;
     left: 8px;
     bottom: 8px;
-    background: rgba(0,0,0,0.55);
-    backdrop-filter: blur(4px);
-    color: #fff;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
     font-size: 0.7rem;
     font-weight: 500;
     border-radius: 6px;
     padding: 1px 8px;
     z-index: 2;
     pointer-events: none;
+    opacity: 0.8;
   }
 
   /* Mobile distance label optimization */
@@ -320,6 +335,60 @@
     text-align: center;
     color: #666;
     font-size: 16px;
+  }
+
+  /* Gallery Toggle Button Styles - Dark/Light Mode Design */
+  .gallery-toggle-btn {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    opacity: 0.8;
+  }
+
+  .gallery-toggle-btn:hover {
+    background: var(--bg-tertiary);
+    border-color: var(--text-primary);
+    transform: scale(1.05);
+    opacity: 1;
+  }
+
+  .gallery-toggle-btn.active {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border-color: var(--text-primary);
+  }
+
+  .gallery-toggle-btn.active:hover {
+    background: var(--bg-tertiary);
+    border-color: var(--text-primary);
+  }
+
+  /* Mobile optimization for toggle button */
+  @media (max-width: 768px) {
+    .gallery-toggle-btn {
+      top: 6px;
+      left: 6px;
+      padding: 4px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .gallery-toggle-btn {
+      top: 4px;
+      left: 4px;
+      padding: 3px;
+    }
   }
 </style>
 
@@ -376,6 +445,34 @@
                     </svg>
                   </div>
                 {/if}
+                {#if showGalleryToggle && onGalleryToggle && getGalleryStatus}
+                  <button 
+                    class="gallery-toggle-btn" 
+                    on:click={(e) => handleGalleryToggle(e, item.id)} 
+                    title="Aus Galerie entfernen/hinzufügen" 
+                    class:active={getGalleryStatus(item.id)}
+                  >
+                    {#if getGalleryStatus(item.id)}
+                      <!-- 3x3 Grid für Gallery true -->
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                        <rect x="3" y="3" width="4" height="4"/>
+                        <rect x="10" y="3" width="4" height="4"/>
+                        <rect x="17" y="3" width="4" height="4"/>
+                        <rect x="3" y="10" width="4" height="4"/>
+                        <rect x="10" y="10" width="4" height="4"/>
+                        <rect x="17" y="10" width="4" height="4"/>
+                        <rect x="3" y="17" width="4" height="4"/>
+                        <rect x="10" y="17" width="4" height="4"/>
+                        <rect x="17" y="17" width="4" height="4"/>
+                      </svg>
+                    {:else}
+                      <!-- Einfaches Rechteck für Gallery false -->
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                        <rect x="4" y="4" width="16" height="16" stroke="currentColor" stroke-width="1" fill="none"/>
+                      </svg>
+                    {/if}
+                  </button>
+                {/if}
               </div>
             {/if}
           {/each}
@@ -412,6 +509,34 @@
                 {/if}
               {/if}
             </div>
+          {/if}
+          {#if showGalleryToggle && onGalleryToggle && getGalleryStatus}
+            <button 
+              class="gallery-toggle-btn" 
+              on:click={(e) => handleGalleryToggle(e, item.id)} 
+              title="Aus Galerie entfernen/hinzufügen" 
+              class:active={getGalleryStatus(item.id)}
+            >
+              {#if getGalleryStatus(item.id)}
+                <!-- 3x3 Grid für Gallery true -->
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="3" y="3" width="4" height="4"/>
+                  <rect x="10" y="3" width="4" height="4"/>
+                  <rect x="17" y="3" width="4" height="4"/>
+                  <rect x="3" y="10" width="4" height="4"/>
+                  <rect x="10" y="10" width="4" height="4"/>
+                  <rect x="17" y="10" width="4" height="4"/>
+                  <rect x="3" y="17" width="4" height="4"/>
+                  <rect x="10" y="17" width="4" height="4"/>
+                  <rect x="17" y="17" width="4" height="4"/>
+                </svg>
+              {:else}
+                <!-- Einfaches Rechteck für Gallery false -->
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="4" y="4" width="16" height="16" stroke="currentColor" stroke-width="1" fill="none"/>
+                </svg>
+              {/if}
+            </button>
           {/if}
         </div>
       {/each}
