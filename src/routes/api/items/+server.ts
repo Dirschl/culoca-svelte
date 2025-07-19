@@ -94,7 +94,7 @@ export const GET = async ({ url, request }) => {
         .not('lat', 'is', null)
         .not('lon', 'is', null)
         .not('path_512', 'is', null)
-        .limit(for_map ? 1000 : maxGpsImages); // Use batch loading for maps to bypass RLS limit
+        .limit(for_map ? 50000 : maxGpsImages); // Use higher limit for maps to bypass RLS limit
       
       // User-Filter anwenden
       if (user_id) {
