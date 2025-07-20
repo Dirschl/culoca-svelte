@@ -42,6 +42,46 @@
   let lastPosition: { lat: number; lon: number; timestamp: number } | null = null;
   let settingsIconRotation = 0; // Rotation des Settings-Icons
   
+  // Manual 3x3 mode toggle
+  let isManual3x3Mode = false; // Manueller 3x3 Modus (durch Klick auf GPS-Koordinaten)
+  
+  // Function to toggle 3x3 mode manually
+  function toggle3x3Mode() {
+    isManual3x3Mode = !isManual3x3Mode;
+    
+    if (isManual3x3Mode) {
+      console.log('🎯 Manueller 3x3 Modus aktiviert');
+      settingsIconRotation += 360; // Start rotation
+      show3x3ModeStatus('3x3 Grid Modus aktiviert', 3000);
+      
+      // Clear gallery and load 3x3 grid
+      pics.set([]);
+      page = 0;
+      hasMoreImages = true;
+      loadMore('manual 3x3 mode');
+    } else {
+      console.log('📋 Zurück zur normalen Galerie');
+      settingsIconRotation = 0; // Stop rotation
+      show3x3ModeStatus('Normale Galerie aktiviert', 3000);
+      
+      // Clear gallery and load normal list
+      pics.set([]);
+      page = 0;
+      hasMoreImages = true;
+      loadMore('normal gallery mode');
+    }
+  }
+  
+  // Function to stop 3x3 mode when filters/search are used
+  function stop3x3Mode() {
+    if (isManual3x3Mode) {
+      console.log('🛑 3x3 Modus durch Filter/Suche gestoppt');
+      isManual3x3Mode = false;
+      settingsIconRotation = 0; // Stop rotation
+      show3x3ModeStatus('3x3 Modus deaktiviert', 3000);
+    }
+  }
+  
   
 
   // Reaktive Funktion: Update displayed count whenever pics store changes
@@ -77,6 +117,11 @@
      const needsReload = hasUserFilter || hasLocationFilter || hasReferrerAccount;
 
      if (!searchQuery.trim() && !isSearching && !loading) {
+       // Stop 3x3 mode if filters are applied
+       if (needsReload && isManual3x3Mode) {
+         stop3x3Mode();
+       }
+       
        // Prevent infinite loop by checking if we're already processing this filter state
        const currentFilterState = JSON.stringify({
          userFilter: $filterStore.userFilter,
@@ -152,56 +197,14 @@
   
 
 
-  // Bewegungserkennung und Modus-Management
+  // Bewegungserkennung deaktiviert - nur manueller 3x3 Modus
   function checkMovement(newLat: number, newLon: number) {
-    if (!lastPosition) {
-      lastPosition = { lat: newLat, lon: newLon, timestamp: Date.now() };
-      return;
-    }
-    
-    const distance = getDistanceInMeters(lastPosition.lat, lastPosition.lon, newLat, newLon);
-    const timeDiff = Date.now() - lastPosition.timestamp;
-    
-    // Bewegung erkannt wenn > 10m in < 5 Sekunden (für Fußgänger optimiert)
-    if (distance > 10 && timeDiff < 5000) {
-      if (!isMoving) {
-        console.log(`🚶 Bewegung erkannt: ${distance.toFixed(0)}m in ${(timeDiff/1000).toFixed(1)}s`);
-        isMoving = true;
-        settingsIconRotation += 360;
-        updateGalleryMode();
-      }
-    } else if (distance < 5 && timeDiff > 5000) { // Stillstand: < 5m in > 5s
-      if (isMoving) {
-        console.log(`🛑 Stillstand erkannt: ${distance.toFixed(0)}m in ${(timeDiff/1000).toFixed(1)}s`);
-        isMoving = false;
-        settingsIconRotation += 360;
-        updateGalleryMode();
-      }
-    }
-    
+    // Bewegungserkennung ist deaktiviert - nur GPS-Tracking für normale Galerie
     lastPosition = { lat: newLat, lon: newLon, timestamp: Date.now() };
   }
   
   function updateGalleryMode() {
-    if (isMoving) {
-      console.log('🎯 Bewegungsmodus: Lade 3x3 Grid');
-      // Im Bewegungsmodus: Lade nur nahe Bilder in 3x3 Grid
-      pics.set([]);
-      page = 0;
-      hasMoreImages = true;
-      loadMore('movement mode - 3x3 grid');
-      
-      showModeStatus('Bewegungsmodus: 3x3 Grid', 3000);
-    } else {
-      console.log('📋 Statischer Modus: Lade komplette Liste nach Entfernung');
-      // Im statischen Modus: Lade alle Bilder nach Entfernung sortiert
-      pics.set([]);
-      page = 0;
-      hasMoreImages = true;
-      loadMore('static mode - full distance list');
-      
-      showModeStatus('Statischer Modus: Komplette Liste', 3000);
-    }
+    // Deaktiviert - Gallery-Modus wird nur manuell gesteuert
   }
   
   // Status-Nachricht für Modus-Wechsel
@@ -214,6 +217,19 @@
     
     setTimeout(() => {
       modeStatusVisible = false;
+    }, duration);
+  }
+  
+  // Status-Nachricht für 3x3 Modus
+  let mode3x3StatusMessage = '';
+  let mode3x3StatusVisible = false;
+  
+  function show3x3ModeStatus(message: string, duration: number = 3000) {
+    mode3x3StatusMessage = message;
+    mode3x3StatusVisible = true;
+    
+    setTimeout(() => {
+      mode3x3StatusVisible = false;
     }, duration);
   }
 
@@ -1503,25 +1519,62 @@
       
       console.log(`[Gallery DirectDB] Loading page ${currentPage}: range ${startIndex}-${endIndex}`);
       
-      let query = supabase
-        .from('items_search_view')
-        .select('id, lat, lon, path_512, path_2048, path_64, title, description, width, height, is_private, profile_id')
-        .not('lat', 'is', null)
-        .not('lon', 'is', null)
-        .not('path_512', 'is', null)
-        .eq('gallery', true) // Only show images with gallery = true
-        .range(startIndex, endIndex);
+      // Use distance-based sorting if GPS coordinates are available
+      let query;
+      if (lat && lon) {
+        console.log(`[Gallery DirectDB] Using distance-based sorting from ${lat}, ${lon}`);
+        
+        // Use the items_by_distance function for proper sorting
+        console.log(`[Gallery DirectDB] Calling RPC with params:`, {
+          user_lat: lat,
+          user_lon: lon,
+          page: currentPage,
+          page_size: pageSize,
+          filter_user_id: hasUserFilter ? currentFilters.userFilter?.userId : null,
+          require_gallery: false,
+          current_user_id: currentUserId
+        });
+        
+        query = supabase
+          .rpc('items_by_distance', {
+            user_lat: lat,
+            user_lon: lon,
+            page: currentPage,
+            page_size: pageSize,
+            filter_user_id: hasUserFilter ? currentFilters.userFilter?.userId : null,
+            require_gallery: true, // Only show gallery = true images for normal gallery
+            current_user_id: currentUserId // Pass current user ID for privacy filtering
+          });
+      } else {
+        // Fallback to date-based sorting if no GPS coordinates
+        console.log(`[Gallery DirectDB] No GPS coordinates available, using date-based sorting`);
+        
+        query = supabase
+          .from('items_search_view')
+          .select('id, lat, lon, path_512, path_2048, path_64, title, description, width, height, is_private, profile_id')
+          .not('lat', 'is', null)
+          .not('lon', 'is', null)
+          .not('path_512', 'is', null)
+          // Temporarily remove gallery filter to see if that's the issue
+          // .eq('gallery', true) // Only show images with gallery = true
+          .order('created_at', { ascending: false })
+          .range(startIndex, endIndex);
+      }
       
       // Apply privacy filtering based on user login status and filters
-      if (hasUserFilter && currentFilters.userFilter) {
-        query = query.eq('profile_id', currentFilters.userFilter.userId);
-        console.log(`[Gallery DirectDB] Adding user filter: ${currentFilters.userFilter.username}`);
-      } else if (currentUserId) {
-        query = query.or(`profile_id.eq.${currentUserId},is_private.eq.false,is_private.is.null`);
-        console.log(`[Gallery DirectDB] Privacy filter for logged in user: ${currentUserId}`);
-      } else {
-        query = query.or('is_private.eq.false,is_private.is.null');
-        console.log(`[Gallery DirectDB] Privacy filter for anonymous user`);
+      // Note: For distance-based queries, filtering is handled by the RPC function
+      if (!lat || !lon) {
+        // Only apply filters for non-distance queries (fallback mode)
+        if (hasUserFilter && currentFilters.userFilter) {
+          query = query.eq('profile_id', currentFilters.userFilter.userId);
+          console.log(`[Gallery DirectDB] Adding user filter: ${currentFilters.userFilter.username}`);
+        } else if (currentUserId) {
+          query = query.or(`profile_id.eq.${currentUserId},is_private.eq.false,is_private.is.null`);
+          console.log(`[Gallery DirectDB] Privacy filter for logged in user: ${currentUserId}`);
+        } else {
+          query = query.or('is_private.eq.false,is_private.is.null');
+          console.log(`[Gallery DirectDB] Privacy filter for anonymous user`);
+        }
       }
       
       const { data, error } = await query;
@@ -1533,11 +1586,24 @@
       
       console.log(`[Gallery DirectDB] Loaded ${data?.length || 0} images for page ${currentPage}`);
       
+      // Map the data to the expected format
       const images = (data || []).map(item => ({
-        ...item,
-        lat: item.lat!,
-        lon: item.lon!,
-        path_512: item.path_512!
+        id: item.id,
+        lat: item.lat,
+        lon: item.lon,
+        path_512: item.path_512,
+        path_2048: item.path_2048,
+        path_64: item.path_64,
+        title: item.title,
+        description: item.description,
+        width: item.width,
+        height: item.height,
+        is_private: item.is_private,
+        profile_id: item.profile_id,
+        keywords: item.keywords,
+        original_name: item.original_name,
+        exif_data: item.exif_data,
+        distance: item.distance // This comes from the distance function
       }));
       
       return images;
@@ -1936,6 +2002,10 @@
     
     // Don't load more images if a search is active (unless it's a navigation back)
     if ((searchQuery.trim() || searchResults.length > 0) && !reason.includes('navigation back')) {
+      // Stop 3x3 mode if search is active
+      if (isManual3x3Mode) {
+        stop3x3Mode();
+      }
       return;
     }
     
@@ -2002,15 +2072,22 @@
     // Always try to load images, regardless of GPS availability
     console.log(`[LoadMore Debug] Attempting to load images with reason: ${reason}`);
     
-          // Handle movement mode - 3x3 grid specifically
-      if (reason.includes('movement mode - 3x3 grid')) {
-        console.log(`[LoadMore] Movement mode detected - loading 3x3 grid`);
+          // Handle manual 3x3 mode or movement mode
+      if (reason.includes('manual 3x3 mode') || reason.includes('movement mode - 3x3 grid')) {
+        console.log(`[LoadMore] Manual 3x3 mode detected - loading 3x3 grid`);
         const bestGps = await getBestAvailableGps();
         const loadLat = bestGps?.lat || effectiveLat!;
         const loadLon = bestGps?.lon || effectiveLon!;
         
-        // Use 3x3 grid loading for movement mode
+        // Use 3x3 grid loading for manual 3x3 mode
         data = await loadInitialGridImages(loadLat, loadLon);
+      }
+      // Normal gallery mode - load all images sorted by distance
+      else if (reason.includes('normal gallery mode')) {
+        console.log(`[LoadMore] Normal gallery mode - loading all images sorted by distance`);
+        
+        // Load all images with pagination, sorted by distance
+        data = await loadImagesNormal(effectiveLat, effectiveLon, anchorItemId, false);
       }
       // Use GPS-based loading if location is available (from GPS or location filter)
       else if (hasValidGpsForGallery()) {
@@ -2393,9 +2470,10 @@
         }
         
         // Check if we should use 3×3 grid or GPS-based loading
-        if (!currentHasLocationFilter) {
-          // No location filter - use 3×3 grid loading
-          console.log('[Gallery Normal] No location filter active, using 3×3 grid loading');
+        // Only use 3×3 grid if we're in manual 3x3 mode
+        if (!currentHasLocationFilter && isManual3x3Mode) {
+          // Manual 3x3 mode active - use 3×3 grid loading
+          console.log('[Gallery Normal] Manual 3x3 mode active, using 3×3 grid loading');
           
           // Get current GPS position for 3×3 grid
           const currentGps = await getBestAvailableGps();
@@ -2436,24 +2514,21 @@
           return [];
         }
         
-                              // Use data directly from database and sort by distance
+                              // Use data directly from database (already sorted by distance)
             if (rawData && rawData.length > 0) {
-              console.log(`[Gallery Normal] Using ${rawData.length} images from database, calculating distances and sorting`);
+              console.log(`[Gallery Normal] Using ${rawData.length} images from database (already sorted by distance)`);
               
-              // Calculate distances for all images and sort them
+              // Add distance property for display purposes
               rawData.forEach((img: any) => {
                 if (img.lat && img.lon && effectiveLat && effectiveLon) {
-                  img.distance = getDistanceInMeters(effectiveLat, effectiveLon, img.lat, img.lon);
+                  img.distance = img.distance || getDistanceInMeters(effectiveLat, effectiveLon, img.lat, img.lon);
                 } else {
                   img.distance = Number.MAX_VALUE; // Put images without GPS at the end
                 }
               });
               
-              // Sort by distance to ensure correct order
-              rawData.sort((a: any, b: any) => (a.distance || 0) - (b.distance || 0));
-              
               // Debug: Log the first few images to verify sorting
-              console.log(`[Gallery Normal] First 5 images after sorting:`, rawData.slice(0, 5).map((img: any) => ({
+              console.log(`[Gallery Normal] First 5 images from database:`, rawData.slice(0, 5).map((img: any) => ({
                 id: img.id,
                 lat: img.lat,
                 lon: img.lon,
@@ -3771,7 +3846,10 @@
         // Enter movement mode
         if (!isInMovementMode) {
           isInMovementMode = true;
-          settingsIconRotation = 360; // Start rotation
+          // Only start rotation if manual 3x3 mode is active
+          if (isManual3x3Mode) {
+            settingsIconRotation = 360; // Start rotation
+          }
           console.log('🔄 [Movement] Entered movement mode');
         }
       } else {
@@ -3782,7 +3860,10 @@
         
         movementModeTimeout = setTimeout(() => {
           isInMovementMode = false;
-          settingsIconRotation = 0; // Stop rotation
+          // Only stop rotation if manual 3x3 mode is not active
+          if (!isManual3x3Mode) {
+            settingsIconRotation = 0; // Stop rotation
+          }
           console.log('🔄 [Movement] Exited movement mode (10s no movement)');
         }, 10000); // 10 seconds
       }
@@ -4210,6 +4291,11 @@
     (async () => {
     // SIMPLIFIED: Force initial gallery load for debugging
     console.log('🔄 [DEBUG] onMount - forcing immediate gallery load');
+    
+    // Add event listener for 3x3 mode toggle
+    window.addEventListener('toggle3x3Mode', () => {
+      toggle3x3Mode();
+    });
     
     // Set auth as checked to allow gallery loading
     authChecked = true;
@@ -6943,6 +7029,15 @@
   <div class="mode-status-overlay">
     <div class="mode-status-message">
       {modeStatusMessage}
+    </div>
+  </div>
+{/if}
+
+<!-- 3x3 Modus Status-Nachricht -->
+{#if mode3x3StatusVisible}
+  <div class="mode-status-overlay">
+    <div class="mode-status-message">
+      {mode3x3StatusMessage}
     </div>
   </div>
 {/if}

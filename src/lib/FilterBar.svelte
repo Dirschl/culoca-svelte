@@ -224,14 +224,16 @@
 					</div>
 				{:else if gpsStatus === 'active' && userLat !== null && userLon !== null}
 					<div class="gps-status active">
-						<span class="gps-coords">
-							{formatCoordinates(userLat, userLon)}
-						</span>
-						{#if gpsStatusInfo && gpsStatusInfo.text}
-							<span class="gps-time {gpsStatusInfo.isStale ? 'stale' : ''}">
-								{gpsStatusInfo.text}
+						<button class="gps-coords-clickable" on:click={() => window.dispatchEvent(new CustomEvent('toggle3x3Mode'))}>
+							<span class="gps-coords">
+								{formatCoordinates(userLat, userLon)}
 							</span>
-						{/if}
+							{#if gpsStatusInfo && gpsStatusInfo.text}
+								<span class="gps-time {gpsStatusInfo.isStale ? 'stale' : ''}">
+									{gpsStatusInfo.text}
+								</span>
+							{/if}
+						</button>
 					</div>
 				{:else if gpsStatus === 'checking'}
 					<div class="gps-status checking">
@@ -489,6 +491,27 @@
 
 	:global(.dark) .gps-status.none {
 		color: var(--text-primary, #f9fafb);
+	}
+
+	.gps-coords-clickable {
+		background: none;
+		border: none;
+		color: inherit;
+		cursor: pointer;
+		padding: 4px 8px;
+		border-radius: 6px;
+		transition: background-color 0.2s ease;
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+
+	.gps-coords-clickable:hover {
+		background: var(--bg-hover, rgba(0, 0, 0, 0.05));
+	}
+
+	:global(.dark) .gps-coords-clickable:hover {
+		background: var(--bg-hover, rgba(255, 255, 255, 0.05));
 	}
 
 	.gps-coords {
