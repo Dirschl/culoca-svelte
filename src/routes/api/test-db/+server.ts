@@ -1,10 +1,10 @@
 import { json } from '@sveltejs/kit';
-import { supabaseService } from '$lib/supabaseClient';
+import { supabase } from '$lib/supabaseClient';
 
 export const POST = async () => {
   try {
     // Test the current function
-    const { data: testData, error: testError } = await supabaseService
+    const { data: testData, error: testError } = await supabase
       .rpc('images_by_distance_optimized', {
         user_lat: 48.3380921172401,
         user_lon: 12.6950471210948,
@@ -81,7 +81,7 @@ export const POST = async () => {
         $$ LANGUAGE plpgsql;
       `;
       
-      const { error: fixError } = await supabaseService.rpc('exec_sql', { sql: fixQuery });
+      const { error: fixError } = await supabase.rpc('exec_sql', { sql: fixQuery });
       
       if (fixError) {
         console.error('Fix function error:', fixError);
@@ -89,7 +89,7 @@ export const POST = async () => {
       }
       
       // Test the fixed function
-      const { data: fixedData, error: fixedError } = await supabaseService
+      const { data: fixedData, error: fixedError } = await supabase
         .rpc('images_by_distance_optimized', {
           user_lat: 48.3380921172401,
           user_lon: 12.6950471210948,
