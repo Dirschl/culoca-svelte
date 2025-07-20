@@ -24,8 +24,8 @@ SELECT
 FROM items
 WHERE path_512 IS NOT NULL;
 
--- Create GIN index for full-text search
-CREATE INDEX IF NOT EXISTS idx_items_search_text ON items USING gin(to_tsvector('english', COALESCE(title, '') || ' ' || COALESCE(description, '') || ' ' || COALESCE(keywords, '')));
+-- Create GIN index for full-text search with German configuration
+CREATE INDEX IF NOT EXISTS idx_items_search_text_german ON items USING gin(to_tsvector('german', COALESCE(title, '') || ' ' || COALESCE(description, '') || ' ' || COALESCE(keywords, '')));
 
 -- Grant permissions
 GRANT SELECT ON items_search_view TO authenticated;

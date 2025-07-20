@@ -57,37 +57,43 @@
     }
     
     try {
-      // Temporäre Lösung: Direkte Suche auf items Tabelle bis items_search_view erstellt ist
+      // Server-side full-text search using items_search_view
+      const searchTerms = searchQuery.toLowerCase().split(/\s+/).filter(term => term.length > 0);
+      console.log('🔍 SearchResults: Search terms:', searchTerms);
+      
+      // Build the search query using full-text search
       let query = supabase
-        .from('items')
+        .from('items_search_view')
         .select('*')
         .eq('gallery', true) // Only show images with gallery = true
-        .order('created_at', { ascending: false })
-        // Kein Limit - alle Bilder
-        
+        .order('created_at', { ascending: false });
+      
+      // Apply privacy filtering
       if (userId) {
         query = query.or(`is_private.eq.false,profile_id.eq.${userId}`);
       } else {
         query = query.eq('is_private', false);
       }
       
+      // Add full-text search filter
+      if (searchTerms.length > 0) {
+        // Use PostgreSQL full-text search with german configuration
+        const searchText = searchTerms.join(' & ');
+        query = query.textSearch('search_text', searchText, {
+          config: 'german',
+          type: 'websearch'
+        });
+      }
+      
       const { data, error } = await query;
-      console.log('🔍 SearchResults: Direct items query result:', { searchQuery, userId, data: data?.length, error });
+      console.log('🔍 SearchResults: Server-side search result:', { searchQuery, userId, data: data?.length, error });
       
       if (error) {
         console.error('🔍 SearchResults: Query error:', error);
         results = [];
       } else {
-        // Client-side filtering for search terms
-        const searchTerms = searchQuery.toLowerCase().split(/\s+/).filter(term => term.length > 0);
-        const filteredData = (data || []).filter((item: any) => {
-          const searchText = `${item.title || ''} ${item.description || ''} ${Array.isArray(item.keywords) ? item.keywords.join(' ') : item.keywords || ''}`.toLowerCase();
-          return searchTerms.every(term => searchText.includes(term));
-        });
-        
-        console.log(`🔍 SearchResults: Found ${filteredData.length} results after client-side filtering`);
         // Transform data to match gallery format
-        const searchPics = filteredData.map((d: any) => ({
+        const searchPics = (data || []).map((d: any) => ({
           id: d.id,
           src: d.path_512 ? `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/images-512/${d.path_512}` : '',
           srcHD: d.path_2048 ? `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/images-2048/${d.path_2048}` : '',
@@ -102,6 +108,8 @@
           path_512: d.path_512,
           path_2048: d.path_2048
         })).filter((pic: any) => pic.path_512); // Filter out images without path_512
+        
+        console.log(`🔍 SearchResults: Found ${searchPics.length} results after server-side filtering`);
         
         // Sort by distance if GPS data is available
         if (showDistance && userLat !== null && userLon !== null) {
