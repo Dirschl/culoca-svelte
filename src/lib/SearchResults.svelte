@@ -57,32 +57,39 @@
     }
     
     try {
-      // Server-side full-text search using items_search_view
+      // Use the same simple database query as the main page
+      // This is the proven approach that shows 1000+ images
       const searchTerms = searchQuery.toLowerCase().split(/\s+/).filter(term => term.length > 0);
       console.log('🔍 SearchResults: Search terms:', searchTerms);
       
-      // Build the search query using full-text search
+      // Simple database query like the main page
       let query = supabase
-        .from('items_search_view')
-        .select('*')
+        .from('items')
+        .select('id, lat, lon, path_512, path_2048, path_64, title, description, width, height, is_private, profile_id, keywords')
+        .not('lat', 'is', null)
+        .not('lon', 'is', null)
+        .not('path_512', 'is', null)
         .eq('gallery', true) // Only show images with gallery = true
         .order('created_at', { ascending: false });
       
-      // Apply privacy filtering
+      // Apply privacy filtering like the main page
       if (userId) {
-        query = query.or(`is_private.eq.false,profile_id.eq.${userId}`);
+        query = query.or(`profile_id.eq.${userId},is_private.eq.false,is_private.is.null`);
+        console.log('🔍 SearchResults: Privacy filter for logged in user:', userId);
       } else {
-        query = query.eq('is_private', false);
+        query = query.or('is_private.eq.false,is_private.is.null');
+        console.log('🔍 SearchResults: Privacy filter for anonymous user');
       }
       
-      // Add full-text search filter
+      // Add simple text search like the main page
       if (searchTerms.length > 0) {
-        // Use PostgreSQL full-text search with german configuration
-        const searchText = searchTerms.join(' & ');
-        query = query.textSearch('search_text', searchText, {
-          config: 'german',
-          type: 'websearch'
-        });
+        // Simple ILIKE search in title, description, and keywords
+        const searchConditions = searchTerms.map(term => 
+          `or(title.ilike.%${term}%,description.ilike.%${term}%,keywords.cs.{${term}})`
+        ).join(',');
+        
+        query = query.or(searchConditions);
+        console.log('🔍 SearchResults: Added simple text search conditions');
       }
       
       const { data, error } = await query;
@@ -92,7 +99,7 @@
         console.error('🔍 SearchResults: Query error:', error);
         results = [];
       } else {
-        // Transform data to match gallery format
+        // Transform data to match gallery format (same as main page)
         const searchPics = (data || []).map((d: any) => ({
           id: d.id,
           src: d.path_512 ? `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/images-512/${d.path_512}` : '',
