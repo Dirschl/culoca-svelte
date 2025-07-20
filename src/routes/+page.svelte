@@ -26,8 +26,7 @@
   const dynamicLoader = dynamicImageLoader;
   let page = 0, size = 100, loading = false, hasMoreImages = true; // 100 Bilder pro Batch für Location Filter
   let displayedImageCount = 0; // Zähler für tatsächlich angezeigte Bilder
-  let removedDuplicatesList: any[] = []; // Liste der entfernten Duplikate
-  let showRemovedDuplicates = false; // Flag zum Anzeigen der entfernten Duplikate
+
   let galleryKey = Date.now(); // Key to force gallery component re-render
   let hasLocationFilter = false; // Global variable for location filter state
   let lastFilterState = ''; // Track last filter state to prevent infinite loops
@@ -142,27 +141,7 @@
      }
    }
   
-  // Funktion zum Entfernen von Duplikaten aus der Galerie
-  function removeDuplicates() {
-    const currentPics = get(pics);
-    const uniquePics = currentPics.filter((pic, index, self) => 
-      index === self.findIndex(p => p.id === pic.id)
-    );
-    
-    if (uniquePics.length !== currentPics.length) {
-      const removedDuplicates = currentPics.filter((pic, index, self) => 
-        index !== self.findIndex(p => p.id === pic.id)
-      );
-      
-      console.log(`🧹 Removed ${removedDuplicates.length} duplicate images from gallery:`, removedDuplicates);
-      
-      // Store removed duplicates for display
-      removedDuplicatesList = removedDuplicates;
-      showRemovedDuplicates = true;
-      
-              pics.set(uniquePics);
-    }
-  }
+
 
   // Funktion um zu prüfen, ob GPS-Daten für die Galerie verfügbar sind
   function hasValidGpsForGallery(): boolean {
@@ -4837,6 +4816,10 @@
 
 </script>
 
+
+
+
+
 <!-- Dialoge für Upload und EXIF Upload -->
 {#if showUploadDialog}
   <div class="dialog-overlay" on:click={closeDialogs}>
@@ -5123,26 +5106,7 @@
     <div class="end-indicator">
       <span>✅ {displayedImageCount} Bilder angezeigt</span>
       
-      {#if showRemovedDuplicates && removedDuplicatesList.length > 0}
-        <div class="removed-duplicates-section">
-          <h4>🗑️ Entfernte Duplikate ({removedDuplicatesList.length})</h4>
-          <div class="removed-duplicates-grid">
-            {#each removedDuplicatesList as duplicate}
-              <div class="removed-duplicate-item">
-                <img src={duplicate.src} alt={duplicate.title || 'Bild'} />
-                <div class="duplicate-info">
-                  <strong>ID:</strong> {duplicate.id}<br>
-                  <strong>Titel:</strong> {duplicate.title || 'Kein Titel'}<br>
-                  <strong>GPS:</strong> {duplicate.lat && duplicate.lon ? `${duplicate.lat.toFixed(6)}, ${duplicate.lon.toFixed(6)}` : 'Keine GPS-Daten'}
-                </div>
-              </div>
-            {/each}
-          </div>
-          <button class="hide-duplicates-btn" on:click={() => showRemovedDuplicates = false}>
-            Liste ausblenden
-          </button>
-        </div>
-      {/if}
+
     </div>
   {/if}
   
@@ -6471,7 +6435,7 @@
     }
   }
 
-  /* End indicator and duplicate removal */
+  /* End indicator */
   .end-indicator {
     text-align: center;
     padding: 20px;
@@ -6481,79 +6445,6 @@
     flex-direction: column;
     align-items: center;
     gap: 10px;
-  }
-  
-  .remove-duplicates-btn {
-    background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    padding: 8px 16px;
-    font-size: 12px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-  }
-  
-  .remove-duplicates-btn:hover {
-    background: var(--accent-color);
-    color: white;
-  }
-
-  /* Removed duplicates section */
-  .removed-duplicates-section {
-    margin-top: 20px;
-    padding: 20px;
-    background: var(--bg-secondary);
-    border-radius: 8px;
-    border: 1px solid var(--border-color);
-  }
-
-  .removed-duplicates-section h4 {
-    margin: 0 0 15px 0;
-    color: var(--text-primary);
-    font-size: 1.1em;
-  }
-
-  .removed-duplicates-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 15px;
-    margin-bottom: 15px;
-  }
-
-  .removed-duplicate-item {
-    display: flex;
-    flex-direction: column;
-    background: var(--bg-tertiary);
-    border-radius: 6px;
-    overflow: hidden;
-    border: 1px solid var(--border-color);
-  }
-
-  .removed-duplicate-item img {
-    width: 100%;
-    height: 120px;
-    object-fit: cover;
-  }
-
-  .duplicate-info {
-    padding: 10px;
-    font-size: 0.8em;
-    color: var(--text-secondary);
-    line-height: 1.4;
-  }
-
-  .hide-duplicates-btn {
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    padding: 8px 16px;
-    font-size: 12px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-  }
-
-  .hide-duplicates-btn:hover {
-    background: var(--border-color);
   }
 
   .impressum-link, .datenschutz-link {
