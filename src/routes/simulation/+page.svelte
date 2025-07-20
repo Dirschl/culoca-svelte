@@ -40,6 +40,7 @@
   // Map state
   let mapInitialized = false;
   let userMarker: any = null;
+  let userHasSetZoom = false; // Verhindert automatische Zoom-Anpassung nach User-Interaktion
 
   let showNoGPSList = false;
   let showIncompleteList = false;
@@ -536,6 +537,9 @@
       
       console.log(`🗺️ Map clicked at: ${newLat}, ${newLon}`);
       
+      // Mark that user has interacted with the map
+      userHasSetZoom = true;
+      
       // Update user marker position
       if (userMarker) {
         userMarker.setLatLng([newLat, newLon]);
@@ -543,6 +547,17 @@
       
       // Update simulation position
       updateSimulatedPosition(newLat, newLon);
+    });
+
+    // Mark user interaction when they zoom or pan
+    map.on('zoomend', () => {
+      userHasSetZoom = true;
+      console.log('User zoomed - preventing automatic zoom adjustments');
+    });
+
+    map.on('moveend', () => {
+      userHasSetZoom = true;
+      console.log('User panned - preventing automatic zoom adjustments');
     });
 
     mapInitialized = true;
@@ -617,8 +632,8 @@
       marker.addTo(map);
     });
     
-    // Fit map to show all markers if we have any
-    if (imagesWithGPS.length > 0) {
+    // Fit map to show all markers if we have any (nur beim ersten Laden)
+    if (imagesWithGPS.length > 0 && !userHasSetZoom) {
       // Create a feature group with all image markers
       // @ts-ignore
       const group = new L.featureGroup();
@@ -632,7 +647,7 @@
       
       if (group.getLayers().length > 0) {
         map.fitBounds(group.getBounds().pad(0.1));
-        console.log('Map fitted to show all individual image markers');
+        console.log('Map fitted to show all individual image markers (first load only)');
       }
     }
   }

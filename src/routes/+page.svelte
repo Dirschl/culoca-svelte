@@ -33,6 +33,15 @@
   let filterChangeTimeout: NodeJS.Timeout | null = null; // Debounce timeout for filter changes
   let anchorItemId: string | null = null; // ID of the anchor item (selected item with 0km distance)
   
+  // Long press functionality
+  let longPressTarget: HTMLElement | null = null;
+  let longPressTimeout: number | null = null;
+  
+  // Bewegungserkennung für Gallery-Modi
+  let isMoving = false; // Bewegungsmodus aktiv
+  let lastPosition: { lat: number; lon: number; timestamp: number } | null = null;
+  let settingsIconRotation = 0; // Rotation des Settings-Icons
+  
   
 
   // Reaktive Funktion: Update displayed count whenever pics store changes
@@ -142,6 +151,71 @@
    }
   
 
+
+  // Bewegungserkennung und Modus-Management
+  function checkMovement(newLat: number, newLon: number) {
+    if (!lastPosition) {
+      lastPosition = { lat: newLat, lon: newLon, timestamp: Date.now() };
+      return;
+    }
+    
+    const distance = getDistanceInMeters(lastPosition.lat, lastPosition.lon, newLat, newLon);
+    const timeDiff = Date.now() - lastPosition.timestamp;
+    
+    // Bewegung erkannt wenn > 10m in < 5 Sekunden (für Fußgänger optimiert)
+    if (distance > 10 && timeDiff < 5000) {
+      if (!isMoving) {
+        console.log(`🚶 Bewegung erkannt: ${distance.toFixed(0)}m in ${(timeDiff/1000).toFixed(1)}s`);
+        isMoving = true;
+        settingsIconRotation += 360;
+        updateGalleryMode();
+      }
+    } else if (distance < 5 && timeDiff > 5000) { // Stillstand: < 5m in > 5s
+      if (isMoving) {
+        console.log(`🛑 Stillstand erkannt: ${distance.toFixed(0)}m in ${(timeDiff/1000).toFixed(1)}s`);
+        isMoving = false;
+        settingsIconRotation += 360;
+        updateGalleryMode();
+      }
+    }
+    
+    lastPosition = { lat: newLat, lon: newLon, timestamp: Date.now() };
+  }
+  
+  function updateGalleryMode() {
+    if (isMoving) {
+      console.log('🎯 Bewegungsmodus: Lade 3x3 Grid');
+      // Im Bewegungsmodus: Lade nur nahe Bilder in 3x3 Grid
+      pics.set([]);
+      page = 0;
+      hasMoreImages = true;
+      loadMore('movement mode - 3x3 grid');
+      
+      showModeStatus('Bewegungsmodus: 3x3 Grid', 3000);
+    } else {
+      console.log('📋 Statischer Modus: Lade komplette Liste nach Entfernung');
+      // Im statischen Modus: Lade alle Bilder nach Entfernung sortiert
+      pics.set([]);
+      page = 0;
+      hasMoreImages = true;
+      loadMore('static mode - full distance list');
+      
+      showModeStatus('Statischer Modus: Komplette Liste', 3000);
+    }
+  }
+  
+  // Status-Nachricht für Modus-Wechsel
+  let modeStatusMessage = '';
+  let modeStatusVisible = false;
+  
+  function showModeStatus(message: string, duration: number = 3000) {
+    modeStatusMessage = message;
+    modeStatusVisible = true;
+    
+    setTimeout(() => {
+      modeStatusVisible = false;
+    }, duration);
+  }
 
   // Funktion um zu prüfen, ob GPS-Daten für die Galerie verfügbar sind
   function hasValidGpsForGallery(): boolean {
@@ -1928,19 +2002,29 @@
     // Always try to load images, regardless of GPS availability
     console.log(`[LoadMore Debug] Attempting to load images with reason: ${reason}`);
     
-    // Use GPS-based loading if location is available (from GPS or location filter)
-    if (hasValidGpsForGallery()) {
-      // Get the best available GPS coordinates
-      const bestGps = await getBestAvailableGps();
-      const loadLat = bestGps?.lat || effectiveLat!;
-      const loadLon = bestGps?.lon || effectiveLon!;
-      
-      console.log(`[LoadMore Debug] Using GPS-based loading with coordinates: ${loadLat}, ${loadLon}`);
-      
-      // Use client-side GPS-based sorting instead of database function (which has errors)
-      data = await loadImagesNormal(effectiveLat, effectiveLon, anchorItemId, false);
+          // Handle movement mode - 3x3 grid specifically
+      if (reason.includes('movement mode - 3x3 grid')) {
+        console.log(`[LoadMore] Movement mode detected - loading 3x3 grid`);
+        const bestGps = await getBestAvailableGps();
+        const loadLat = bestGps?.lat || effectiveLat!;
+        const loadLon = bestGps?.lon || effectiveLon!;
+        
+        // Use 3x3 grid loading for movement mode
+        data = await loadInitialGridImages(loadLat, loadLon);
+      }
+      // Use GPS-based loading if location is available (from GPS or location filter)
+      else if (hasValidGpsForGallery()) {
+        // Get the best available GPS coordinates
+        const bestGps = await getBestAvailableGps();
+        const loadLat = bestGps?.lat || effectiveLat!;
+        const loadLon = bestGps?.lon || effectiveLon!;
+        
+        console.log(`[LoadMore Debug] Using GPS-based loading with coordinates: ${loadLat}, ${loadLon}`);
+        
+        // Use client-side GPS-based sorting instead of database function (which has errors)
+        data = await loadImagesNormal(effectiveLat, effectiveLon, anchorItemId, false);
 
-    } else {
+      } else {
       // Keine GPS-Daten verfügbar - lade mit Datumssortierung als Fallback
       console.log(`[LoadMore Debug] No GPS data available, using date-based sorting as fallback`);
       
@@ -3487,6 +3571,9 @@
   gpsStatus = 'active';
   lastGPSUpdateTime = Date.now();
   
+  // Check for movement and update gallery mode
+  checkMovement(newLat, newLon);
+  
   // Update movement mode
   updateMovementMode(newLat, newLon);
     
@@ -3668,7 +3755,6 @@
   // Movement mode state
   let isInMovementMode = false;
   let movementModeTimeout: ReturnType<typeof setTimeout> | null = null;
-  let settingsIconRotation = 0;
   
   // Update movement mode based on GPS position changes
   function updateMovementMode(newLat: number, newLon: number) {
@@ -5099,7 +5185,20 @@
       userLon={$filterStore.locationFilter?.lon || $filterStore.lastGpsPosition?.lon || userLon}
       getDistanceFromLatLonInMeters={getDistanceFromLatLonInMeters}
       />
+
+  <!-- Mobile-Modus Erklärung - für alle User, ohne Seiten-Reload -->
+  <div class="mobile-mode-explanation">
+    <div class="explanation-content">
+      <h3>Mobile‑Modus</h3>
+      <p>Zeigt dir nur Bilder in einem 10 × 10‑Kilometer‑Quadrat – mindestens 5 km rund um deinen aktuellen Standort, selbst wenn du dich bewegst.</p>
       
+      <h4>Mehr sehen?</h4>
+      <p>Wechsle in den Endlos‑Modus und scrolle, bis der Daumen glüht: Die App lädt fortlaufend 100er‑Pakete an Bildern, bis wirklich alles gezeigt wurde.</p>
+      
+      <h4>Fernweh?</h4>
+      <p>Tippe auf ein Bild, um einen entfernten Spot zu wählen. Mit dem Culoca‑Marker setzt du ihn als neues Zentrum deiner Suche – perfekt, um schon mal eine fremde Region zu erkunden.</p>
+    </div>
+  </div>
 
     {/if}
   
@@ -5108,13 +5207,10 @@
   {#if loading}
     <div class="loading-indicator">
       <div class="spinner"></div>
-      <span>Lade weitere Bilder...</span>
   </div>
   {:else if $pics.length > 0}
     <div class="end-indicator">
       <span>✅ {displayedImageCount} Bilder angezeigt</span>
-      
-
     </div>
   {/if}
   
@@ -6794,6 +6890,29 @@
   .simple-empty-message p {
     margin: 0;
   }
+
+  /* Bewegungsmodus Status-Nachricht */
+  .mode-status-overlay {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 10000;
+    pointer-events: none;
+  }
+
+  .mode-status-message {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    padding: 12px 20px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 4px 16px var(--shadow);
+    font-size: 14px;
+    font-weight: 500;
+    text-align: center;
+    white-space: nowrap;
+  }
 </style>
 
 <!-- Fullscreen Map -->
@@ -6818,6 +6937,15 @@
 <!-- Impressum-Link links unten -->
 <a class="impressum-link" href="#" on:click|preventDefault={() => showImpressum = true}>Impressum</a>
 <a class="datenschutz-link" href="#" on:click|preventDefault={() => showDatenschutz = true}>Datenschutz</a>
+
+<!-- Bewegungsmodus Status-Nachricht -->
+{#if modeStatusVisible}
+  <div class="mode-status-overlay">
+    <div class="mode-status-message">
+      {modeStatusMessage}
+    </div>
+  </div>
+{/if}
 
 {#if showImpressum}
   <div class="impressum-modal-overlay" on:click={() => showImpressum = false}>

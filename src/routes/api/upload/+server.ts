@@ -722,13 +722,40 @@ export const POST = async ({ request }) => {
         successfulUploads.push(filename);
         console.log(`✅ Successfully processed: ${filename}`);
         
-      } catch (fileError) {
-        console.error(`❌ Failed to process file: ${filename}`, fileError);
-        failedUploads.push(filename);
+        // Token-Erneuerung nach erfolgreichem Upload für nächste Datei
+        if (i < totalFiles - 1) { // Nicht nach der letzten Datei
+          try {
+            console.log('🔄 Attempting token refresh for next upload...');
+            
+            // Erstelle neuen Supabase-Client mit aktuellem JWT für Token-Erneuerung
+            const refreshSupabase = createClient(supabaseUrl, supabaseAnonKey, {
+              global: {
+                headers: {
+                  Authorization: jwt ? `Bearer ${jwt}` : undefined
+                }
+              }
+            });
+            
+            // Versuche Token-Erneuerung
+            const { data: refreshData, error: refreshError } = await refreshSupabase.auth.refreshSession();
+            
+            if (refreshError) {
+              console.warn('⚠️ Token refresh failed for next upload:', refreshError);
+            } else {
+              console.log('🔄 Token refreshed successfully for next upload');
+            }
+          } catch (refreshErr) {
+            console.warn('⚠️ Token refresh attempt failed:', refreshErr);
+          }
+        }
         
-        // Continue with next file instead of stopping the entire upload
-        continue;
-      }
+        } catch (fileError) {
+          console.error(`❌ Failed to process file: ${filename}`, fileError);
+          failedUploads.push(filename);
+          
+          // Continue with next file instead of stopping the entire upload
+          continue;
+        }
     }
 
     // Upload Summary
@@ -741,6 +768,7 @@ export const POST = async ({ request }) => {
       console.log(`\n✅ Successfully uploaded:`);
       successfulUploads.forEach((filename, index) => {
         console.log(`  ${index + 1}. ${filename}`);
+
       });
     }
     

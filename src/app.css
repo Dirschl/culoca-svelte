@@ -174,3 +174,43 @@ html, body {
 * {
   transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
 }
+
+/* Mobile Mode Explanation Styles */
+.mobile-mode-explanation {
+  width: 75%;
+  margin: 1.8rem;
+  text-align: left;
+}
+
+.explanation-content {
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.explanation-content h3 {
+  color: var(--text-primary);
+  margin: 0 0 15px 0;
+  font-size: 1.2em;
+  font-weight: 600;
+}
+
+.explanation-content h4 {
+  color: var(--text-primary);
+  margin: 15px 0 8px 0;
+  font-size: 1em;
+  font-weight: 600;
+}
+
+.explanation-content p {
+  color: var(--text-secondary);
+  margin: 0 0 12px 0;
+  line-height: 1.5;
+  font-size: 0.95em;
+}
+
+@media (max-width: 768px) {
+  .mobile-mode-explanation {
+    /* width: 85%; */
+    /* padding: 15px 0; */
+  }
+}
