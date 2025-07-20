@@ -3,7 +3,6 @@
   import { supabase } from '$lib/supabaseClient';
   import type { NewsFlashImage } from '$lib/types';
   import GalleryLayout from '$lib/GalleryLayout.svelte';
-  import { getDistanceInMeters } from '$lib/imageUtils';
   
   export let searchQuery: string = '';
   export let userId: string = '';
