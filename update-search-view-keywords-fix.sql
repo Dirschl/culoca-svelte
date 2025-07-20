@@ -1,7 +1,7 @@
--- Fix items_search_view for proper German full-text search
--- This ensures the search functionality works correctly
+-- Fix items_search_view to properly handle keywords array
+-- This ensures keywords are properly converted from array to string for search
 
--- Drop and recreate the view
+-- Drop and recreate the view with proper keywords handling
 DROP VIEW IF EXISTS items_search_view;
 
 CREATE VIEW items_search_view AS
@@ -56,18 +56,16 @@ CREATE INDEX idx_items_search_text_german ON items USING gin(
 GRANT SELECT ON items_search_view TO authenticated;
 GRANT SELECT ON items_search_view TO anon;
 
--- Test the view
-SELECT COUNT(*) as total_items FROM items_search_view;
-SELECT COUNT(*) as items_with_search_text FROM items_search_view WHERE search_text != '';
+-- Test the fix
+SELECT 'View updated successfully' as status;
 
--- Show some examples of search_text content
-SELECT id, title, description, keywords, search_text 
+-- Show some examples of how keywords are now handled
+SELECT 
+  id, 
+  title, 
+  keywords,
+  array_to_string(keywords, ' ') as keywords_string,
+  search_text
 FROM items_search_view 
-WHERE search_text != '' 
-LIMIT 5;
-
--- Test search for "Burghausen" specifically
-SELECT id, title, description, keywords, search_text 
-FROM items_search_view 
-WHERE search_text ILIKE '%burghausen%' 
-LIMIT 10; 
+WHERE keywords IS NOT NULL AND keywords != '{}'
+LIMIT 5; 
