@@ -16,7 +16,7 @@ export const GET = async ({ url, request }) => {
     // Query-Parameter: limit (default 100), user_id (optional), offset (optional)
     // New filter parameters: filter_user_id, lat, lon, radius (for GPS-based filtering)
     // Special parameter: for_map (for map clustering - bypasses limit)
-    const limit = parseInt(url.searchParams.get('limit') || '100', 10);
+    const limit = parseInt(url.searchParams.get('limit') || '999999', 10);
     const offset = parseInt(url.searchParams.get('offset') || '0', 10);
     const user_id = url.searchParams.get('user_id');
     const filter_user_id = url.searchParams.get('filter_user_id');
@@ -80,7 +80,7 @@ export const GET = async ({ url, request }) => {
     });
     if (useGpsFiltering) {
       console.log('🔍 API Debug - Using GPS filtering with coordinates:', { lat, lon });
-      const maxGpsImages = for_map ? 50000 : 10000; // Für Karten 50000, sonst 10000 Bilder
+      const maxGpsImages = Infinity; // Keine Begrenzung - alle Bilder laden
       
       // For maps, use service role client to bypass RLS 1000-row limit
       const dbClient = for_map ? supabaseService : supabase;
@@ -95,7 +95,7 @@ export const GET = async ({ url, request }) => {
         .not('lon', 'is', null)
         .not('path_512', 'is', null)
         .eq('gallery', true) // Only show images with gallery = true
-        .limit(for_map ? 50000 : maxGpsImages); // Use higher limit for maps to bypass RLS limit
+        .limit(1000000); // Very high limit to load all images
       
       // User-Filter anwenden
       if (user_id) {
@@ -114,60 +114,14 @@ export const GET = async ({ url, request }) => {
         }
       }
       
-      // For maps without service key, use batch loading to get more than 1000 items
+      // Load all images without batching
       let allGpsData = [];
-      console.log(`🔍 API Debug - Batch loading check: for_map=${for_map}, supabaseServiceKey=${!!supabaseServiceKey}, condition=${for_map && !supabaseServiceKey}`);
-      if (for_map && !supabaseServiceKey) {
-        console.log('🔍 API Debug - Using batch loading for maps (no service key available)');
-        const batchSize = 1000;
-        let hasMore = true;
-        let batchOffset = 0;
-        
-        while (hasMore && allGpsData.length < maxGpsImages) {
-          const batchQuery = supabase
-            .from('items')
-            .select('id, path_512, path_2048, path_64, original_name, created_at, user_id, profile_id, title, description, lat, lon, width, height, is_private')
-            .not('lat', 'is', null)
-            .not('lon', 'is', null)
-            .not('path_512', 'is', null)
-            .eq('gallery', true) // Only show images with gallery = true
-            .range(batchOffset, batchOffset + batchSize - 1);
-            
-          // Apply same user filters to batch
-          if (user_id) {
-            batchQuery.eq('user_id', user_id);
-          } else if (filter_user_id) {
-            batchQuery.eq('profile_id', filter_user_id);
-          } else {
-            if (current_user_id) {
-              batchQuery.or(`profile_id.eq.${current_user_id},is_private.eq.false,is_private.is.null`);
-            } else {
-              batchQuery.or('is_private.eq.false,is_private.is.null');
-            }
-          }
-          
-          const { data: batchData, error: batchError } = await batchQuery;
-          if (batchError) throw error(500, batchError.message);
-          
-          if (batchData && batchData.length > 0) {
-            allGpsData.push(...batchData);
-            console.log(`🔍 API Debug - Loaded batch ${Math.floor(batchOffset/batchSize) + 1}: ${batchData.length} items, total: ${allGpsData.length}`);
-            
-            // Continue if we got a full batch
-            hasMore = batchData.length === batchSize;
-            batchOffset += batchSize;
-          } else {
-            hasMore = false;
-          }
-        }
-        
-        console.log(`🔍 API Debug - Batch loading complete: ${allGpsData.length} total items loaded`);
-      } else {
-        // Regular single query (with or without service key)
-        const { data: gpsData, error: gpsError } = await gpsQuery;
-        if (gpsError) throw error(500, gpsError.message);
-        allGpsData = gpsData || [];
-      }
+      console.log(`🔍 API Debug - Loading all images without batching`);
+      
+      // Single query to get all images
+      const { data: gpsData, error: gpsError } = await gpsQuery;
+      if (gpsError) throw error(500, gpsError.message);
+      allGpsData = gpsData || [];
       
       console.log('🔍 API Debug - Raw GPS data loaded:', allGpsData?.length || 0, 'items');
       
@@ -191,12 +145,20 @@ export const GET = async ({ url, request }) => {
         return item;
       });
       
+      // Debug: Markiere die Distanzen mit "+" um zu zeigen, dass sie von der API kommen
+      itemsWithDistance = itemsWithDistance.map(item => ({
+        ...item,
+        distance: (item as any).distance ? (item as any).distance + 0.001 : null // Kleine Abweichung um API-Distanzen zu markieren
+      }));
+      
       console.log('🔍 API Debug - Items with distance calculated:', itemsWithDistance.length);
       
       itemsWithDistance.sort((a, b) => ((a as any).distance || Infinity) - ((b as any).distance || Infinity));
       
       console.log('🔍 API Debug - Items after sorting by distance:', itemsWithDistance.length);
       console.log('🔍 API Debug - First 3 items after sorting:', itemsWithDistance.slice(0, 3).map(item => ({ id: item.id, distance: (item as any).distance })));
+      
+
       
       // Apply radius filter if specified
       if (radius && !isNaN(parseFloat(radius))) {

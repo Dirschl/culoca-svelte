@@ -123,7 +123,10 @@
   });
   
   function handleImageClick(image: NewsFlashImage) {
-    goto(`/item/${image.id}`);
+    // Navigate to item detail page with anchor parameter
+    const url = new URL(`/item/${image.id}`, window.location.origin);
+    url.searchParams.set('anchor', image.id);
+    goto(url.toString());
   }
 </script>
 

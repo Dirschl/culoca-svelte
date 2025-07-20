@@ -1239,7 +1239,7 @@
       const currentUserId = session?.user?.id || null;
       
       // Batch loading to get more than 1000 items
-      const batchSize = 1000;
+      const batchSize = Infinity; // Kein Limit - alle Bilder
       let allImages = [];
       let hasMore = true;
       let offset = 0;

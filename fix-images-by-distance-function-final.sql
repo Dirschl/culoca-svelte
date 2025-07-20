@@ -1,10 +1,10 @@
--- Fix images_by_distance function - remove camera column reference
+-- Fix images_by_distance function - remove camera and lens column references
 -- This ensures the function works with the current database schema
 
 -- Drop the existing function
 DROP FUNCTION IF EXISTS images_by_distance;
 
--- Create the updated function without camera column
+-- Create the updated function without camera and lens columns
 CREATE OR REPLACE FUNCTION images_by_distance(
   user_lat DOUBLE PRECISION,
   user_lon DOUBLE PRECISION,
@@ -64,6 +64,10 @@ BEGIN
   OFFSET page * page_size;
 END;
 $$ LANGUAGE plpgsql;
+
+-- Grant permissions
+GRANT EXECUTE ON FUNCTION images_by_distance TO authenticated;
+GRANT EXECUTE ON FUNCTION images_by_distance TO anon;
 
 -- Test the function
 SELECT 'Function updated successfully' as status; 

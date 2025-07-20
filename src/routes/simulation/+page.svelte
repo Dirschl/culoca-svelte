@@ -159,7 +159,7 @@
         };
       })
       .sort((a: any, b: any) => a.distance - b.distance)
-      .slice(0, 50); // Show closest 50 images
+              // Kein Limit - alle Bilder
     
     pics.set(nearbyImages);
   }
@@ -181,7 +181,7 @@
       const currentUserId = session?.user?.id || null;
       
       // Batch loading to get more than 1000 items
-      const batchSize = 1000;
+      const batchSize = Infinity; // Kein Limit - alle Bilder
       let allImages = [];
       let hasMore = true;
       let offset = 0;
@@ -608,8 +608,10 @@
       });
 
       marker.on('click', () => {
-        // Navigate to image detail page
-        window.open(`/item/${img.id}`, '_blank');
+        // Navigate to image detail page with anchor parameter
+        const url = new URL(`/item/${img.id}`, window.location.origin);
+        url.searchParams.set('anchor', img.id);
+        window.open(url.toString(), '_blank');
       });
 
       marker.addTo(map);
@@ -966,7 +968,7 @@
       return title.includes(query) || 
              description.includes(query) || 
              keywords.includes(query);
-    }).slice(0, 10); // Limit to 10 results
+          }); // Kein Limit - alle Ergebnisse
   }
 
   function selectLocation(image: any) {
@@ -1075,7 +1077,7 @@
       </div>
       <div class="compact-list">
         {#each noGpsImagesList as img}
-          <div class="compact-item" on:click={() => window.open(`/item/${img.id}`, '_blank')}>
+          <div class="compact-item" on:click={() => { const url = new URL(`/item/${img.id}`, window.location.origin); url.searchParams.set('anchor', img.id); window.open(url.toString(), '_blank'); }}>
             <img 
               src="https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/{img.path_64 || img.path_512}"
               alt={img.title || 'Bild'}
@@ -1103,7 +1105,7 @@
       </div>
       <div class="compact-list">
         {#each incompleteImagesList as img}
-          <div class="compact-item" on:click={() => window.open(`/item/${img.id}`, '_blank')}>
+          <div class="compact-item" on:click={() => { const url = new URL(`/item/${img.id}`, window.location.origin); url.searchParams.set('anchor', img.id); window.open(url.toString(), '_blank'); }}>
             <img 
               src="https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/{img.path_64 || img.path_512}"
               alt={img.title || 'Bild'}

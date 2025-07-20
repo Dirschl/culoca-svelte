@@ -131,7 +131,10 @@
     if (onImageClick) {
       onImageClick(itemId);
     } else {
-      location.href = `/item/${itemId}`;
+      // Navigate to item detail page with anchor parameter
+      const url = new URL(`/item/${itemId}`, window.location.origin);
+      url.searchParams.set('anchor', itemId);
+      location.href = url.toString();
     }
   }
 

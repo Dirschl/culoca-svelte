@@ -1,5 +1,7 @@
--- Optimierte Funktion für effizientes Laden der nähesten Bilder
--- Lädt die 100 nähesten Bilder im 5km Radius und sortiert sie nach Entfernung
+-- Fix images_by_distance_optimized function to work properly
+-- This replaces the old function that was using PostGIS functions
+
+DROP FUNCTION IF EXISTS images_by_distance_optimized(DOUBLE PRECISION, DOUBLE PRECISION, INTEGER, INTEGER);
 
 CREATE OR REPLACE FUNCTION images_by_distance_optimized(
   user_lat DOUBLE PRECISION,
@@ -61,4 +63,7 @@ BEGIN
   ORDER BY distance_meters ASC
   LIMIT max_results;
 END;
-$$ LANGUAGE plpgsql; 
+$$ LANGUAGE plpgsql;
+
+-- Test the function
+SELECT 'Function updated successfully' as status; 

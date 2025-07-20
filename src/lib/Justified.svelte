@@ -18,6 +18,27 @@
   }
 
   export let items: { src: string; width: number; height: number; id: string; lat?: number; lon?: number; distance?: number }[] = [];
+  
+  // Debug: Log items when they change
+  $: if (items.length > 0) {
+    console.log(`[Justified] Received ${items.length} items, first 3 distances:`, items.slice(0, 3).map(item => ({
+      id: item.id,
+      distance: item.distance,
+      lat: item.lat,
+      lon: item.lon
+    })));
+    
+    // Check if distances are actually present
+    const itemsWithDistance = items.filter(item => item.distance !== undefined && item.distance !== null);
+    console.log(`[Justified] Items with distance: ${itemsWithDistance.length}/${items.length}`);
+    
+    if (itemsWithDistance.length > 0) {
+      console.log(`[Justified] First item with distance:`, itemsWithDistance[0]);
+    }
+  }
+  
+  // Simple debug to check if component loads
+  console.log('[Justified] Component loaded');
   export let containerWidth = 1024;
   export let targetRowHeight = 200;  // Will be adjusted responsively
   export let gap = 2;  // Set default gap to 2px
@@ -120,7 +141,10 @@
   });
 
   function handleImageClick(itemId: string) {
-    location.href = `/item/${itemId}`;
+    // Navigate to item detail page with anchor parameter
+    const url = new URL(`/item/${itemId}`, window.location.origin);
+    url.searchParams.set('anchor', itemId);
+    location.href = url.toString();
   }
 
   function handleKeydown(event: KeyboardEvent, itemId: string) {
@@ -278,9 +302,12 @@
                   {(item.distance / 1000).toFixed(1)}km
                 {/if}
               {:else if getDistanceFromLatLonInMeters}
-                {getDistanceFromLatLonInMeters(userLat, userLon, item.lat, item.lon)}
+                <!-- Temporär auskommentiert - verwendet falsche GPS-Koordinaten -->
+                <!-- {getDistanceFromLatLonInMeters(userLat, userLon, item.lat, item.lon)}+ -->
               {/if}
             </div>
+
+
           {/if}
           {#if showCompass && userLat !== null && userLon !== null && item.lat && item.lon && deviceHeading !== null}
             <div class="compass" style="position: absolute; left: 12px; bottom: 48px; z-index: 3;">

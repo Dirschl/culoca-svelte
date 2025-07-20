@@ -29,10 +29,9 @@ interface LoadedRegion {
 class IntelligentImageLoader {
   private loadedImages: Map<string, LoadedImage> = new Map();
   private loadedRegions: LoadedRegion[] = [];
-  private readonly MAX_IMAGES_IN_MEMORY = 5000; // Speicher-Limit
-  private readonly MIN_RADIUS_KM = 25; // Minimum Suchradius
-  private readonly MAX_RADIUS_KM = 500; // Maximum Suchradius
-  private readonly BATCH_SIZE = 1000; // Batch-Größe für DB-Abfragen
+  private readonly MAX_IMAGES_IN_MEMORY = Infinity; // Keine Begrenzung
+  private readonly MAX_RADIUS_KM = Infinity; // Keine Begrenzung
+  private readonly BATCH_SIZE = Infinity; // Kein Limit - alle Bilder
   
   /**
    * Lädt Bilder basierend auf GPS-Position mit intelligentem Nachladen
@@ -40,7 +39,7 @@ class IntelligentImageLoader {
   async loadImagesForPosition(
     lat: number, 
     lon: number, 
-    requestedCount: number = 1000
+    requestedCount: number = Infinity
   ): Promise<LoadedImage[]> {
     console.log(`[IntelligentLoader] Loading images for position: ${lat}, ${lon}`);
     
@@ -49,13 +48,14 @@ class IntelligentImageLoader {
     console.log(`[IntelligentLoader] Found ${nearbyLoaded.length} already loaded nearby images`);
     
     if (nearbyLoaded.length >= requestedCount) {
-      return this.sortByDistance(nearbyLoaded, lat, lon).slice(0, requestedCount);
+      // Use already calculated distances, no additional sorting needed
+      return nearbyLoaded.slice(0, requestedCount);
     }
     
     // 2. Bestimme optimalen Laderadius
     const loadRadius = this.calculateOptimalRadius(lat, lon, requestedCount);
     
-    // 3. Lade neue Bilder aus Datenbank
+    // 3. Lade neue Bilder aus Datenbank (already sorted by distance)
     const newImages = await this.loadFromDatabase(lat, lon, loadRadius, requestedCount);
     console.log(`[IntelligentLoader] Loaded ${newImages.length} new images from database`);
     
@@ -65,13 +65,24 @@ class IntelligentImageLoader {
     // 5. Speicher-Management
     this.manageMemory();
     
-    // 6. Kombiniere und sortiere alle verfügbaren Bilder
-    const allAvailableImages = [
-      ...nearbyLoaded,
-      ...newImages.filter(img => !this.loadedImages.has(img.id))
-    ];
+    // 6. Kombiniere alle verfügbaren Bilder und sortiere nach Distanz
+    const allAvailableImages = [...newImages];
     
-    return this.sortByDistance(allAvailableImages, lat, lon).slice(0, requestedCount);
+    console.log(`[IntelligentLoader] Debug - nearbyLoaded: ${nearbyLoaded.length}, newImages: ${newImages.length}, using: ${allAvailableImages.length}`);
+    
+    // Ensure all images have distances calculated
+    allAvailableImages.forEach(img => {
+      if (img.distance === undefined || img.distance === null) {
+        img.distance = this.calculateDistance(lat, lon, img.lat, img.lon);
+      }
+    });
+    
+    // Sort all images by distance to ensure correct order
+    const sortedImages = allAvailableImages.sort((a, b) => (a.distance || 0) - (b.distance || 0));
+    
+    console.log(`[IntelligentLoader] Final sorted images - first 3 distances:`, sortedImages.slice(0, 3).map(img => img.distance?.toFixed(0) + 'm'));
+    
+    return sortedImages.slice(0, requestedCount);
   }
   
   /**
@@ -86,58 +97,130 @@ class IntelligentImageLoader {
     const sessionData = get(sessionStore);
     const currentUserId = sessionData.isAuthenticated ? sessionData.userId : null;
     
-    // Berechne Lat/Lon-Grenzen für Radius
-    const kmToDegLat = 1 / 111.0;
-    const kmToDegLon = 1 / (111.0 * Math.cos(lat * Math.PI / 180));
-    const latMargin = radiusKm * kmToDegLat;
-    const lonMargin = radiusKm * kmToDegLon;
+    console.log(`[IntelligentLoader] Loading from database: lat=${lat}, lon=${lon}, radius=${radiusKm}km, max=${maxImages}`);
     
-    const minLat = lat - latMargin;
-    const maxLat = lat + latMargin;
-    const minLon = lon - lonMargin;
-    const maxLon = lon + lonMargin;
-    
-    let query = supabase
-      .from('items')
-      .select('id, lat, lon, path_512, path_2048, path_64, title, description, width, height, is_private, profile_id')
-      .not('lat', 'is', null)
-      .not('lon', 'is', null)
-      .not('path_512', 'is', null)
-      .eq('gallery', true) // Only show images with gallery = true
-      .gte('lat', minLat)
-      .lte('lat', maxLat)
-      .gte('lon', minLon)
-      .lte('lon', maxLon)
-      .limit(maxImages * 2); // Etwas mehr laden für bessere Auswahl
-    
-    // Privacy-Filter anwenden
-    if (currentUserId) {
-      query = query.or(`profile_id.eq.${currentUserId},is_private.eq.false,is_private.is.null`);
-    } else {
-      query = query.or('is_private.eq.false,is_private.is.null');
+    // Use direct table query since the database function has schema issues
+    console.log('[IntelligentLoader] Using direct table query');
+      
+      // No geographic boundaries - load all images
+      const minLat = -90;
+      const maxLat = 90;
+      const minLon = -180;
+      const maxLon = 180;
+      
+      let fallbackQuery = supabase
+        .from('items')
+        .select('id, lat, lon, path_512, path_2048, path_64, title, description, width, height, is_private, profile_id')
+        .not('lat', 'is', null)
+        .not('lon', 'is', null)
+        .not('path_512', 'is', null)
+        .eq('gallery', true) // Only show images with gallery = true
+        // No geographic filtering - load all images
+        // Kein Limit - lade alle Bilder
+      
+      // Privacy-Filter anwenden
+      if (currentUserId) {
+        fallbackQuery = fallbackQuery.or(`profile_id.eq.${currentUserId},is_private.eq.false,is_private.is.null`);
+      } else {
+        fallbackQuery = fallbackQuery.or('is_private.eq.false,is_private.is.null');
+      }
+      
+      const { data: fallbackData, error: fallbackError } = await fallbackQuery;
+      
+      if (fallbackError) {
+        console.error('[IntelligentLoader] Fallback query error:', fallbackError);
+        return [];
+      }
+      
+      console.log(`[IntelligentLoader] Fallback query returned ${fallbackData?.length || 0} images`);
+      
+      const fallbackImages = (fallbackData || []).map(item => ({
+        id: item.id,
+        lat: item.lat,
+        lon: item.lon,
+        path_512: item.path_512,
+        path_2048: item.path_2048,
+        path_64: item.path_64,
+        title: item.title,
+        description: item.description,
+        width: item.width,
+        height: item.height,
+        is_private: item.is_private,
+        profile_id: item.profile_id,
+        distance: this.calculateDistance(lat, lon, item.lat, item.lon) // Calculate distance client-side in meters
+      }));
+      
+      // Sort by distance
+      fallbackImages.sort((a, b) => (a.distance || 0) - (b.distance || 0));
+      
+      console.log(`[IntelligentLoader] After sorting - first 3 distances:`, fallbackImages.slice(0, 3).map(img => img.distance?.toFixed(0) + 'm'));
+      
+      // No radius filtering - use all images
+      const radiusFilteredImages = fallbackImages;
+      console.log(`[IntelligentLoader] Using all ${radiusFilteredImages.length} images without radius filtering`);
+      
+      // Ensure the selected item (if any) is always first
+      // This is important for anchor-based navigation
+      const selectedItemId = (window as any).selectedItemId;
+      if (selectedItemId) {
+        const selectedItemIndex = radiusFilteredImages.findIndex(img => img.id === selectedItemId);
+        if (selectedItemIndex > 0) {
+          // Move selected item to first position
+          const selectedItem = radiusFilteredImages.splice(selectedItemIndex, 1)[0];
+          radiusFilteredImages.unshift(selectedItem);
+          console.log(`[IntelligentLoader] Moved selected item ${selectedItemId} to first position`);
+        } else if (selectedItemIndex === 0) {
+          // Selected item is already first, ensure its distance is 0
+          radiusFilteredImages[0].distance = 0;
+          console.log(`[IntelligentLoader] Selected item ${selectedItemId} is already first, set distance to 0`);
+        } else if (selectedItemIndex === -1) {
+          // Selected item not found in filtered images, try to find it in all loaded images
+          const allSelectedItem = this.loadedImages.get(selectedItemId);
+          if (allSelectedItem) {
+            // Add the selected item to the beginning with distance 0
+            allSelectedItem.distance = 0;
+            radiusFilteredImages.unshift(allSelectedItem);
+            console.log(`[IntelligentLoader] Added selected item ${selectedItemId} to first position with 0m distance`);
+          }
+        }
+      }
+      
+      // Ensure the first image is actually the closest (double-check sorting)
+      if (radiusFilteredImages.length > 0) {
+        const firstImage = radiusFilteredImages[0];
+        const actualDistance = this.calculateDistance(lat, lon, firstImage.lat, firstImage.lon);
+        console.log(`[IntelligentLoader] First image distance verification: calculated=${actualDistance?.toFixed(0)}m, stored=${firstImage.distance?.toFixed(0)}m`);
+        
+        // If there's a mismatch, recalculate all distances
+        if (Math.abs(actualDistance - (firstImage.distance || 0)) > 1) {
+          console.log(`[IntelligentLoader] Distance mismatch detected, recalculating all distances`);
+          radiusFilteredImages.forEach(img => {
+            img.distance = this.calculateDistance(lat, lon, img.lat, img.lon);
+          });
+          radiusFilteredImages.sort((a, b) => (a.distance || 0) - (b.distance || 0));
+          console.log(`[IntelligentLoader] After recalculation - first 3 distances:`, radiusFilteredImages.slice(0, 3).map(img => img.distance?.toFixed(0) + 'm'));
+        }
+      }
+      
+      console.log(`[IntelligentLoader] After radius filtering: ${radiusFilteredImages.length} images`);
+      
+      // Debug: Log first few images with distances
+      if (radiusFilteredImages.length > 0) {
+        console.log(`[IntelligentLoader] First 3 images with distances:`, radiusFilteredImages.slice(0, 3).map(img => ({
+          id: img.id,
+          distance: img.distance?.toFixed(0) + 'm',
+          lat: img.lat,
+          lon: img.lon
+        })));
+      }
+      
+      // Füge zu geladenen Bildern hinzu
+      radiusFilteredImages.forEach(img => {
+        this.loadedImages.set(img.id, img);
+      });
+      
+      return radiusFilteredImages;
     }
-    
-    const { data, error } = await query;
-    
-    if (error) {
-      console.error('[IntelligentLoader] Database error:', error);
-      return [];
-    }
-    
-    const images = (data || []).map(item => ({
-      ...item,
-      lat: item.lat!,
-      lon: item.lon!,
-      path_512: item.path_512!
-    }));
-    
-    // Füge zu geladenen Bildern hinzu
-    images.forEach(img => {
-      this.loadedImages.set(img.id, img);
-    });
-    
-    return images;
-  }
   
   /**
    * Berechnet optimalen Radius basierend auf Position und gewünschter Bildanzahl
@@ -152,10 +235,8 @@ class IntelligentImageLoader {
       return Math.min(this.MAX_RADIUS_KM, Math.max(this.MIN_RADIUS_KM, distance + nearestRegion.radius));
     }
     
-    // Adaptive Radius-Berechnung basierend auf gewünschter Bildanzahl
-    // Mehr Bilder = größerer Radius (Annahme: ~10 Bilder pro km² in dicht besiedelten Gebieten)
-    const estimatedRadius = Math.sqrt(requestedCount / (10 * Math.PI));
-    return Math.min(this.MAX_RADIUS_KM, Math.max(this.MIN_RADIUS_KM, estimatedRadius));
+    // No radius limitation - use maximum possible radius
+    return this.MAX_RADIUS_KM;
   }
   
   /**
@@ -166,7 +247,8 @@ class IntelligentImageLoader {
     const radiusMeters = radiusKm * 1000;
     
     for (const [id, image] of this.loadedImages) {
-      const distance = this.calculateDistance(lat, lon, image.lat, image.lon);
+      // Use distance if already calculated, otherwise calculate it
+      const distance = image.distance !== undefined ? image.distance : this.calculateDistance(lat, lon, image.lat, image.lon);
       if (distance <= radiusMeters) {
         nearby.push({ ...image, distance });
       }
@@ -181,7 +263,8 @@ class IntelligentImageLoader {
   private sortByDistance(images: LoadedImage[], lat: number, lon: number): LoadedImage[] {
     return images.map(img => ({
       ...img,
-      distance: this.calculateDistance(lat, lon, img.lat, img.lon)
+      // Use distance if already calculated by database, otherwise calculate it
+      distance: img.distance !== undefined ? img.distance : this.calculateDistance(lat, lon, img.lat, img.lon)
     })).sort((a, b) => (a.distance || 0) - (b.distance || 0));
   }
   

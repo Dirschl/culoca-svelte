@@ -128,7 +128,7 @@
 								{userFilterInfo.name.charAt(0).toUpperCase()}
 							</div>
 						{/if}
-						<span class="user-name" class:clickable={isPermalinkMode} on:click={() => isPermalinkMode && permalinkImageId && (window.location.href = `/item/${permalinkImageId}`)}>
+						<span class="user-name" class:clickable={isPermalinkMode} on:click={() => isPermalinkMode && permalinkImageId && (() => { const url = new URL(`/item/${permalinkImageId}`, window.location.origin); url.searchParams.set('anchor', permalinkImageId); window.location.href = url.toString(); })()}>
 							{userFilterInfo.name}
 						</span>
 						<!-- Show X button if removal is allowed -->
@@ -156,7 +156,7 @@
 								{$userFilter.username.charAt(0).toUpperCase()}
 							</div>
 						{/if}
-						<span class="user-name" class:clickable={isPermalinkMode} on:click={() => isPermalinkMode && permalinkImageId && (window.location.href = `/item/${permalinkImageId}`)}>
+						<span class="user-name" class:clickable={isPermalinkMode} on:click={() => isPermalinkMode && permalinkImageId && (() => { const url = new URL(`/item/${permalinkImageId}`, window.location.origin); url.searchParams.set('anchor', permalinkImageId); window.location.href = url.toString(); })()}>
 							{$userFilter.accountName || $userFilter.username}
 						</span>
 						<button 
@@ -181,7 +181,7 @@
 								{customerBrandInfo.name.charAt(0).toUpperCase()}
 							</div>
 						{/if}
-						<span class="customer-name" class:clickable={isPermalinkMode} on:click={() => isPermalinkMode && permalinkImageId && (window.location.href = `/item/${permalinkImageId}`)}>
+						<span class="customer-name" class:clickable={isPermalinkMode} on:click={() => isPermalinkMode && permalinkImageId && (() => { const url = new URL(`/item/${permalinkImageId}`, window.location.origin); url.searchParams.set('anchor', permalinkImageId); window.location.href = url.toString(); })()}>
 							{customerBrandInfo.name}
 						</span>
 						<!-- Show X button if removal is allowed -->
@@ -205,7 +205,7 @@
 				{#if $locationFilter}
 					<div class="location-filter">
 						<span class="location-icon">📍</span>
-						<span class="location-name" class:clickable={isPermalinkMode} on:click={() => isPermalinkMode && permalinkImageId && (window.location.href = `/item/${permalinkImageId}`)}>{$locationFilter.name}</span>
+						<span class="location-name" class:clickable={isPermalinkMode} on:click={() => isPermalinkMode && permalinkImageId && (() => { const url = new URL(`/item/${permalinkImageId}`, window.location.origin); url.searchParams.set('anchor', permalinkImageId); window.location.href = url.toString(); })()}>{$locationFilter.name}</span>
 						<button 
 							class="remove-filter"
 							on:click={() => filterStore.clearLocationFilter()}

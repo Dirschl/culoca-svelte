@@ -204,62 +204,52 @@ export class DynamicImageLoader {
       
       console.log(`🗺️ Loading cell ${cell.x},${cell.y} at ${cellCenterLat}, ${cellCenterLon}`);
       
-      const pageSize = 1000;
-      let offset = 0;
-      let fetchedTotal = 0;
-
-      while (true) {
-        const { data: batch, error } = await supabase
-          .from('items')
-          .select(`
-            id,
-            title,
-            description,
-            keywords,
-            lat,
-            lon,
-            path_2048,
-            path_512,
-            path_64,
-            width,
-            height,
-            created_at,
-            user_id,
-            is_private
-          `)
-          .not('lat', 'is', null)
-          .not('lon', 'is', null)
-          .eq('gallery', true) // Only show images with gallery = true
-          .gte('lat', cellCenterLat - this.CELL_SIZE_DEG / 2)
-          .lte('lat', cellCenterLat + this.CELL_SIZE_DEG / 2)
-          .gte('lon', cellCenterLon - this.CELL_SIZE_DEG / 2)
-          .lte('lon', cellCenterLon + this.CELL_SIZE_DEG / 2)
-          .or(this.currentUserId ? `profile_id.eq.${this.currentUserId},is_private.eq.false,is_private.is.null` : 'is_private.eq.false,is_private.is.null')
-          .order('created_at', { ascending: false })
-          .range(offset, offset + pageSize - 1);
+      // Load all images without pagination
+      const { data: batch, error } = await supabase
+        .from('items')
+        .select(`
+          id,
+          title,
+          description,
+          keywords,
+          lat,
+          lon,
+          path_2048,
+          path_512,
+          path_64,
+          width,
+          height,
+          created_at,
+          user_id,
+          is_private
+        `)
+        .not('lat', 'is', null)
+        .not('lon', 'is', null)
+        .eq('gallery', true) // Only show images with gallery = true
+        .gte('lat', cellCenterLat - this.CELL_SIZE_DEG / 2)
+        .lte('lat', cellCenterLat + this.CELL_SIZE_DEG / 2)
+        .gte('lon', cellCenterLon - this.CELL_SIZE_DEG / 2)
+        .lte('lon', cellCenterLon + this.CELL_SIZE_DEG / 2)
+        .or(this.currentUserId ? `profile_id.eq.${this.currentUserId},is_private.eq.false,is_private.is.null` : 'is_private.eq.false,is_private.is.null')
+        .order('created_at', { ascending: false });
 
         if (error) {
           console.error('Error loading cell batch:', error);
-          break;
+          return;
         }
 
         if (!batch || batch.length === 0) {
-          break;
+          console.log(`🗺️ No images found in cell ${cell.x},${cell.y}`);
+          return;
         }
 
+        let fetchedTotal = 0;
         batch.forEach(image => {
           if (!this.loadedImages.has(image.id)) {
             this.loadedImages.set(image.id, image);
             fetchedTotal++;
           }
         });
-
-        if (batch.length < pageSize) {
-          // last batch fetched
-          break;
-        }
-        offset += pageSize;
-      }
 
       console.log(`🗺️ Loaded ${fetchedTotal} new images from cell ${cell.x},${cell.y}`);
        

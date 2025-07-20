@@ -63,7 +63,7 @@
         .select('*')
         .eq('gallery', true) // Only show images with gallery = true
         .order('created_at', { ascending: false })
-        .limit(5000);
+        // Kein Limit - alle Bilder
         
       if (userId) {
         query = query.or(`is_private.eq.false,profile_id.eq.${userId}`);

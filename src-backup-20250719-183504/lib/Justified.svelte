@@ -273,12 +273,13 @@
             <div class="distance-label">
               {#if item.distance !== undefined && item.distance !== null}
                 {#if item.distance < 1000}
-                  {Math.round(item.distance)}m
+                  {Math.round(item.distance)}m+
                 {:else}
-                  {(item.distance / 1000).toFixed(1)}km
+                  {(item.distance / 1000).toFixed(1)}km+
                 {/if}
               {:else if getDistanceFromLatLonInMeters}
-                {getDistanceFromLatLonInMeters(userLat, userLon, item.lat, item.lon)}
+                <!-- Temporär auskommentiert - verwendet falsche GPS-Koordinaten -->
+                <!-- {getDistanceFromLatLonInMeters(userLat, userLon, item.lat, item.lon)}+ -->
               {/if}
             </div>
           {/if}
