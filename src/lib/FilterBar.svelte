@@ -195,15 +195,10 @@
 							</button>
 						{/if}
 					</div>
-				<!-- Priority 4: Culoca Logo (when no profile filter is selected) -->
+				<!-- Priority 4: Culoca Logo (when no other filters are active) -->
 				{:else}
-					<div class="culoca-brand">
-						<!-- Culoca Logo PNG -->
-						<img 
-							src="/culoca-logo-512px.png" 
-							alt="Culoca"
-							class="culoca-logo"
-						/>
+					<div class="culoca-logo">
+						<img src="/culoca-logo-512px.png" alt="Culoca" class="culoca-logo-img" />
 					</div>
 				{/if}
 			</div>
@@ -278,6 +273,9 @@
 	.filter-bar {
 		padding: 4px 0;
 		margin-bottom: 2px;
+		height: 80px;
+		display: flex;
+		align-items: center;
 	}
 
 	.filter-bar.map-style {
@@ -292,6 +290,7 @@
 		border-radius: 8px;
 		padding: 8px 12px;
 		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+		height: 80px;
 	}
 
 	.filter-container {
@@ -299,6 +298,8 @@
 		justify-content: space-between;
 		align-items: center;
 		padding: 2px 2rem;
+		width: 100%;
+		height: 100%;
 	}
 
 	.left-section {
@@ -411,29 +412,7 @@
 		font-size: 18px;
 	}
 
-	/* Culoca Brand Styling - Same size as other avatars */
-	.culoca-brand {
-		display: flex;
-		align-items: center;
-		gap: 12px;
-		color: var(--text-primary, #1f2937);
-		font-weight: 500;
-		font-size: 16px;
-	}
 
-	:global(.dark) .culoca-brand {
-		color: var(--text-primary, #f9fafb);
-	}
-
-	.culoca-logo {
-		height: 32px;
-		width: auto;
-		object-fit: contain;
-	}
-
-	.culoca-brand {
-		margin-top: 10px;
-	}
 
 	/* GPS Status Styling - Theme-aware with different states */
 	.gps-status {
@@ -572,5 +551,18 @@
 	.clickable:hover {
 		color: var(--culoca-orange, #ee7221);
 		text-decoration-color: var(--culoca-orange, #ee7221);
+	}
+
+	/* Culoca Logo Styling - Theme-aware */
+	.culoca-logo {
+		display: flex;
+		align-items: center;
+		margin-top: 4px;
+	}
+
+	.culoca-logo-img {
+		height: 32px;
+		width: auto;
+		object-fit: contain;
 	}
 </style> 

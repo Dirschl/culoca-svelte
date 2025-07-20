@@ -183,8 +183,8 @@
     </button>
   {/if}
   
-  <!-- Simulation/Test mode button -->
-  {#if showTestMode}
+  <!-- Simulation/Test mode button - only for logged in users -->
+  {#if showTestMode && isLoggedIn}
     <button 
       class="fab-button test-mode"
       on:click={handleTestMode}
@@ -240,21 +240,23 @@
     </svg>
   </button>
   
-  <!-- Public Content button -->
-  <button 
-    class="fab-button public-content"
-    on:click={handlePublicContent}
-    aria-label="Öffentlichen Content hinzufügen"
-    title="Öffentlichen Content hinzufügen"
-  >
-    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <circle cx="12" cy="8" r="3"/>
-      <circle cx="6" cy="16" r="3"/>
-      <circle cx="18" cy="16" r="3"/>
-      <path d="M12 11v3"/>
-      <path d="M9 16h6"/>
-    </svg>
-  </button>
+  <!-- Public Content button - only for logged in users -->
+  {#if isLoggedIn}
+    <button 
+      class="fab-button public-content"
+      on:click={handlePublicContent}
+      aria-label="Öffentlichen Content hinzufügen"
+      title="Öffentlichen Content hinzufügen"
+    >
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="8" r="3"/>
+        <circle cx="6" cy="16" r="3"/>
+        <circle cx="18" cy="16" r="3"/>
+        <path d="M12 11v3"/>
+        <path d="M9 16h6"/>
+      </svg>
+    </button>
+  {/if}
   
   <!-- Profile button -->
   <button 

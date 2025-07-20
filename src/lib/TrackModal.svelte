@@ -270,7 +270,8 @@
   }
   
   .modal-content {
-    background: var(--bg-color, white);
+    background: var(--bg-primary, white);
+    color: var(--text-primary, #1f2937);
     border-radius: 12px;
     max-width: 800px;
     width: 90%;
@@ -284,12 +285,13 @@
     justify-content: space-between;
     align-items: center;
     padding: 20px;
-    border-bottom: 1px solid var(--border-color, #eee);
+    border-bottom: 1px solid var(--border-secondary, #eee);
   }
   
   .modal-header h2 {
     margin: 0;
     font-size: 1.5rem;
+    color: var(--text-primary, #1f2937);
   }
   
   .close-btn {
@@ -308,7 +310,7 @@
   }
   
   .close-btn:hover {
-    background: var(--hover-bg, #f0f0f0);
+    background: var(--bg-secondary, #f0f0f0);
   }
   
   .modal-body {
@@ -335,13 +337,14 @@
   }
   
   .tracks-list {
-    border-right: 1px solid var(--border-color, #eee);
+    border-right: 1px solid var(--border-secondary, #eee);
     padding-right: 20px;
   }
   
   .tracks-list h3 {
     margin-top: 0;
     margin-bottom: 16px;
+    color: var(--text-primary, #1f2937);
   }
   
   .track-item {
@@ -349,15 +352,17 @@
     justify-content: space-between;
     align-items: center;
     padding: 12px;
-    border: 1px solid var(--border-color, #eee);
+    border: 1px solid var(--border-secondary, #eee);
     border-radius: 8px;
     margin-bottom: 8px;
     cursor: pointer;
     transition: all 0.2s;
+    background: var(--bg-primary, white);
+    color: var(--text-primary, #1f2937);
   }
   
   .track-item:hover {
-    background: var(--hover-bg, #f8f9fa);
+    background: var(--bg-secondary, #f8f9fa);
   }
   
   .track-item.selected {
@@ -369,6 +374,7 @@
   .track-info h4 {
     margin: 0 0 4px 0;
     font-size: 14px;
+    color: var(--text-primary, #1f2937);
   }
   
   .track-details {
@@ -376,6 +382,7 @@
     gap: 8px;
     font-size: 12px;
     opacity: 0.8;
+    color: var(--text-secondary, #6b7280);
   }
   
   .delete-btn {
@@ -409,6 +416,7 @@
   .track-details-panel h3 {
     margin-top: 0;
     margin-bottom: 16px;
+    color: var(--text-primary, #1f2937);
   }
   
   .track-detail-info {
@@ -418,10 +426,12 @@
   .detail-row {
     margin-bottom: 8px;
     font-size: 14px;
+    color: var(--text-primary, #1f2937);
   }
   
   .export-section h4 {
     margin-bottom: 12px;
+    color: var(--text-primary, #1f2937);
   }
   
   .export-buttons {
@@ -446,6 +456,7 @@
   
   .email-section h4 {
     margin-bottom: 12px;
+    color: var(--text-primary, #1f2937);
   }
   
   .email-input-group {
@@ -457,9 +468,11 @@
   .email-input-group input {
     flex: 1;
     padding: 8px 12px;
-    border: 1px solid var(--border-color, #ddd);
+    border: 1px solid var(--border-secondary, #ddd);
     border-radius: 6px;
     font-size: 14px;
+    background: var(--bg-primary, white);
+    color: var(--text-primary, #1f2937);
   }
   
   .email-btn {
@@ -492,7 +505,7 @@
   .no-selection {
     text-align: center;
     padding: 40px 20px;
-    color: var(--text-muted, #666);
+    color: var(--text-secondary, #666);
   }
   
   .no-selection-icon {
@@ -507,7 +520,7 @@
     
     .tracks-list {
       border-right: none;
-      border-bottom: 1px solid var(--border-color, #eee);
+      border-bottom: 1px solid var(--border-secondary, #eee);
       padding-right: 0;
       padding-bottom: 20px;
     }

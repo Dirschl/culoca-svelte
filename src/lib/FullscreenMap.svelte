@@ -410,9 +410,7 @@
   
   function addImageMarkers() {
     const filteredImages = getFilteredImages();
-    console.log(`[FullscreenMap] addImageMarkers called with ${allImages.length} total images, ${filteredImages.length} filtered images`);
     if (!map || !markerClusterGroup || !filteredImages.length) {
-      console.log(`[FullscreenMap] Skipping addImageMarkers - map: ${!!map}, clusterGroup: ${!!markerClusterGroup}, filteredImages.length: ${filteredImages.length}`);
       return;
     }
     
@@ -420,16 +418,7 @@
     markerClusterGroup.clearLayers();
     imageMarkers = [];
     
-    console.log(`[FullscreenMap] Processing ${filteredImages.length} filtered images for markers`);
     filteredImages.forEach((image, index) => {
-      console.log(`[FullscreenMap] Processing image ${index + 1}/${filteredImages.length}:`, {
-        id: image.id,
-        lat: image.lat,
-        lon: image.lon,
-        title: image.title,
-        path_64: image.path_64,
-        path_512: image.path_512
-      });
       
       // Create marker element with image and label
       const markerEl = document.createElement('div');
@@ -1238,24 +1227,14 @@
       const { data: { session } } = await supabase.auth.getSession();
       const currentUserId = session?.user?.id || null;
       
-      // Batch loading to get more than 1000 items
-      const batchSize = Infinity; // Kein Limit - alle Bilder
-      let allImages = [];
-      let hasMore = true;
-      let offset = 0;
-      const maxBatches = 10; // Load up to 10,000 images
-      
-      while (hasMore && allImages.length < maxBatches * batchSize) {
-        console.log(`[FullscreenMap DirectDB] Loading batch ${Math.floor(offset/batchSize) + 1}, offset: ${offset}`);
-        
-        let query = supabase
-          .from('items')
-          .select('id, lat, lon, path_512, path_2048, path_64, title, description, width, height, is_private, profile_id')
-          .not('lat', 'is', null)
-          .not('lon', 'is', null)
-          .not('path_512', 'is', null)
-          .eq('gallery', true) // Only show images with gallery = true
-          .range(offset, offset + batchSize - 1);
+      // Load all images without pagination (no range limit)
+      let query = supabase
+        .from('items')
+        .select('id, lat, lon, path_512, path_2048, path_64, title, description, width, height, is_private, profile_id')
+        .not('lat', 'is', null)
+        .not('lon', 'is', null)
+        .not('path_512', 'is', null)
+        .eq('gallery', true); // Only show images with gallery = true
         
         // Apply privacy filtering
         if (currentUserId) {
@@ -1270,30 +1249,24 @@
         
         if (error) {
           console.error('[FullscreenMap DirectDB] Database error:', error);
-          break;
+          return [];
         }
         
         if (data && data.length > 0) {
-          allImages.push(...data);
-          console.log(`[FullscreenMap DirectDB] Batch ${Math.floor(offset/batchSize) + 1}: loaded ${data.length} images, total: ${allImages.length}`);
+          console.log(`[FullscreenMap DirectDB] Successfully loaded ${data.length} images`);
           
-          // Continue if we got a full batch
-          hasMore = data.length === batchSize;
-          offset += batchSize;
+          const images = data.map(item => ({
+            ...item,
+            lat: item.lat!,
+            lon: item.lon!,
+            path_512: item.path_512!
+          }));
+          
+          return images;
         } else {
-          hasMore = false;
+          console.log('[FullscreenMap DirectDB] No images found');
+          return [];
         }
-      }
-      
-      const images = allImages.map(item => ({
-        ...item,
-        lat: item.lat!,
-        lon: item.lon!,
-        path_512: item.path_512!
-      }));
-      
-      console.log(`[FullscreenMap DirectDB] Successfully loaded ${images.length} images via batch loading`);
-      return images;
       
     } catch (error) {
       console.error('[FullscreenMap DirectDB] Error:', error);
