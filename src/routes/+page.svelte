@@ -420,6 +420,7 @@
   let searchTimeout: ReturnType<typeof setTimeout> | null = null;
   let searchInput: HTMLInputElement;
   let useSearchResults = false; // Flag to switch between SearchResults component and legacy search
+  let searchResultsComponent: any; // Reference to SearchResults component
 
   // Login-Overlay Variablen
   let loginEmail = '';
@@ -4701,6 +4702,12 @@
     // Update placeholder with result count
     updateSearchPlaceholder();
     
+    // Trigger search in SearchResults component if available
+    if (searchResultsComponent && searchResultsComponent.triggerSearch) {
+      console.log('🔍 Triggering search in SearchResults component');
+      searchResultsComponent.triggerSearch();
+    }
+    
     // Reset isSearching after a short delay to allow SearchResults to complete
     setTimeout(() => {
       if (isSearching) {
@@ -5066,6 +5073,7 @@
   {#if useSearchResults && searchQuery.trim()}
     <!-- Use SearchResults component with items_search_view -->
     <SearchResults 
+      bind:this={searchResultsComponent}
       {searchQuery}
       userId={currentUser?.id || ''}
       layout={useJustifiedLayout ? 'justified' : 'grid'}

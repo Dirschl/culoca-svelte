@@ -12,11 +12,12 @@
   export let getDistanceFromLatLonInMeters: ((lat1: number, lon1: number, lat2: number, lon2: number) => string) | null = null;
   export let onSearchComplete: (() => void) | undefined = undefined;
   
-  let results: any[] = [];
   let loading = false;
+  let results: any[] = [];
   let lastSearchTerm = '';
   let lastUserId = '';
-  let searchTimeout: number | null = null;
+  let searchTimeout: ReturnType<typeof setTimeout> | null = null;
+  let isInitializing = true; // Flag to prevent reactive searches during initialization
   let isInitialized = false;
 
   // Local distance calculation function for sorting
@@ -143,30 +144,28 @@
     }
   }
 
-  // Only trigger search when searchQuery changes and is not empty
-  $: {
-    if (searchQuery && searchQuery.trim() && (searchQuery !== lastSearchTerm || userId !== lastUserId)) {
-      console.log('🔍 SearchResults: Reactive search triggered for:', searchQuery);
-      
-      // Clear existing timeout
-      if (searchTimeout) {
-        clearTimeout(searchTimeout);
-      }
-      
-      // Debounce search to prevent rapid successive calls
-      searchTimeout = setTimeout(() => {
-        console.log('🔍 SearchResults: Executing debounced search');
-        search();
-      }, 300);
-    } else if (!searchQuery.trim()) {
-      console.log('🔍 SearchResults: Clearing results for empty query');
-      results = [];
-      loading = false; // Ensure loading is false when clearing
-      
-      // Notify parent component that search is complete
-      if (onSearchComplete) {
-        onSearchComplete();
-      }
+  // Prevent reactive searches during initialization
+  $: if (!isInitializing && searchQuery && searchQuery.trim() && (searchQuery !== lastSearchTerm || userId !== lastUserId)) {
+    console.log('🔍 SearchResults: Reactive search triggered for:', searchQuery);
+    
+    // Clear existing timeout
+    if (searchTimeout) {
+      clearTimeout(searchTimeout);
+    }
+    
+    // Debounce search to prevent rapid successive calls
+    searchTimeout = setTimeout(() => {
+      console.log('🔍 SearchResults: Executing debounced search');
+      search();
+    }, 300);
+  } else if (!searchQuery.trim()) {
+    console.log('🔍 SearchResults: Clearing results for empty query');
+    results = [];
+    loading = false; // Ensure loading is false when clearing
+    
+    // Notify parent component that search is complete
+    if (onSearchComplete) {
+      onSearchComplete();
     }
   }
   
@@ -174,6 +173,15 @@
   $: if (searchQuery && !isInitialized) {
     isInitialized = true;
     console.log('🔍 SearchResults: Component initialized');
+  }
+  
+  // Allow external search triggers
+  export function triggerSearch() {
+    isInitializing = false; // Allow reactive searches after external trigger
+    if (searchQuery && searchQuery.trim()) {
+      console.log('🔍 SearchResults: External search trigger for:', searchQuery);
+      search();
+    }
   }
 </script>
 
