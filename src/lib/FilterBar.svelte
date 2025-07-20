@@ -108,8 +108,8 @@
 	} : null;
 </script>
 
-<!-- Show filter bar when customer branding should be shown or when other filters are present -->
-{#if customerBrandInfo || userFilterInfo || $locationFilter || gpsStatus !== 'none' || $userFilter}
+<!-- Show filter bar when customer branding should be shown, when other filters are present, or always show Culoca logo -->
+{#if customerBrandInfo || userFilterInfo || $locationFilter || gpsStatus !== 'none' || $userFilter || true}
 	<div class="filter-bar {showOnMap ? 'map-style' : ''}">
 		<div class="filter-container">
 			<!-- Left Side: Avatar/Logo and Name - Only show one at a time -->
@@ -195,6 +195,16 @@
 							</button>
 						{/if}
 					</div>
+				<!-- Priority 4: Culoca Logo (when no profile filter is selected) -->
+				{:else}
+					<div class="culoca-brand">
+						<!-- Culoca Logo PNG -->
+						<img 
+							src="/culoca-logo-512px.png" 
+							alt="Culoca"
+							class="culoca-logo"
+						/>
+					</div>
 				{/if}
 			</div>
 
@@ -204,7 +214,10 @@
 				<!-- Location Filter OR GPS Status -->
 				{#if $locationFilter}
 					<div class="location-filter">
-						<span class="location-icon">📍</span>
+						<!-- Culoca O Icon SVG -->
+						<svg width="18" height="18" viewBox="0 0 83.86 100.88" fill="currentColor" class="location-icon">
+							<path d="M0,41.35c0-5.67,1.1-11.03,3.29-16.07,2.19-5.04,5.19-9.43,8.98-13.17,3.79-3.74,8.25-6.69,13.36-8.86,5.11-2.17,10.54-3.25,16.29-3.25s11.18,1.08,16.29,3.25c5.11,2.17,9.56,5.12,13.36,8.86,3.79,3.74,6.79,8.13,8.98,13.17,2.19,5.04,3.29,10.4,3.29,16.07s-1.1,11.03-3.29,16.07c-2.2,5.04-5.19,9.43-8.98,13.17-3.8,3.74-8.25,6.7-13.36,8.86-5.11,2.17-9.49,21.42-15.25,21.42s-12.23-19.25-17.34-21.42c-5.11-2.17-9.56-5.12-13.36-8.86-3.79-3.74-6.79-8.13-8.98-13.17-2.2-5.04-3.29-10.4-3.29-16.07ZM25.16,41.35c0,2.29.44,4.43,1.32,6.44.88,2.01,2.07,3.76,3.59,5.26,1.52,1.5,3.29,2.68,5.33,3.55,2.04.87,4.21,1.3,6.53,1.3s4.49-.43,6.53-1.3c2.04-.87,3.81-2.05,5.33-3.55,1.52-1.5,2.71-3.25,3.59-5.26.88-2.01,1.32-4.15,1.32-6.44s-.44-4.43-1.32-6.44c-.88-2.01-2.08-3.76-3.59-5.26-1.52-1.5-3.29-2.68-5.33-3.55-2.03-.87-4.21-1.3-6.53-1.3s-4.49.43-6.53,1.3c-2.04.87-3.81,2.05-5.33,3.55-1.52,1.5-2.72,3.25-3.59,5.26-.88,2.01-1.32,4.16-1.32,6.44Z"/>
+						</svg>
 						<span class="location-name" class:clickable={isPermalinkMode} on:click={() => isPermalinkMode && permalinkImageId && (() => { const url = new URL(`/item/${permalinkImageId}`, window.location.origin); url.searchParams.set('anchor', permalinkImageId); window.location.href = url.toString(); })()}>{$locationFilter.name}</span>
 						<button 
 							class="remove-filter"
@@ -385,17 +398,41 @@
 		display: flex;
 		align-items: center;
 		gap: 8px;
-		color: var(--text-accent, #059669);
+		color: var(--text-primary, #1f2937);
 		font-weight: 500;
 		font-size: 16px;
 	}
 
 	:global(.dark) .location-filter {
-		color: var(--text-accent, #10b981);
+		color: var(--text-primary, #f9fafb);
 	}
 
 	.location-icon {
 		font-size: 18px;
+	}
+
+	/* Culoca Brand Styling - Same size as other avatars */
+	.culoca-brand {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		color: var(--text-primary, #1f2937);
+		font-weight: 500;
+		font-size: 16px;
+	}
+
+	:global(.dark) .culoca-brand {
+		color: var(--text-primary, #f9fafb);
+	}
+
+	.culoca-logo {
+		height: 32px;
+		width: auto;
+		object-fit: contain;
+	}
+
+	.culoca-brand {
+		margin-top: 10px;
 	}
 
 	/* GPS Status Styling - Theme-aware with different states */
@@ -404,33 +441,49 @@
 		font-size: 16px;
 	}
 
-	/* Active GPS - Green */
+	/* Active GPS - Theme-aware */
 	.gps-status.active {
-		color: var(--text-accent, #059669);
+		color: var(--text-primary, #1f2937);
 	}
 
 	:global(.dark) .gps-status.active {
-		color: var(--text-accent, #10b981);
+		color: var(--text-primary, #f9fafb);
 	}
 
-	/* Cached GPS - Orange/Yellow */
+	/* Cached GPS - Theme-aware */
 	.gps-status.cached {
-		color: var(--text-accent, #f59e0b);
+		color: var(--text-primary, #1f2937);
 	}
 
-	/* Checking GPS - Blue */
+	:global(.dark) .gps-status.cached {
+		color: var(--text-primary, #f9fafb);
+	}
+
+	/* Checking GPS - Theme-aware */
 	.gps-status.checking {
-		color: var(--text-accent, #3b82f6);
+		color: var(--text-primary, #1f2937);
 	}
 
-	/* Denied GPS - Red */
+	:global(.dark) .gps-status.checking {
+		color: var(--text-primary, #f9fafb);
+	}
+
+	/* Denied GPS - Theme-aware */
 	.gps-status.denied {
-		color: var(--text-accent, #ef4444);
+		color: var(--text-primary, #1f2937);
 	}
 
-	/* Unavailable GPS - Gray */
+	:global(.dark) .gps-status.denied {
+		color: var(--text-primary, #f9fafb);
+	}
+
+	/* Unavailable GPS - Theme-aware */
 	.gps-status.unavailable {
-		color: var(--text-secondary, #6b7280);
+		color: var(--text-primary, #1f2937);
+	}
+
+	:global(.dark) .gps-status.unavailable {
+		color: var(--text-primary, #f9fafb);
 	}
 
 	/* GPS Map Link Button */
@@ -450,17 +503,13 @@
 		color: var(--culoca-orange, #ee7221);
 	}
 
-	:global(.dark) .gps-status.cached {
-		color: var(--text-accent, #fbbf24);
-	}
-
-	/* No GPS - Red */
+	/* No GPS - Theme-aware */
 	.gps-status.none {
-		color: var(--text-accent, #ef4444);
+		color: var(--text-primary, #1f2937);
 	}
 
 	:global(.dark) .gps-status.none {
-		color: var(--text-accent, #f87171);
+		color: var(--text-primary, #f9fafb);
 	}
 
 	.gps-coords {

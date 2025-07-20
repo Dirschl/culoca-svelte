@@ -1552,10 +1552,20 @@
           {#if image.lat && image.lon}
             <div class="action-buttons">
               <a class="square-btn gmaps-btn" href={`https://www.google.com/maps?q=${image.lat},${image.lon}`} target="_blank" rel="noopener" title="Google Maps öffnen">
-                <svg width="80" height="80" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                <!-- Google Logo SVG, einfarbig im Normalzustand, farbig bei Hover -->
+                <svg width="35" height="35" viewBox="0 0 24 24" class="google-logo">
+                  <path class="google-blue" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="currentColor"/>
+                  <path class="google-green" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="currentColor"/>
+                  <path class="google-yellow" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="currentColor"/>
+                  <path class="google-red" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="currentColor"/>
                 </svg>
               </a>
+              <button class="square-btn location-filter-btn" on:click={setLocationFilter} title="Als Location-Filter setzen">
+                <!-- Culoca O Icon SVG -->
+                <svg width="35" height="35" viewBox="0 0 83.86 100.88" fill="currentColor">
+                  <path d="M0,41.35c0-5.67,1.1-11.03,3.29-16.07,2.19-5.04,5.19-9.43,8.98-13.17,3.79-3.74,8.25-6.69,13.36-8.86,5.11-2.17,10.54-3.25,16.29-3.25s11.18,1.08,16.29,3.25c5.11,2.17,9.56,5.12,13.36,8.86,3.79,3.74,6.79,8.13,8.98,13.17,2.19,5.04,3.29,10.4,3.29,16.07s-1.1,11.03-3.29,16.07c-2.2,5.04-5.19,9.43-8.98,13.17-3.8,3.74-8.25,6.7-13.36,8.86-5.11,2.17-9.49,21.42-15.25,21.42s-12.23-19.25-17.34-21.42c-5.11-2.17-9.56-5.12-13.36-8.86-3.79-3.74-6.79-8.13-8.98-13.17-2.2-5.04-3.29-10.4-3.29-16.07ZM25.16,41.35c0,2.29.44,4.43,1.32,6.44.88,2.01,2.07,3.76,3.59,5.26,1.52,1.5,3.29,2.68,5.33,3.55,2.04.87,4.21,1.3,6.53,1.3s4.49-.43,6.53-1.3c2.04-.87,3.81-2.05,5.33-3.55,1.52-1.5,2.71-3.25,3.59-5.26.88-2.01,1.32-4.15,1.32-6.44s-.44-4.43-1.32-6.44c-.88-2.01-2.08-3.76-3.59-5.26-1.52-1.5-3.29-2.68-5.33-3.55-2.03-.87-4.21-1.3-6.53-1.3s-4.49.43-6.53,1.3c-2.04.87-3.81,2.05-5.33,3.55-1.52,1.5-2.72,3.25-3.59,5.26-.88,2.01-1.32,4.16-1.32,6.44Z"/>
+                </svg>
+              </button>
               <button class="square-btn share-btn" on:click={copyLink} title="Link kopieren">
                 <svg width="35" height="35" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
@@ -1994,9 +2004,9 @@
                   {/if}
                   <h2 class="map-title">{image.title || 'Standort'}</h2>
                 <button class="location-filter-btn" on:click={setLocationFilter} title="Standort als Filter setzen">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
-                    <circle cx="12" cy="10" r="3"/>
+                  <!-- Culoca O Icon SVG -->
+                  <svg width="20" height="20" viewBox="0 0 83.86 100.88" fill="currentColor">
+                    <path d="M0,41.35c0-5.67,1.1-11.03,3.29-16.07,2.19-5.04,5.19-9.43,8.98-13.17,3.79-3.74,8.25-6.69,13.36-8.86,5.11-2.17,10.54-3.25,16.29-3.25s11.18,1.08,16.29,3.25c5.11,2.17,9.56,5.12,13.36,8.86,3.79,3.74,6.79,8.13,8.98,13.17,2.19,5.04,3.29,10.4,3.29,16.07s-1.1,11.03-3.29,16.07c-2.2,5.04-5.19,9.43-8.98,13.17-3.8,3.74-8.25,6.7-13.36,8.86-5.11,2.17-9.49,21.42-15.25,21.42s-12.23-19.25-17.34-21.42c-5.11-2.17-9.56-5.12-13.36-8.86-3.79-3.74-6.79-8.13-8.98-13.17-2.2-5.04-3.29-10.4-3.29-16.07ZM25.16,41.35c0,2.29.44,4.43,1.32,6.44.88,2.01,2.07,3.76,3.59,5.26,1.52,1.5,3.29,2.68,5.33,3.55,2.04.87,4.21,1.3,6.53,1.3s4.49-.43,6.53-1.3c2.04-.87,3.81-2.05,5.33-3.55,1.52-1.5,2.71-3.25,3.59-5.26.88-2.01,1.32-4.15,1.32-6.44s-.44-4.43-1.32-6.44c-.88-2.01-2.08-3.76-3.59-5.26-1.52-1.5-3.29-2.68-5.33-3.55-2.03-.87-4.21-1.3-6.53-1.3s-4.49.43-6.53,1.3c-2.04.87-3.81,2.05-5.33,3.55-1.52,1.5-2.72,3.25-3.59,5.26-.88,2.01-1.32,4.16-1.32,6.44Z"/>
                   </svg>
                 </button>
                 <button class="map-type-btn" on:click={toggleMapType} title={mapType === 'standard' ? 'Satellit' : 'Standard'}>
@@ -3673,6 +3683,25 @@
     background: var(--bg-secondary);
   }
 
+  .location-filter-btn {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+  }
+
+  .location-filter-btn:hover {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border-color: var(--text-primary);
+  }
+
+  .location-filter-btn svg {
+    fill: var(--text-primary);
+  }
+
+  .location-filter-btn:hover svg {
+    fill: #ee7221;
+  }
+
   /* Filename editing styles */
   .filename.editable {
     cursor: pointer;
@@ -3736,4 +3765,20 @@
     color: #666;
     font-style: italic;
   }
+
+  /* CSS für Google Logo Farbumschlag */
+  .google-logo .google-blue,
+  .google-logo .google-green,
+  .google-logo .google-yellow,
+  .google-logo .google-red {
+    transition: fill 0.2s;
+  }
+  .gmaps-btn .google-logo .google-blue { fill: currentColor; }
+  .gmaps-btn .google-logo .google-green { fill: currentColor; }
+  .gmaps-btn .google-logo .google-yellow { fill: currentColor; }
+  .gmaps-btn .google-logo .google-red { fill: currentColor; }
+  .gmaps-btn:hover .google-logo .google-blue { fill: #4285F4; }
+  .gmaps-btn:hover .google-logo .google-green { fill: #34A853; }
+  .gmaps-btn:hover .google-logo .google-yellow { fill: #FBBC05; }
+  .gmaps-btn:hover .google-logo .google-red { fill: #EA4335; }
 </style> 

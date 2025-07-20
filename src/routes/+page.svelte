@@ -411,7 +411,7 @@
   let showCompass = false;
   let autoguide = false;
   let newsFlashMode: 'aus' | 'eigene' | 'alle' = 'alle';
-  let showSearchField = false; // Default: Logo sichtbar, Suchfeld versteckt
+  	let showSearchField = true; // Default: Suchfeld sichtbar, Logo versteckt
   let userLat: number | null = null;
   let userLon: number | null = null;
   let deviceHeading: number | null = null;
@@ -2958,8 +2958,8 @@
     showDistance = data?.show_distance ?? true; // Default to true for GPS-based sorting
     showCompass = data?.show_compass ?? false;
     autoguide = data?.autoguide ?? false;
-          // Load showSearchField from localStorage (default: false = Logo visible)
-      showSearchField = localStorage.getItem('showSearchField') === 'true';
+          	// Load showSearchField from localStorage (default: true = Search field visible)
+	showSearchField = localStorage.getItem('showSearchField') !== 'false';
     useJustifiedLayout = data?.use_justified_layout ?? true;
     // Ensure justified layout is enabled by default
     if (useJustifiedLayout === undefined || useJustifiedLayout === null) {
