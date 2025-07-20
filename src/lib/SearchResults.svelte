@@ -1,7 +1,9 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { supabase } from '$lib/supabaseClient';
   import type { NewsFlashImage } from '$lib/types';
   import GalleryLayout from '$lib/GalleryLayout.svelte';
+  import { getDistanceInMeters } from '$lib/imageUtils';
   
   export let searchQuery: string = '';
   export let userId: string = '';
@@ -19,6 +21,16 @@
   let searchTimeout: ReturnType<typeof setTimeout> | null = null;
   let isInitializing = true; // Flag to prevent reactive searches during initialization
   let isInitialized = false;
+  
+  // Initialize component on mount
+  onMount(() => {
+    console.log('🔍 SearchResults: Component mounted');
+    // Allow searches after a short delay to ensure component is ready
+    setTimeout(() => {
+      isInitializing = false;
+      console.log('🔍 SearchResults: Component ready for searches');
+    }, 100);
+  });
 
   // Local distance calculation function for sorting
   function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -177,10 +189,23 @@
   
   // Allow external search triggers
   export function triggerSearch() {
+    console.log('🔍 SearchResults: triggerSearch called, isInitializing:', isInitializing);
+    
+    if (isInitializing) {
+      // If still initializing, wait a bit and try again
+      setTimeout(() => {
+        console.log('🔍 SearchResults: Retrying triggerSearch after initialization');
+        triggerSearch();
+      }, 150);
+      return;
+    }
+    
     isInitializing = false; // Allow reactive searches after external trigger
     if (searchQuery && searchQuery.trim()) {
       console.log('🔍 SearchResults: External search trigger for:', searchQuery);
       search();
+    } else {
+      console.log('🔍 SearchResults: triggerSearch called but no search query');
     }
   }
 </script>
