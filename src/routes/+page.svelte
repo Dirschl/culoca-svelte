@@ -41,6 +41,9 @@
   let isMoving = false; // Bewegungsmodus aktiv
   let lastPosition: { lat: number; lon: number; timestamp: number } | null = null;
   let settingsIconRotation = 0; // Rotation des Settings-Icons
+  let continuousRotation = 0; // Kontinuierliche Rotation im mobilen Modus
+  let rotationSpeed = 1; // Geschwindigkeit der kontinuierlichen Rotation (1 = langsam, 5 = schnell)
+  let rotationInterval = null; // Interval für kontinuierliche Rotation
   
   // Manual 3x3 mode toggle
   let isManual3x3Mode = false; // Manueller 3x3 Modus (durch Klick auf GPS-Koordinaten)
@@ -52,6 +55,7 @@
     if (isManual3x3Mode) {
       console.log('🎯 Manueller 3x3 Modus aktiviert');
       settingsIconRotation += 360; // Start rotation
+      startContinuousRotation(); // Start kontinuierliche Rotation
       show3x3ModeStatus('3x3 Grid Modus aktiviert', 3000);
       
       // Clear gallery and load 3x3 grid
@@ -62,6 +66,7 @@
     } else {
       console.log('📋 Zurück zur normalen Galerie');
       settingsIconRotation = 0; // Stop rotation
+      stopContinuousRotation(); // Stop kontinuierliche Rotation
       show3x3ModeStatus('Normale Galerie aktiviert', 3000);
       
       // Clear gallery and load normal list
@@ -72,12 +77,42 @@
     }
   }
   
+  // Funktion für kontinuierliche Rotation im mobilen Modus
+  function startContinuousRotation() {
+    if (rotationInterval) {
+      clearInterval(rotationInterval);
+    }
+    
+    rotationInterval = setInterval(() => {
+      continuousRotation += rotationSpeed;
+      if (continuousRotation >= 360) {
+        continuousRotation = 0;
+      }
+    }, 50); // Alle 50ms aktualisieren
+  }
+  
+  // Funktion zum Stoppen der kontinuierlichen Rotation
+  function stopContinuousRotation() {
+    if (rotationInterval) {
+      clearInterval(rotationInterval);
+      rotationInterval = null;
+    }
+    continuousRotation = 0;
+  }
+  
+  // Funktion zum Erhöhen der Rotationsgeschwindigkeit
+  function increaseRotationSpeed() {
+    rotationSpeed = Math.min(rotationSpeed + 1, 10); // Maximal 10x Geschwindigkeit
+    console.log(`⚡ Rotationsgeschwindigkeit erhöht auf: ${rotationSpeed}x`);
+  }
+  
   // Function to stop 3x3 mode when filters/search are used
   function stop3x3Mode() {
     if (isManual3x3Mode) {
       console.log('🛑 3x3 Modus durch Filter/Suche gestoppt');
       isManual3x3Mode = false;
       settingsIconRotation = 0; // Stop rotation
+      stopContinuousRotation(); // Stop kontinuierliche Rotation
       show3x3ModeStatus('3x3 Modus deaktiviert', 3000);
     }
   }
@@ -4297,6 +4332,13 @@
       toggle3x3Mode();
     });
     
+    // Event listener for rotation speed increase
+    window.addEventListener('increaseRotationSpeed', () => {
+      if (isManual3x3Mode) {
+        increaseRotationSpeed();
+      }
+    });
+    
     // Set auth as checked to allow gallery loading
     authChecked = true;
     isLoggedIn = false;
@@ -5219,6 +5261,8 @@
       {simulationMode}
         {profileAvatar}
         {settingsIconRotation}
+        {continuousRotation}
+        {rotationSpeed}
     on:upload={() => isLoggedIn ? location.href = '/bulk-upload' : showLoginOverlay = true}
     on:publicContent={() => showPublicContentModal.set(true)}
     on:bulkUpload={() => isLoggedIn ? location.href = '/bulk-upload' : showLoginOverlay = true}
@@ -5272,19 +5316,21 @@
       getDistanceFromLatLonInMeters={getDistanceFromLatLonInMeters}
       />
 
-  <!-- Mobile-Modus Erklärung - für alle User, ohne Seiten-Reload -->
-  <div class="mobile-mode-explanation">
-    <div class="explanation-content">
-      <h3>Mobile‑Modus</h3>
-      <p>Zeigt dir nur Bilder in einem 10 × 10‑Kilometer‑Quadrat – mindestens 5 km rund um deinen aktuellen Standort, selbst wenn du dich bewegst.</p>
-      
-      <h4>Mehr sehen?</h4>
-      <p>Wechsle in den Endlos‑Modus und scrolle, bis der Daumen glüht: Die App lädt fortlaufend 100er‑Pakete an Bildern, bis wirklich alles gezeigt wurde.</p>
-      
-      <h4>Fernweh?</h4>
-      <p>Tippe auf ein Bild, um einen entfernten Spot zu wählen. Mit dem Culoca‑Marker setzt du ihn als neues Zentrum deiner Suche – perfekt, um schon mal eine fremde Region zu erkunden.</p>
+  <!-- Mobile-Modus Erklärung - nur am Ende der Liste sichtbar -->
+  {#if $pics.length > 0 && !hasMoreImages && !loading}
+    <div class="mobile-mode-explanation">
+      <div class="explanation-content">
+        <h3>Mobile‑Modus</h3>
+        <p>Zeigt dir nur Bilder in einem 10 × 10‑Kilometer‑Quadrat – mindestens 5 km rund um deinen aktuellen Standort, selbst wenn du dich bewegst. Bilder außerhalb deiner Planquadrate werden verworfen und neue werden bei erreichen eines neuen Quadranten hinzugefügt.</p>
+        
+        <h4>Normale Galerie?</h4>
+        <p>Wechsle in den Endlos‑Modus und scrolle, bis der Daumen glüht: Die App lädt fortlaufend 100er‑Pakete an Bildern sortiert nach Entfernung zu deinem Standort, bis wirklich alles gezeigt wurde. Default beim starten der App, Wechsel durch klick auf die GPS Koordinaten.</p>
+        
+        <h4>Location Filter?</h4>
+        <p>Tippe auf ein Bild, um einen entfernten Spot zu wählen. Mit dem Culoca‑Marker setzt du ihn als neues Zentrum deiner Suche – perfekt, um schon mal eine fremde Region zu erkunden.</p>
+      </div>
     </div>
-  </div>
+  {/if}
 
     {/if}
   

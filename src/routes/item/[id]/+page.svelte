@@ -20,6 +20,8 @@
   let error = '';
   let profile: any = null;
   let nearby: any[] = [];
+  let hiddenItems: any[] = []; // Items mit gallery = false
+  let showHiddenItems = false; // Toggle für ausgeblendete Items
   
 
   let radius = 500; // meters, default
@@ -399,6 +401,10 @@
     if (nearbyCache[cacheKey]) {
       console.log('📸 Using cached nearby items for radius:', maxRadius, 'm');
       nearby = nearbyCache[cacheKey];
+      // Recalculate hidden items from cached data
+      hiddenItems = nearby.filter((item: any) => item.gallery === false);
+      nearby = nearby.filter((item: any) => item.gallery !== false);
+      console.log(`📸 From cache: ${nearby.length} visible, ${hiddenItems.length} hidden`);
       return;
     }
     
@@ -410,19 +416,25 @@
     // Filter server-side loaded nearby items by radius
     if (data.nearby && data.nearby.length > 0) {
       console.log('📸 Using server-side loaded nearby items:', data.nearby.length);
-      nearby = data.nearby
+      const allNearby = data.nearby
         .filter((item: any) => item.distance <= maxRadius)
         .map((item: any) => ({
           ...item,
           gallery: item.gallery ?? true
         }))
         .sort((a: any, b: any) => a.distance - b.distance);
+      
+      // Separate visible and hidden items
+      nearby = allNearby.filter((item: any) => item.gallery !== false);
+      hiddenItems = allNearby.filter((item: any) => item.gallery === false);
+      
+      console.log(`📸 Nearby items: ${nearby.length} visible, ${hiddenItems.length} hidden`);
     } else if (typeof window !== 'undefined' && (window as any).allImagesData) {
       // Fallback to global item data if available (from main page)
       const allItems = (window as any).allImagesData;
       console.log('📸 Using global item data for nearby calculation, found', allItems?.length || 0, 'items');
       
-      nearby = allItems
+      const allNearby = allItems
         .filter((item: any) => item.id !== imageId && item.lat && item.lon)
         .map((item: any) => {
           const dist = getDistanceInMeters(lat, lon, item.lat, item.lon);
@@ -442,6 +454,12 @@
         })
         .filter((it: any) => it.distance <= maxRadius)
         .sort((a: any, b: any) => a.distance - b.distance);
+      
+      // Separate visible and hidden items
+      nearby = allNearby.filter((item: any) => item.gallery !== false);
+      hiddenItems = allNearby.filter((item: any) => item.gallery === false);
+      
+      console.log(`📸 Nearby items: ${nearby.length} visible, ${hiddenItems.length} hidden`);
     } else {
       // No data available - just return empty array
       console.log('📸 No nearby data available');
@@ -457,8 +475,8 @@
       console.log(`📍 Distance range: ${closest.toFixed(0)}m - ${farthest.toFixed(0)}m`);
     }
     
-    // Cache the result
-    nearbyCache[cacheKey] = [...nearby];
+    // Cache the result (store all items, both visible and hidden)
+    nearbyCache[cacheKey] = [...nearby, ...hiddenItems];
     
     // Clean up old cache entries (keep only last 50 for better performance)
     const cacheKeys = Object.keys(nearbyCache);
@@ -495,6 +513,19 @@
     }
   }
   
+  // Function to toggle hidden items visibility
+  function toggleHiddenItems() {
+    showHiddenItems = !showHiddenItems;
+    if (showHiddenItems) {
+      // Add hidden items to nearby array
+      nearby = [...nearby, ...hiddenItems].sort((a: any, b: any) => a.distance - b.distance);
+    } else {
+      // Remove hidden items from nearby array
+      nearby = nearby.filter((item: any) => item.gallery !== false);
+    }
+    console.log(`🔍 Hidden items ${showHiddenItems ? 'shown' : 'hidden'}: ${hiddenItems.length} items`);
+  }
+
   // Radius slider event handlers with improved UX
   function onRadiusInput() {
     isDraggingRadius = true;
@@ -1625,6 +1656,11 @@
                 {#if nearby.length > 0}
                   <span class="nearby-count">• {nearby.length} Items</span>
                 {/if}
+                {#if hiddenItems.length > 0}
+                  <span class="hidden-count" class:active={showHiddenItems} on:click={toggleHiddenItems}>
+                    + {hiddenItems.length} ausgeblendet
+                  </span>
+                {/if}
               </div>
               <input id="radius" type="range" min="50" max="5000" step="50" bind:value={radius} on:input={onRadiusInput} on:change={onRadiusChange}>
             </div>
@@ -2515,6 +2551,26 @@
     font-weight: 400;
     color: var(--text-muted);
     margin-left: 0.3rem;
+  }
+
+  .hidden-count {
+    font-size: 0.85rem;
+    font-weight: 400;
+    color: var(--text-muted);
+    margin-left: 0.3rem;
+    cursor: pointer;
+    transition: color 0.2s;
+    opacity: 0.7;
+  }
+
+  .hidden-count:hover {
+    color: var(--culoca-orange);
+    opacity: 1;
+  }
+
+  .hidden-count.active {
+    color: var(--culoca-orange);
+    opacity: 1;
   }
 
   .no-nearby {

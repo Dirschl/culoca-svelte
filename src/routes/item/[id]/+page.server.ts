@@ -66,13 +66,12 @@ export const load: PageServerLoad = async ({ params }) => {
           .not('lat', 'is', null)
           .not('lon', 'is', null)
           .not('path_512', 'is', null)
-          .eq('gallery', true) // Only show images with gallery = true
-            .or('is_private.eq.false,is_private.is.null')
-            .gte('lat', latMin)
-            .lte('lat', latMax)
-            .gte('lon', lonMin)
-            .lte('lon', lonMax)
-            .range(offset, offset + pageSize - 1);
+          .or('is_private.eq.false,is_private.is.null')
+          .gte('lat', latMin)
+          .lte('lat', latMax)
+          .gte('lon', lonMin)
+          .lte('lon', lonMax)
+          .range(offset, offset + pageSize - 1);
 
           if (nearbyError) {
             console.error('Nearby fetch error:', nearbyError);

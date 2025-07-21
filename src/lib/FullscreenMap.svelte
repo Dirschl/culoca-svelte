@@ -1227,14 +1227,23 @@
       const { data: { session } } = await supabase.auth.getSession();
       const currentUserId = session?.user?.id || null;
       
-      // Load all images without pagination (no range limit)
-      let query = supabase
-        .from('items')
-        .select('id, lat, lon, path_512, path_2048, path_64, title, description, width, height, is_private, profile_id')
-        .not('lat', 'is', null)
-        .not('lon', 'is', null)
-        .not('path_512', 'is', null)
-        .eq('gallery', true); // Only show images with gallery = true
+      // Batch loading to get all images (bypass 1000 limit)
+      const allImages = [];
+      let offset = 0;
+      const batchSize = 1000;
+      let hasMore = true;
+      
+      while (hasMore) {
+        // Load batch of images - exclude gallery = false
+        let query = supabase
+          .from('items')
+          .select('id, lat, lon, path_64, title, is_private, profile_id')
+          .not('lat', 'is', null)
+          .not('lon', 'is', null)
+          .not('path_64', 'is', null)
+          .or('gallery.eq.true,gallery.is.null') // Show all except gallery = false (duplicates)
+          .range(offset, offset + batchSize - 1);
+          // Optimized for map: only essential fields, exclude duplicates
         
         // Apply privacy filtering
         if (currentUserId) {
@@ -1249,24 +1258,38 @@
         
         if (error) {
           console.error('[FullscreenMap DirectDB] Database error:', error);
-          return [];
+          break;
         }
         
         if (data && data.length > 0) {
-          console.log(`[FullscreenMap DirectDB] Successfully loaded ${data.length} images`);
+          console.log(`[FullscreenMap DirectDB] Loaded batch ${offset / batchSize + 1}: ${data.length} images`);
+          allImages.push(...data);
+          offset += batchSize;
           
-          const images = data.map(item => ({
-            ...item,
-            lat: item.lat!,
-            lon: item.lon!,
-            path_512: item.path_512!
-          }));
-          
-          return images;
+          // If we got less than batchSize, we've reached the end
+          if (data.length < batchSize) {
+            hasMore = false;
+          }
         } else {
-          console.log('[FullscreenMap DirectDB] No images found');
-          return [];
+          hasMore = false;
         }
+      }
+      
+      if (allImages.length > 0) {
+        console.log(`[FullscreenMap DirectDB] Successfully loaded ${allImages.length} total images`);
+        
+        const images = allImages.map(item => ({
+          ...item,
+          lat: item.lat!,
+          lon: item.lon!,
+          path_512: item.path_64! // Use path_64 as path_512 for map thumbnails
+        }));
+        
+        return images;
+      } else {
+        console.log('[FullscreenMap DirectDB] No images found');
+        return [];
+      }
       
     } catch (error) {
       console.error('[FullscreenMap DirectDB] Error:', error);
