@@ -56,7 +56,7 @@
       console.log('🎯 Manueller 3x3 Modus aktiviert');
       settingsIconRotation += 360; // Start rotation
       startContinuousRotation(); // Start kontinuierliche Rotation
-      show3x3ModeStatus('3x3 Grid Modus aktiviert', 3000);
+      show3x3ModeStatus('Mobile Galerie aktiviert', 3000);
       
       // Clear gallery and load 3x3 grid
       pics.set([]);
@@ -4683,6 +4683,24 @@
       }
     });
 
+    // Event-Handler für Standby/Tab-Wechsel: Galerie neu sortieren/aktualisieren
+    function handleVisibilityOrFocus() {
+      if (document.visibilityState === 'visible' || document.hasFocus()) {
+        // Resortiere bestehende Bilder nach aktueller GPS-Position
+        if (userLat !== null && userLon !== null) {
+          resortExistingImages();
+          // Prüfe, ob wir in eine neue Grid-Zelle gewechselt sind (Mobile Galerie)
+          if (isManual3x3Mode) {
+            // Prüfe, ob neue GPS-Koordinaten eine neue Zelle ergeben und lade ggf. neu
+            // (Grid-Logik ist bereits in checkMovement/updateMovementMode enthalten)
+            checkMovement(userLat, userLon);
+          }
+        }
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    window.addEventListener('focus', handleVisibilityOrFocus);
+
     return () => {
       window.removeEventListener('scroll', handleScroll);
       window.removeEventListener('scroll', handleScrollForAudioguide);
@@ -5316,21 +5334,19 @@
       getDistanceFromLatLonInMeters={getDistanceFromLatLonInMeters}
       />
 
-  <!-- Mobile-Modus Erklärung - nur am Ende der Liste sichtbar -->
-  {#if $pics.length > 0 && !hasMoreImages && !loading}
-    <div class="mobile-mode-explanation">
-      <div class="explanation-content">
-        <h3>Mobile‑Modus</h3>
-        <p>Zeigt dir nur Bilder in einem 10 × 10‑Kilometer‑Quadrat – mindestens 5 km rund um deinen aktuellen Standort, selbst wenn du dich bewegst. Bilder außerhalb deiner Planquadrate werden verworfen und neue werden bei erreichen eines neuen Quadranten hinzugefügt.</p>
-        
-        <h4>Normale Galerie?</h4>
-        <p>Wechsle in den Endlos‑Modus und scrolle, bis der Daumen glüht: Die App lädt fortlaufend 100er‑Pakete an Bildern sortiert nach Entfernung zu deinem Standort, bis wirklich alles gezeigt wurde. Default beim starten der App, Wechsel durch klick auf die GPS Koordinaten.</p>
-        
-        <h4>Location Filter?</h4>
-        <p>Tippe auf ein Bild, um einen entfernten Spot zu wählen. Mit dem Culoca‑Marker setzt du ihn als neues Zentrum deiner Suche – perfekt, um schon mal eine fremde Region zu erkunden.</p>
-      </div>
+  <!-- Mobile-Modus Erklärung - immer unterhalb der Galerie sichtbar -->
+  <div class="mobile-mode-explanation">
+    <div class="explanation-content">
+      <h3>Mobile Galerie</h3>
+      <p>Zeigt dir nur Bilder in einem 10 × 10‑Kilometer‑Quadrat – mindestens 5 km rund um deinen aktuellen Standort, selbst wenn du dich bewegst. Bilder außerhalb deiner Planquadrate werden verworfen und neue werden bei erreichen eines neuen Quadranten hinzugefügt.</p>
+      
+      <h4>Normale Galerie</h4>
+      <p>Wechsle in den Endlos‑Modus und scrolle, bis der Daumen glüht: Die App lädt fortlaufend 100er‑Pakete an Bildern sortiert nach Entfernung zu deinem Standort, bis wirklich alles gezeigt wurde. Default beim starten der App, Wechsel durch klick auf die GPS Koordinaten.</p>
+      
+      <h4>Location Filter</h4>
+      <p>Tippe auf ein Bild, um einen entfernten Spot zu wählen. Mit dem Culoca‑Marker setzt du ihn als neues Zentrum deiner Suche – perfekt, um schon mal eine fremde Region zu erkunden.</p>
     </div>
-  {/if}
+  </div>
 
     {/if}
   
