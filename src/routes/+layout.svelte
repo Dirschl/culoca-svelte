@@ -117,13 +117,9 @@
   <link rel="icon" type="image/png" href="/culoca-icon.png" />
 </svelte:head>
 
-{#if $sessionReady}
-  <div class="app">
-    <slot />
-  </div>
-{:else}
-  <div class="loading-spinner">Lade...</div>
-{/if}
+<div class="app">
+  <slot />
+</div>
 
 <style>
   .app {
