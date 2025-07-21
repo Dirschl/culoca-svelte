@@ -21,6 +21,10 @@
   import { intelligentImageLoader } from '$lib/intelligentImageLoader';
   import { authFetch } from '$lib/authFetch';
   import { dynamicImageLoader } from '$lib/dynamicImageLoader';
+  import LoginOverlay from '$lib/LoginOverlay.svelte';
+  import UploadDialog from '$lib/UploadDialog.svelte';
+  import SearchBar from '$lib/SearchBar.svelte';
+  import GalleryFunctionsInfo from '$lib/GalleryFunctionsInfo.svelte';
 
   const pics = writable<any[]>([]);
   const dynamicLoader = dynamicImageLoader;
@@ -2770,65 +2774,6 @@
     }
   }
 
-  let uploading = false;
-  let uploadMessage = '';
-  let uploadProgress = 0;
-  let currentUploading = '';
-  let uploadPreviews: string[] = [];
-  let isDragOver = false;
-
-  async function deleteAllImages() {
-    if (!confirm('Wirklich ALLE Bilder löschen? Diese Aktion kann nicht rückgängig gemacht werden!')) {
-      return;
-    }
-
-    try {
-      uploading = true;
-      uploadMessage = 'Lösche alle Bilder...';
-
-      const response = await authFetch('/api/delete-all', { method: 'POST' });
-      const result = await response.json();
-
-      if (result.status === 'success') {
-        uploadMessage = `✅ ${result.deletedCount} Bilder erfolgreich gelöscht!`;
-        // Special handling for location filters to prevent flickering
-        if (hasLocationFilter) {
-          console.log("[Filter Change] Location filter detected - loading smoothly without clearing gallery");
-          // For location filters: load smoothly without clearing existing images
-          // This prevents the flickering effect
-          page = 0;
-          hasMoreImages = true;
-          
-          // Clear global GPS data to ensure fresh sorting from new location
-          if ((window as any).gpsSortedData) {
-            delete (window as any).gpsSortedData;
-            console.log("[Filter Change] Cleared GPS sorted data for location filter");
-          }
-        } else {
-          // For other filters: reset gallery state immediately
-          pics.set([]);
-          page = 0;
-          hasMoreImages = true;
-        } // Clear the gallery
-        page = 0; // Reset pagination
-        hasMoreImages = true; // Reset for future uploads
-        
-        // Reset gallery stats
-        updateGalleryStats(0, 0);
-      } else {
-        throw new Error(result.message);
-      }
-    } catch (error) {
-      const err = error as Error;
-      uploadMessage = `❌ Fehler beim Löschen: ${err.message}`;
-    } finally {
-      uploading = false;
-      setTimeout(() => {
-        uploadMessage = '';
-      }, 5000);
-    }
-  }
-
   // Drag & Drop handlers
   function handleDragOver(event: DragEvent) {
     event.preventDefault();
@@ -5052,167 +4997,40 @@
   let showImpressum = false;
   let showDatenschutz = false;
 
-
+ 
 </script>
 
-
-
-
+<FilterBar
+  {userLat}
+  {userLon}
+  {showDistance}
+  {isLoggedIn}
+  gpsStatus={gpsStatus}
+  lastGPSUpdateTime={lastGPSUpdateTime}
+  isManual3x3Mode={isManual3x3Mode}
+  on:toggle3x3Mode={toggle3x3Mode}
+/>
 
 <!-- Dialoge für Upload und EXIF Upload -->
-{#if showUploadDialog}
-  <div class="dialog-overlay" on:click={closeDialogs}>
-    <div class="dialog-content" on:click|stopPropagation>
-      <div class="dialog-header">
-        <h2>Bilder hochladen</h2>
-        <button class="close-btn" on:click={closeDialogs}>×</button>
-      </div>
-      
-      <div class="upload-section">
-        <form on:submit|preventDefault={uploadImages}>
-          <!-- Drag & Drop Zone -->
-          <div 
-            class="drop-zone"
-            class:drag-over={isDragOver}
-            class:uploading={uploading}
-            on:dragover={handleDragOver}
-            on:dragleave={handleDragLeave}
-            on:drop={handleDrop}
-            role="button"
-            tabindex="0"
-          >
-            <div class="drop-content">
-              {#if uploading}
-                <div class="upload-icon">
-                  <div class="spinner"></div>
-                </div>
-                <h3>Uploading...</h3>
-                <p>Bitte warten...</p>
-              {:else}
-                <div class="upload-icon">
-                  <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
-                  </svg>
-                </div>
-                <h3>Bilder hier hinziehen</h3>
-                <p>oder <span class="link-text">Dateien auswählen</span></p>
-                <small>Nur JPEG- und WebP-Dateien erlaubt</small>
-              {/if}
-            </div>
-            
-            <input 
-              type="file" 
-              name="files" 
-              multiple 
-              accept="image/jpeg,image/jpg,image/webp" 
-              disabled={uploading}
-              class="file-input"
-            />
-          </div>
+<UploadDialog
+  show={showUploadDialog}
+  on:close={() => showUploadDialog = false}
+  on:uploaded={() => { /* Optional: Galerie neu laden */ }}
+  on:deletedAll={() => { /* Optional: Galerie neu laden */ }}
+/>
 
-          <div class="upload-actions">
-            <button type="submit" disabled={uploading} class="upload-btn">
-              {uploading ? 'Uploading...' : 'Ausgewählte Bilder hochladen'}
-            </button>
-            <button 
-              type="button" 
-              class="delete-all-btn"
-              on:click={deleteAllImages}
-              disabled={uploading || $pics.length === 0}
-            >
-              🗑️ Alle Bilder löschen
-            </button>
+<!-- Search Bar oder Culoca Logo -->
+<SearchBar
+  searchQuery={searchQuery}
+  isSearching={isSearching}
+  searchResults={searchResults}
+  showSearchField={showSearchField}
+  onSearch={performSearch}
+  onInput={q => { searchQuery = q; performSearch(q, false); }}
+  onToggleSearchField={toggleSearchField}
+/>
 
-          </div>
-        </form>
-        
-        <!-- Upload Progress -->
-        {#if uploading}
-          <div class="upload-progress">
-            <div class="progress-info">
-              <span class="current-file">{currentUploading}</span>
-              <span class="progress-percent">{uploadProgress}%</span>
-            </div>
-            <div class="progress-bar">
-              <div class="progress-fill" style="width: {uploadProgress}%"></div>
-            </div>
-          </div>
-    {/if}
-
-        <!-- Upload Previews -->
-        {#if uploadPreviews.length > 0}
-          <div class="upload-previews">
-            <h4>Upload-Vorschau:</h4>
-            <div class="preview-grid">
-              {#each uploadPreviews as preview, i}
-                <div class="preview-item">
-                  <img src={preview} alt="Upload preview {i + 1}" />
-                </div>
-              {/each}
-            </div>
-          </div>
-        {/if}
-        
-        {#if uploadMessage}
-          <div class="upload-message" class:success={uploadMessage.includes('✅')} class:error={uploadMessage.includes('❌')}>
-            {uploadMessage}
-          </div>
-        {/if}
-      </div>
-    </div>
-  </div>
-{/if}
-
-
-
-<!-- Search Bar or Culoca Logo -->
-{#if showSearchField}
-  <div class="search-container">
-    <div class="search-box">
-      <!-- Culoca Logo SVG als klickbares Icon -->
-      <svg class="culoca-icon" width="20" height="20" viewBox="0 0 83.86 100.88" fill="currentColor" on:click={toggleSearchField}>
-        <path d="M0,41.35c0-5.67,1.1-11.03,3.29-16.07,2.19-5.04,5.19-9.43,8.98-13.17,3.79-3.74,8.25-6.69,13.36-8.86,5.11-2.17,10.54-3.25,16.29-3.25s11.18,1.08,16.29,3.25c5.11,2.17,9.56,5.12,13.36,8.86,3.79,3.74,6.79,8.13,8.98,13.17,2.19,5.04,3.29,10.4,3.29,16.07s-1.1,11.03-3.29,16.07c-2.2,5.04-5.19,9.43-8.98,13.17-3.8,3.74-8.25,6.7-13.36,8.86-5.11,2.17-9.49,21.42-15.25,21.42s-12.23-19.25-17.34-21.42c-5.11-2.17-9.56-5.12-13.36-8.86-3.79-3.74-6.79-8.13-8.98-13.17-2.2-5.04-3.29-10.4-3.29-16.07ZM25.16,41.35c0,2.29.44,4.43,1.32,6.44.88,2.01,2.07,3.76,3.59,5.26,1.52,1.5,3.29,2.68,5.33,3.55,2.04.87,4.21,1.3,6.53,1.3s4.49-.43,6.53-1.3c2.04-.87,3.81-2.05,5.33-3.55,1.52-1.5,2.71-3.25,3.59-5.26.88-2.01,1.32-4.15,1.32-6.44s-.44-4.43-1.32-6.44c-.88-2.01-2.08-3.76-3.59-5.26-1.52-1.5-3.29-2.68-5.33-3.55-2.03-.87-4.21-1.3-6.53-1.3s-4.49.43-6.53,1.3c-2.04-.87-3.81-2.05-5.33,3.55-1.52,1.5-2.72,3.25-3.59,5.26-.88,2.01-1.32,4.16-1.32,6.44Z"/>
-      </svg>
-      <input 
-        type="text" 
-        placeholder=""
-        bind:value={searchQuery}
-        on:keydown={handleSearchKeydown}
-        class="search-input"
-        disabled={isSearching}
-        bind:this={searchInput}
-      />
-      {#if searchQuery}
-        <button class="clear-search-btn" on:click={clearSearch} disabled={isSearching}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-          </svg>
-        </button>
-      {/if}
-      {#if isSearching}
-        <div class="search-spinner"></div>
-      {/if}
-    </div>
-  </div>
-{/if}
-
-<!-- Originales Culoca Logo (PNG) - immer sichtbar außer wenn Suchfeld aktiv ist -->
-{#if !showSearchField}
-  <img 
-    src="/culoca-logo-512px.png" 
-    alt="Culoca" 
-    class="culoca-logo"
-    class:clickable={true}
-    on:click|preventDefault={toggleSearchField}
-  />
-{/if}
-
-
-
-<!-- Filter Bar - at the very top of the page -->
-        <FilterBar showOnMap={false} userLat={userLat} userLon={userLon} isPermalinkMode={isPermalinkMode} permalinkImageId={permalinkImageId} showDistance={showDistance} isLoggedIn={isLoggedIn} gpsStatus={gpsStatus} lastGPSUpdateTime={lastGPSUpdateTime} />
-
-    <!-- NewsFlash Component -->
+<!-- NewsFlash Component -->
 {#if isLoggedIn && newsFlashMode !== 'aus'}
     <NewsFlash 
     mode={newsFlashMode}
@@ -5229,15 +5047,7 @@
 {/if}
 
 <!-- Welcome Section -->
-{#if isLoggedIn && $welcomeVisible && !isWelcomeDismissed()}
-  <WelcomeSection 
-    visible={$welcomeVisible}
-    userName={currentUser?.user_metadata?.name || currentUser?.user_metadata?.full_name || 'Fotograf'}
-    currentUserId={currentUser?.id || ''}
-    onClose={() => hideWelcome()}
-    onDismiss={() => dismissWelcome()}
-      />
-    {/if}
+<WelcomeSection />
 
 <!-- Autoguide Bar -->
 {#if isLoggedIn && autoguide}
@@ -5247,19 +5057,12 @@
         {currentImageTitle || (audioActivated ? 'Bildtitel werden vorgelesen' : 'Audio deaktiviert - Klicke auf den Lautsprecher')}
       </div>
       <button class="speaker-btn" on:click={() => {
-        console.log('🎤 Speaker button clicked, audioActivated:', audioActivated);
         if (audioActivated) {
-          console.log('🎤 Deactivating audio...');
           speechSynthesis?.cancel();
           audioActivated = false;
         } else {
-          console.log('🎤 Activating audio...');
           activateAudioGuide();
-          // Also announce first image after activation
-          setTimeout(() => {
-            console.log('🎤 Announcing first image after manual activation...');
-            announceFirstImage();
-          }, 1500);
+          setTimeout(() => { announceFirstImage(); }, 1500);
         }
       }}>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
@@ -5371,137 +5174,7 @@
     </div>
   {/if}
 
-  <!-- Keine GPS-Daten verfügbar Meldung -->
-  {#if !hasValidGpsForGallery() && $pics.length === 0 && !searchQuery.trim() && !isSearching}
-    <div class="no-items-message">
-      <div class="no-items-content">
-        <div class="no-items-icon">📡</div>
-        <h3>Keine GPS-Daten verfügbar</h3>
-        <p>Aktuell sind keine verwertbaren GPS-Lokationsdaten verfügbar.</p>
-        <p><strong>Du kannst trotzdem Culoca nutzen:</strong></p>
-        <div class="no-items-benefits">
-          <div class="benefit-item">
-            <span class="benefit-icon">🔍</span>
-            <span>Suche nach Bildern</span>
-          </div>
-          <div class="benefit-item">
-            <span class="benefit-icon">🗺️</span>
-            <span>Kartenmodus verwenden</span>
-          </div>
-        </div>
-        <div class="no-items-actions">
-          <button class="map-nav-btn" on:click={() => showMap = true}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM10 5.47l4 1.4v11.66l-4-1.4V5.47z"/>
-            </svg>
-            Karte öffnen
-          </button>
-          <button class="search-btn" on:click={() => showSearchField = true}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
-            </svg>
-            Suche öffnen
-          </button>
-        </div>
-        <div class="no-items-note">
-          <p><strong>Tipp:</strong> Erlaube GPS-Zugriff in deinem Browser, um Bilder nach Entfernung zu sehen.</p>
-        </div>
-      </div>
-    </div>
-  {/if}
-
-  <!-- Login Overlay für nicht eingeloggte User -->
-  {#if showLoginOverlay && !isLoggedIn && authChecked}
-    <div class="modern-login-overlay" on:click={closeLoginOverlay}>
-      <div class="modern-login-content" on:click|stopPropagation>
-        <!-- Close Button -->
-        <button class="modern-login-close" on:click={closeLoginOverlay}>×</button>
-        <!-- Compact Logo -->
-        <img src="/culoca-logo-512px.png" alt="Culoca Logo" class="modern-login-logo" />
-
-        {#if loginError}
-          <div class="modern-login-error">{loginError}</div>
-        {/if}
-        {#if loginInfo}
-          <div class="modern-login-info">{loginInfo}</div>
-        {/if}
-
-        <!-- Social Login Buttons -->
-        <div class="modern-social-login">
-          <button class="modern-social-btn google-btn" on:click={() => loginWithProvider('google')} disabled={loginLoading}>
-            <svg class="modern-social-icon" viewBox="0 0 48 48" fill="none">
-              <g>
-                <path fill="#4285F4" d="M24 9.5c3.54 0 6.7 1.22 9.19 3.23l6.85-6.85C36.45 2.36 30.68 0 24 0 14.82 0 6.71 5.06 2.69 12.44l7.98 6.2C12.13 13.13 17.62 9.5 24 9.5z"/>
-                <path fill="#34A853" d="M46.1 24.5c0-1.64-.15-3.22-.42-4.74H24v9.01h12.42c-.54 2.9-2.18 5.36-4.65 7.03l7.19 5.6C43.98 37.13 46.1 31.3 46.1 24.5z"/>
-                <path fill="#FBBC05" d="M9.67 28.64c-1.13-3.36-1.13-6.92 0-10.28l-7.98-6.2C-1.13 17.13-1.13 31.87 1.69 37.84l7.98-6.2z"/>
-                <path fill="#EA4335" d="M24 46c6.48 0 11.92-2.14 15.9-5.82l-7.19-5.6c-2.01 1.35-4.6 2.15-8.71 2.15-6.38 0-11.87-3.63-14.33-8.94l-7.98 6.2C6.71 42.94 14.82 48 24 48z"/>
-              </g>
-            </svg>
-          </button>
-          <button class="modern-social-btn facebook-btn" on:click={() => loginWithProvider('facebook')} disabled={loginLoading}>
-            <svg class="modern-social-icon" viewBox="0 0 32 32" fill="none">
-              <circle cx="16" cy="16" r="16" fill="white"/>
-              <path d="M20.5 16H18V24H15V16H13.5V13.5H15V12.25C15 10.73 15.67 9 18 9H20.5V11.5H19.25C18.84 11.5 18.5 11.84 18.5 12.25V13.5H20.5L20 16Z" fill="#23272F"/>
-            </svg>
-          </button>
-        </div>
-
-        <!-- Login/Register Tabs -->
-        <div class="modern-login-tabs">
-          <button class="modern-tab-btn" class:active={!showRegister} on:click={() => showRegister = false}>
-            Anmelden
-          </button>
-          <button class="modern-tab-btn" class:active={showRegister} on:click={() => showRegister = true}>
-            Registrieren
-          </button>
-        </div>
-
-        <!-- Login Form -->
-        {#if !showRegister}
-          <form class="modern-login-form" on:submit|preventDefault={loginWithEmail}>
-            <input class="modern-login-input" type="email" placeholder="E-Mail" bind:value={loginEmail} required />
-            <input class="modern-login-input" type="password" placeholder="Passwort" bind:value={loginPassword} required />
-            <button class="modern-login-submit-btn" type="submit" disabled={loginLoading}>
-              {loginLoading ? 'Anmelden...' : 'Anmelden'}
-            </button>
-            <button type="button" class="modern-forgot-password" on:click={resetPassword}>
-              Passwort vergessen?
-            </button>
-          </form>
-        {:else}
-          <form class="modern-login-form" on:submit|preventDefault={signupWithEmail}>
-            <input class="modern-login-input" type="email" placeholder="E-Mail" bind:value={loginEmail} required />
-            <input class="modern-login-input" type="password" placeholder="Passwort" bind:value={loginPassword} required />
-            <button class="modern-login-submit-btn" type="submit" disabled={loginLoading}>
-              {loginLoading ? 'Registrieren...' : 'Registrieren'}
-            </button>
-          </form>
-        {/if}
-
-        <!-- Anonymous Access -->
-        <div class="modern-anonymous-section">
-          <div class="modern-anonymous-divider">
-            <span>oder</span>
-          </div>
-          <button class="modern-anonymous-btn" on:click={() => setAnonymousMode()}>
-            Anonym weiter
-          </button>
-          <p class="modern-anonymous-info">
-            Anonyme Benutzer können die Galerie ansehen, aber keine Bilder hochladen.
-          </p>
-        </div>
-
-        <!-- Footer Links -->
-        <div class="modern-login-footer">
-          <div class="modern-footer-links">
-            <a href="/impressum" class="modern-footer-link">Impressum</a>
-            <span class="modern-footer-separator">•</span>
-            <a href="/datenschutz" class="modern-footer-link">Datenschutz</a>
-          </div>
-        </div>
-      </div>
-    </div>
-  {/if}
+  
 </div>
 
 <style>
@@ -6259,352 +5932,6 @@
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
   }
 
-  /* Modern Login Overlay */
-  .modern-login-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(135deg, #0a1124 0%, #1a202c 100%);
-    backdrop-filter: blur(10px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-    animation: fadeIn 0.3s ease-out;
-  }
-
-  .modern-login-content {
-    background: rgba(26, 32, 44, 0.95);
-    backdrop-filter: blur(20px);
-    border-radius: 24px;
-    padding: 2.5rem;
-    text-align: center;
-    max-width: 440px;
-    width: 90%;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-    border: 1px solid rgba(238, 114, 33, 0.3);
-    position: relative;
-    overflow: hidden;
-  }
-
-  .modern-login-content::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 4px;
-    background: linear-gradient(90deg, #ee7221, #ff8c42);
-    border-radius: 24px 24px 0 0;
-  }
-
-  .modern-login-logo {
-    width: 200px;
-    height: 200px;
-    margin: 0 auto 1.5rem;
-    object-fit: contain;
-    filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3));
-  }
-
-  .modern-login-error {
-    background: linear-gradient(135deg, #dc3545, #c82333);
-    color: #fff;
-    padding: 1rem;
-    border-radius: 12px;
-    margin-bottom: 1.5rem;
-    font-weight: 500;
-    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
-  }
-
-  .modern-login-info {
-    background: linear-gradient(135deg, #28a745, #218838);
-    color: #fff;
-    padding: 1rem;
-    border-radius: 12px;
-    margin-bottom: 1.5rem;
-    font-weight: 500;
-    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
-  }
-
-  .modern-social-login {
-    display: flex;
-    gap: 1rem;
-    justify-content: center;
-    margin-bottom: 2rem;
-  }
-
-  .modern-social-btn {
-    background: #fff;
-    border: 2px solid #f0f0f0;
-    border-radius: 16px;
-    width: 64px;
-    height: 64px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  }
-
-  .modern-social-btn:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
-    border-color: #ee7221;
-  }
-
-  .modern-social-btn:active {
-    transform: translateY(0);
-  }
-
-  .modern-social-btn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-
-  .modern-social-icon {
-    width: 32px;
-    height: 32px;
-  }
-
-  .modern-login-tabs {
-    display: flex;
-    margin-bottom: 2rem;
-    border-radius: 12px;
-    overflow: hidden;
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-  }
-
-  .modern-tab-btn {
-    flex: 1;
-    padding: 0.75rem 1rem;
-    background: transparent;
-    border: none;
-    color: rgba(255, 255, 255, 0.7);
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    position: relative;
-  }
-
-  .modern-tab-btn.active {
-    background: linear-gradient(135deg, #ee7221, #ff8c42);
-    color: #fff;
-    box-shadow: 0 2px 8px rgba(238, 114, 33, 0.3);
-  }
-
-  .modern-tab-btn:not(.active):hover {
-    background: rgba(238, 114, 33, 0.2);
-    color: #ee7221;
-  }
-
-  .modern-login-form {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-  }
-
-  .modern-login-input {
-    width: 100%;
-    padding: 1rem;
-    border: 2px solid rgba(255, 255, 255, 0.2);
-    border-radius: 12px;
-    background: rgba(255, 255, 255, 0.9);
-    color: #2d3748;
-    font-size: 1rem;
-    box-sizing: border-box;
-    transition: all 0.3s ease;
-  }
-
-  .modern-login-input::placeholder {
-    color: #718096;
-  }
-
-  .modern-login-input:focus {
-    outline: none;
-    border-color: #ee7221;
-    box-shadow: 0 0 0 4px rgba(238, 114, 33, 0.2);
-    background: rgba(255, 255, 255, 0.95);
-  }
-
-  .modern-login-submit-btn {
-    width: 100%;
-    padding: 1rem;
-    background: linear-gradient(135deg, #ee7221, #ff8c42);
-    color: #fff;
-    border: none;
-    border-radius: 12px;
-    font-weight: 700;
-    font-size: 1rem;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 12px rgba(238, 114, 33, 0.3);
-  }
-
-  .modern-login-submit-btn:hover:not(:disabled) {
-    background: linear-gradient(135deg, #d6610a, #ee7221);
-    transform: translateY(-1px);
-    box-shadow: 0 6px 16px rgba(238, 114, 33, 0.4);
-  }
-
-  .modern-login-submit-btn:active {
-    transform: translateY(0);
-  }
-
-  .modern-login-submit-btn:disabled {
-    background: linear-gradient(135deg, #6c757d, #495057);
-    cursor: not-allowed;
-    transform: none;
-    box-shadow: none;
-  }
-
-  .modern-forgot-password {
-    background: none;
-    border: none;
-    color: #ee7221;
-    font-size: 0.9rem;
-    cursor: pointer;
-    padding: 0.5rem 0;
-    text-decoration: underline;
-    transition: color 0.3s ease;
-  }
-
-  .modern-forgot-password:hover {
-    color: #d6610a;
-  }
-
-  .modern-login-footer {
-    margin-top: 2rem;
-    padding-top: 1.5rem;
-    border-top: 1px solid rgba(255, 255, 255, 0.2);
-  }
-
-  .modern-footer-links {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    font-size: 0.875rem;
-  }
-
-  .modern-footer-link {
-    color: rgba(255, 255, 255, 0.7);
-    text-decoration: none;
-    transition: color 0.3s ease;
-  }
-
-  .modern-footer-link:hover {
-    color: #ee7221;
-  }
-
-  .modern-footer-separator {
-    color: rgba(255, 255, 255, 0.5);
-    font-weight: bold;
-  }
-
-  /* Anonymous section styles */
-  .modern-anonymous-section {
-    margin-top: 1.5rem;
-    padding-top: 1.5rem;
-    border-top: 1px solid rgba(255, 255, 255, 0.2);
-  }
-
-  .modern-anonymous-divider {
-    text-align: center;
-    margin-bottom: 1rem;
-    position: relative;
-  }
-
-  .modern-anonymous-divider::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 0;
-    right: 0;
-    height: 1px;
-    background: rgba(255, 255, 255, 0.2);
-  }
-
-  .modern-anonymous-divider span {
-    background: #1a1a1a;
-    padding: 0 1rem;
-    color: rgba(255, 255, 255, 0.7);
-    font-size: 0.875rem;
-    position: relative;
-  }
-
-  .modern-anonymous-btn {
-    width: 100%;
-    padding: 0.875rem 1rem;
-    background: rgba(255, 255, 255, 0.1);
-    color: rgba(255, 255, 255, 0.9);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 8px;
-    font-size: 0.95rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    margin-bottom: 0.75rem;
-  }
-
-  .modern-anonymous-btn:hover {
-    background: rgba(255, 255, 255, 0.15);
-    border-color: rgba(255, 255, 255, 0.3);
-    color: white;
-  }
-
-  .modern-anonymous-info {
-    margin: 0;
-    color: rgba(255, 255, 255, 0.6);
-    font-size: 0.8rem;
-    text-align: center;
-    line-height: 1.4;
-  }
-
-  @keyframes fadeIn {
-    from {
-      opacity: 0;
-      transform: scale(0.95);
-    }
-    to {
-      opacity: 1;
-      transform: scale(1);
-    }
-  }
-
-  @media (max-width: 600px) {
-    .modern-login-content {
-      padding: 1.5rem;
-      margin: 1rem;
-      border-radius: 20px;
-    }
-    
-    .modern-login-logo {
-      width: 160px;
-      height: 160px;
-      margin-bottom: 1rem;
-    }
-
-    .modern-social-btn {
-      width: 56px;
-      height: 56px;
-    }
-
-    .modern-social-icon {
-      width: 28px;
-      height: 28px;
-    }
-
-    .modern-login-input,
-    .modern-login-submit-btn {
-      padding: 0.875rem;
-      font-size: 0.95rem;
-    }
-  }
-
   /* Autoguide Bar */
   .autoguide-bar {
     position: static;
@@ -6719,96 +6046,9 @@
     color: var(--text-primary);
   }
   
-  .impressum-modal-overlay {
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0,0,0,0.45);
-    z-index: 3000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 1rem;
-  }
-  
-  .impressum-modal {
-    background: var(--bg-primary);
-    color: var(--text-primary);
-    border-radius: 12px;
-    max-width: 720px;
-    width: 100%;
-    max-height: 90vh;
-    overflow-y: auto;
-    box-shadow: 0 8px 32px var(--shadow);
-    padding: 2.5rem 2rem 2rem 2rem;
-    position: relative;
-  }
-  
-  .impressum-modal h2 {
-    margin: 0 0 2rem 0;
-    font-size: 1.8rem;
-    color: var(--text-primary);
-  }
-  
-  .impressum-modal h3 {
-    margin: 2.5rem 0 1rem 0;
-    font-size: 1.3rem;
-    color: var(--text-primary);
-  }
-  
-  .impressum-modal p {
-    margin: 0 0 1.5rem 0;
-    line-height: 1.6;
-    color: var(--text-secondary);
-  }
-  
-  .impressum-modal a {
-    color: var(--accent-color);
-    text-decoration: none;
-  }
-  
-  .impressum-modal a:hover {
-    text-decoration: underline;
-  }
-  
-  .impressum-close {
-    position: absolute;
-    top: 1rem;
-    right: 1rem;
-    background: none;
-    border: none;
-    font-size: 2rem;
-    color: var(--text-secondary);
-    cursor: pointer;
-    opacity: 0.7;
-    transition: opacity 0.2s;
-  }
-  
-  .impressum-close:hover {
-    opacity: 1;
-    color: var(--accent-color);
-  }
+
   
   @media (max-width: 600px) {
-    .impressum-modal {
-      max-width: 98vw;
-      padding: 1.5rem 1rem 1rem 1rem;
-    }
-    
-    .impressum-modal h2 {
-      font-size: 1.5rem;
-      margin-bottom: 1.5rem;
-    }
-    
-    .impressum-modal h3 {
-      font-size: 1.2rem;
-      margin: 2rem 0 0.8rem 0;
-    }
-    
-
-
-
-
-
 
   .map-nav-btn, .dismiss-btn, .search-btn {
     display: flex;
@@ -7083,8 +6323,8 @@
 {/if}
 
 <!-- Impressum-Link links unten -->
-<a class="impressum-link" href="#" on:click|preventDefault={() => showImpressum = true}>Impressum</a>
-<a class="datenschutz-link" href="#" on:click|preventDefault={() => showDatenschutz = true}>Datenschutz</a>
+<a class="impressum-link" href="/impressum" target="_blank" rel="noopener">Impressum</a>
+<a class="datenschutz-link" href="/datenschutz" target="_blank" rel="noopener">Datenschutz</a>
 
 <!-- Bewegungsmodus Status-Nachricht -->
 {#if modeStatusVisible}
@@ -7104,175 +6344,25 @@
   </div>
 {/if}
 
-{#if showImpressum}
-  <div class="impressum-modal-overlay" on:click={() => showImpressum = false}>
-    <div class="impressum-modal" on:click|stopPropagation>
-      <button class="impressum-close" on:click={() => showImpressum = false} title="Schließen">×</button>
-      <section id="impressum">
-        <h2>Impressum</h2>
-        <p><strong>Autor, Herausgeber, Design und technische Umsetzung</strong><br>
-        DIRSCHL.com GmbH<br>
-        Waldberg 84<br>
-        84571 Reischach<br>
-        Deutschland</p>
-        <p><strong>Geschäftsführer:</strong><br>
-        Johann Dirschl</p>
-        <p><strong>Kontakt:</strong><br>
-        Mobil: 0179 9766666<br>
-        Festnetz: 08670 5590127<br>
-        E-Mail: <a href="mailto:johann.dirschl@gmx.de">johann.dirschl@gmx.de</a></p>
-        <p><strong>Handelsregister:</strong><br>
-        Amtsgericht Traunstein, HRB 18130</p>
-        <p><strong>USt-IdNr.:</strong><br>
-        DE258218256</p>
-        <p><strong>Steuernummer:</strong><br>
-        141/124/50220</p>
-        <p><strong>Verantwortlich für den Inhalt gemäß § 55 Abs. 2 RStV:</strong><br>
-        Johann Dirschl<br>
-        Waldberg 84<br>
-        84571 Reischach</p>
-        <p><strong>Social Media:</strong><br>
-        <a href="https://www.facebook.com/johann.dirschl" target="_blank" rel="noopener noreferrer">Facebook – DIRSCHL.com GmbH</a></p>
-        <h3>Haftungsausschluss</h3>
-        <p>Die Inhalte dieser Website wurden mit größter Sorgfalt erstellt. Für die Richtigkeit, Vollständigkeit und Aktualität der Inhalte übernehmen wir jedoch keine Gewähr. Als Diensteanbieter sind wir gemäß § 7 Abs. 1 TMG für eigene Inhalte verantwortlich. Für Links auf externe Webseiten übernehmen wir keine Haftung – für deren Inhalte sind ausschließlich deren Betreiber verantwortlich.</p>
-        <h3>Datenschutzerklärung</h3>
-        <p>Bitte beachten Sie unsere <a href="#" on:click|preventDefault={() => { showImpressum = false; showDatenschutz = true; }}>Datenschutzerklärung</a>.</p>
-        <h3>Allgemeine Geschäftsbedingungen (AGB)</h3>
-        <p>Unsere vollständigen AGB finden Sie <a href="/agb">hier</a>.</p>
-      </section>
-    </div>
-  </div>
+<!-- Galerie-Funktionen Info -->
+<GalleryFunctionsInfo />
+
+{#if showLoginOverlay}
+  <LoginOverlay
+    show={true}
+    isLoggedIn={isLoggedIn}
+    authChecked={authChecked}
+    bind:loginEmail
+    bind:loginPassword
+    bind:loginLoading
+    bind:loginError
+    bind:loginInfo
+    bind:showRegister
+    onClose={closeLoginOverlay}
+    loginWithProvider={loginWithProvider}
+    loginWithEmail={loginWithEmail}
+    signupWithEmail={signupWithEmail}
+    resetPassword={resetPassword}
+    setAnonymousMode={setAnonymousMode}
+  />
 {/if}
-
-{#if showDatenschutz}
-  <div class="impressum-modal-overlay" on:click={() => showDatenschutz = false}>
-    <div class="impressum-modal" on:click|stopPropagation>
-      <button class="impressum-close" on:click={() => showDatenschutz = false} title="Schließen">×</button>
-      <section id="datenschutz">
-        <h2>Datenschutzerklärung</h2>
-        
-        <h3>1. Datenschutz auf einen Blick</h3>
-        
-        <h4>Allgemeine Hinweise</h4>
-        <p>Die folgenden Hinweise geben einen einfachen Überblick darüber, was mit Ihren personenbezogenen Daten passiert, wenn Sie diese Website besuchen. Personenbezogene Daten sind alle Daten, mit denen Sie persönlich identifiziert werden können. Ausführliche Informationen zum Thema Datenschutz entnehmen Sie unserer unter diesem Text aufgeführten Datenschutzerklärung.</p>
-        
-        <h4>Datenerfassung auf dieser Website</h4>
-        <p><strong>Wer ist verantwortlich für die Datenerfassung auf dieser Website?</strong><br>
-        Die Datenverarbeitung auf dieser Website erfolgt durch den Websitebetreiber. Dessen Kontaktdaten können Sie dem Abschnitt „Hinweis zur Verantwortlichen Stelle" in dieser Datenschutzerklärung entnehmen.</p>
-        
-        <p><strong>Wie erfassen wir Ihre Daten?</strong><br>
-        Ihre Daten werden zum einen dadurch erhoben, dass Sie uns diese mitteilen. Hierbei kann es sich z. B. um Daten handeln, die Sie in ein Kontaktformular eingeben. Andere Daten werden automatisch oder nach Ihrer Einwilligung beim Besuch der Website durch unsere IT-Systeme erfasst. Das sind vor allem technische Daten (z. B. Internetbrowser, Betriebssystem oder Uhrzeit des Seitenaufrufs). Die Erfassung dieser Daten erfolgt automatisch, sobald Sie diese Website betreten.</p>
-        
-        <p><strong>Wofür nutzen wir Ihre Daten?</strong><br>
-        Ein Teil der Daten wird erhoben, um eine fehlerfreie Bereitstellung der Website zu gewährleisten. Andere Daten können zur Analyse Ihres Nutzerverhaltens verwendet werden.</p>
-        
-        <p><strong>Welche Rechte haben Sie bezüglich Ihrer Daten?</strong><br>
-        Sie haben jederzeit das Recht, unentgeltlich Auskunft über Herkunft, Empfänger und Zweck Ihrer gespeicherten personenbezogenen Daten zu erhalten. Sie haben außerdem ein Recht, die Berichtigung oder Löschung dieser Daten zu verlangen. Wenn Sie eine Einwilligung zur Datenverarbeitung erteilt haben, können Sie diese Einwilligung jederzeit für die Zukunft widerrufen. Außerdem haben Sie das Recht, unter bestimmten Umständen die Einschränkung der Verarbeitung Ihrer personenbezogenen Daten zu verlangen. Des Weiteren steht Ihnen ein Beschwerderecht bei der zuständigen Aufsichtsbehörde zu. Hierzu sowie zu weiteren Fragen zum Thema Datenschutz können Sie sich jederzeit an uns wenden.</p>
-        
-        <h3>2. Hosting</h3>
-        <p>Wir hosten unsere Website bei Vercel Inc., 340 S Lemon Ave #4133, Walnut, CA 91789, USA. Vercel verarbeitet Daten im Auftrag und ist durch Standardvertragsklauseln der EU-Kommission zur Einhaltung europäischer Datenschutzstandards verpflichtet.</p>
-        
-        <h3>3. Allgemeine Hinweise und Pflichtinformationen</h3>
-        
-        <h4>Datenschutz</h4>
-        <p>Die Betreiber dieser Seiten nehmen den Schutz Ihrer persönlichen Daten sehr ernst. Wir behandeln Ihre personenbezogenen Daten vertraulich und entsprechend den gesetzlichen Datenschutzvorschriften sowie dieser Datenschutzerklärung. Wenn Sie diese Website benutzen, werden verschiedene personenbezogene Daten erhoben. Personenbezogene Daten sind Daten, mit denen Sie persönlich identifiziert werden können. Die vorliegende Datenschutzerklärung erläutert, welche Daten wir erheben und wofür wir sie nutzen. Sie erläutert auch, wie und zu welchem Zweck das geschieht. Wir weisen darauf hin, dass die Datenübertragung im Internet (z. B. bei der Kommunikation per E-Mail) Sicherheitslücken aufweisen kann. Ein lückenloser Schutz der Daten vor dem Zugriff durch Dritte ist nicht möglich.</p>
-        
-        <h4>Hinweis zur verantwortlichen Stelle</h4>
-        <p>Die verantwortliche Stelle für die Datenverarbeitung auf dieser Website ist:</p>
-        <p>DIRSCHL.com GmbH<br>
-        Waldberg 84<br>
-        84571 Reischach<br>
-        Deutschland</p>
-        <p>Telefon: 0179 9766666<br>
-        E-Mail: johann.dirschl@gmx.de</p>
-        <p>Verantwortliche Stelle ist die natürliche oder juristische Person, die allein oder gemeinsam mit anderen über die Zwecke und Mittel der Verarbeitung von personenbezogenen Daten (z. B. Namen, E-Mail-Adressen o. Ä.) entscheidet.</p>
-        
-        <h4>Speicherdauer</h4>
-        <p>Soweit innerhalb dieser Datenschutzerklärung keine speziellere Speicherdauer genannt wurde, verbleiben Ihre personenbezogenen Daten bei uns, bis der Zweck für die Datenverarbeitung entfällt. Wenn Sie ein berechtigtes Löschersuchen geltend machen oder eine Einwilligung zur Datenverarbeitung widerrufen, werden Ihre Daten gelöscht, sofern wir keine anderen rechtlich zulässigen Gründe für die Speicherung Ihrer personenbezogenen Daten haben (z. B. steuer- oder handelsrechtliche Aufbewahrungsfristen); im letztgenannten Fall erfolgt die Löschung nach Fortfall dieser Gründe.</p>
-        
-        <h4>Allgemeine Hinweise zu den Rechtsgrundlagen der Datenverarbeitung auf dieser Website</h4>
-        <p>Sofern Sie in die Datenverarbeitung eingewilligt haben, verarbeiten wir Ihre personenbezogenen Daten auf Grundlage von Art. 6 Abs. 1 lit. a DSGVO bzw. Art. 9 Abs. 2 lit. a DSGVO, sofern besondere Datenkategorien nach Art. 9 Abs. 1 DSGVO verarbeitet werden. Im Falle einer ausdrücklichen Einwilligung in die Übertragung personenbezogener Daten in Drittstaaten erfolgt die Datenverarbeitung außerdem auf Grundlage von Art. 49 Abs. 1 lit. a DSGVO. Sofern Sie in die Speicherung von Cookies oder in den Zugriff auf Informationen in Ihr Endgerät (z. B. via Device Fingerprinting) eingewilligt haben, erfolgt die Datenverarbeitung außerdem auf Grundlage von § 25 Abs. 1 TTDSG. Die Einwilligung ist jederzeit widerrufbar. Sind Ihre Daten zur Vertragserfüllung oder zur Durchführung vorvertraglicher Maßnahmen erforderlich, verarbeiten wir Ihre Daten auf Grundlage von Art. 6 Abs. 1 lit. b DSGVO. Des Weiteren verarbeiten wir Ihre Daten, sofern diese zur Erfüllung einer rechtlichen Verpflichtung erforderlich sind auf Grundlage von Art. 6 Abs. 1 lit. c DSGVO. Die Datenverarbeitung kann ferner auf Grundlage unseres berechtigten Interesses nach Art. 6 Abs. 1 lit. f DSGVO erfolgen. Über die jeweils im Einzelfall einschlägigen Rechtsgrundlagen wird in den folgenden Absätzen dieser Datenschutzerklärung informiert.</p>
-        
-        <h4>Hinweis zur Datenweitergabe in die USA und andere Drittstaaten</h4>
-        <p>Wir verwenden unter anderem Tools von Unternehmen mit Sitz in den USA oder anderen datenschutzrechtlich nicht sicheren Drittstaaten. Wenn diese Tools aktiv sind, können Ihre personenbezogenen Daten in diese Drittstaaten übertragen und dort verarbeitet werden. Wir weisen darauf hin, dass in diesen Ländern kein mit der EU vergleichbares Datenschutzniveau garantiert werden kann. Beispielsweise sind US-Unternehmen dazu verpflichtet, personenbezogene Daten an Sicherheitsbehörden herauszugeben, ohne dass Sie als Betroffener hiergegen gerichtlich vorgehen könnten. Es kann daher nicht ausgeschlossen werden, dass US-Behörden (z. B. Geheimdienste) Ihre auf US-Servern befindlichen Daten zu Überwachungszwecken verarbeiten, auswerten und dauerhaft speichern. Wir haben auf diese Verarbeitungstätigkeiten keinen Einfluss.</p>
-        
-        <h4>Widerruf Ihrer Einwilligung zur Datenverarbeitung</h4>
-        <p>Viele Datenverarbeitungsvorgänge sind nur mit Ihrer ausdrücklichen Einwilligung möglich. Sie können eine bereits erteilte Einwilligung jederzeit widerrufen. Die Rechtmäßigkeit der bis zum Widerruf erfolgten Datenverarbeitung bleibt vom Widerruf unberührt.</p>
-        
-        <h4>Widerspruchsrecht gegen die Datenerhebung in besonderen Fällen sowie gegen Direktwerbung (Art. 21 DSGVO)</h4>
-        <p>WENN DIE DATENVERARBEITUNG AUF GRUNDLAGE VON ART. 6 ABS. 1 LIT. E ODER F DSGVO ERFOLGT, HABEN SIE JEDERZEIT DAS RECHT, AUS GRÜNDEN, DIE SICH AUS IHRER BESONDEREN SITUATION ERGEBEN, GEGEN DIE VERARBEITUNG IHRER PERSONENBEZOGENEN DATEN WIDERSPRUCH EINZULEGEN; DIES GILT AUCH FÜR EIN AUF DIESE BESTIMMUNGEN GESTÜTZTES PROFILING. DIE JEWEILIGE RECHTSGRUNDLAGE, AUF DENEN EINE VERARBEITUNG BERUHT, ENTNEHMEN SIE DIESER DATENSCHUTZERKLÄRUNG. WENN SIE WIDERSPRUCH EINLEGEN, WERDEN WIR IHRE BETROFFENEN PERSONENBEZOGENEN DATEN NICHT MEHR VERARBEITEN, ES SEI DENN, WIR KÖNNEN ZWINGENDE SCHUTZWÜRDIGE GRÜNDE FÜR DIE VERARBEITUNG NACHWEISEN, DIE IHRE INTERESSEN, RECHTE UND FREIHEITEN ÜBERWIEGEN ODER DIE VERARBEITUNG DIENT DER GELTENDMACHUNG, AUSÜBUNG ODER VERTEIDIGUNG VON RECHTSANSPRÜCHEN (WIDERSPRUCH NACH ART. 21 ABS. 1 DSGVO). WENN IHRE PERSONENBEZOGENEN DATEN VERARBEITET WERDEN, UM DIREKTWERBUNG ZU BETREIBEN, HABEN SIE DAS RECHT, JEDERZEIT WIDERSPRUCH GEGEN DIE VERARBEITUNG SIE BETREFFENDER PERSONENBEZOGENER DATEN ZUM ZWECKE DERARTIGER WERBUNG EINZULEGEN; DIES GILT AUCH FÜR DAS PROFILING, SOWEIT ES MIT SOLCHER DIREKTWERBUNG IN VERBINDUNG STEHT. WENN SIE WIDERSPRECHEN, WERDEN IHRE PERSONENBEZOGENEN DATEN ANSCHLIESSEND NICHT MEHR ZUM ZWECKE DER DIREKTWERBUNG VERWENDET (WIDERSPRUCH NACH ART. 21 ABS. 2 DSGVO).</p>
-        
-        <h4>Beschwerderecht bei der zuständigen Aufsichtsbehörde</h4>
-        <p>Im Falle von Verstößen gegen die DSGVO steht den Betroffenen ein Beschwerderecht bei einer Aufsichtsbehörde, insbesondere in dem Mitgliedstaat ihres gewöhnlichen Aufenthalts, ihres Arbeitsplatzes oder des Orts des mutmaßlichen Verstoßes zu. Das Beschwerderecht besteht unbeschadet anderweitiger verwaltungsrechtlicher oder gerichtlicher Rechtsbehelfe.</p>
-        
-        <h4>Recht auf Datenübertragbarkeit</h4>
-        <p>Sie haben das Recht, Daten, die wir auf Grundlage Ihrer Einwilligung oder in Erfüllung eines Vertrags automatisiert verarbeiten, an sich oder an einen Dritten in einem gängigen, maschinenlesbaren Format aushändigen zu lassen. Sofern Sie die direkte Übertragung der Daten an einen anderen Verantwortlichen verlangen, erfolgt dies nur, soweit es technisch machbar ist.</p>
-        
-        <h4>Auskunft, Löschung und Berichtigung</h4>
-        <p>Sie haben im Rahmen der geltenden gesetzlichen Bestimmungen jederzeit das Recht auf unentgeltliche Auskunft über Ihre gespeicherten personenbezogenen Daten, deren Herkunft und Empfänger und den Zweck der Datenverarbeitung sowie ein Recht auf Berichtigung oder Löschung dieser Daten. Hierzu sowie zu weiteren Fragen zum Thema personenbezogene Daten können Sie sich jederzeit an uns wenden.</p>
-        
-        <h4>Recht auf Einschränkung der Verarbeitung</h4>
-        <p>Sie haben das Recht, die Einschränkung der Verarbeitung Ihrer personenbezogenen Daten zu verlangen. Hierzu können Sie sich jederzeit an uns wenden. Das Recht auf Einschränkung der Verarbeitung besteht in folgenden Fällen:</p>
-        <ul>
-          <li>Wenn Sie die Richtigkeit Ihrer bei uns gespeicherten personenbezogenen Daten bestreiten, benötigen wir in der Regel Zeit, um dies zu überprüfen. Für die Dauer der Prüfung haben Sie das Recht, die Einschränkung der Verarbeitung Ihrer personenbezogenen Daten zu verlangen.</li>
-          <li>Wenn die Verarbeitung Ihrer personenbezogenen Daten unrechtmäßig geschah/geschieht, können Sie statt der Löschung die Einschränkung der Datenverarbeitung verlangen.</li>
-          <li>Wenn wir Ihre personenbezogenen Daten nicht mehr benötigen, Sie sie jedoch zur Ausübung, Verteidigung oder Geltendmachung von Rechtsansprüchen benötigen, haben Sie das Recht, statt der Löschung die Einschränkung der Verarbeitung Ihrer personenbezogenen Daten zu verlangen.</li>
-          <li>Wenn Sie einen Widerspruch nach Art. 21 Abs. 1 DSGVO eingelegt haben, muss eine Abwägung zwischen Ihren und unseren Interessen vorgenommen werden. Solange noch nicht feststeht, wessen Interessen überwiegen, haben Sie das Recht, die Einschränkung der Verarbeitung Ihrer personenbezogenen Daten zu verlangen.</li>
-        </ul>
-        
-        <h4>SSL- bzw. TLS-Verschlüsselung</h4>
-        <p>Diese Seite nutzt aus Sicherheitsgründen und zum Schutz der Übertragung vertraulicher Inhalte, wie zum Beispiel der Anfragen, die Sie an uns als Seitenbetreiber senden, eine SSL- bzw. TLS-Verschlüsselung. Eine verschlüsselte Verbindung erkennen Sie daran, dass die Adresszeile des Browsers von „http://" auf „https://" wechselt und an dem Schloss-Symbol in Ihrer Browserzeile. Wenn die SSL- bzw. TLS-Verschlüsselung aktiviert ist, können die Daten, die Sie an uns übermitteln, nicht von Dritten mitgelesen werden.</p>
-        
-        <h3>4. Datenerfassung auf dieser Website</h3>
-        
-        <h4>Cookies</h4>
-        <p>Die Internetseiten verwenden teilweise so genannte Cookies. Cookies richten auf Ihrem Rechner keinen Schaden an und enthalten keine Viren. Cookies dienen dazu, unser Angebot nutzerfreundlicher, effektiver und sicherer zu machen. Cookies sind kleine Textdateien, die auf Ihrem Rechner abgelegt werden und die Ihr Browser speichert. Die meisten der von uns verwendeten Cookies sind so genannte „Session-Cookies". Sie werden nach Ende Ihres Besuchs automatisch gelöscht. Andere Cookies bleiben auf Ihrem Endgerät gespeichert, bis Sie diese löschen. Diese Cookies ermöglichen es uns, Ihren Browser beim nächsten Besuch wiederzuerkennen. Sie können Ihren Browser so einstellen, dass Sie über das Setzen von Cookies informiert werden und Cookies nur im Einzelfall erlauben, die Annahme von Cookies für bestimmte Fälle oder generell ausschließen sowie das automatische Löschen der Cookies beim Schließen des Browsers aktivieren. Bei der Deaktivierung von Cookies kann die Funktionalität dieser Website eingeschränkt sein.</p>
-        
-        <h4>Server-Log-Dateien</h4>
-        <p>Der Provider der Seiten erhebt und speichert automatisch Informationen in so genannten Server-Log-Dateien, die Ihr Browser automatisch an uns übermittelt. Dies sind:</p>
-        <ul>
-          <li>Browsertyp und Browserversion</li>
-          <li>verwendetes Betriebssystem</li>
-          <li>Referrer URL</li>
-          <li>Hostname des zugreifenden Rechners</li>
-          <li>Uhrzeit der Serveranfrage</li>
-          <li>IP-Adresse</li>
-        </ul>
-        <p>Eine Zusammenführung dieser Daten mit anderen Datenquellen wird nicht vorgenommen. Die Erfassung dieser Daten erfolgt auf Grundlage von Art. 6 Abs. 1 lit. f DSGVO. Der Websitebetreiber hat ein berechtigtes Interesse an der technisch fehlerfreien Darstellung und der Optimierung seiner Website – hierzu müssen die Server-Log-Dateien erfasst werden.</p>
-        
-        <h4>Kontaktformular</h4>
-        <p>Wenn Sie uns per Kontaktformular Anfragen zukommen lassen, werden Ihre Angaben aus dem Anfrageformular inklusive der von Ihnen dort angegebenen Kontaktdaten zwecks Bearbeitung der Anfrage und für den Fall von Anschlussfragen bei uns gespeichert. Diese Daten geben wir nicht ohne Ihre Einwilligung weiter. Die Verarbeitung dieser Daten erfolgt auf Grundlage von Art. 6 Abs. 1 lit. b DSGVO, sofern Ihre Anfrage mit der Erfüllung eines Vertrags zusammenhängt oder zur Durchführung vorvertraglicher Maßnahmen erforderlich ist. In allen übrigen Fällen beruht die Verarbeitung auf unserem berechtigten Interesse an der effektiven Bearbeitung der an uns gerichteten Anfragen (Art. 6 Abs. 1 lit. f DSGVO) oder auf Ihrer Einwilligung (Art. 6 Abs. 1 lit. a DSGVO), sofern diese abgefragt wurde; die Einwilligung ist jederzeit widerrufbar. Die von Ihnen im Kontaktformular eingegebenen Daten verbleiben bei uns, bis Sie uns zur Löschung auffordern, Ihre Einwilligung zur Speicherung widerrufen oder der Zweck für die Datenspeicherung entfällt (z. B. nach abgeschlossener Bearbeitung Ihres Anliegens). Zwingende gesetzliche Bestimmungen – insbesondere Aufbewahrungsfristen – bleiben unberührt.</p>
-        
-        <h4>Anfrage per E-Mail, Telefon oder Telefax</h4>
-        <p>Wenn Sie uns per E-Mail, Telefon oder Telefax kontaktieren, wird Ihre Anfrage inklusive aller daraus abgeleiteten personenbezogenen Daten (Name, Anfrage) zum Zwecke der Bearbeitung Ihres Anliegens bei uns gespeichert und verarbeitet. Diese Daten geben wir nicht ohne Ihre Einwilligung weiter. Die Verarbeitung dieser Daten erfolgt auf Grundlage von Art. 6 Abs. 1 lit. b DSGVO, sofern Ihre Anfrage mit der Erfüllung eines Vertrags zusammenhängt oder zur Durchführung vorvertraglicher Maßnahmen erforderlich ist. In allen übrigen Fällen beruht die Verarbeitung auf unserem berechtigten Interesse an der effektiven Bearbeitung der an uns gerichteten Anfragen (Art. 6 Abs. 1 lit. f DSGVO) oder auf Ihrer Einwilligung (Art. 6 Abs. 1 lit. a DSGVO), sofern diese abgefragt wurde; die Einwilligung ist jederzeit widerrufbar. Die von Ihnen an uns übermittelten Daten verbleiben bei uns, bis Sie uns zur Löschung auffordern, Ihre Einwilligung zur Speicherung widerrufen oder der Zweck für die Datenspeicherung entfällt (z. B. nach abgeschlossener Bearbeitung Ihres Anliegens). Zwingende gesetzliche Bestimmungen – insbesondere gesetzliche Aufbewahrungsfristen – bleiben unberührt.</p>
-        
-        <h3>5. Analyse-Tools und Tools von Drittanbietern</h3>
-        <p>Beim Besuch dieser Website kann Ihr Surf-Verhalten statistisch ausgewertet werden. Das geschieht vor allem mit sogenannten Analyseprogrammen. Detaillierte Informationen zu diesen Analyseprogrammen finden Sie in der folgenden Datenschutzerklärung.</p>
-        
-        <h3>6. Newsletter</h3>
-        <p>Falls Sie den auf der Website angebotenen Newsletter beziehen möchten, benötigen wir von Ihnen eine E-Mail-Adresse sowie Informationen, welche uns die Überprüfung gestatten, dass Sie der Inhaber der angegebenen E-Mail-Adresse sind und mit dem Empfang des Newsletters einverstanden sind (sog. Double-Opt-In). Weitere Daten werden nicht bzw. nur auf freiwilliger Basis erhoben. Diese Daten werden ausschließlich für den Versand der angeforderten Informationen und ggf. für die personalisierte Gestaltung des Newsletters verwendet. Die Verarbeitung der in das Newsletter-Anmeldeformular eingegebenen Daten erfolgt ausschließlich auf Grundlage Ihrer Einwilligung (Art. 6 Abs. 1 lit. a DSGVO). Die erteilte Einwilligung zur Speicherung der Daten, der E-Mail-Adresse sowie deren Nutzung zum Versand des Newsletters können Sie jederzeit widerrufen, etwa über den „Austragen"-Link im Newsletter. Die Rechtmäßigkeit der bereits erfolgten Datenverarbeitungsvorgänge bleibt vom Widerruf unberührt. Die von Ihnen zum Zwecke des Newsletter-Bezugs bei uns hinterlegten Daten werden von uns bis zu Ihrer Austragung gespeichert und nach der Abmeldung des Newsletters sowohl von unseren Servern als auch von den Servern des Newsletter-Dienstleisters gelöscht. Sofern wir Ihnen Newsletter-Dienstleister mitteilen, erfolgt dies nur, wenn dies gesetzlich erforderlich ist oder eine gerichtliche Anordnung vorliegt.</p>
-        
-        <h3>7. Plugins und Tools</h3>
-        
-        <h4>Google Fonts (lokales Hosting)</h4>
-        <p>Diese Seite nutzt zur einheitlichen Darstellung von Schriftarten so genannte Google Fonts, die von Google bereitgestellt werden. Die Google Fonts sind lokal installiert. Eine Verbindung zu Servern von Google findet dabei nicht statt. Weitere Informationen zu Google Fonts finden Sie unter <a href="https://developers.google.com/fonts/faq" target="_blank" rel="noopener noreferrer">https://developers.google.com/fonts/faq</a> und in der Datenschutzerklärung von Google: <a href="https://policies.google.com/privacy?hl=de" target="_blank" rel="noopener noreferrer">https://policies.google.com/privacy?hl=de</a>.</p>
-        
-        <h4>Google Maps</h4>
-        <p>Diese Seite nutzt den Kartendienst Google Maps. Anbieter ist die Google Ireland Limited, Gordon House, Barrow Street, Dublin 4, Irland. Zur Nutzung der Funktionen von Google Maps ist es notwendig, Ihre IP-Adresse zu speichern. Diese Informationen werden in der Regel an einen Server von Google in den USA übertragen und dort gespeichert. Der Anbieter dieser Seite hat keinen Einfluss auf diese Datenübertragung. Die Nutzung von Google Maps erfolgt im Interesse einer ansprechenden Darstellung unserer Online-Angebote und an einer leichten Auffindbarkeit der von uns auf der Website angegebenen Orte. Dies stellt ein berechtigtes Interesse im Sinne von Art. 6 Abs. 1 lit. f DSGVO dar. Sofern eine entsprechende Einwilligung abgefragt wurde, erfolgt die Verarbeitung ausschließlich auf Grundlage von Art. 6 Abs. 1 lit. a DSGVO und § 25 Abs. 1 TTDSG, soweit die Einwilligung die Speicherung von Cookies oder den Zugriff auf Informationen im Endgerät des Nutzers (z. B. Device Fingerprinting) umfasst. Die Einwilligung ist jederzeit widerrufbar. Mehr Informationen zum Umgang mit Nutzerdaten finden Sie in der Datenschutzerklärung von Google: <a href="https://policies.google.com/privacy?hl=de" target="_blank" rel="noopener noreferrer">https://policies.google.com/privacy?hl=de</a>.</p>
-        
-        <h3>8. Eigene Dienste</h3>
-        
-        <h4>Bewerbung und Bewerbungsverfahren</h4>
-        <p>Wir erheben und verarbeiten personenbezogene Daten von Bewerbern zum Zwecke der Bewerbungsabwicklung. Die Verarbeitung kann auch auf elektronischem Wege erfolgen. Dies ist insbesondere dann der Fall, wenn ein Bewerber entsprechende Bewerbungsunterlagen auf elektronischem Wege, etwa per E-Mail oder über ein auf der Website befindliches Webformular, an uns übermittelt. Schließen wir einen Anstellungsvertrag mit einem Bewerber, werden die übermittelten Daten zum Zwecke der Abwicklung des Beschäftigungsverhältnisses unter Beachtung der gesetzlichen Vorschriften gespeichert. Wird von uns kein Anstellungsvertrag mit dem Bewerber geschlossen, so werden die Bewerbungsunterlagen zwei Monate nach Bekanntgabe der Ablehnungsentscheidung automatisch gelöscht, sofern einer Löschung keine sonstigen berechtigten Interessen unsererseits entgegenstehen. Ein sonstiges berechtigtes Interesse liegt in diesem Sinne zum Beispiel in einem Beweisverfahren in einem Verfahren nach dem Allgemeinen Gleichbehandlungsgesetz (AGG).</p>
-        
-        <h3>9. Datenschutz für Bewerbungen und im Bewerbungsverfahren</h3>
-        <p>Wir erheben und verarbeiten personenbezogene Daten von Bewerbern zum Zwecke der Bewerbungsabwicklung. Die Verarbeitung kann auch auf elektronischem Wege erfolgen. Dies ist insbesondere dann der Fall, wenn ein Bewerber entsprechende Bewerbungsunterlagen auf elektronischem Wege, etwa per E-Mail oder über ein auf der Website befindliches Webformular, an uns übermittelt. Schließen wir einen Anstellungsvertrag mit einem Bewerber, werden die übermittelten Daten zum Zwecke der Abwicklung des Beschäftigungsverhältnisses unter Beachtung der gesetzlichen Vorschriften gespeichert. Wird von uns kein Anstellungsvertrag mit dem Bewerber geschlossen, so werden die Bewerbungsunterlagen zwei Monate nach Bekanntgabe der Ablehnungsentscheidung automatisch gelöscht, sofern einer Löschung keine sonstigen berechtigten Interessen unsererseits entgegenstehen. Ein sonstiges berechtigtes Interesse liegt in diesem Sinne zum Beispiel in einem Beweisverfahren in einem Verfahren nach dem Allgemeinen Gleichbehandlungsgesetz (AGG).</p>
-        
-        <h3>10. Datenschutz für Bewerbungen und im Bewerbungsverfahren</h3>
-        <p>Wir erheben und verarbeiten personenbezogene Daten von Bewerbern zum Zwecke der Bewerbungsabwicklung. Die Verarbeitung kann auch auf elektronischem Wege erfolgen. Dies ist insbesondere dann der Fall, wenn ein Bewerber entsprechende Bewerbungsunterlagen auf elektronischem Wege, etwa per E-Mail oder über ein auf der Website befindliches Webformular, an uns übermittelt. Schließen wir einen Anstellungsvertrag mit einem Bewerber, werden die übermittelten Daten zum Zwecke der Abwicklung des Beschäftigungsverhältnisses unter Beachtung der gesetzlichen Vorschriften gespeichert. Wird von uns kein Anstellungsvertrag mit dem Bewerber geschlossen, so werden die Bewerbungsunterlagen zwei Monate nach Bekanntgabe der Ablehnungsentscheidung automatisch gelöscht, sofern einer Löschung keine sonstigen berechtigten Interessen unsererseits entgegenstehen. Ein sonstiges berechtigtes Interesse liegt in diesem Sinne zum Beispiel in einem Beweisverfahren in einem Verfahren nach dem Allgemeinen Gleichbehandlungsgesetz (AGG).</p>
-      </section>
-    </div>
-  </div>
-{/if}
-
-

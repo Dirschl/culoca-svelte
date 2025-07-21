@@ -2,24 +2,28 @@
   import { onMount } from 'svelte';
   import { supabase } from '$lib/supabaseClient';
   import WelcomeEditor from '$lib/WelcomeEditor.svelte';
-  
-  export let visible = true;
-  export let onClose: () => void;
-  export let onDismiss: () => void;
-  export let userName = '';
-  export let currentUserId = '';
-  
+  import { welcomeVisible, hideWelcome, dismissWelcome, isWelcomeDismissed } from '$lib/welcomeStore';
+  import { sessionStore } from '$lib/sessionStore';
+  import { get } from 'svelte/store';
+
   const CREATOR_ID = '0ceb2320-0553-463b-971a-a0eef5ecdf09';
-  
+
   let mounted = false;
   let showEditor = false;
   let welcomeContent: any = {};
-  
+  let userName = '';
+  let currentUserId = '';
+  let isLoggedIn = false;
+
   onMount(() => {
     mounted = true;
     loadWelcomeContent();
+    const session = get(sessionStore);
+    isLoggedIn = session.isAuthenticated;
+    currentUserId = session.userId || '';
+    userName = session.user?.user_metadata?.name || session.user?.user_metadata?.full_name || 'Fotograf';
   });
-  
+
   async function loadWelcomeContent() {
     try {
       const { data, error } = await supabase
@@ -27,9 +31,7 @@
         .select('*')
         .eq('is_active', true)
         .order('id');
-      
       if (error) throw error;
-      
       const content = data || [];
       welcomeContent = {
         greeting: content.find(item => item.section_key === 'greeting'),
@@ -40,13 +42,13 @@
       console.error('Error loading welcome content:', error);
     }
   }
-  
+
   function handleEditorSave() {
     loadWelcomeContent(); // Reload content after save
   }
 </script>
 
-{#if visible && mounted}
+{#if isLoggedIn && $welcomeVisible && !isWelcomeDismissed() && mounted}
   <div class="welcome-section">
     <div class="welcome-content">
       <!-- Edit Button for Creator -->
@@ -58,7 +60,6 @@
           Bearbeiten
         </button>
       {/if}
-      
       <div class="welcome-grid">
         <div class="welcome-column">
           <h3>{@html (welcomeContent.greeting?.title || 'Hallo {userName}! 👋').replace('{userName}', userName)}</h3>
@@ -69,7 +70,6 @@
             <p class="beta-notice">Du nutzt die <span class="beta-badge">Beta-Version</span>. Wir haben viele Ideen, lass dich überraschen! 🚀</p>
           {/if}
         </div>
-        
         <div class="welcome-column">
           <h3>{@html (welcomeContent.gps?.title || 'GPS zeigt dir was du willst').replace('{userName}', userName)}</h3>
           {#if welcomeContent.gps?.content}
@@ -79,7 +79,6 @@
             <p>Deine Kamera kennt bereits jeden Ort – wir machen ihn für andere sichtbar.</p>
           {/if}
         </div>
-        
         <div class="welcome-column">
           <h3>{@html (welcomeContent.discover?.title || 'Entdecke deine Region').replace('{userName}', userName)}</h3>
           {#if welcomeContent.discover?.content}
@@ -90,10 +89,9 @@
           {/if}
         </div>
       </div>
-      
       <div class="welcome-footer">
         <label class="dont-show-again">
-          <input type="checkbox" on:change={onDismiss} />
+          <input type="checkbox" on:change={dismissWelcome} />
           <span>Nicht mehr anzeigen</span>
         </label>
       </div>
