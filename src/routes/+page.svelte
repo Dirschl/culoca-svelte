@@ -25,6 +25,7 @@
   import UploadDialog from '$lib/UploadDialog.svelte';
   import SearchBar from '$lib/SearchBar.svelte';
   import GalleryFunctionsInfo from '$lib/GalleryFunctionsInfo.svelte';
+  import StatusOverlay from '$lib/StatusOverlay.svelte';
 
   const pics = writable<any[]>([]);
   const dynamicLoader = dynamicImageLoader;
@@ -6327,25 +6328,9 @@
 <a class="datenschutz-link" href="/datenschutz" target="_blank" rel="noopener">Datenschutz</a>
 
 <!-- Bewegungsmodus Status-Nachricht -->
-{#if modeStatusVisible}
-  <div class="mode-status-overlay">
-    <div class="mode-status-message">
-      {modeStatusMessage}
-    </div>
-  </div>
-{/if}
-
+<StatusOverlay visible={modeStatusVisible} message={modeStatusMessage} />
 <!-- 3x3 Modus Status-Nachricht -->
-{#if mode3x3StatusVisible}
-  <div class="mode-status-overlay">
-    <div class="mode-status-message">
-      {mode3x3StatusMessage}
-    </div>
-  </div>
-{/if}
-
-<!-- Galerie-Funktionen Info -->
-<GalleryFunctionsInfo />
+<StatusOverlay visible={mode3x3StatusVisible} message={mode3x3StatusMessage} />
 
 {#if showLoginOverlay}
   <LoginOverlay
