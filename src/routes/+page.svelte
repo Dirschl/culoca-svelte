@@ -5071,7 +5071,7 @@
       </button>
     </div>
   </div>
-{/if}
+    {/if}
 
     <!-- Floating Action Buttons -->
     <FloatingActionButtons 
@@ -5148,21 +5148,21 @@
       
       <h4>Location Filter</h4>
       <p>Tippe auf ein Bild, um einen entfernten Spot zu wählen. Mit dem Culoca‑Marker setzt du ihn als neues Zentrum deiner Suche – perfekt, um schon mal eine fremde Region zu erkunden.</p>
-    </div>
-  </div>
+        </div>
+        </div>
 
-    {/if}
+        {/if}
   
 
   
   {#if loading}
     <div class="loading-indicator">
       <div class="spinner"></div>
-  </div>
+          </div>
   {:else if $pics.length > 0}
     <div class="end-indicator">
       <span>✅ {displayedImageCount} Bilder angezeigt</span>
-    </div>
+          </div>
   {/if}
   
 
@@ -5832,7 +5832,7 @@
 
   .search-input {
     flex: 1;
-    background: transparent;
+  background: transparent;
     border: none;
     outline: none;
     color: var(--text-primary);
@@ -5858,7 +5858,7 @@
     padding: 0.25rem;
     border-radius: 50%;
     transition: all 0.2s ease;
-    margin-left: 0.2rem;
+  margin-left: 0.2rem;
     display: flex;
     align-items: center;
     justify-content: center;
