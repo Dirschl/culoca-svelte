@@ -1238,7 +1238,7 @@
   };
 
   async function fetchFileSizes() {
-    if (!image) return;
+    if (!image || !browser) return;
     
     try {
       // Get file sizes from the actual loaded images
@@ -1269,8 +1269,7 @@
   }
 
   // Fetch file sizes when image loads
-  $: if (image) {
-    // Wait a bit for images to load
+  $: if (image && browser) {
     setTimeout(fetchFileSizes, 1000);
   }
 
