@@ -6185,7 +6185,7 @@
     padding: 0.25rem;
     border-radius: 50%;
     transition: all 0.2s ease;
-    margin-left: 0.5rem;
+    margin-left: 0.2rem;
     display: flex;
     align-items: center;
     justify-content: center;
