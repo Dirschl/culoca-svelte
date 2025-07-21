@@ -204,9 +204,7 @@
   }
 
   .justified-pic-container:focus {
-    outline: 3px solid #0066cc;
-    outline-offset: 2px;
-    background: transparent;
+    outline: none;
   }
 
   .justified-pic-container:hover {
@@ -265,6 +263,10 @@
     justify-content: center;
     aspect-ratio: 1/1;
     position: relative;
+  }
+
+  .grid-item:focus {
+    outline: none;
   }
 
   @media (max-width: 768px) {

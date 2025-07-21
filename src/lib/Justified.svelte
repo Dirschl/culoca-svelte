@@ -187,9 +187,7 @@
   }
 
   .pic-container:focus {
-    outline: 3px solid #0066cc;
-    outline-offset: 2px;
-    background: transparent;
+    outline: none;
   }
   .pic-container:hover {
     box-shadow: 0 4px 16px rgba(0,0,0,0.18);
