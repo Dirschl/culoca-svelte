@@ -2,6 +2,8 @@
   import { onMount, onDestroy } from 'svelte';
   import { writable, get } from 'svelte/store';
   import GalleryLayout from './GalleryLayout.svelte';
+  import { updateGalleryStats } from '$lib/galleryStats';
+  import { supabase } from '$lib/supabaseClient';
   export let userLat: number | null = null;
   export let userLon: number | null = null;
   export let useJustifiedLayout = true;
@@ -18,6 +20,52 @@
   let rotation = 0;
   let rotationSpeed = 1;
   let rotationInterval: any = null;
+
+  // Function to get total image count from database
+  async function getTotalImageCount(): Promise<number> {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const currentUserId = session?.user?.id || null;
+      
+      let query = supabase
+        .from('items')
+        .select('id', { count: 'exact' })
+        .not('path_512', 'is', null)
+        .eq('gallery', true);
+      
+      // Apply privacy filtering
+      if (currentUserId) {
+        query = query.or(`profile_id.eq.${currentUserId},is_private.eq.false,is_private.is.null`);
+      } else {
+        query = query.or('is_private.eq.false,is_private.is.null');
+      }
+      
+      const { count, error } = await query;
+      
+      if (error) {
+        console.error('[MobileGallery] Error getting total count:', error);
+        return 0;
+      }
+      
+      return count || 0;
+    } catch (error) {
+      console.error('[MobileGallery] Error getting total count:', error);
+      return 0;
+    }
+  }
+
+  // Separate Entfernungsfunktion für Sortierung (gibt Zahl zurück)
+  function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    const R = 6371e3; // Erdradius in Metern
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  }
 
   function startContinuousRotation() {
     if (rotationInterval) clearInterval(rotationInterval);
@@ -77,13 +125,18 @@
     if (lat !== null && lon !== null) {
       converted.sort((a: any, b: any) => {
         if (!a.lat || !a.lon || !b.lat || !b.lon) return 0;
-        const da = a.lat && a.lon ? getDistanceFromLatLonInMeters(lat, lon, a.lat, a.lon) : Number.MAX_VALUE;
-        const db = b.lat && b.lon ? getDistanceFromLatLonInMeters(lat, lon, b.lat, b.lon) : Number.MAX_VALUE;
+        const da = a.lat && a.lon ? getDistanceInMeters(lat, lon, a.lat, a.lon) : Number.MAX_VALUE;
+        const db = b.lat && b.lon ? getDistanceInMeters(lat, lon, b.lat, b.lon) : Number.MAX_VALUE;
         return da - db;
       });
     }
     gridItems.set(converted);
     displayedImageCount = converted.length;
+    
+    // Update gallery stats with total count from database
+    const totalCount = await getTotalImageCount();
+    updateGalleryStats(displayedImageCount, totalCount);
+    
     loading = false;
   }
 

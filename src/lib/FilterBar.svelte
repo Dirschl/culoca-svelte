@@ -21,6 +21,7 @@
 	export let lastGPSUpdateTime: number | null = null; // Add this prop
 	let cachedLat: number | null = null;
 	let cachedLon: number | null = null;
+	export let isManual3x3Mode = false;
 	
 	// Reactive GPS status info
 	$: gpsStatusInfo = (() => {
@@ -224,7 +225,10 @@
 					</div>
 				{:else if gpsStatus === 'active' && userLat !== null && userLon !== null}
 					<div class="gps-status active">
-						<button class="gps-coords-clickable" on:click={() => window.dispatchEvent(new CustomEvent('toggle3x3Mode'))}>
+						<button class="gps-coords-clickable" on:click={() => {
+							console.log('🎯 GPS-Koordinaten geklickt!');
+							window.dispatchEvent(new CustomEvent('toggle3x3Mode'));
+						}}>
 							<span class="gps-coords">
 								{formatCoordinates(userLat, userLon)}
 							</span>

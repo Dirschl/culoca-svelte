@@ -3,6 +3,7 @@
   import { writable, get } from 'svelte/store';
   import GalleryLayout from './GalleryLayout.svelte';
   import { supabase } from '$lib/supabaseClient';
+  import { updateGalleryStats } from '$lib/galleryStats';
   export let useJustifiedLayout = true;
   export let showDistance = true;
   export let showCompass = false;
@@ -15,6 +16,39 @@
   const pics = writable<any[]>([]);
   let page = 0, size = 100, loading = false, hasMoreImages = true;
   let displayedImageCount = 0;
+
+  // Function to get total image count from database
+  async function getTotalImageCount(): Promise<number> {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const currentUserId = session?.user?.id || null;
+      
+      let query = supabase
+        .from('items')
+        .select('id', { count: 'exact' })
+        .not('path_512', 'is', null)
+        .eq('gallery', true);
+      
+      // Apply privacy filtering
+      if (currentUserId) {
+        query = query.or(`profile_id.eq.${currentUserId},is_private.eq.false,is_private.is.null`);
+      } else {
+        query = query.or('is_private.eq.false,is_private.is.null');
+      }
+      
+      const { count, error } = await query;
+      
+      if (error) {
+        console.error('[NormalGallery] Error getting total count:', error);
+        return 0;
+      }
+      
+      return count || 0;
+    } catch (error) {
+      console.error('[NormalGallery] Error getting total count:', error);
+      return 0;
+    }
+  }
 
   // Infinite Scroll Handler
   function handleScroll() {
@@ -34,6 +68,8 @@
   async function loadMore() {
     if (loading || !hasMoreImages) return;
     loading = true;
+    
+    // Get current filter state
     const currentFilters = get(filterStore);
     const hasUserFilter = currentFilters.userFilter !== null;
     let currentHasLocationFilter = currentFilters.locationFilter !== null;
@@ -86,18 +122,22 @@
             : '',
       srcHD: item.path_2048
         ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${item.path_2048}`
-        : '',
-      distance: (item.lat && item.lon && effectiveLat !== null && effectiveLon !== null)
-        ? getDistanceFromLatLonInMeters(effectiveLat, effectiveLon, item.lat, item.lon)
-        : null
+        : ''
     }));
     if (newItems.length > 0) {
       pics.update(arr => [...arr, ...newItems]);
       page++;
       hasMoreImages = newItems.length === size;
       displayedImageCount = get(pics).length;
+      
+      // Update gallery stats with total count from database
+      const totalCount = await getTotalImageCount();
+      updateGalleryStats(displayedImageCount, totalCount);
     } else {
       hasMoreImages = false;
+      // Even if no new items, update stats with current count
+      const totalCount = await getTotalImageCount();
+      updateGalleryStats(displayedImageCount, totalCount);
     }
     loading = false;
   }

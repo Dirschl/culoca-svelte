@@ -5,6 +5,7 @@
   import GalleryLayout from '$lib/GalleryLayout.svelte';
   import NewsFlash from '$lib/NewsFlash.svelte';
   import { darkMode } from '$lib/darkMode';
+  import FloatingActionButtons from '$lib/FloatingActionButtons.svelte';
 
   // Simulation state
   let simulationActive = false;
@@ -1049,6 +1050,13 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </svelte:head>
+
+<FloatingActionButtons
+  showTestMode={true}
+  isLoggedIn={true}
+  simulationMode={true}
+  on:testMode={() => window.location.href = '/'}
+/>
 
 <div class="simulation-container" class:dark={$darkMode}>
   <!-- Split Screen -->

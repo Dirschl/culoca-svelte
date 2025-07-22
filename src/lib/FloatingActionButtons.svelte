@@ -189,32 +189,36 @@ export let rotationSpeed = 1; // Geschwindigkeit der kontinuierlichen Rotation
     </button>
   {/if}
   
-  <!-- Simulation/Test mode button - only for logged in users -->
+  <!-- Simulation/Test mode button - nur einer sichtbar: Joystick ODER Haus -->
   {#if showTestMode && isLoggedIn}
-    <button 
-      class="fab-button test-mode"
-      on:click={handleTestMode}
-      aria-label={simulationMode ? "Zurück zur Hauptansicht" : "Simulationsmodus"}
-      title={simulationMode ? "Zurück zur Hauptansicht" : "Simulationsmodus"}
-    >
-      {#if simulationMode}
-        <!-- House icon when simulation is active -->
+    {#if simulationMode}
+      <button 
+        class="fab-button test-mode"
+        on:click={handleTestMode}
+        aria-label="Zurück zur Hauptansicht"
+        title="Zurück zur Hauptansicht"
+      >
+        <!-- House icon -->
         <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
           <polyline points="9,22 9,12 15,12 15,22"/>
         </svg>
-      {:else}
-        <!-- Competition Pro Joystick icon for simulation mode -->
+      </button>
+    {:else}
+      <button 
+        class="fab-button test-mode"
+        on:click={handleTestMode}
+        aria-label="Simulationsmodus"
+        title="Simulationsmodus"
+      >
+        <!-- Joystick icon -->
         <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <!-- Competition Pro base (wider rectangular) -->
           <rect x="4" y="14" width="16" height="6" rx="1"/>
-          <!-- Competition Pro stick -->
           <line x1="12" y1="14" x2="12" y2="6"/>
-          <!-- Competition Pro handle (filled, larger) -->
           <circle cx="12" cy="6" r="3" fill="currentColor"/>
         </svg>
-      {/if}
-    </button>
+      </button>
+    {/if}
   {/if}
   
   <!-- Map button -->

@@ -1,108 +1,39 @@
-<script lang="ts">
+<script>
+  // Optional: SEO, Titel, etc.
 </script>
 
-<svelte:head>
-  <title>Impressum - Culoca</title>
-  <link rel="icon" type="image/png" href="/culoca-icon.png" />
-</svelte:head>
-
-<div class="container">
-  <header>
-    <a href="/" class="back-link">← Zurück zur Hauptseite</a>
-  </header>
-  
-  <main>
-    <section id="impressum">
-      <h1>Impressum</h1>
-      
-      <h3>Angaben gemäß § 5 TMG</h3>
-      <p>
-        DIRSCHL.com GmbH<br>
-        Johann Dirschl<br>
-        Waldberg 84<br>
-        84571 Reischach<br>
-        Deutschland
-      </p>
-      
-      <h3>Kontakt</h3>
-      <p>
-        Mobil: +49 179 9766666<br>
-        Festnetz: +49 8670 5590127<br>
-        Büro: +49 8670 8674004<br>
-        Fax: +49 8670 8674005<br>
-        E-Mail: <a href="mailto:johann.dirschl@gmx.de">johann.dirschl@gmx.de</a>
-      </p>
-      
-      <h3>Handelsregister</h3>
-      <p>
-        Registergericht: Traunstein<br>
-        Registernummer: HRB 18130
-      </p>
-      
-      <h3>Steuernummer</h3>
-      <p>Steuernummer: 141/124/50220</p>
-      
-      <h3>Umsatzsteuer-ID</h3>
-      <p>Umsatzsteuer-Identifikationsnummer gemäß § 27 a Umsatzsteuergesetz: DE258218256</p>
-      
-      <h3>Redaktionell verantwortlich</h3>
-      <p>Johann Dirschl</p>
-      
-      <h3>EU-Streitschlichtung</h3>
-      <p>Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit: <a href="https://ec.europa.eu/consumers/odr/" target="_blank" rel="noopener noreferrer">https://ec.europa.eu/consumers/odr/</a><br>
-      Unsere E-Mail-Adresse finden Sie oben im Impressum.</p>
-      
-      <h3>Verbraucher­streit­beilegung/Universal­schlichtungs­stelle</h3>
-      <p>Wir sind nicht bereit oder verpflichtet, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen.</p>
-      
-      <h3>Datenschutzerklärung</h3>
-      <p>Bitte beachten Sie unsere <a href="/datenschutz">Datenschutzerklärung</a>.</p>
-      
-      <h3>Nutzungsbedingungen</h3>
-      <p>Mit der Nutzung unserer Website und der Anmeldung über soziale Medien (Facebook, Google) erklären Sie sich mit folgenden Nutzungsbedingungen einverstanden:</p>
-      
-      <h4>1. Geltungsbereich</h4>
-      <p>Diese Nutzungsbedingungen gelten für die Nutzung der Website culoca.com und der damit verbundenen Dienste.</p>
-      
-      <h4>2. Anmeldung und Nutzerkonto</h4>
-      <p>Sie können sich über verschiedene Anmeldeverfahren registrieren:</p>
-      <ul>
-        <li>E-Mail und Passwort</li>
-        <li>Facebook Login (OAuth)</li>
-        <li>Google Login (OAuth)</li>
-      </ul>
-      <p>Bei der Anmeldung über Facebook oder Google werden nur die für den Service notwendigen Daten übertragen (Name, E-Mail-Adresse, Profilbild). Eine Weiterverwendung Ihrer Daten erfolgt nur gemäß unserer Datenschutzerklärung.</p>
-      
-      <h4>3. Nutzung der Plattform</h4>
-      <p>Culoca ist eine Foto-Sharing-Plattform mit GPS-basierten Funktionen. Sie können:</p>
-      <ul>
-        <li>Fotos mit GPS-Koordinaten hochladen</li>
-        <li>Fotos auf einer Karte anzeigen lassen</li>
-        <li>Ihre Fotos verwalten und organisieren</li>
-        <li>Profile anderer Nutzer einsehen (falls öffentlich)</li>
-      </ul>
-      
-      <h4>4. Verantwortlichkeiten</h4>
-      <p>Sie sind verantwortlich für:</p>
-      <ul>
-        <li>Die Rechtmäßigkeit der hochgeladenen Inhalte</li>
-        <li>Die Einhaltung von Urheberrechten</li>
-        <li>Die Korrektheit der angegebenen Daten</li>
-      </ul>
-      
-      <h4>5. Haftungsausschluss</h4>
-      <p>Wir übernehmen keine Haftung für:</p>
-      <ul>
-        <li>Von Nutzern hochgeladene Inhalte</li>
-        <li>Technische Ausfälle oder Datenverlust</li>
-        <li>Schäden durch Nutzung der GPS-Funktionen</li>
-      </ul>
-      
-      <h4>6. Kündigung</h4>
-      <p>Sie können Ihr Konto jederzeit löschen. Informationen zur Datenlöschung finden Sie in unserer <a href="/datenschutz">Datenschutzerklärung</a>.</p>
-    </section>
-  </main>
-</div>
+<section id="impressum">
+  <h2>Impressum</h2>
+  <p><strong>Autor, Herausgeber, Design und technische Umsetzung</strong><br>
+  DIRSCHL.com GmbH<br>
+  Waldberg 84<br>
+  84571 Reischach<br>
+  Deutschland</p>
+  <p><strong>Geschäftsführer:</strong><br>
+  Johann Dirschl</p>
+  <p><strong>Kontakt:</strong><br>
+  Mobil: 0179 9766666<br>
+  Festnetz: 08670 5590127<br>
+  E-Mail: <a href="mailto:johann.dirschl@gmx.de">johann.dirschl@gmx.de</a></p>
+  <p><strong>Handelsregister:</strong><br>
+  Amtsgericht Traunstein, HRB 18130</p>
+  <p><strong>USt-IdNr.:</strong><br>
+  DE258218256</p>
+  <p><strong>Steuernummer:</strong><br>
+  141/124/50220</p>
+  <p><strong>Verantwortlich für den Inhalt gemäß § 55 Abs. 2 RStV:</strong><br>
+  Johann Dirschl<br>
+  Waldberg 84<br>
+  84571 Reischach</p>
+  <p><strong>Social Media:</strong><br>
+  <a href="https://www.facebook.com/johann.dirschl" target="_blank" rel="noopener noreferrer">Facebook – DIRSCHL.com GmbH</a></p>
+  <h3>Haftungsausschluss</h3>
+  <p>Die Inhalte dieser Website wurden mit größter Sorgfalt erstellt. Für die Richtigkeit, Vollständigkeit und Aktualität der Inhalte übernehmen wir jedoch keine Gewähr. Als Diensteanbieter sind wir gemäß § 7 Abs. 1 TMG für eigene Inhalte verantwortlich. Für Links auf externe Webseiten übernehmen wir keine Haftung – für deren Inhalte sind ausschließlich deren Betreiber verantwortlich.</p>
+  <h3>Datenschutzerklärung</h3>
+  <p>Bitte beachten Sie unsere <a href="/datenschutz">Datenschutzerklärung</a>.</p>
+  <h3>Allgemeine Geschäftsbedingungen (AGB)</h3>
+  <p>Unsere vollständigen AGB finden Sie <a href="/agb">hier</a>.</p>
+</section>
 
 <style>
   .container {
@@ -175,6 +106,63 @@
     margin-top: 1.5rem;
     margin-bottom: 0.75rem;
     font-size: 1.1rem;
+  }
+  
+  section#impressum {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    border-radius: 12px;
+    max-width: 720px;
+    width: 100%;
+    margin: 2rem auto;
+    padding: 2.5rem 2rem 2rem 2rem;
+    box-shadow: 0 8px 32px var(--shadow);
+    font-size: 1rem;
+    line-height: 1.7;
+  }
+  section#impressum h2 {
+    margin: 0 0 2rem 0;
+    font-size: 1.8rem;
+    color: var(--text-primary);
+  }
+  section#impressum h3 {
+    margin: 2.5rem 0 1rem 0;
+    font-size: 1.3rem;
+    color: var(--text-primary);
+  }
+  section#impressum h4 {
+    margin: 1.5rem 0 0.5rem 0;
+    font-size: 1.1rem;
+    color: var(--text-primary);
+  }
+  section#impressum p, section#impressum ul, section#impressum li {
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
+  }
+  section#impressum ul {
+    margin-left: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+  section#impressum a {
+    color: var(--accent-color);
+    text-decoration: none;
+  }
+  section#impressum a:hover {
+    text-decoration: underline;
+  }
+  @media (max-width: 600px) {
+    section#impressum {
+      max-width: 98vw;
+      padding: 1.5rem 1rem 1rem 1rem;
+    }
+    section#impressum h2 {
+      font-size: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    section#impressum h3 {
+      font-size: 1.2rem;
+      margin: 2rem 0 0.8rem 0;
+    }
   }
   
   @media (max-width: 768px) {
