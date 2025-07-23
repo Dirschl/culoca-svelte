@@ -217,41 +217,7 @@
     z-index: 1000;
     pointer-events: none;
   }
-  .distance-label {
-    position: absolute;
-    left: 8px;
-    bottom: 8px;
-    background: rgba(0,0,0,0.55);
-    backdrop-filter: blur(4px);
-    color: #fff;
-    font-size: 0.7rem;
-    font-weight: 500;
-    border-radius: 6px;
-    padding: 1px 8px;
-    z-index: 2;
-    pointer-events: none;
-  }
 
-  /* Mobile distance label optimization */
-  @media (max-width: 768px) {
-    .distance-label {
-      font-size: 0.75rem;
-      padding: 2px 10px;
-      left: 10px;
-      bottom: 10px;
-      border-radius: 8px;
-    }
-  }
-
-  @media (max-width: 480px) {
-    .distance-label {
-      font-size: 0.8rem;
-      padding: 2px 12px;
-      left: 12px;
-      bottom: 12px;
-      border-radius: 10px;
-    }
-  }
   .justified-grid {
     width: 100%;
     margin: 0;
@@ -292,7 +258,7 @@
             loading="lazy"
           />
           {#if showDistance && userLat !== null && userLon !== null && item.lat && item.lon}
-            <div class="distance-label">
+            <div class="gallery-distance">
               {#if item.distance !== undefined && item.distance !== null}
                 {#if item.distance < 1000}
                   {Math.round(item.distance)}m

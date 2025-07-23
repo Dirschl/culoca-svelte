@@ -227,3 +227,33 @@ html, body {
     /* padding: 15px 0; */
   }
 }
+
+/* Gallery Distance Label - Unified Style for all galleries */
+.gallery-distance {
+  position: absolute;
+  bottom: 0px;
+  left: 0px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  /* border: 1px solid var(--border-color); */
+  font-size: 0.7rem;
+  font-weight: 500;
+  padding: 0px 5px 0px 4px;
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* Mobile distance label optimization */
+@media (max-width: 768px) {
+  .gallery-distance {
+    font-size: 0.65rem;
+    padding: 1px 2px;
+  }
+}
+
+@media (max-width: 480px) {
+  .gallery-distance {
+    font-size: 0.6rem;
+    padding: 1px 2px;
+  }
+}

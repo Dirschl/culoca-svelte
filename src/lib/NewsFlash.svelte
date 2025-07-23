@@ -217,7 +217,7 @@ function handleScroll(event: Event) {
             <div class="newsflash-thumb" on:click={() => handleImageClick(img)} tabindex="0" role="button" aria-label={img.title || img.original_name || 'Bild'}>
               <img src={"https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/" + img.path_512} alt={img.title || img.original_name || 'Bild'} />
               {#if showDistance && userLat !== null && userLon !== null && img.lat && img.lon && getDistanceFromLatLonInMeters}
-                <div class="newsflash-distance-label">
+                <div class="gallery-distance">
                   {getDistanceFromLatLonInMeters(userLat, userLon, img.lat, img.lon)}
                 </div>
               {/if}
@@ -234,7 +234,7 @@ function handleScroll(event: Event) {
             <div class="newsflash-thumb" on:click={() => handleImageClick(img)} tabindex="0" role="button" aria-label={img.title || img.original_name || 'Bild'}>
               <img src={"https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/" + img.path_512} alt={img.title || img.original_name || 'Bild'} />
               {#if showDistance && userLat !== null && userLon !== null && img.lat && img.lon && getDistanceFromLatLonInMeters}
-                <div class="newsflash-distance-label">
+                <div class="gallery-distance">
                   {getDistanceFromLatLonInMeters(userLat, userLon, img.lat, img.lon)}
                 </div>
               {/if}
@@ -441,39 +441,5 @@ function handleScroll(event: Event) {
   flex-shrink: 0;
 }
 
-.newsflash-distance-label {
-  position: absolute;
-  left: 8px;
-  bottom: 8px;
-  background: rgba(24,24,40,0.55);
-  backdrop-filter: blur(4px);
-  color: #fff;
-  font-size: 0.75rem;
-  font-weight: 500;
-  border-radius: 6px;
-  padding: 2px 8px;
-  z-index: 2;
-  pointer-events: none;
-}
 
-/* Mobile distance label optimization */
-@media (max-width: 768px) {
-  .newsflash-distance-label {
-    font-size: 0.8rem;
-    padding: 3px 10px;
-    left: 10px;
-    bottom: 10px;
-    border-radius: 8px;
-  }
-}
-
-@media (max-width: 480px) {
-  .newsflash-distance-label {
-    font-size: 0.85rem;
-    padding: 4px 12px;
-    left: 12px;
-    bottom: 12px;
-    border-radius: 10px;
-  }
-}
 </style> 

@@ -6,7 +6,7 @@ export const galleryTotalCount = writable(0);
 export const hasMoreGalleryItems = writable(true);
 export const galleryParams = writable({ search: '', lat: null, lon: null, radius: null });
 let offset = 0;
-const limit = 100;
+const limit = 50; // Erhöht auf 50 für besseres Preloading
 let currentRequestId = 0;
 
 export async function loadMoreGallery(params: { search?: string; lat?: number; lon?: number; radius?: number } = {}) {
@@ -73,6 +73,7 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
       if (offset === 0) {
         galleryItems.set(mapped);
       } else {
+        // Progressives Hinzufügen für flüssigere UX
         galleryItems.update(items => [...items, ...mapped]);
       }
       offset += mapped.length;

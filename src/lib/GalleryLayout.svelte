@@ -85,6 +85,8 @@
     }
   }
 
+
+
   let galleryEl: HTMLDivElement;
   
   function resize() {
@@ -288,43 +290,7 @@
     transform: scale(1.04);
   }
 
-  /* Distance Label Styles - Dark/Light Mode Design */
-  .distance-label {
-    position: absolute;
-    left: 8px;
-    bottom: 8px;
-    background: var(--bg-secondary);
-    color: var(--text-primary);
-    border: 1px solid var(--border-color);
-    font-size: 0.7rem;
-    font-weight: 500;
-    border-radius: 6px;
-    padding: 1px 8px;
-    z-index: 2;
-    pointer-events: none;
-    opacity: 0.8;
-  }
 
-  /* Mobile distance label optimization */
-  @media (max-width: 768px) {
-    .distance-label {
-      font-size: 0.75rem;
-      padding: 2px 10px;
-      left: 10px;
-      bottom: 10px;
-      border-radius: 8px;
-    }
-  }
-
-  @media (max-width: 480px) {
-    .distance-label {
-      font-size: 0.8rem;
-      padding: 2px 12px;
-      left: 12px;
-      bottom: 12px;
-      border-radius: 10px;
-    }
-  }
 
   /* Empty state */
   .empty-state {
@@ -337,20 +303,20 @@
   /* Gallery Toggle Button Styles - Dark/Light Mode Design */
   .gallery-toggle-btn {
     position: absolute;
-    top: 8px;
-    left: 8px;
+    top: 0px;
+    left: 0px;
     background: var(--bg-secondary);
     color: var(--text-primary);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    padding: 6px;
+    /* border: 1px solid var(--border-color); */
+    /* border-radius: 6px; */
+    padding: 3px 4px 4px 3px;
     cursor: pointer;
     transition: all 0.2s ease;
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 10;
-    opacity: 0.8;
+    z-index: 2;
+    /* opacity: 0.8; */
   }
 
   .gallery-toggle-btn:hover {
@@ -374,17 +340,17 @@
   /* Mobile optimization for toggle button */
   @media (max-width: 768px) {
     .gallery-toggle-btn {
-      top: 6px;
-      left: 6px;
-      padding: 4px;
+      top: 0px;
+      left: 0px;
+      padding: 2px 3px 3px 2px;
     }
   }
 
   @media (max-width: 480px) {
     .gallery-toggle-btn {
-      top: 4px;
-      left: 4px;
-      padding: 3px;
+      top: 0px;
+      left: 0px;
+      padding: 2px 3px 3px 2px;
     }
   }
 </style>
@@ -420,7 +386,7 @@
                   loading="lazy"
                 />
                 {#if showDistance && userLat !== null && userLon !== null && item.lat && item.lon}
-                  <div class="distance-label">
+                  <div class="gallery-distance">
                     {#if getDistanceFromLatLonInMeters}
                       {getDistanceFromLatLonInMeters(userLat, userLon, item.lat, item.lon)}
                     {:else if item.distance !== undefined && item.distance !== null}
@@ -493,9 +459,13 @@
           aria-label="View image {item.id}"
           title={item.title || ''}
         >
-          <img src={item.src} alt={item.title || 'Bild'} />
+          <img 
+            src={item.src}
+            alt={item.title || 'Bild'} 
+            loading="lazy"
+          />
           {#if showDistance && userLat !== null && userLon !== null && item.lat && item.lon}
-            <div class="distance-label">
+            <div class="gallery-distance">
               {#if getDistanceFromLatLonInMeters}
                 {getDistanceFromLatLonInMeters(userLat, userLon, item.lat, item.lon)}
               {:else if item.distance !== undefined && item.distance !== null}

@@ -3171,41 +3171,7 @@
     transform: scale(1.04);
   }
 
-  .distance-label {
-    position: absolute;
-    left: 12px;
-    bottom: 12px;
-    background: rgba(24,24,40,0.55);
-    backdrop-filter: blur(4px);
-    color: #fff;
-    font-size: 0.85rem;
-    font-weight: 500;
-    border-radius: 8px;
-    padding: 2px 12px;
-    z-index: 2;
-    pointer-events: none;
-  }
 
-  /* Mobile distance label optimization */
-  @media (max-width: 768px) {
-    .distance-label {
-      font-size: 1rem;
-      padding: 4px 16px;
-      left: 16px;
-      bottom: 16px;
-      border-radius: 12px;
-    }
-  }
-
-  @media (max-width: 480px) {
-    .distance-label {
-      font-size: 1.1rem;
-      padding: 6px 18px;
-      left: 20px;
-      bottom: 20px;
-      border-radius: 14px;
-    }
-  }
 
   /* Light/Dark Mode Background Colors for Justified and Grid */
   .edge-to-edge-gallery {

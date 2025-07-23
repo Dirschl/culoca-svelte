@@ -1274,16 +1274,7 @@
     object-fit: cover;
   }
 
-  .distance-label {
-    position: absolute;
-    bottom: 0.5rem;
-    right: 0.5rem;
-    background: rgba(0, 0, 0, 0.7);
-    color: white;
-    padding: 0.25rem 0.5rem;
-    border-radius: 0.25rem;
-    font-size: 0.8rem;
-  }
+
 
   .loading {
     display: flex;

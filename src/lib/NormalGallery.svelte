@@ -16,6 +16,9 @@
 
   let displayedImageCount = 0;
   let scrollTimeout: any = null;
+  let lastScrollTime = 0;
+  let lastScrollTop = 0;
+  let scrollVelocity = 0;
 
   // Reactive statement to update stats when gallery items change
   $: {
@@ -25,17 +28,40 @@
 
   function handleScroll() {
     if (scrollTimeout) clearTimeout(scrollTimeout);
+    
+    // Berechne Scroll-Geschwindigkeit
+    const now = Date.now();
+    const currentScrollTop = window.scrollY;
+    const timeDiff = now - lastScrollTime;
+    const scrollDiff = Math.abs(currentScrollTop - lastScrollTop);
+    
+    if (timeDiff > 0) {
+      scrollVelocity = scrollDiff / timeDiff; // Pixel pro Millisekunde
+    }
+    
+    lastScrollTime = now;
+    lastScrollTop = currentScrollTop;
+    
     scrollTimeout = setTimeout(() => {
-      if ((window.innerHeight + window.scrollY) >= (document.documentElement.scrollHeight - 1000)) {
+      // Dynamische Schwelle basierend auf Scroll-Geschwindigkeit
+      const baseThreshold = 2000; // Erhöht auf 2000px vor Ende
+      const velocityMultiplier = Math.min(scrollVelocity * 1000, 2000); // Max 2000px zusätzlich
+      const dynamicThreshold = baseThreshold + velocityMultiplier;
+      
+      const scrollHeight = document.documentElement.scrollHeight;
+      const scrollTop = window.innerHeight + window.scrollY;
+      const threshold = scrollHeight - dynamicThreshold;
+      
+      if (scrollTop >= threshold) {
         if ($hasMoreGalleryItems && !$isGalleryLoading) {
-          console.log('[NormalGallery] Loading more images via galleryStore');
+          console.log(`[NormalGallery] Loading more images (threshold: ${Math.round(dynamicThreshold)}px, velocity: ${scrollVelocity.toFixed(3)})`);
           loadMoreGallery({
             lat: userLat || undefined,
             lon: userLon || undefined
           });
         }
       }
-    }, 100);
+    }, 50);
   }
 
   onMount(() => {
@@ -80,7 +106,7 @@
 {#if $isGalleryLoading && $galleryItems.length > 0}
   <div class="loading-more">
     <div class="spinner-small"></div>
-    <span>Lade weitere Bilder...</span>
+    <span>Weitere Bilder werden geladen...</span>
   </div>
 {/if}
 
