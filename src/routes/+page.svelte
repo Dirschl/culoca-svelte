@@ -132,6 +132,11 @@
     loadUserAvatar();
   }
 
+  // Setze anonyme User Defaults wenn Login-Status sich ändert
+  $: if (browser) {
+    setAnonymousUserDefaults();
+  }
+
   // Kontinuierliche Rotation im 3x3-Modus
   $: if (isManual3x3Mode) {
     // Starte kontinuierliche Rotation
@@ -152,6 +157,22 @@
   // Initiale Galerie-Initialisierung
   let galleryInitialized = false;
   
+  // Setze Default-Settings für anonyme User
+  function setAnonymousUserDefaults() {
+    if (browser && !isLoggedIn) {
+      // Setze NewsFlash auf 'alle' für anonyme User wenn nicht bereits gesetzt
+      if (!localStorage.getItem('newsFlashMode')) {
+        localStorage.setItem('newsFlashMode', 'alle');
+        newsFlashMode = 'alle';
+      }
+      
+      // WelcomeVisible ist bereits standardmäßig auf true gesetzt
+      // Dark Mode wird bereits in darkMode.ts auf true gesetzt
+      
+      console.log('[Anonymous] Set default settings:', { newsFlashMode, darkMode: true, welcomeVisible: true });
+    }
+  }
+  
   onMount(() => {
     const onScroll = () => {
       showScrollToTop = window.scrollY > 200;
@@ -165,6 +186,17 @@
     
     // Intelligente GPS-Initialisierung
     initializeGPSIntelligently();
+    
+    // Setze Default-Settings für anonyme User
+    setAnonymousUserDefaults();
+    
+    // Lade NewsFlash-Modus aus localStorage
+    if (browser) {
+      const storedNewsFlash = localStorage.getItem('newsFlashMode');
+      if (storedNewsFlash === 'aus' || storedNewsFlash === 'eigene' || storedNewsFlash === 'alle') {
+        newsFlashMode = storedNewsFlash;
+      }
+    }
     
     // Galerie nach kurzer Verzögerung initialisieren
     setTimeout(() => {
@@ -473,7 +505,7 @@
     onToggleSearchField={() => {}}
     onClear={clearSearchAndReloadGallery}
   />
-  {#if isLoggedIn && newsFlashMode !== 'aus'}
+  {#if newsFlashMode !== 'aus'}
     <NewsFlash 
       mode={newsFlashMode}
       userId={null}

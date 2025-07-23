@@ -1,12 +1,16 @@
 import { writable } from 'svelte/store';
 
-// Initialize dark mode from localStorage or default to false
+// Initialize dark mode from localStorage or default to true (for better anonymous UX)
 const getInitialDarkMode = (): boolean => {
   if (typeof window !== 'undefined') {
     const stored = localStorage.getItem('darkMode');
-    return stored === 'true';
+    if (stored !== null) {
+      return stored === 'true';
+    }
+    // Default to dark mode for new users (better UX)
+    return true;
   }
-  return false;
+  return true; // Default to dark mode
 };
 
 export const darkMode = writable<boolean>(getInitialDarkMode());
@@ -25,6 +29,12 @@ function applyTheme(isDark: boolean) {
 
 // Subscribe to changes and save to localStorage + apply theme
 if (typeof window !== 'undefined') {
+  // Set initial value to localStorage if not present
+  const stored = localStorage.getItem('darkMode');
+  if (stored === null) {
+    localStorage.setItem('darkMode', 'true');
+  }
+  
   darkMode.subscribe((value) => {
     localStorage.setItem('darkMode', value ? 'true' : 'false');
     applyTheme(value);

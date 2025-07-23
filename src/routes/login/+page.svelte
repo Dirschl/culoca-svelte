@@ -220,10 +220,10 @@
   .modern-login-content {
     background: rgba(26, 32, 44, 0.95);
     backdrop-filter: blur(20px);
-    border-radius: 24px;
-    padding: 2.5rem;
+    border-radius: 20px;
+    padding: 2rem;
     text-align: center;
-    max-width: 440px;
+    max-width: 400px;
     width: 90%;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
     border: 1px solid rgba(238, 114, 33, 0.3);
@@ -241,42 +241,42 @@
     border-radius: 24px 24px 0 0;
   }
   .modern-login-logo {
-    width: 200px;
-    height: 200px;
-    margin: 0 auto 1.5rem;
+    width: 120px;
+    height: 120px;
+    margin: 0 auto 1rem;
     object-fit: contain;
     filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3));
   }
   .modern-login-error {
     background: linear-gradient(135deg, #dc3545, #c82333);
     color: #fff;
-    padding: 1rem;
+    padding: 0.75rem;
     border-radius: 12px;
-    margin-bottom: 1.5rem;
+    margin-bottom: 1rem;
     font-weight: 500;
     box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
   }
   .modern-login-info {
     background: linear-gradient(135deg, #28a745, #218838);
     color: #fff;
-    padding: 1rem;
+    padding: 0.75rem;
     border-radius: 12px;
-    margin-bottom: 1.5rem;
+    margin-bottom: 1rem;
     font-weight: 500;
     box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
   }
   .modern-social-login {
     display: flex;
-    gap: 1rem;
+    gap: 0.75rem;
     justify-content: center;
-    margin-bottom: 2rem;
+    margin-bottom: 1.5rem;
   }
   .modern-social-btn {
     background: #fff;
     border: 2px solid #f0f0f0;
-    border-radius: 16px;
-    width: 64px;
-    height: 64px;
+    border-radius: 14px;
+    width: 56px;
+    height: 56px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -297,8 +297,8 @@
     cursor: not-allowed;
   }
   .modern-social-icon {
-    width: 32px;
-    height: 32px;
+    width: 28px;
+    height: 28px;
   }
   .modern-login-tabs {
     display: flex;
@@ -331,16 +331,16 @@
   .modern-login-form {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 0.75rem;
   }
   .modern-login-input {
     width: 100%;
-    padding: 1rem;
+    padding: 0.75rem;
     border: 2px solid rgba(255, 255, 255, 0.2);
-    border-radius: 12px;
+    border-radius: 10px;
     background: rgba(255, 255, 255, 0.9);
     color: #2d3748;
-    font-size: 1rem;
+    font-size: 0.95rem;
     box-sizing: border-box;
     transition: all 0.3s ease;
   }
@@ -355,13 +355,13 @@
   }
   .modern-login-submit-btn {
     width: 100%;
-    padding: 1rem;
+    padding: 0.75rem;
     background: linear-gradient(135deg, #ee7221, #ff8c42);
     color: #fff;
     border: none;
-    border-radius: 12px;
+    border-radius: 10px;
     font-weight: 700;
-    font-size: 1rem;
+    font-size: 0.95rem;
     cursor: pointer;
     transition: all 0.3s ease;
     box-shadow: 0 4px 12px rgba(238, 114, 33, 0.3);
@@ -394,8 +394,8 @@
     color: #d6610a;
   }
   .modern-login-footer {
-    margin-top: 2rem;
-    padding-top: 1.5rem;
+    margin-top: 1.5rem;
+    padding-top: 1rem;
     border-top: 1px solid rgba(255, 255, 255, 0.2);
   }
   .modern-footer-links {
@@ -421,7 +421,6 @@
   .modern-anonymous-section {
     margin-top: 1.5rem;
     padding-top: 1.5rem;
-    border-top: 1px solid rgba(255, 255, 255, 0.2);
   }
   .modern-anonymous-divider {
     text-align: center;
