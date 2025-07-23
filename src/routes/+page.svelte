@@ -186,6 +186,10 @@
   }
   
   onMount(() => {
+    // Initialize filter store from URL parameters
+    filterStore.initFromUrl($pageStore.url.searchParams);
+    console.log('[onMount] Initialized filterStore from URL parameters');
+    
     const onScroll = () => {
       showScrollToTop = window.scrollY > 200;
     };
@@ -411,9 +415,14 @@
   // Event-Listener für FilterBar Events
   function handleToggle3x3Mode() {
     console.log('🎯 toggle3x3Mode Event empfangen!');
+    console.log('🎯 Current state - isManual3x3Mode:', isManual3x3Mode);
+    console.log('🎯 Location Filter active:', $filterStore.locationFilter !== null);
+    
     isManual3x3Mode = !isManual3x3Mode;
     settingsIconRotation += 180; // Rotiere das Settings-Symbol um 180 Grad
-    console.log('📱 Mobile Mode:', isManual3x3Mode, 'Settings Rotation:', settingsIconRotation);
+    
+    console.log('📱 New state - isManual3x3Mode:', isManual3x3Mode, 'Settings Rotation:', settingsIconRotation);
+    
     if (isManual3x3Mode) {
       statusOverlayMessage = 'Mobile Galerie aktiviert';
     } else {
@@ -573,6 +582,7 @@
   // Location Filter löschen und Galerie neu laden
   function clearLocationFilterAndReloadGallery() {
     console.log('[Location-Clear] Starting clearLocationFilterAndReloadGallery');
+    console.log('[Location-Clear] Current mode - isManual3x3Mode:', isManual3x3Mode);
     
     // Lade die normale Galerie mit aktuellen GPS-Daten
     const gps = getEffectiveGpsPosition();
@@ -590,9 +600,40 @@
     
     // Kurze Verzögerung um sicherzustellen dass clearLocationFilter abgeschlossen ist
     setTimeout(() => {
-      resetGallery(galleryParams);
-      console.log('[Location-Clear] resetGallery called');
+      // Only reset normal gallery, mobile gallery handles its own state
+      if (!isManual3x3Mode) {
+        resetGallery(galleryParams);
+        console.log('[Location-Clear] resetGallery called for normal gallery');
+      } else {
+        console.log('[Location-Clear] Skipping resetGallery for mobile gallery mode');
+      }
     }, 50);
+  }
+
+  // Berechne effektive GPS-Koordinaten für alle Components
+  $: {
+    const gps = getEffectiveGpsPosition();
+    effectiveLat = gps?.lat || userLat;
+    effectiveLon = gps?.lon || userLon;
+  }
+  
+  let effectiveLat: number | null = null;
+  let effectiveLon: number | null = null;
+  
+  // Derive hasLocationFilter from filterStore
+  $: hasLocationFilter = $filterStore.locationFilter !== null;
+  
+  // Debug: Log gallery display decisions
+  $: {
+    if (browser) {
+      console.log('[Gallery-Display] Decision variables:', {
+        isManual3x3Mode,
+        hasLocationFilter,
+        locationFilter: $filterStore.locationFilter,
+        willShowMobileGallery: isManual3x3Mode && !hasLocationFilter,
+        willShowNormalGallery: !(isManual3x3Mode && !hasLocationFilter)
+      });
+    }
   }
 </script>
 
@@ -605,9 +646,9 @@
         Du kannst aber auch ohne Standort die Galerie nutzen.
       </p>
       <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;">
-        <button on:click={initializeGPS} style="padding: 0.9rem 2.2rem; font-size: 1.15rem; border-radius: 0.5rem; background: #3a7; color: #fff; border: none; cursor: pointer; font-weight:600;">
-          📍 Standort verwenden
-        </button>
+      <button on:click={initializeGPS} style="padding: 0.9rem 2.2rem; font-size: 1.15rem; border-radius: 0.5rem; background: #3a7; color: #fff; border: none; cursor: pointer; font-weight:600;">
+        📍 Standort verwenden
+      </button>
         <button on:click={() => gpsStatus = 'none'} style="padding: 0.9rem 2.2rem; font-size: 1.15rem; border-radius: 0.5rem; background: #666; color: #fff; border: none; cursor: pointer; font-weight:600;">
           Ohne Standort fortfahren
         </button>
@@ -627,8 +668,8 @@
 {:else}
   <!-- Galerie-Komponenten und restliche Seite -->
   <FilterBar
-    {userLat}
-    {userLon}
+    userLat={effectiveLat}
+    userLon={effectiveLon}
     {showDistance}
     {isLoggedIn}
     gpsStatus={gpsStatus}
@@ -657,14 +698,14 @@
       limit={15}
       showToggles={false}
       showDistance={showDistance}
-      userLat={userLat}
-      userLon={userLon}
+      userLat={effectiveLat}
+      userLon={effectiveLon}
       getDistanceFromLatLonInMeters={getDistanceFromLatLonInMeters}
       displayedImageCount={$galleryStats.loadedCount}
     />
   {/if}
   <WelcomeSection />
-  {#if isManual3x3Mode}
+  {#if isManual3x3Mode && !hasLocationFilter}
     <MobileGallery
       userLat={userLat}
       userLon={userLon}
@@ -681,8 +722,8 @@
       useJustifiedLayout={$useJustifiedLayout}
       showDistance={showDistance}
       showCompass={showCompass}
-      userLat={userLat}
-      userLon={userLon}
+      userLat={effectiveLat}
+      userLon={effectiveLon}
       originalGalleryLat={originalGalleryLat}
       originalGalleryLon={originalGalleryLon}
       getDistanceFromLatLonInMeters={getDistanceFromLatLonInMeters}
@@ -728,8 +769,8 @@
   {#if showFullscreenMap}
     <FullscreenMap 
       images={[]}
-      {userLat}
-      {userLon}
+      userLat={effectiveLat}
+      userLon={effectiveLon}
       {deviceHeading}
       {isManual3x3Mode}
       on:close={() => showFullscreenMap = false}

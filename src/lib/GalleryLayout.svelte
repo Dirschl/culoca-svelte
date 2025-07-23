@@ -387,14 +387,16 @@
                 />
                 {#if showDistance && userLat !== null && userLon !== null && item.lat && item.lon}
                   <div class="gallery-distance">
-                    {#if getDistanceFromLatLonInMeters}
-                      {getDistanceFromLatLonInMeters(userLat, userLon, item.lat, item.lon)}
-                    {:else if item.distance !== undefined && item.distance !== null}
+                    {#if item.distance !== undefined && item.distance !== null}
+                      <!-- Use API distance when available (prioritized) -->
                       {#if item.distance < 1000}
                         {Math.round(item.distance)}m
                       {:else}
                         {(item.distance / 1000).toFixed(1)}km
                       {/if}
+                    {:else if getDistanceFromLatLonInMeters}
+                      <!-- Fallback to frontend calculation when API distance not available -->
+                      {getDistanceFromLatLonInMeters(userLat, userLon, item.lat, item.lon)}
                     {/if}
                   </div>
                 {/if}
@@ -466,14 +468,16 @@
           />
           {#if showDistance && userLat !== null && userLon !== null && item.lat && item.lon}
             <div class="gallery-distance">
-              {#if getDistanceFromLatLonInMeters}
-                {getDistanceFromLatLonInMeters(userLat, userLon, item.lat, item.lon)}
-              {:else if item.distance !== undefined && item.distance !== null}
+              {#if item.distance !== undefined && item.distance !== null}
+                <!-- Use API distance when available (prioritized) -->
                 {#if item.distance < 1000}
                   {Math.round(item.distance)}m
                 {:else}
                   {(item.distance / 1000).toFixed(1)}km
                 {/if}
+              {:else if getDistanceFromLatLonInMeters}
+                <!-- Fallback to frontend calculation when API distance not available -->
+                {getDistanceFromLatLonInMeters(userLat, userLon, item.lat, item.lon)}
               {/if}
             </div>
           {/if}

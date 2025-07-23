@@ -105,15 +105,28 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
   if (typeof window === 'undefined') return; // Nur im Browser ausführen!
   currentRequestId++;
   const thisRequestId = currentRequestId;
-  
+
   // Prüfe sofort ohne weitere Verzögerung
   if (get(isGalleryLoading) || !get(hasMoreGalleryItems)) return;
   isGalleryLoading.set(true);
-  
-  // Merge params
-  const mergedParams = { ...get(galleryParams), ...params };
+
+  // --- NEU: Location Filter Koordinaten bevorzugen ---
+  let mergedParams = { ...get(galleryParams), ...params };
+  try {
+    const filterState = get(require('./filterStore').filterStore);
+    if (filterState.locationFilter) {
+      mergedParams.lat = filterState.locationFilter.lat;
+      mergedParams.lon = filterState.locationFilter.lon;
+      // Pass fromItem flag if location filter is from an item
+      if (filterState.locationFilter.fromItem) {
+        mergedParams.fromItem = true;
+      }
+    }
+  } catch (e) {
+    // fallback: keine Änderung
+  }
   galleryParams.set(mergedParams);
-  
+
   const url = new URL('/api/items', window.location.origin);
   url.searchParams.set('offset', String(offset));
   url.searchParams.set('limit', String(limit));
@@ -123,20 +136,21 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
     url.searchParams.set('lon', String(mergedParams.lon));
   }
   if (mergedParams.radius) url.searchParams.set('radius', String(mergedParams.radius));
-  
+  if (mergedParams.fromItem) url.searchParams.set('fromItem', 'true');
+
   console.log('[GalleryStore] API-Request:', {
     params: mergedParams,
     url: url.toString(),
     hasGPS: !!(mergedParams.lat && mergedParams.lon)
   });
-  
+
   try {
     const res = await fetch(url.toString());
     if (thisRequestId !== currentRequestId) {
       console.log('[GalleryStore] Ignoriere veraltete Response für RequestId', thisRequestId);
       return;
     }
-    
+
     const data = await res.json();
     console.log('[GalleryStore] API Response:', {
       status: data.status,
@@ -144,7 +158,7 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
       totalCount: data.totalCount,
       gpsMode: data.gpsMode
     });
-    
+
     if (data && data.images) {
       // Mappe nur Bilder mit path_512 und baue das src-Feld (keine clientseitige Sortierung!)
       const mapped = data.images
@@ -161,9 +175,16 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
           description: item.description,
           profile_id: item.profile_id
         }));
-        
+
+      // WORKAROUND: For fromItem location filters, ensure first item has distance 0
+      if (mergedParams.fromItem && mapped && mapped.length > 0 && offset === 0) {
+        mapped[0].distance = 0;
+        mapped[0].isSourceItem = true;
+        console.log('[GalleryStore] FromItem workaround: Set first item distance to 0m for item:', mapped[0].id);
+      }
+
       console.log('[GalleryStore] Mapped images:', mapped.length);
-      
+
       if (offset === 0) {
         galleryItems.set(mapped);
       } else {
@@ -173,7 +194,7 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
       offset += mapped.length;
       galleryTotalCount.set(data.totalCount || 0);
       hasMoreGalleryItems.set(offset < (data.totalCount || 0));
-      
+
       console.log('[GalleryStore] Updated store:', {
         itemsCount: mapped.length,
         totalOffset: offset,
@@ -188,7 +209,7 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
     console.error('[GalleryStore] API Error:', error);
     hasMoreGalleryItems.set(false);
   }
-  
+
   isGalleryLoading.set(false);
 }
 

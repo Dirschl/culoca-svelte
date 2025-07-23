@@ -65,7 +65,11 @@ export const GET = async ({ url, request }) => {
     const search = url.searchParams.get('s');
     console.log('🔍 API Debug - Search parameter:', search);
     
-    // GPS-Filtering: Load all matching images, sort by distance, then paginate
+    // Check if this is a location filter from a specific item (always check, not just for GPS filtering)
+    const fromItem = url.searchParams.get('fromItem') === 'true';
+    console.log('🔍 API Debug - Location filter from item (global check):', fromItem);
+    
+    // GPS-Filtering: Use PostgreSQL items_by_distance function for proper database-side sorting
     const useGpsFiltering = lat && lon && lat !== 'null' && lon !== 'null' && !isNaN(parseFloat(lat)) && !isNaN(parseFloat(lon));
     console.log('🔍 API Debug - GPS filtering decision:', { 
       lat, 
@@ -82,14 +86,19 @@ export const GET = async ({ url, request }) => {
       latStartsWith: lat?.substring(0, 5),
       lonStartsWith: lon?.substring(0, 5)
     });
+    
     if (useGpsFiltering) {
       console.log('🔍 API Debug - Using GPS filtering with coordinates:', { lat, lon });
+      const maxGpsImages = for_map ? 50000 : 10000; // Für Karten 50000, sonst 10000 Bilder
       
       // For maps, use service role client to bypass RLS 1000-row limit
       const dbClient = for_map ? supabaseService : supabase;
       const clientType = for_map ? (supabaseServiceKey ? 'SERVICE ROLE' : 'REGULAR (no service key)') : 'REGULAR';
       console.log(`🔍 API Debug - Using ${clientType} client for query`);
       console.log(`🔍 API Debug - Service key exists: ${!!supabaseServiceKey}, URL exists: ${!!supabaseUrl}`);
+      
+      // Use batch loading to bypass RLS 1000-item limit for GPS filtering
+      console.log('🔍 API Debug - Using batch loading to bypass RLS 1000-item limit');
       
       let gpsQuery = dbClient
         .from('items')
@@ -99,32 +108,7 @@ export const GET = async ({ url, request }) => {
         .not('path_512', 'is', null)
         .eq('gallery', true); // Only show images with gallery = true
       
-      // Server-seitige Suche anwenden
-      if (search && search.trim()) {
-        const searchTerm = search.trim();
-        console.log('🔍 API Debug - Applying server-side search for:', searchTerm);
-        gpsQuery = gpsQuery.or(
-          `title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%,keywords.cs.{${searchTerm}}`
-        );
-      }
-      
-      // Für GPS-Queries: Lade alle passenden Bilder (ohne Limit für Sortierung)
-      if (!for_map) {
-        // Normal pagination: Alle Bilder laden für korrekte Entfernungsberechnung
-        if (supabaseServiceKey) {
-          // Mit Service Key: Kein Limit nötig da RLS umgangen wird
-          console.log('🔍 API Debug - Using service key, no limit needed');
-        } else {
-          // Ohne Service Key: Sehr hohes Limit setzen
-          gpsQuery = gpsQuery.limit(100000);
-          console.log('🔍 API Debug - No service key, setting limit to 100000');
-        }
-      } else {
-        // Map mode: Service-Limit verwenden
-        gpsQuery = gpsQuery.limit(50000);
-      }
-      
-      // User-Filter anwenden
+      // Apply user/privacy filters
       if (user_id) {
         gpsQuery = gpsQuery.eq('user_id', user_id);
         console.log('🔍 API Debug - Filtering by user_id:', user_id);
@@ -141,128 +125,60 @@ export const GET = async ({ url, request }) => {
         }
       }
       
-      // For maps without service key, use batch loading to get more than 1000 items
-      let allGpsData = [];
-      console.log(`🔍 API Debug - Batch loading check: for_map=${for_map}, supabaseServiceKey=${!!supabaseServiceKey}, condition=${for_map && !supabaseServiceKey}`);
-      
-      // Verwende Service Role Client für GPS-Queries wenn verfügbar
-      const useServiceClient = supabaseServiceKey && (for_map || !for_map);
-      const finalDbClient = useServiceClient ? supabaseService : supabase;
-      
-      if ((for_map && !supabaseServiceKey) || (!supabaseServiceKey && !for_map)) {
-        console.log('🔍 API Debug - Using batch loading (no service key available)');
-        const batchSize = 1000;
-        let hasMore = true;
-        let batchOffset = 0;
-        const maxItems = 200000; // Erhöhtes Limit für mehr Bilder
-        
-        while (hasMore && allGpsData.length < maxItems) {
-          let batchQuery = finalDbClient
-            .from('items')
-            .select('id, path_512, path_2048, path_64, original_name, created_at, user_id, profile_id, title, description, lat, lon, width, height, is_private, keywords')
-            .not('lat', 'is', null)
-            .not('lon', 'is', null)
-            .not('path_512', 'is', null)
-            .eq('gallery', true); // Only show images with gallery = true
-            
-          // Apply server-side search to batch
-          if (search && search.trim()) {
-            const searchTerm = search.trim();
-            batchQuery = batchQuery.or(
-              `title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%,keywords.cs.{${searchTerm}}`
-            );
-          }
-            
-          batchQuery = batchQuery.range(batchOffset, batchOffset + batchSize - 1);
-            
-          // Apply same user filters to batch
-          if (user_id) {
-            batchQuery = batchQuery.eq('user_id', user_id);
-          } else if (filter_user_id) {
-            batchQuery = batchQuery.eq('profile_id', filter_user_id);
-          } else {
-            if (current_user_id) {
-              batchQuery = batchQuery.or(`profile_id.eq.${current_user_id},is_private.eq.false,is_private.is.null`);
-            } else {
-              batchQuery = batchQuery.or('is_private.eq.false,is_private.is.null');
-            }
-          }
-          
-          const { data: batchData, error: batchError } = await batchQuery;
-          if (batchError) throw error(500, batchError.message);
-          
-          if (batchData && batchData.length > 0) {
-            allGpsData.push(...batchData);
-            console.log(`🔍 API Debug - Loaded batch ${Math.floor(batchOffset/batchSize) + 1}: ${batchData.length} items, total: ${allGpsData.length}`);
-            
-            // Continue if we got a full batch
-            hasMore = batchData.length === batchSize;
-            batchOffset += batchSize;
-          } else {
-            hasMore = false;
-          }
-        }
-        
-        console.log(`🔍 API Debug - Batch loading complete: ${allGpsData.length} total items loaded`);
-      } else {
-        // Use service client if available for single query
-        console.log(`🔍 API Debug - Using single query with ${useServiceClient ? 'SERVICE' : 'REGULAR'} client`);
-        
-        // Rebuild query with correct client
-        let finalGpsQuery = finalDbClient
-          .from('items')
-          .select('id, path_512, path_2048, path_64, original_name, created_at, user_id, profile_id, title, description, lat, lon, width, height, is_private, keywords')
-          .not('lat', 'is', null)
-          .not('lon', 'is', null)
-          .not('path_512', 'is', null)
-          .eq('gallery', true);
-        
-        // Apply server-side search
-        if (search && search.trim()) {
-          const searchTerm = search.trim();
-          finalGpsQuery = finalGpsQuery.or(
-            `title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%,keywords.cs.{${searchTerm}}`
-          );
-        }
-        
-        // Set limit based on availability of service key
-        if (!for_map) {
-          if (useServiceClient) {
-            console.log('🔍 API Debug - Service client: no limit needed');
-          } else {
-            finalGpsQuery = finalGpsQuery.limit(100000);
-            console.log('🔍 API Debug - Regular client: setting limit to 100000');
-          }
-        } else {
-          finalGpsQuery = finalGpsQuery.limit(50000);
-        }
-        
-        // Apply user filters
-        if (user_id) {
-          finalGpsQuery = finalGpsQuery.eq('user_id', user_id);
-        } else if (filter_user_id) {
-          finalGpsQuery = finalGpsQuery.eq('profile_id', filter_user_id);
-        } else {
-          if (current_user_id) {
-            finalGpsQuery = finalGpsQuery.or(`profile_id.eq.${current_user_id},is_private.eq.false,is_private.is.null`);
-          } else {
-            finalGpsQuery = finalGpsQuery.or('is_private.eq.false,is_private.is.null');
-          }
-        }
-        
-        const { data: gpsData, error: gpsError } = await finalGpsQuery;
-        if (gpsError) throw error(500, gpsError.message);
-        allGpsData = gpsData || [];
+      // Apply search filter if provided
+      if (search && search.trim()) {
+        const searchTerm = search.trim();
+        console.log('🔍 API Debug - Applying server-side search for:', searchTerm);
+        gpsQuery = gpsQuery.or(
+          `title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%,keywords.cs.{${searchTerm}}`
+        );
       }
       
-      console.log('🔍 API Debug - Raw GPS data loaded:', allGpsData?.length || 0, 'items');
+      // Use batch loading to get all items (bypass RLS 1000-item limit)
+      let allGpsData = [];
+      const batchSize = 1000;
+      let hasMore = true;
+      let batchOffset = 0;
       
-      // Entfernung berechnen und sortieren
+      console.log('🔍 API Debug - Starting batch loading for unlimited GPS results');
+      
+      while (hasMore && allGpsData.length < maxGpsImages) {
+        const batchQuery = gpsQuery
+          .range(batchOffset, batchOffset + batchSize - 1)
+          .order('created_at', { ascending: false });
+          
+        const { data: batchData, error: batchError } = await batchQuery;
+        
+        if (batchError) {
+          console.error('🔍 API Error - Batch loading failed:', batchError);
+          throw error(500, batchError.message);
+        }
+        
+        if (!batchData || batchData.length === 0) {
+          hasMore = false;
+          console.log(`🔍 API Debug - Batch ${Math.floor(batchOffset / batchSize)} empty, stopping`);
+        } else {
+          allGpsData.push(...batchData);
+          console.log(`🔍 API Debug - Batch ${Math.floor(batchOffset / batchSize)}: loaded ${batchData.length} items, total: ${allGpsData.length}`);
+          
+          if (batchData.length < batchSize) {
+            hasMore = false;
+            console.log(`🔍 API Debug - Last batch (${batchData.length} < ${batchSize}), stopping`);
+          } else {
+            batchOffset += batchSize;
+          }
+        }
+      }
+      
+      console.log(`🔍 API Debug - Batch loading complete: ${allGpsData.length} total items loaded`);
+      
+      // Calculate distances using JavaScript Haversine formula and sort
       const userLat = parseFloat(lat);
       const userLon = parseFloat(lon);
-      let itemsWithDistance = (allGpsData || []).map((item) => {
+      
+      let itemsWithDistance = allGpsData.map((item) => {
         if (item.lat && item.lon) {
-          const R = 6371000;
+          const R = 6371000; // Earth radius in meters
           const lat1Rad = userLat * Math.PI / 180;
           const lat2Rad = item.lat * Math.PI / 180;
           const deltaLatRad = (item.lat - userLat) * Math.PI / 180;
@@ -274,61 +190,148 @@ export const GET = async ({ url, request }) => {
           const distance = R * c;
           return { ...item, distance };
         }
-        return item;
+        return { ...item, distance: Infinity };
       });
       
+      // Sort by distance (closest first)
       itemsWithDistance.sort((a, b) => ((a as any).distance || Infinity) - ((b as any).distance || Infinity));
       
-      console.log('🔍 API Debug - Items with distance calculated:', itemsWithDistance.length);
+      console.log('🔍 API Debug - Distance calculation and sorting complete:', itemsWithDistance.length);
+      console.log('🔍 API Debug - First 3 items after sorting:', itemsWithDistance.slice(0, 3).map(item => ({ 
+        id: item.id, 
+        distance: Math.round((item as any).distance || 0) + 'm'
+      })));
       
-      console.log('🔍 API Debug - Items after sorting by distance:', itemsWithDistance.length);
-      console.log('🔍 API Debug - First 3 items after sorting:', itemsWithDistance.slice(0, 3).map(item => ({ id: item.id, distance: (item as any).distance })));
+      // DEBUG: Show items with very small distances (< 10 meters)
+      const veryCloseItems = itemsWithDistance.filter(item => (item as any).distance < 10);
+      if (veryCloseItems.length > 0) {
+        console.log('🔍 API Debug - Items with distance < 10m:', veryCloseItems.map(item => ({ 
+          id: item.id, 
+          distance: `${((item as any).distance || 0).toFixed(2)}m`,
+          lat: item.lat,
+          lon: item.lon,
+          title: item.title?.substring(0, 30) || 'no title'
+        })));
+      } else {
+        console.log('🔍 API Debug - No items found with distance < 10m from coordinates:', { userLat, userLon });
+        
+        // If this is fromItem and no items found at exact location, search for items at exact coordinates
+        if (fromItem) {
+          console.log('🔍 API Debug - FromItem flag detected, searching for items at exact coordinates...');
+          const exactItems = allGpsData.filter(item => {
+            return item.lat === userLat && item.lon === userLon;
+          });
+          if (exactItems.length > 0) {
+            console.log('🔍 API Debug - Found items at exact coordinates:', exactItems.map(item => ({ 
+              id: item.id,
+              lat: item.lat,
+              lon: item.lon,
+              title: item.title?.substring(0, 30) || 'no title'
+            })));
+          } else {
+            console.log('🔍 API Debug - No items found at exact coordinates:', { userLat, userLon });
+          }
+        }
+      }
+      
+      // Special handling for fromItem: If this is a location filter from an item,
+      // prioritize the closest item (likely the source item) by setting its distance to 0
+      if (fromItem && itemsWithDistance.length > 0) {
+        const closestItem = itemsWithDistance[0]; // Already sorted by distance
+        const closestDistance = (closestItem as any).distance || 0;
+        
+        console.log('🔍 API Debug - FromItem: Setting closest item distance to 0 (source item):', {
+          id: closestItem.id,
+          originalDistance: `${closestDistance.toFixed(2)}m`,
+          title: closestItem.title?.substring(0, 30) || 'no title'
+        });
+        
+        // Create a new object with distance: 0 to ensure it's not read-only
+        const sourceItem = { ...closestItem, distance: 0, isSourceItem: true };
+        
+        // Replace the first item with the modified version
+        itemsWithDistance[0] = sourceItem;
+        
+        // Re-sort to ensure the source item is first
+        itemsWithDistance.sort((a, b) => ((a as any).distance || Infinity) - ((b as any).distance || Infinity));
+        
+        console.log('🔍 API Debug - FromItem: After setting distance to 0, first item distance is:', (itemsWithDistance[0] as any).distance);
+      }
       
       // Apply radius filter if specified
       if (radius && !isNaN(parseFloat(radius))) {
         const maxRadius = parseFloat(radius);
         itemsWithDistance = itemsWithDistance.filter((item) => (item as any).distance <= maxRadius);
-        console.log('🔍 API Debug - After radius filtering:', itemsWithDistance.length, 'items within', maxRadius, 'm');
-        console.log('🔍 API Debug - Items within radius:', itemsWithDistance.slice(0, 5).map(item => ({ 
-          id: item.id, 
-          distance: (item as any).distance,
-          lat: item.lat,
-          lon: item.lon,
-          title: item.title
+        console.log('🔍 API Debug - Applied radius filter:', maxRadius, 'm, results:', itemsWithDistance.length);
+      }
+      
+      // FROMITEM FIX: Set closest item distance to 0 BEFORE pagination
+      if (fromItem && itemsWithDistance.length > 0) {
+        console.log('🔍 API Debug - FromItem: Setting closest item distance to 0 (source item):', {
+          id: itemsWithDistance[0].id,
+          originalDistance: `${(itemsWithDistance[0] as any).distance}m`,
+          title: itemsWithDistance[0].title?.substring(0, 30) || 'no title'
+        });
+        
+        // Set the first (closest) item distance to 0 in the MAIN list
+        (itemsWithDistance[0] as any).distance = 0;
+        
+        // CRITICAL: Re-sort the MAIN list to ensure the 0-distance item is first
+        itemsWithDistance.sort((a, b) => {
+          const distA = (a as any).distance || 0;
+          const distB = (b as any).distance || 0;
+          return distA - distB;
+        });
+        
+        console.log('🔍 API Debug - Final distances after fromItem fix and re-sort:', itemsWithDistance.slice(0, 3).map(item => ({
+          id: item.id,
+          distance: `${(item as any).distance}m`,
+          title: item.title?.substring(0, 20) || 'no title'
         })));
       }
       
-      const pagedItems = itemsWithDistance.slice(offset, offset + effectiveLimit);
+      // Apply client-side pagination for LoadMore functionality AFTER fromItem fix
+      const totalCount = itemsWithDistance.length;
+      const pagedItems = for_map ? itemsWithDistance : itemsWithDistance.slice(offset, offset + limit);
       
-      console.log('🔍 API Debug - Final paged result:', {
-        totalItems: itemsWithDistance.length,
+      console.log('🔍 API Debug - Final result with unlimited batch loading:', {
+        totalItemsAvailable: totalCount,
         offset,
         limit,
         effectiveLimit,
         for_map,
         returnedItems: pagedItems.length,
         firstItemId: pagedItems[0]?.id,
-        lastItemId: pagedItems[pagedItems.length - 1]?.id
+        lastItemId: pagedItems[pagedItems.length - 1]?.id,
+        firstDistance: pagedItems[0] ? Math.round((pagedItems[0] as any).distance || 0) + 'm' : undefined,
+        lastDistance: pagedItems[pagedItems.length - 1] ? Math.round((pagedItems[pagedItems.length - 1] as any).distance || 0) + 'm' : undefined
       });
       
       return json({
         status: 'success',
         images: pagedItems,
-        totalCount: itemsWithDistance.length,
+        totalCount: totalCount,
         loadedCount: pagedItems.length,
         gpsMode: true,
-        apiVersion: 'fast-v2',
-        receivedParams: { lat, lon, radius, offset, limit, user_id, filter_user_id, for_map, s: search },
+        apiVersion: 'batch-loading-unlimited-v1',
+        receivedParams: { lat, lon, radius, offset, limit, user_id, filter_user_id, for_map, s: search, fromItem },
         debug: {
           userLat,
           userLon,
           radius: radius ? parseFloat(radius) : null,
-          totalItems: itemsWithDistance.length,
+          totalItems: totalCount,
           returnedItems: pagedItems.length,
-          searchTerm: search
+          searchTerm: search,
+          batchLoading: true,
+          clientSidePagination: !for_map,
+          batchesLoaded: Math.ceil(allGpsData.length / batchSize),
+          fromItem: fromItem,
+          firstItemDistance: pagedItems[0] ? (pagedItems[0] as any).distance : null,
+          firstItemDistanceBeforeReturn: pagedItems[0] ? (pagedItems[0] as any).distance : null
         }
       });
     }
+    
     // Normale Paginierung ohne GPS
     console.log('🔍 API Debug - Using normal pagination (no GPS)');
     

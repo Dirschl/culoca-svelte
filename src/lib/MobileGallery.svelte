@@ -227,6 +227,14 @@
     }, 2000) as any; // Check every 2 seconds (same as simulation)
   }
 
+  // Function to update GPS position for mobile gallery sorting
+  function updateGPSPosition(lat: number, lon: number) {
+    console.log('[MobileGallery] GPS position updated, triggering re-sort');
+    // Trigger reaktive Sortierung durch explizite Zuweisung
+    userLat = lat;
+    userLon = lon;
+  }
+
   onMount(() => {
     if (userLat !== null && userLon !== null) {
       loadInitialGridImages(userLat, userLon);

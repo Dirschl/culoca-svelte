@@ -8,6 +8,7 @@
 		isDuplicateDisplay 
 	} from './sessionStore';
 	import { browser } from '$app/environment';
+	import { X } from 'lucide-svelte';
 
 	export let showOnMap = false; // Different styling for map vs gallery
 	export let userLat: number | null = null;
@@ -237,15 +238,25 @@
 						<span class="location-name" 
 							class:clickable={true} 
 							on:click={() => {
+								console.log('[FilterBar] Location filter clear clicked');
+								console.log('[FilterBar] isPermalinkMode:', isPermalinkMode);
+								console.log('[FilterBar] permalinkImageId:', permalinkImageId);
+								console.log('[FilterBar] isManual3x3Mode:', isManual3x3Mode);
+								
 								if (isPermalinkMode && permalinkImageId) {
 									const url = new URL(`/item/${permalinkImageId}`, window.location.origin); 
 									url.searchParams.set('anchor', permalinkImageId); 
 									window.location.href = url.toString();
 								} else {
+									console.log('[FilterBar] Clearing location filter');
 									filterStore.clearLocationFilter();
+									
 									// Rufe Callback auf um Galerie neu zu laden
 									if (onLocationFilterClear) {
+										console.log('[FilterBar] Calling onLocationFilterClear callback');
 										onLocationFilterClear();
+									} else {
+										console.log('[FilterBar] No onLocationFilterClear callback provided');
 									}
 								}
 							}}

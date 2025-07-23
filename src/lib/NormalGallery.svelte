@@ -28,6 +28,16 @@
     updateGalleryStats($galleryTotalCount, displayedImageCount);
   }
 
+  // WICHTIG: Reagiere auf Filter-Änderungen und lade neue Daten
+  $: if (filterStore && $filterStore.locationFilter) {
+    console.log('[NormalGallery] Location filter changed, resetting gallery:', $filterStore.locationFilter);
+    resetGallery({
+      lat: $filterStore.locationFilter.lat,
+      lon: $filterStore.locationFilter.lon,
+      fromItem: $filterStore.locationFilter.fromItem
+    });
+  }
+
   function handleScroll() {
     if (scrollTimeout) clearTimeout(scrollTimeout);
     
@@ -68,6 +78,17 @@
 
   onMount(() => {
     console.log('[NormalGallery] Component mounted');
+    
+    // WICHTIG: Initial load der Galerie beim ersten Mount (nur wenn kein Location Filter aktiv)
+    if ($galleryItems.length === 0 && !$isGalleryLoading && !$filterStore.locationFilter) {
+      console.log('[NormalGallery] Triggering initial gallery load (no location filter)');
+      loadMoreGallery({
+        lat: userLat || undefined,
+        lon: userLon || undefined
+      });
+    } else if ($filterStore.locationFilter) {
+      console.log('[NormalGallery] Skipping initial load - location filter active:', $filterStore.locationFilter);
+    }
     
     // Scroll-Handler hinzufügen
     window.addEventListener('scroll', handleScroll);
