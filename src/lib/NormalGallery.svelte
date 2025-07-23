@@ -10,6 +10,8 @@
   export let showCompass = false;
   export let userLat: number | null = null;
   export let userLon: number | null = null;
+  export let originalGalleryLat: number | null = null;
+  export let originalGalleryLon: number | null = null;
   export let getDistanceFromLatLonInMeters: any;
   export let filterStore;
   export let sessionStore;

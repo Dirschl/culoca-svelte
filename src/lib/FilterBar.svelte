@@ -19,6 +19,8 @@
 	export let gpsStatus: 'active' | 'cached' | 'none' | 'checking' | 'denied' | 'unavailable' = 'none';
 	export let lastGPSUpdateTime: number | null = null; // Add this prop
 	export let isManual3x3Mode = false;
+	export let originalGalleryLat: number | null = null;
+	export let originalGalleryLon: number | null = null;
 	export let onLocationFilterClear: (() => void) | undefined = undefined; // New callback for location filter clearing
 	
 	let cachedLat: number | null = null;
@@ -250,6 +252,11 @@
 								</span>
 							{/if}
 						</button>
+						{#if !isManual3x3Mode && originalGalleryLat && originalGalleryLon}
+							<div class="original-gps-coords">
+								{formatCoordinates(originalGalleryLat, originalGalleryLon)}
+							</div>
+						{/if}
 					</div>
 				{:else if gpsStatus === 'checking'}
 					<div class="gps-status checking">
@@ -514,11 +521,7 @@
 		border: none;
 		color: inherit;
 		cursor: pointer;
-		padding: 4px 8px;
-		border-radius: 6px;
-		transition: background-color 0.2s ease;
 		display: flex;
-		align-items: center;
 		gap: 8px;
 	}
 
@@ -600,8 +603,13 @@
 	}
 
 	.culoca-logo-img {
-		height: 32px;
+		height: 20px;
 		width: auto;
-		object-fit: contain;
+		filter: var(--logo-filter, none);
+	}
+
+	/* Ursprüngliche GPS-Koordinaten in Orange */
+	.original-gps-coords {
+		color: #ee7221; /* Culoca Orange */
 	}
 </style> 

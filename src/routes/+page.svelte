@@ -50,6 +50,10 @@
   let lastLoadedSource: string | null = null;
   let galleryLoadPending = false;
   let gpsWatchId: number | null = null;
+  
+  // Ursprüngliche GPS-Koordinaten für Normal Mode (werden nur einmal gesetzt)
+  let originalGalleryLat: number | null = null;
+  let originalGalleryLon: number | null = null;
 
   // Debug-Variable für die aktuelle API-URL
   let lastApiUrl = '';
@@ -309,6 +313,13 @@
           lastLoadedLat = effectiveLat;
           lastLoadedLon = effectiveLon;
           lastLoadedSource = gps?.source || 'direct';
+          
+          // Setze ursprüngliche Galerie-Koordinaten für Normal Mode (nur einmal)
+          if (originalGalleryLat === null && originalGalleryLon === null) {
+            originalGalleryLat = effectiveLat;
+            originalGalleryLon = effectiveLon;
+            console.log('[Gallery-Init] Set original gallery coordinates:', { originalGalleryLat, originalGalleryLon });
+          }
         }
         
         const galleryParams: any = {
@@ -378,9 +389,8 @@
           // Mobile Mode: Keine Galerie-Reset, Mobile Galerie sortiert sich selbst reaktiv
           console.log('[GPS-Trigger] Mobile Mode: Skipping gallery reset, mobile gallery will sort itself');
         } else {
-          // Normal Mode: Reset Galerie für neue GPS-Position (lädt neue Daten)
-          resetGallery({ lat: effectiveLat, lon: effectiveLon });
-          console.log('[GPS-Trigger] Normal Mode: Reset Galerie mit neuen GPS-Daten:', { lat: effectiveLat, lon: effectiveLon, source: gps?.source || 'direct' });
+          // Normal Mode: KEINE automatischen Reloads - nur LoadMore basierend auf ursprünglichen GPS-Daten
+          console.log('[GPS-Trigger] Normal Mode: No automatic reloads, only LoadMore based on original GPS coordinates');
         }
         
         // Clientseitige Sortierung für bereits geladene Items (unabhängig vom Modus)
@@ -624,6 +634,8 @@
     gpsStatus={gpsStatus}
     lastGPSUpdateTime={lastGPSUpdateTime}
     isManual3x3Mode={isManual3x3Mode}
+    originalGalleryLat={originalGalleryLat}
+    originalGalleryLon={originalGalleryLon}
     onLocationFilterClear={clearLocationFilterAndReloadGallery}
   />
   <SearchBar
@@ -671,6 +683,8 @@
       showCompass={showCompass}
       userLat={userLat}
       userLon={userLon}
+      originalGalleryLat={originalGalleryLat}
+      originalGalleryLon={originalGalleryLon}
       getDistanceFromLatLonInMeters={getDistanceFromLatLonInMeters}
       filterStore={filterStore}
       sessionStore={sessionStore}
