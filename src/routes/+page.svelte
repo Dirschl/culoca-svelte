@@ -16,7 +16,7 @@
   import { page as pageStore } from '$app/stores';
   import { galleryStats } from '$lib/galleryStats';
   import { dynamicImageLoader } from '$lib/dynamicImageLoader';
-  import { loadMoreGallery, galleryItems, resetGallery } from '$lib/galleryStore';
+  import { loadMoreGallery, galleryItems, resetGallery, useJustifiedLayout, toggleLayout } from '$lib/galleryStore';
   import { browser } from '$app/environment';
   import { getEffectiveGpsPosition } from '$lib/filterStore';
   import { supabase } from '$lib/supabaseClient';
@@ -29,7 +29,6 @@
   let userLon: number | null = null;
   let showDistance = true;
   let showCompass = false;
-  let useJustifiedLayout = true;
   let isLoggedIn = false;
   let newsFlashMode: 'alle' | 'eigene' | 'aus' = 'alle';
   let profileAvatar: string | null = null;
@@ -54,6 +53,15 @@
 
   // Debug-Variable für die aktuelle API-URL
   let lastApiUrl = '';
+
+  // Anonyme User bekommen justified Layout als Default
+  $: if (browser && !isLoggedIn) {
+    // Setze Default nur wenn noch nicht gesetzt
+    const stored = localStorage.getItem('useJustifiedLayout');
+    if (stored === null) {
+      useJustifiedLayout.set(true);
+    }
+  }
 
   // Funktion zum Laden des User-Avatars
   async function loadUserAvatar() {
@@ -198,39 +206,69 @@
       }
     }
     
-    // Galerie sofort initialisieren (ohne künstlichen Delay)
-    if (!galleryInitialized) {
-      galleryInitialized = true;
-      const gps = getEffectiveGpsPosition();
-      
-      // Prüfe Querystring für Suchparameter
-      const urlParams = new URLSearchParams(window.location.search);
-      const searchParam = urlParams.get('s');
-      
-      console.log('[Gallery-Init] Initialisiere Galerie mit GPS:', gps);
-      console.log('[Gallery-Init] UserLat/Lon:', userLat, userLon);
-      console.log('[Gallery-Init] Search param from URL:', searchParam);
-      
-      // Verwende GPS von getEffectiveGpsPosition oder fallback auf userLat/userLon
-      const effectiveLat = gps?.lat || userLat || undefined;
-      const effectiveLon = gps?.lon || userLon || undefined;
-      
-      console.log('[Gallery-Init] Effective GPS:', effectiveLat, effectiveLon);
-      
-      const galleryParams: any = {
-        lat: effectiveLat,
-        lon: effectiveLon
-      };
-      
-      // Füge Suchparameter hinzu falls vorhanden
-      if (searchParam) {
-        galleryParams.search = searchParam;
-        // Setze auch den searchQuery Store für die UI
-        setSearchQuery(searchParam);
+    // Galerie intelligenter initialisieren - warte kurz auf GPS falls Permission bereits erteilt
+    const initializeGalleryIntelligently = async () => {
+      if (!galleryInitialized) {
+        galleryInitialized = true;
+        
+        // Prüfe ob GPS-Permission bereits erteilt ist
+        let shouldWaitForGPS = false;
+        if ('permissions' in navigator) {
+          try {
+            const permissionStatus = await navigator.permissions.query({ name: 'geolocation' });
+            shouldWaitForGPS = permissionStatus.state === 'granted';
+            console.log('[Gallery-Init] GPS permission status:', permissionStatus.state, 'shouldWait:', shouldWaitForGPS);
+          } catch (e) {
+            console.log('[Gallery-Init] Permission check failed, proceeding immediately');
+          }
+        }
+        
+        // Wenn GPS-Permission erteilt ist, warte kurz auf GPS-Daten
+        if (shouldWaitForGPS && !userLat && !userLon) {
+          console.log('[Gallery-Init] Waiting briefly for GPS data...');
+          await new Promise(resolve => setTimeout(resolve, 300)); // 300ms warten auf GPS
+        }
+        
+        const gps = getEffectiveGpsPosition();
+        
+        // Prüfe Querystring für Suchparameter
+        const urlParams = new URLSearchParams(window.location.search);
+        const searchParam = urlParams.get('s');
+        
+        console.log('[Gallery-Init] Initialisiere Galerie mit GPS:', gps);
+        console.log('[Gallery-Init] UserLat/Lon:', userLat, userLon);
+        console.log('[Gallery-Init] Search param from URL:', searchParam);
+        
+        // Verwende GPS von getEffectiveGpsPosition oder fallback auf userLat/userLon
+        const effectiveLat = gps?.lat || userLat || undefined;
+        const effectiveLon = gps?.lon || userLon || undefined;
+        
+        console.log('[Gallery-Init] Effective GPS:', effectiveLat, effectiveLon);
+        
+        // Setze lastLoaded-Werte um doppelte GPS-Trigger zu vermeiden
+        if (effectiveLat && effectiveLon) {
+          lastLoadedLat = effectiveLat;
+          lastLoadedLon = effectiveLon;
+          lastLoadedSource = gps?.source || 'direct';
+        }
+        
+        const galleryParams: any = {
+          lat: effectiveLat,
+          lon: effectiveLon
+        };
+        
+        // Füge Suchparameter hinzu falls vorhanden
+        if (searchParam) {
+          galleryParams.search = searchParam;
+          // Setze auch den searchQuery Store für die UI
+          setSearchQuery(searchParam);
+        }
+        
+        resetGallery(galleryParams);
       }
-      
-      resetGallery(galleryParams);
-    }
+    };
+    
+    initializeGalleryIntelligently();
     
     return () => {
       window.removeEventListener('scroll', onScroll);
@@ -248,23 +286,36 @@
 
   // GPS-Trigger für neue GPS-Daten mit Debouncing
   let gpsUpdateTimeout: any = null;
+  let lastTriggerLog = '';
   
   $: if (galleryInitialized && browser) {
     const gps = getEffectiveGpsPosition();
     const effectiveLat = gps?.lat || userLat;
     const effectiveLon = gps?.lon || userLon;
     
+    // Debug-Logging für reaktive Trigger
+    const triggerLog = `GPS-Trigger: lat=${effectiveLat}, lon=${effectiveLon}, source=${gps?.source || 'direct'}, lastLat=${lastLoadedLat}, lastLon=${lastLoadedLon}, lastSource=${lastLoadedSource}`;
+    
+    if (triggerLog !== lastTriggerLog) {
+      console.log('[GPS-Trigger-Debug]', triggerLog);
+      lastTriggerLog = triggerLog;
+    }
+    
     if (effectiveLat && effectiveLon && (effectiveLat !== lastLoadedLat || effectiveLon !== lastLoadedLon || gps?.source !== lastLoadedSource)) {
       // Debounce GPS updates um Endlosschleifen zu verhindern
-      if (gpsUpdateTimeout) clearTimeout(gpsUpdateTimeout);
+      if (gpsUpdateTimeout) {
+        clearTimeout(gpsUpdateTimeout);
+        console.log('[GPS-Trigger] Clearing previous timeout');
+      }
       
       gpsUpdateTimeout = setTimeout(() => {
+        console.log('[GPS-Trigger] Executing delayed reset');
         lastLoadedLat = effectiveLat;
         lastLoadedLon = effectiveLon;
         lastLoadedSource = gps?.source || 'direct';
         resetGallery({ lat: effectiveLat, lon: effectiveLon });
         console.log('[GPS-Trigger] Reset Galerie mit neuen GPS-Daten:', { lat: effectiveLat, lon: effectiveLon, source: gps?.source || 'direct' });
-      }, 200); // 200ms Debounce - schneller als vorher
+      }, 200); // 200ms Debounce
     }
   }
 
@@ -508,16 +559,18 @@
     searchQuery={$searchQuery}
     isSearching={$isSearching}
     showSearchField={true}
+    useJustifiedLayout={$useJustifiedLayout}
     onSearch={performSearch}
     onInput={q => setSearchQuery(q)}
     onToggleSearchField={() => {}}
+    onToggleLayout={toggleLayout}
     onClear={clearSearchAndReloadGallery}
   />
   {#if newsFlashMode !== 'aus'}
     <NewsFlash 
       mode={newsFlashMode}
       userId={null}
-      layout={useJustifiedLayout ? 'justified' : 'grid'}
+      layout={$useJustifiedLayout ? 'justified' : 'grid'}
       limit={15}
       showToggles={false}
       showDistance={showDistance}
@@ -532,7 +585,7 @@
     <MobileGallery
       userLat={userLat}
       userLon={userLon}
-      useJustifiedLayout={useJustifiedLayout}
+      useJustifiedLayout={$useJustifiedLayout}
       showDistance={showDistance}
       showCompass={showCompass}
       getDistanceFromLatLonInMeters={getDistanceFromLatLonInMeters}
@@ -542,7 +595,7 @@
     />
   {:else}
     <NormalGallery
-      useJustifiedLayout={useJustifiedLayout}
+      useJustifiedLayout={$useJustifiedLayout}
       showDistance={showDistance}
       showCompass={showCompass}
       userLat={userLat}
@@ -593,9 +646,19 @@
       {userLat}
       {userLon}
       {deviceHeading}
+      {isManual3x3Mode}
       on:close={() => showFullscreenMap = false}
-      on:imageClick={() => {}}
-      on:locationSelected={() => {}}
+      on:imageClick={(event) => {
+        const imageId = event.detail.imageId;
+        console.log('[FullscreenMap] Image clicked:', imageId);
+        // Navigate to item detail page
+        window.location.href = `/item/${imageId}`;
+      }}
+      on:locationSelected={(event) => {
+        const { lat, lon } = event.detail;
+        console.log('[FullscreenMap] Location selected:', lat, lon);
+        // Optional: Set location filter or handle location selection
+      }}
     />
   {/if}
   <a class="impressum-link" href="/impressum" target="_blank" rel="noopener">Impressum</a>

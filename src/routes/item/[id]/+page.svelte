@@ -12,6 +12,7 @@
   import { sessionStore, sessionReady } from '$lib/sessionStore';
   import { get } from 'svelte/store';
   import type { PageData } from './$types';
+  import { useJustifiedLayout as globalLayoutStore } from '$lib/galleryStore';
 
   export let data: any;
   
@@ -33,30 +34,9 @@
   let mapEl: HTMLDivElement;
   let map: any;
   let keywordsList: string[] = [];
-  let useJustifiedLayout = true;
+  // useJustifiedLayout is now imported from galleryStore as global state
   
-  // Load layout preference from database
-  async function loadUserLayoutPreference() {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data } = await supabase
-          .from('profiles')
-          .select('use_justified_layout')
-          .eq('id', user.id)
-          .single();
-        
-        if (data) {
-          useJustifiedLayout = data.use_justified_layout ?? true;
-          console.log('[Detail] Loaded layout preference from DB:', useJustifiedLayout ? 'justified' : 'grid');
-        }
-      }
-    } catch (error) {
-      console.error('[Detail] Error loading layout preference:', error);
-      // Fallback to justified layout
-      useJustifiedLayout = true;
-    }
-  }
+  // Layout preference is now managed globally via galleryStore
   let editingTitle = false;
   let titleEditValue = '';
   let currentUser: any = null;
@@ -123,8 +103,7 @@
         console.log('[Detail] Got user from Supabase:', user?.id);
       }
 
-      // Load user's layout preference from database
-      await loadUserLayoutPreference();
+      // Layout preference is now managed globally via galleryStore
 
       // Radius aus localStorage laden (pro User oder anonym)
       if (browser && !radiusLoaded) {
@@ -1050,10 +1029,7 @@
     return meters + ' m';
   }
 
-  if (typeof localStorage !== 'undefined') {
-    const savedLayout = localStorage.getItem('galleryLayout');
-    useJustifiedLayout = savedLayout === 'justified';
-  }
+  // Layout preference is now managed globally via galleryStore
 
   // Radius speichern, wenn er sich ändert und geladen wurde
   $: if (browser && radiusLoaded) {
@@ -1676,7 +1652,7 @@
               {#if nearby.length > 0}
                 <GalleryLayout
                   items={nearby}
-                  layout={useJustifiedLayout ? 'justified' : 'grid'}
+                  layout={$globalLayoutStore ? 'justified' : 'grid'}
                   gap={2}
                   showDistance={true}
                   userLat={image.lat}

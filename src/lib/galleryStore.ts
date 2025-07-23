@@ -1,10 +1,35 @@
 import { writable, get } from 'svelte/store';
+import { browser } from '$app/environment';
 
+// Gallery Items and Loading State
 export const galleryItems = writable<any[]>([]);
 export const isGalleryLoading = writable(false);
 export const galleryTotalCount = writable(0);
 export const hasMoreGalleryItems = writable(true);
 export const galleryParams = writable({ search: '', lat: null, lon: null, radius: null });
+
+// Global Layout Store - shared between main page and detail page
+export const useJustifiedLayout = writable(true);
+
+// Initialize layout from localStorage
+if (browser) {
+  const stored = localStorage.getItem('useJustifiedLayout');
+  if (stored !== null) {
+    useJustifiedLayout.set(stored === 'true');
+  }
+  
+  // Save to localStorage when changed
+  useJustifiedLayout.subscribe((value) => {
+    localStorage.setItem('useJustifiedLayout', String(value));
+  });
+}
+
+// Function to toggle layout globally
+export function toggleLayout() {
+  useJustifiedLayout.update(current => !current);
+  console.log('[Global-Layout-Toggle] Switched to:', get(useJustifiedLayout) ? 'justified' : 'grid');
+}
+
 let offset = 0;
 const limit = 50; // Erhöht auf 50 für besseres Preloading
 let currentRequestId = 0;

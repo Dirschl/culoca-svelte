@@ -14,6 +14,7 @@
   export let userLat: number | null = null;
   export let userLon: number | null = null;
   export let deviceHeading: number | null = null;
+  export let isManual3x3Mode: boolean = false;
   
   const dispatch = createEventDispatcher();
   
@@ -32,7 +33,7 @@
   let satelliteLayer: any = null;
   let autoRotateEnabled = false;
   let showDistance = true; // New: Toggle between distance and title display
-  let keepMarkerCentered = true; // New: Always keep user marker centered on map
+  let keepMarkerCentered = false; // Default: deaktiviert für freie Erkundung
   let lastPosition: { lat: number; lon: number; accuracy: number; timestamp: number } | null = null;
   let lastPositionTime: number | null = null;
   let currentBearing = 0;
@@ -57,7 +58,18 @@
   // Internal images array for clustering
   let allImages: any[] = [];
   
-    // Load saved map state from localStorage
+    // Reaktive Zentrierung basierend auf Mobile Mode
+  $: if (isManual3x3Mode) {
+    // Mobile Mode aktiviert → Automatische Zentrierung aktivieren (wie Navi)
+    keepMarkerCentered = true;
+    console.log('[FullscreenMap] Mobile Mode aktiviert → Marker-Zentrierung aktiviert');
+  } else {
+    // Normal Mode → Standard-Einstellung (deaktiviert für freie Erkundung)
+    keepMarkerCentered = false;
+    console.log('[FullscreenMap] Normal Mode → Marker-Zentrierung deaktiviert (freie Erkundung)');
+  }
+
+  // Load saved map state from localStorage
   function loadMapState() {
     // Load track visibility state
     if (typeof window !== 'undefined') {
@@ -75,7 +87,7 @@
           autoRotateEnabled = state.autoRotate !== undefined ? state.autoRotate : false;
           isHybridView = state.isHybridView !== undefined ? state.isHybridView : false;
           showDistance = state.showDistance !== undefined ? state.showDistance : true;
-          keepMarkerCentered = state.keepMarkerCentered !== undefined ? state.keepMarkerCentered : true;
+          // keepMarkerCentered wird jetzt reaktiv durch isManual3x3Mode gesteuert
         } catch (e) {
           console.error('Error loading map state:', e);
         }
@@ -91,8 +103,8 @@
         center: [map.getCenter().lat, map.getCenter().lng],
         autoRotate: autoRotateEnabled,
         isHybridView: isHybridView,
-        showDistance: showDistance,
-        keepMarkerCentered: keepMarkerCentered
+        showDistance: showDistance
+        // keepMarkerCentered wird nicht gespeichert - wird reaktiv durch isManual3x3Mode gesteuert
       };
       localStorage.setItem('culoca-map-state', JSON.stringify(state));
       
