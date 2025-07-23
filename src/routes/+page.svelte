@@ -16,7 +16,7 @@
   import { page as pageStore } from '$app/stores';
   import { galleryStats } from '$lib/galleryStats';
   import { dynamicImageLoader } from '$lib/dynamicImageLoader';
-  import { loadMoreGallery, galleryItems, resetGallery, useJustifiedLayout, toggleLayout } from '$lib/galleryStore';
+  import { loadMoreGallery, galleryItems, resetGallery, useJustifiedLayout, toggleLayout, updateGPSPosition } from '$lib/galleryStore';
   import { browser } from '$app/environment';
   import { getEffectiveGpsPosition } from '$lib/filterStore';
   import { supabase } from '$lib/supabaseClient';
@@ -313,8 +313,19 @@
         lastLoadedLat = effectiveLat;
         lastLoadedLon = effectiveLon;
         lastLoadedSource = gps?.source || 'direct';
-        resetGallery({ lat: effectiveLat, lon: effectiveLon });
-        console.log('[GPS-Trigger] Reset Galerie mit neuen GPS-Daten:', { lat: effectiveLat, lon: effectiveLon, source: gps?.source || 'direct' });
+        
+        if (isManual3x3Mode) {
+          // Mobile Mode: Keine Galerie-Reset, Mobile Galerie sortiert sich selbst reaktiv
+          console.log('[GPS-Trigger] Mobile Mode: Skipping gallery reset, mobile gallery will sort itself');
+        } else {
+          // Normal Mode: Reset Galerie für neue GPS-Position (lädt neue Daten)
+          resetGallery({ lat: effectiveLat, lon: effectiveLon });
+          console.log('[GPS-Trigger] Normal Mode: Reset Galerie mit neuen GPS-Daten:', { lat: effectiveLat, lon: effectiveLon, source: gps?.source || 'direct' });
+        }
+        
+        // Clientseitige Sortierung für bereits geladene Items (unabhängig vom Modus)
+        updateGPSPosition(effectiveLat, effectiveLon);
+        console.log('[GPS-Trigger] Updated GPS position for client-side sorting');
       }, 200); // 200ms Debounce
     }
   }

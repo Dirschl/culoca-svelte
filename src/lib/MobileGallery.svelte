@@ -149,6 +149,30 @@
       stopContinuousRotation();
     };
   });
+
+  // Reaktive Sortierung nach GPS-Position
+  $: if (userLat !== null && userLon !== null && $gridItems.length > 0) {
+    console.log('[MobileGallery] GPS position changed, re-sorting items by distance');
+    
+    // Sortiere die vorhandenen Items nach aktueller GPS-Position
+    const sortedItems = [...$gridItems].sort((a: any, b: any) => {
+      if (!a.lat || !a.lon || !b.lat || !b.lon) return 0;
+      
+      const distanceA = getDistanceInMeters(userLat, userLon, a.lat, a.lon);
+      const distanceB = getDistanceInMeters(userLat, userLon, b.lat, b.lon);
+      
+      return distanceA - distanceB;
+    });
+    
+    // Nur updaten wenn sich die Reihenfolge geändert hat
+    const firstItemChanged = sortedItems.length > 0 && $gridItems.length > 0 && 
+                            sortedItems[0].id !== $gridItems[0].id;
+    
+    if (firstItemChanged) {
+      console.log('[MobileGallery] Items re-sorted, closest item is now:', sortedItems[0]?.id);
+      gridItems.set(sortedItems);
+    }
+  }
 </script>
 
 <GalleryLayout

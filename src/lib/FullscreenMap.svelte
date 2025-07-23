@@ -874,6 +874,13 @@
   function toggleMarkerCentering() {
     keepMarkerCentered = !keepMarkerCentered;
     console.log(`[FullscreenMap] Marker centering ${keepMarkerCentered ? 'enabled' : 'disabled'}`);
+    
+    // Sofort auf User-Marker zentrieren wenn aktiviert und GPS verfügbar
+    if (keepMarkerCentered && map && userLat !== null && userLon !== null) {
+      console.log(`[FullscreenMap] Centering map on user position: ${userLat}, ${userLon}`);
+      map.setView([userLat, userLon], map.getZoom(), { animate: true });
+    }
+    
     // Save the new state
     saveMapState();
   }
