@@ -192,6 +192,65 @@
     window.addEventListener('toggle3x3Mode', handleToggle3x3Mode);
     window.addEventListener('openMap', handleOpenMap);
     
+    // GPS-Simulation Message-Listener
+    const handleGPSSimulation = (event: MessageEvent) => {
+      if (event.data && event.data.type === 'gps-simulation') {
+        console.log('[GPS-Simulation] Received GPS data from simulation:', event.data);
+        
+        // Setze simulierte GPS-Daten als echte GPS-Position
+        userLat = event.data.lat;
+        userLon = event.data.lon;
+        gpsStatus = 'active';
+        lastGPSUpdateTime = Date.now();
+        
+        console.log('[GPS-Simulation] Updated GPS position:', { userLat, userLon });
+        
+        // Trigger GPS-basierte Sortierung und Galerie-Updates
+        if (galleryInitialized) {
+          // Debounce auch für Simulation
+          if (gpsUpdateTimeout) {
+            clearTimeout(gpsUpdateTimeout);
+          }
+          
+          gpsUpdateTimeout = setTimeout(() => {
+            lastLoadedLat = userLat;
+            lastLoadedLon = userLon;
+            lastLoadedSource = 'simulation';
+            
+            if (isManual3x3Mode) {
+              // Mobile Mode: Nur clientseitige Sortierung
+              console.log('[GPS-Simulation] Mobile Mode: Triggering client-side sort only');
+            } else {
+              // Normal Mode: Reset Galerie mit neuen GPS-Daten
+              resetGallery({ lat: userLat!, lon: userLon! });
+              console.log('[GPS-Simulation] Normal Mode: Reset gallery with simulated GPS');
+            }
+            
+            // Clientseitige Sortierung für bereits geladene Items
+            updateGPSPosition(userLat!, userLon!);
+            console.log('[GPS-Simulation] Updated GPS position for client-side sorting');
+          }, 100); // Kürzerer Debounce für Simulation
+        }
+      } else if (event.data && event.data.type === 'gps-simulation-stop') {
+        console.log('[GPS-Simulation] Received stop signal from simulation');
+        
+        // Simulation gestoppt - zurück zu echtem GPS oder keine GPS-Daten
+        userLat = null;
+        userLon = null;
+        gpsStatus = 'none';
+        lastGPSUpdateTime = null;
+        
+        console.log('[GPS-Simulation] Cleared simulated GPS data');
+        
+        // Versuche echtes GPS zu reaktivieren falls verfügbar
+        if (navigator.geolocation) {
+          initializeGPSIntelligently();
+        }
+      }
+    };
+    
+    window.addEventListener('message', handleGPSSimulation);
+    
     // Intelligente GPS-Initialisierung
     initializeGPSIntelligently();
     
@@ -274,6 +333,7 @@
       window.removeEventListener('scroll', onScroll);
       window.removeEventListener('toggle3x3Mode', handleToggle3x3Mode);
       window.removeEventListener('openMap', handleOpenMap);
+      window.removeEventListener('message', handleGPSSimulation);
       if (rotationInterval) {
         clearInterval(rotationInterval);
       }
