@@ -198,41 +198,39 @@
       }
     }
     
-    // Galerie nach kurzer Verzögerung initialisieren
-    setTimeout(() => {
-      if (!galleryInitialized) {
-        galleryInitialized = true;
-        const gps = getEffectiveGpsPosition();
-        
-        // Prüfe Querystring für Suchparameter
-        const urlParams = new URLSearchParams(window.location.search);
-        const searchParam = urlParams.get('s');
-        
-        console.log('[Gallery-Init] Initialisiere Galerie mit GPS:', gps);
-        console.log('[Gallery-Init] UserLat/Lon:', userLat, userLon);
-        console.log('[Gallery-Init] Search param from URL:', searchParam);
-        
-        // Verwende GPS von getEffectiveGpsPosition oder fallback auf userLat/userLon
-        const effectiveLat = gps?.lat || userLat || undefined;
-        const effectiveLon = gps?.lon || userLon || undefined;
-        
-        console.log('[Gallery-Init] Effective GPS:', effectiveLat, effectiveLon);
-        
-        const galleryParams: any = {
-          lat: effectiveLat,
-          lon: effectiveLon
-        };
-        
-        // Füge Suchparameter hinzu falls vorhanden
-        if (searchParam) {
-          galleryParams.search = searchParam;
-          // Setze auch den searchQuery Store für die UI
-          setSearchQuery(searchParam);
-        }
-        
-        resetGallery(galleryParams);
+    // Galerie sofort initialisieren (ohne künstlichen Delay)
+    if (!galleryInitialized) {
+      galleryInitialized = true;
+      const gps = getEffectiveGpsPosition();
+      
+      // Prüfe Querystring für Suchparameter
+      const urlParams = new URLSearchParams(window.location.search);
+      const searchParam = urlParams.get('s');
+      
+      console.log('[Gallery-Init] Initialisiere Galerie mit GPS:', gps);
+      console.log('[Gallery-Init] UserLat/Lon:', userLat, userLon);
+      console.log('[Gallery-Init] Search param from URL:', searchParam);
+      
+      // Verwende GPS von getEffectiveGpsPosition oder fallback auf userLat/userLon
+      const effectiveLat = gps?.lat || userLat || undefined;
+      const effectiveLon = gps?.lon || userLon || undefined;
+      
+      console.log('[Gallery-Init] Effective GPS:', effectiveLat, effectiveLon);
+      
+      const galleryParams: any = {
+        lat: effectiveLat,
+        lon: effectiveLon
+      };
+      
+      // Füge Suchparameter hinzu falls vorhanden
+      if (searchParam) {
+        galleryParams.search = searchParam;
+        // Setze auch den searchQuery Store für die UI
+        setSearchQuery(searchParam);
       }
-    }, 500);
+      
+      resetGallery(galleryParams);
+    }
     
     return () => {
       window.removeEventListener('scroll', onScroll);
@@ -266,7 +264,7 @@
         lastLoadedSource = gps?.source || 'direct';
         resetGallery({ lat: effectiveLat, lon: effectiveLon });
         console.log('[GPS-Trigger] Reset Galerie mit neuen GPS-Daten:', { lat: effectiveLat, lon: effectiveLon, source: gps?.source || 'direct' });
-      }, 1000); // 1 Sekunde Debounce
+      }, 200); // 200ms Debounce - schneller als vorher
     }
   }
 

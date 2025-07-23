@@ -29,8 +29,8 @@ export async function performSearch(q: string, trigger = true) {
     return;
   }
   
-  // Kurzes Debounce für getippte Suchen
-  const delay = trigger ? 300 : 100;
+  // Kurzes Debounce für getippte Suchen - reduziert für bessere Performance
+  const delay = trigger ? 150 : 50; // Reduziert von 300ms auf 150ms
   
   if (searchTimeout) clearTimeout(searchTimeout);
   searchTimeout = setTimeout(async () => {

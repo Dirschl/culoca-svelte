@@ -61,7 +61,7 @@
           });
         }
       }
-    }, 50);
+    }, 25); // Reduziert von 50ms auf 25ms für noch schnellere Reaktion
   }
 
   onMount(() => {

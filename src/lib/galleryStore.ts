@@ -13,6 +13,8 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
   if (typeof window === 'undefined') return; // Nur im Browser ausführen!
   currentRequestId++;
   const thisRequestId = currentRequestId;
+  
+  // Prüfe sofort ohne weitere Verzögerung
   if (get(isGalleryLoading) || !get(hasMoreGalleryItems)) return;
   isGalleryLoading.set(true);
   
