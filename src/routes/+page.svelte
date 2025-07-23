@@ -241,22 +241,32 @@
       if (rotationInterval) {
         clearInterval(rotationInterval);
       }
+      if (gpsUpdateTimeout) {
+        clearTimeout(gpsUpdateTimeout);
+      }
       stopGPSTracking();
     };
   });
 
-  // GPS-Trigger für neue GPS-Daten
+  // GPS-Trigger für neue GPS-Daten mit Debouncing
+  let gpsUpdateTimeout: any = null;
+  
   $: if (galleryInitialized && browser) {
     const gps = getEffectiveGpsPosition();
     const effectiveLat = gps?.lat || userLat;
     const effectiveLon = gps?.lon || userLon;
     
     if (effectiveLat && effectiveLon && (effectiveLat !== lastLoadedLat || effectiveLon !== lastLoadedLon || gps?.source !== lastLoadedSource)) {
-      lastLoadedLat = effectiveLat;
-      lastLoadedLon = effectiveLon;
-      lastLoadedSource = gps?.source || 'direct';
-      resetGallery({ lat: effectiveLat, lon: effectiveLon });
-      console.log('[GPS-Trigger] Reset Galerie mit neuen GPS-Daten:', { lat: effectiveLat, lon: effectiveLon, source: gps?.source || 'direct' });
+      // Debounce GPS updates um Endlosschleifen zu verhindern
+      if (gpsUpdateTimeout) clearTimeout(gpsUpdateTimeout);
+      
+      gpsUpdateTimeout = setTimeout(() => {
+        lastLoadedLat = effectiveLat;
+        lastLoadedLon = effectiveLon;
+        lastLoadedSource = gps?.source || 'direct';
+        resetGallery({ lat: effectiveLat, lon: effectiveLon });
+        console.log('[GPS-Trigger] Reset Galerie mit neuen GPS-Daten:', { lat: effectiveLat, lon: effectiveLon, source: gps?.source || 'direct' });
+      }, 1000); // 1 Sekunde Debounce
     }
   }
 

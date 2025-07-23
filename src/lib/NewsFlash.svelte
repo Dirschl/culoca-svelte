@@ -151,10 +151,11 @@ onDestroy(() => {
   stopAutoRefresh();
 });
 
-$: if (mounted && mode !== 'aus') {
-  fetchImages();
-  startAutoRefresh();
-}
+// Nur beim ersten Mount und bei expliziter Mode-Änderung laden
+// $: if (mounted && mode !== 'aus') {
+//   fetchImages();
+//   startAutoRefresh();
+// }
 
 function handleImageClick(img: NewsFlashImage) {
   goto(`/item/${img.id}`);
@@ -164,7 +165,14 @@ function toggleMode() {
   if (mode === 'alle') mode = 'eigene';
   else if (mode === 'eigene') mode = 'aus';
   else mode = 'alle';
-  // fetchImages() wird automatisch durch den reaktiven Block aufgerufen
+  
+  // Explizit laden und Auto-Refresh starten statt reaktiver Block
+  if (mode !== 'aus') {
+    fetchImages();
+    startAutoRefresh();
+  } else {
+    stopAutoRefresh();
+  }
 }
 
 function toggleLayout() {

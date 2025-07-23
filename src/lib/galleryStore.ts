@@ -99,18 +99,34 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
 }
 
 export function resetGallery(params: { search?: string; lat?: number; lon?: number; radius?: number } = {}) {
-  offset = 0;
-  galleryItems.set([]);
-  hasMoreGalleryItems.set(true);
-  isGalleryLoading.set(false); // Lade-Status zurücksetzen, damit ein neuer Ladevorgang nicht blockiert wird
-  
-  // Setze neue Parameter (überschreibe alle alten Parameter)
-  galleryParams.set({ 
+  // Prüfe ob sich die Parameter wirklich geändert haben
+  const currentParams = get(galleryParams);
+  const newParams = { 
     search: params.search || '', 
     lat: params.lat || null, 
     lon: params.lon || null, 
     radius: params.radius || null 
-  });
+  };
+  
+  // Nur zurücksetzen wenn sich Parameter geändert haben
+  const hasChanged = currentParams.search !== newParams.search ||
+                    currentParams.lat !== newParams.lat ||
+                    currentParams.lon !== newParams.lon ||
+                    currentParams.radius !== newParams.radius;
+  
+  if (!hasChanged && get(galleryItems).length > 0) {
+    console.log('[GalleryStore] Parameters unchanged, skipping reset');
+    return;
+  }
+  
+  console.log('[GalleryStore] Parameters changed, resetting gallery');
+  offset = 0;
+  galleryItems.set([]);
+  hasMoreGalleryItems.set(true);
+  isGalleryLoading.set(false);
+  
+  // Setze neue Parameter
+  galleryParams.set(newParams);
   
   loadMoreGallery(params);
 } 
