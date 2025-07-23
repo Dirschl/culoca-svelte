@@ -122,7 +122,7 @@
     border: none;
     outline: none;
     color: var(--text-primary);
-    font-size: 0.9rem;
+    font-size: 16px; /* Mindestens 16px für iOS um Zoom zu verhindern */
     font-weight: 500;
     padding: 0;
   }

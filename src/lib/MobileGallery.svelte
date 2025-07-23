@@ -6,13 +6,13 @@
   import { supabase } from '$lib/supabaseClient';
   export let userLat: number | null = null;
   export let userLon: number | null = null;
-  export let useJustifiedLayout = true;
-  export let showDistance = true;
-  export let showCompass = false;
+  export let useJustifiedLayout: boolean = true;
+  export let showDistance: boolean = true;
+  export let showCompass: boolean = false;
   export let getDistanceFromLatLonInMeters: any;
-  export let filterStore;
-  export let sessionStore;
-  export let dynamicLoader;
+  export let filterStore: any;
+  export let sessionStore: any;
+  export let dynamicLoader: any;
 
   const gridItems = writable<any[]>([]);
   let loading = false;
@@ -244,6 +244,7 @@
 
   // Reaktive Sortierung nach GPS-Position
   $: if (userLat !== null && userLon !== null && $gridItems.length > 0) {
+    
     console.log('[MobileGallery] GPS position changed, re-sorting items by distance');
     
     // Sortiere die vorhandenen Items nach aktueller GPS-Position
