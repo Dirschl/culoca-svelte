@@ -20,6 +20,8 @@
   let rotation = 0;
   let rotationSpeed = 1;
   let rotationInterval: any = null;
+  let lastLoadCheckPosition: { lat: number; lon: number } | null = null;
+  let loadCheckInterval: number | null = null;
 
   // Function to get total image count from database
   async function getTotalImageCount(): Promise<number> {
@@ -140,13 +142,103 @@
     loading = false;
   }
 
+  // Start position monitoring for dynamic loading (like in simulation)
+  function startPositionMonitoring() {
+    if (loadCheckInterval) {
+      clearInterval(loadCheckInterval);
+    }
+    
+    // Monitor position changes and dynamically load images
+    loadCheckInterval = setInterval(async () => {
+      if (!userLat || !userLon || !dynamicLoader) return;
+      
+      const currentPos = { lat: userLat, lon: userLon };
+      
+      // Skip if position hasn't changed significantly
+      if (lastLoadCheckPosition && 
+          Math.abs(currentPos.lat - lastLoadCheckPosition.lat) < 0.001 &&
+          Math.abs(currentPos.lon - lastLoadCheckPosition.lon) < 0.001) {
+        return;
+      }
+      
+      lastLoadCheckPosition = { ...currentPos };
+      
+      const isInCenter = dynamicLoader.isInCenterCell(currentPos.lat, currentPos.lon);
+      if (!isInCenter) {
+        console.log(`[MobileGallery] Position ${currentPos.lat},${currentPos.lon} is outside center cell - triggering grid update`);
+        
+        // Load new images from dynamic loader
+        loading = true;
+        await dynamicLoader.loadImagesForPosition(currentPos.lat, currentPos.lon);
+        
+        // Wait for loading to complete
+        let previousCount = -1;
+        for (let i = 0; i < 20; i++) {
+          await new Promise(res => setTimeout(res, 100));
+          const currentCount = dynamicLoader.getImageCount();
+          if (currentCount === previousCount && !dynamicLoader.getDebugInfo().isLoading) break;
+          previousCount = currentCount;
+        }
+        
+        // Update gridItems with the new data from dynamic loader
+        const gridImages = dynamicLoader.getAllImages();
+        const converted = gridImages.map((img: any) => {
+          let bestSrc = '';
+          if (img.path_512) {
+            bestSrc = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${img.path_512}`;
+          } else if (img.path_2048) {
+            bestSrc = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${img.path_2048}`;
+          } else if (img.path_64) {
+            bestSrc = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/${img.path_64}`;
+          }
+          return {
+            id: img.id,
+            src: bestSrc,
+            srcHD: img.path_2048 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${img.path_2048}` : bestSrc,
+            width: img.width && img.width > 0 ? img.width : 400,
+            height: img.height && img.height > 0 ? img.height : 300,
+            lat: img.lat,
+            lon: img.lon,
+            title: img.title,
+            description: img.description,
+            keywords: img.keywords,
+            path_64: img.path_64,
+            path_512: img.path_512,
+            path_2048: img.path_2048
+          };
+        }).filter((p: any) => p.src);
+        
+        // Sort by distance (closest first)
+        if (currentPos.lat !== null && currentPos.lon !== null) {
+          converted.sort((a: any, b: any) => {
+            if (!a.lat || !a.lon || !b.lat || !b.lon) return 0;
+            const da = a.lat && a.lon ? getDistanceInMeters(currentPos.lat, currentPos.lon, a.lat, a.lon) : Number.MAX_VALUE;
+            const db = b.lat && b.lon ? getDistanceInMeters(currentPos.lat, currentPos.lon, b.lat, b.lon) : Number.MAX_VALUE;
+            return da - db;
+          });
+        }
+        
+        gridItems.set(converted);
+        displayedImageCount = converted.length;
+        loading = false;
+        
+        console.log(`[MobileGallery] Updated gridItems with ${converted.length} images from dynamic loader`);
+      }
+    }, 2000) as any; // Check every 2 seconds (same as simulation)
+  }
+
   onMount(() => {
     if (userLat !== null && userLon !== null) {
       loadInitialGridImages(userLat, userLon);
       startContinuousRotation();
+      // Start position monitoring for dynamic loading
+      startPositionMonitoring();
     }
     return () => {
       stopContinuousRotation();
+      if (loadCheckInterval) {
+        clearInterval(loadCheckInterval);
+      }
     };
   });
 
