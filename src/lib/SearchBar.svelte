@@ -1,11 +1,11 @@
 <script lang="ts">
   export let searchQuery = '';
   export let isSearching = false;
-  export let searchResults: any[] = [];
   export let showSearchField = true;
   export let onSearch: (query: string) => void;
   export let onInput: (query: string) => void;
   export let onToggleSearchField: () => void;
+  export let onClear: (() => void) | undefined = undefined;
 
   let searchInput: HTMLInputElement;
 
@@ -13,6 +13,13 @@
     if (event.key === 'Enter') {
       event.preventDefault();
       onSearch(searchQuery);
+    }
+  }
+
+  function handleClear() {
+    onInput(''); // Leere das Eingabefeld
+    if (onClear) {
+      onClear(); // Rufe clearSearch auf
     }
   }
 </script>
@@ -34,7 +41,7 @@
         bind:this={searchInput}
       />
       {#if searchQuery}
-        <button class="clear-search-btn" on:click={() => onInput('')} disabled={isSearching}>
+        <button class="clear-search-btn" on:click={handleClear} disabled={isSearching}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
             <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
           </svg>
@@ -44,11 +51,6 @@
         <div class="search-spinner"></div>
       {/if}
     </div>
-    {#if searchResults.length > 0}
-      <div class="search-results-info">
-        {searchResults.length} Ergebnis{searchResults.length !== 1 ? 'se' : ''} gefunden
-      </div>
-    {/if}
   </div>
 {:else}
   <img 

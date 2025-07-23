@@ -1,7 +1,22 @@
 <script>
-  // Optional: SEO, Titel, etc.
+  import { goto } from '$app/navigation';
+  
+  function goBackToApp() {
+    goto('/');
+  }
 </script>
 
+<div class="fullscreen-page">
+  <header class="page-header">
+    <button class="back-button" on:click={goBackToApp}>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.42-1.41L7.83 13H20v-2z"/>
+      </svg>
+      Zurück zur App
+    </button>
+  </header>
+
+  <main class="content">
     <section id="datenschutz">
   <h2>Datenschutzerklärung</h2>
       
@@ -125,144 +140,124 @@
       <h3>10. Datenschutz für Bewerbungen und im Bewerbungsverfahren</h3>
   <p>Wir erheben und verarbeiten personenbezogene Daten von Bewerbern zum Zwecke der Bewerbungsabwicklung. Die Verarbeitung kann auch auf elektronischem Wege erfolgen. Dies ist insbesondere dann der Fall, wenn ein Bewerber entsprechende Bewerbungsunterlagen auf elektronischem Wege, etwa per E-Mail oder über ein auf der Website befindliches Webformular, an uns übermittelt. Schließen wir einen Anstellungsvertrag mit dem Bewerber, werden die übermittelten Daten zum Zwecke der Abwicklung des Beschäftigungsverhältnisses unter Beachtung der gesetzlichen Vorschriften gespeichert. Wird von uns kein Anstellungsvertrag mit dem Bewerber geschlossen, so werden die Bewerbungsunterlagen zwei Monate nach Bekanntgabe der Ablehnungsentscheidung automatisch gelöscht, sofern einer Löschung keine sonstigen berechtigten Interessen unsererseits entgegenstehen. Ein sonstiges berechtigtes Interesse liegt in diesem Sinne zum Beispiel in einem Beweisverfahren in einem Verfahren nach dem Allgemeinen Gleichbehandlungsgesetz (AGG).</p>
     </section>
+  </main>
+</div>
 
 <style>
-  .container {
-    max-width: 800px;
-    margin: 0 auto;
-    padding: 2rem;
+  .fullscreen-page {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
     background: var(--bg-primary);
     color: var(--text-primary);
-    min-height: 100vh;
   }
-  
-  header {
-    margin-bottom: 2rem;
+
+  .page-header {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    padding: 1rem 2rem;
+    background: var(--bg-secondary);
+    box-shadow: 0 2px 8px var(--shadow);
   }
-  
-  .back-link {
-    color: var(--culoca-orange);
-    text-decoration: none;
+
+  .back-button {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--culoca-orange);
+    color: white;
+    padding: 0.75rem 1.25rem;
+    border-radius: 8px;
     font-weight: 500;
-    transition: color 0.2s;
+    font-size: 0.9rem;
+    transition: background 0.2s;
+    border: none;
+    cursor: pointer;
   }
-  
-  .back-link:hover {
-    color: var(--accent-color);
-    text-decoration: underline;
+
+  .back-button:hover {
+    background: var(--accent-color);
   }
-  
-  main {
-    line-height: 1.6;
-  }
-  
-  h1 {
-    color: var(--text-primary);
-    margin-bottom: 2rem;
-    font-size: 2.5rem;
-  }
-  
-  h3 {
-    color: var(--text-primary);
-    margin-top: 2rem;
-    margin-bottom: 1rem;
-    font-size: 1.25rem;
-  }
-  
-  h4 {
-    color: var(--text-primary);
-    margin-top: 1.5rem;
-    margin-bottom: 0.75rem;
-    font-size: 1.1rem;
-  }
-  
-  p {
-    margin-bottom: 1rem;
-  }
-  
-  ul {
-    margin-bottom: 1rem;
-    padding-left: 2rem;
-  }
-  
-  li {
-    margin-bottom: 0.5rem;
-  }
-  
-  a {
-    color: var(--culoca-orange);
-    text-decoration: none;
-  }
-  
-  a:hover {
-    color: var(--accent-color);
-    text-decoration: underline;
-  }
-  
-  @media (max-width: 768px) {
-    .container {
-      padding: 1rem;
-    }
-    
-    h1 {
-      font-size: 2rem;
-    }
+
+  .content {
+    flex-grow: 1;
+    padding: 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+    width: 100%;
   }
 
   section#datenschutz {
     background: var(--bg-primary);
     color: var(--text-primary);
-    border-radius: 12px;
-    max-width: 720px;
-    width: 100%;
-    margin: 2rem auto;
-    padding: 2.5rem 2rem 2rem 2rem;
-    box-shadow: 0 8px 32px var(--shadow);
     font-size: 1rem;
     line-height: 1.7;
   }
+
   section#datenschutz h2 {
     margin: 0 0 2rem 0;
-    font-size: 1.8rem;
+    font-size: 2.5rem;
     color: var(--text-primary);
   }
+
   section#datenschutz h3 {
     margin: 2.5rem 0 1rem 0;
-    font-size: 1.3rem;
+    font-size: 1.5rem;
     color: var(--text-primary);
   }
+
   section#datenschutz h4 {
     margin: 1.5rem 0 0.5rem 0;
-    font-size: 1.1rem;
+    font-size: 1.2rem;
     color: var(--text-primary);
   }
-  section#datenschutz p, section#datenschutz ul, section#datenschutz li {
+
+  section#datenschutz p,
+  section#datenschutz ul,
+  section#datenschutz li {
     color: var(--text-secondary);
     margin-bottom: 1rem;
+    font-size: 1.1rem;
   }
+
   section#datenschutz ul {
     margin-left: 1.5rem;
     margin-bottom: 1.5rem;
   }
+
   section#datenschutz a {
-    color: var(--accent-color);
+    color: var(--culoca-orange);
     text-decoration: none;
   }
+
   section#datenschutz a:hover {
+    color: var(--accent-color);
     text-decoration: underline;
   }
-  @media (max-width: 600px) {
-    section#datenschutz {
-      max-width: 98vw;
-      padding: 1.5rem 1rem 1rem 1rem;
+
+  @media (max-width: 768px) {
+    .page-header {
+      padding: 1rem;
     }
+
+    .content {
+      padding: 1.5rem 1rem;
+    }
+
     section#datenschutz h2 {
-      font-size: 1.5rem;
+      font-size: 2rem;
       margin-bottom: 1.5rem;
     }
+
     section#datenschutz h3 {
-      font-size: 1.2rem;
+      font-size: 1.3rem;
       margin: 2rem 0 0.8rem 0;
+    }
+
+    .back-button {
+      padding: 0.6rem 1rem;
+      font-size: 0.85rem;
     }
   }
 </style> 

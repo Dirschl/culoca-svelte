@@ -10,25 +10,29 @@
   import MobileGallery from '$lib/MobileGallery.svelte';
   import LoginOverlay from '$lib/LoginOverlay.svelte';
   import FullscreenMap from '$lib/FullscreenMap.svelte';
-  import { searchQuery, searchResults, isSearching, useSearchResults, performSearch, clearSearch, setSearchQuery } from '$lib/searchStore';
+  import { searchQuery, isSearching, useSearchResults, performSearch, clearSearch, setSearchQuery } from '$lib/searchStore';
   import { sessionStore } from '$lib/sessionStore';
   import { filterStore } from '$lib/filterStore';
   import { page as pageStore } from '$app/stores';
   import { galleryStats } from '$lib/galleryStats';
   import { dynamicImageLoader } from '$lib/dynamicImageLoader';
+  import { loadMoreGallery, galleryItems, resetGallery } from '$lib/galleryStore';
+  import { browser } from '$app/environment';
+  import { getEffectiveGpsPosition } from '$lib/filterStore';
+  import { supabase } from '$lib/supabaseClient';
 
   // Globale States für Umschaltung, Overlay, etc.
   let showLoginOverlay = false;
   let showFullscreenMap = false;
   let isManual3x3Mode = false;
-  let userLat = null;
-  let userLon = null;
+  let userLat: number | null = null;
+  let userLon: number | null = null;
   let showDistance = true;
   let showCompass = false;
   let useJustifiedLayout = true;
   let isLoggedIn = false;
-  let newsFlashMode = 'alle';
-  let profileAvatar = null;
+  let newsFlashMode: 'alle' | 'eigene' | 'aus' = 'alle';
+  let profileAvatar: string | null = null;
   let deviceHeading = null;
   let authChecked = false;
   let showScrollToTop = false;
@@ -42,9 +46,91 @@
   let rotationInterval: any = null;
   let showStatusOverlay = false;
   let statusOverlayMessage = '';
+  let lastLoadedLat: number | null = null;
+  let lastLoadedLon: number | null = null;
+  let lastLoadedSource: string | null = null;
+  let galleryLoadPending = false;
+  let gpsWatchId: number | null = null;
+
+  // Debug-Variable für die aktuelle API-URL
+  let lastApiUrl = '';
+
+  // Funktion zum Laden des User-Avatars
+  async function loadUserAvatar() {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        profileAvatar = null;
+        return;
+      }
+      
+      // Fetch profile from profiles table (not public_profiles)
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('avatar_url')
+        .eq('id', user.id)
+        .single();
+        
+      if (data && data.avatar_url) {
+        if (data.avatar_url.startsWith('http')) {
+          profileAvatar = data.avatar_url;
+          console.log('[Avatar] Loaded external avatar:', data.avatar_url);
+        } else {
+          profileAvatar = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/avatars/${data.avatar_url}`;
+          console.log('[Avatar] Loaded Supabase storage avatar:', profileAvatar);
+        }
+      } else {
+        // Fallback: Versuche Avatar aus user_metadata zu laden
+        const avatarUrl = user.user_metadata?.avatar_url || 
+                         user.user_metadata?.picture ||
+                         user.user_metadata?.image ||
+                         null;
+        
+        if (avatarUrl) {
+          profileAvatar = avatarUrl;
+          console.log('[Avatar] Loaded from user metadata:', avatarUrl);
+        } else {
+          // Fallback: Verwende Initialen oder Standard-Avatar
+          const email = user.email;
+          const name = user.user_metadata?.full_name || 
+                      user.user_metadata?.name || 
+                      email?.split('@')[0] || 
+                      'User';
+          
+          // Erstelle einen generischen Avatar mit Initialen
+          const initials = name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
+          profileAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=ee7221&color=fff&size=128`;
+          console.log('[Avatar] Created generic avatar for:', name);
+        }
+      }
+    } catch (error) {
+      console.error('[Avatar] Error loading user avatar:', error);
+      profileAvatar = null;
+    }
+  }
+
+  function buildGalleryApiUrl() {
+    if (!browser) return '';
+    const gps = getEffectiveGpsPosition();
+    const url = new URL('/api/items', window.location.origin);
+    url.searchParams.set('offset', '0');
+    url.searchParams.set('limit', '100');
+    if (gps && gps.lat !== undefined && gps.lon !== undefined) {
+      url.searchParams.set('lat', String(gps.lat));
+      url.searchParams.set('lon', String(gps.lon));
+    }
+    return url.toString();
+  }
+
+  $: lastApiUrl = buildGalleryApiUrl();
 
   $: isLoggedIn = $sessionStore.isAuthenticated;
   $: simulationMode = $pageStore.url.pathname.startsWith('/simulation');
+
+  // Lade Avatar wenn Login-Status sich ändert
+  $: if (isLoggedIn && !profileAvatar) {
+    loadUserAvatar();
+  }
 
   // Kontinuierliche Rotation im 3x3-Modus
   $: if (isManual3x3Mode) {
@@ -62,6 +148,93 @@
     }
     continuousRotation = 0;
   }
+
+  // Initiale Galerie-Initialisierung
+  let galleryInitialized = false;
+  
+  onMount(() => {
+    const onScroll = () => {
+      showScrollToTop = window.scrollY > 200;
+    };
+    window.addEventListener('scroll', onScroll);
+    isInIframe = window.self !== window.top;
+    
+    // Event-Listener für FilterBar Events
+    window.addEventListener('toggle3x3Mode', handleToggle3x3Mode);
+    window.addEventListener('openMap', handleOpenMap);
+    
+    // Intelligente GPS-Initialisierung
+    initializeGPSIntelligently();
+    
+    // Galerie nach kurzer Verzögerung initialisieren
+    setTimeout(() => {
+      if (!galleryInitialized) {
+        galleryInitialized = true;
+        const gps = getEffectiveGpsPosition();
+        
+        // Prüfe Querystring für Suchparameter
+        const urlParams = new URLSearchParams(window.location.search);
+        const searchParam = urlParams.get('s');
+        
+        console.log('[Gallery-Init] Initialisiere Galerie mit GPS:', gps);
+        console.log('[Gallery-Init] UserLat/Lon:', userLat, userLon);
+        console.log('[Gallery-Init] Search param from URL:', searchParam);
+        
+        // Verwende GPS von getEffectiveGpsPosition oder fallback auf userLat/userLon
+        const effectiveLat = gps?.lat || userLat || undefined;
+        const effectiveLon = gps?.lon || userLon || undefined;
+        
+        console.log('[Gallery-Init] Effective GPS:', effectiveLat, effectiveLon);
+        
+        const galleryParams: any = {
+          lat: effectiveLat,
+          lon: effectiveLon
+        };
+        
+        // Füge Suchparameter hinzu falls vorhanden
+        if (searchParam) {
+          galleryParams.search = searchParam;
+          // Setze auch den searchQuery Store für die UI
+          setSearchQuery(searchParam);
+        }
+        
+        resetGallery(galleryParams);
+      }
+    }, 500);
+    
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('toggle3x3Mode', handleToggle3x3Mode);
+      window.removeEventListener('openMap', handleOpenMap);
+      if (rotationInterval) {
+        clearInterval(rotationInterval);
+      }
+      stopGPSTracking();
+    };
+  });
+
+  // GPS-Trigger für neue GPS-Daten
+  $: if (galleryInitialized && browser) {
+    const gps = getEffectiveGpsPosition();
+    const effectiveLat = gps?.lat || userLat;
+    const effectiveLon = gps?.lon || userLon;
+    
+    if (effectiveLat && effectiveLon && (effectiveLat !== lastLoadedLat || effectiveLon !== lastLoadedLon || gps?.source !== lastLoadedSource)) {
+      lastLoadedLat = effectiveLat;
+      lastLoadedLon = effectiveLon;
+      lastLoadedSource = gps?.source || 'direct';
+      resetGallery({ lat: effectiveLat, lon: effectiveLon });
+      console.log('[GPS-Trigger] Reset Galerie mit neuen GPS-Daten:', { lat: effectiveLat, lon: effectiveLon, source: gps?.source || 'direct' });
+    }
+  }
+
+  // Reagiere auf Änderungen von userLat/userLon
+  // $: tryLoadGalleryWithGps(); // This line is no longer needed as the logic is now in the $: block
+
+  // Wenn GPS nachträglich gesetzt wird, erneut versuchen
+  // $: if (galleryLoadPending && userLat !== null && userLon !== null && !isNaN(userLat) && !isNaN(userLon)) { // This line is no longer needed as the logic is now in the $: block
+  //   tryLoadGalleryWithGps(); // This line is no longer needed as the logic is now in the $: block
+  // } // This line is no longer needed as the logic is now in the $: block
 
   // Event-Listener für FilterBar Events
   function handleToggle3x3Mode() {
@@ -111,18 +284,21 @@
 
     gpsStatus = "checking";
 
-    navigator.geolocation.getCurrentPosition(
+    // Live-Tracking: watchPosition
+    gpsWatchId = navigator.geolocation.watchPosition(
       (position) => {
         userLat = position.coords.latitude;
         userLon = position.coords.longitude;
         gpsStatus = "active";
         lastGPSUpdateTime = Date.now();
-        console.log("GPS initialisiert:", userLat, userLon);
+        if (browser) localStorage.setItem('gpsAllowed', 'true');
+        console.log("[GPS] Position geändert:", userLat, userLon);
       },
       (error) => {
         switch (error.code) {
           case error.PERMISSION_DENIED:
             gpsStatus = "denied";
+            if (browser) localStorage.removeItem('gpsAllowed');
             break;
           case error.POSITION_UNAVAILABLE:
             gpsStatus = "unavailable";
@@ -143,6 +319,47 @@
     );
   }
 
+  // Intelligente GPS-Initialisierung, die Berechtigungen berücksichtigt
+  function initializeGPSIntelligently() {
+    if (!navigator.geolocation) {
+      gpsStatus = "unavailable";
+      return;
+    }
+
+    // Prüfe zuerst den aktuellen Berechtigungsstatus
+    if ('permissions' in navigator) {
+      navigator.permissions.query({ name: 'geolocation' }).then((permissionStatus) => {
+        console.log('[GPS] Permission status:', permissionStatus.state);
+        
+        if (permissionStatus.state === 'granted') {
+          // Berechtigung bereits erteilt - starte GPS
+          initializeGPS();
+        } else if (permissionStatus.state === 'denied') {
+          // Berechtigung verweigert - zeige Galerie ohne GPS
+          gpsStatus = "denied";
+          console.log('[GPS] Permission denied - showing gallery without GPS');
+        } else {
+          // Berechtigung noch nicht entschieden - versuche GPS zu starten
+          initializeGPS();
+        }
+      }).catch(() => {
+        // Fallback: Versuche GPS zu starten
+        initializeGPS();
+      });
+    } else {
+      // Fallback für Browser ohne Permissions API
+      initializeGPS();
+    }
+  }
+
+  function stopGPSTracking() {
+    if (gpsWatchId !== null) {
+      navigator.geolocation.clearWatch(gpsWatchId);
+      gpsWatchId = null;
+      console.log('[GPS] Tracking gestoppt');
+    }
+  }
+
   // Umschalt-Logik für Galerie/3x3-Modus
   function toggle3x3Mode() {
     isManual3x3Mode = !isManual3x3Mode;
@@ -152,146 +369,198 @@
     window.location.href = '/simulation';
   }
 
-  // Dummy-Implementierung für GPS, Auth, etc. (kann nach Bedarf erweitert werden)
-  onMount(() => {
-    const onScroll = () => {
-      showScrollToTop = window.scrollY > 200;
-    };
-    window.addEventListener('scroll', onScroll);
-    isInIframe = window.self !== window.top;
+  // Erweiterte clearSearch Funktion mit Galerie-Reload
+  function clearSearchAndReloadGallery() {
+    console.log('[Search-Clear] Starting clearSearchAndReloadGallery');
     
-    // Event-Listener für FilterBar Events
-    window.addEventListener('toggle3x3Mode', handleToggle3x3Mode);
-    window.addEventListener('openMap', handleOpenMap);
+    // Lösche zuerst die Suche
+    clearSearch();
+    console.log('[Search-Clear] clearSearch() completed');
     
-    // GPS beim App-Start initialisieren
-    initializeGPS();
+    // Dann lade die normale Galerie mit aktuellen GPS-Daten
+    const gps = getEffectiveGpsPosition();
+    const effectiveLat = gps?.lat || userLat || undefined;
+    const effectiveLon = gps?.lon || userLon || undefined;
     
-    return () => {
-      window.removeEventListener('scroll', onScroll);
-      window.removeEventListener('toggle3x3Mode', handleToggle3x3Mode);
-      window.removeEventListener('openMap', handleOpenMap);
-      if (rotationInterval) {
-        clearInterval(rotationInterval);
-      }
-    };
-  });
+    const galleryParams: any = {};
+    if (effectiveLat && effectiveLon) {
+      galleryParams.lat = effectiveLat;
+      galleryParams.lon = effectiveLon;
+    }
+    
+    console.log('[Search-Clear] About to resetGallery with params:', galleryParams);
+    console.log('[Search-Clear] GPS data:', { gps, userLat, userLon, effectiveLat, effectiveLon });
+    
+    // Kurze Verzögerung um sicherzustellen dass clearSearch abgeschlossen ist
+    setTimeout(() => {
+      resetGallery(galleryParams);
+      console.log('[Search-Clear] resetGallery called');
+    }, 50);
+  }
+
+  // Location Filter löschen und Galerie neu laden
+  function clearLocationFilterAndReloadGallery() {
+    console.log('[Location-Clear] Starting clearLocationFilterAndReloadGallery');
+    
+    // Lade die normale Galerie mit aktuellen GPS-Daten
+    const gps = getEffectiveGpsPosition();
+    const effectiveLat = gps?.lat || userLat || undefined;
+    const effectiveLon = gps?.lon || userLon || undefined;
+    
+    const galleryParams: any = {};
+    if (effectiveLat && effectiveLon) {
+      galleryParams.lat = effectiveLat;
+      galleryParams.lon = effectiveLon;
+    }
+    
+    console.log('[Location-Clear] About to resetGallery with params:', galleryParams);
+    console.log('[Location-Clear] GPS data:', { gps, userLat, userLon, effectiveLat, effectiveLon });
+    
+    // Kurze Verzögerung um sicherzustellen dass clearLocationFilter abgeschlossen ist
+    setTimeout(() => {
+      resetGallery(galleryParams);
+      console.log('[Location-Clear] resetGallery called');
+    }, 50);
+  }
 </script>
 
-<FilterBar
-  {userLat}
-  {userLon}
-  {showDistance}
-  {isLoggedIn}
-  gpsStatus={gpsStatus}
-  lastGPSUpdateTime={lastGPSUpdateTime}
-  isManual3x3Mode={isManual3x3Mode}
-/>
-
-<SearchBar
-  searchQuery={$searchQuery}
-  isSearching={$isSearching}
-  searchResults={$searchResults}
-  showSearchField={true}
-  onSearch={performSearch}
-  onInput={q => setSearchQuery(q)}
-  onToggleSearchField={() => {}}
-/>
-
-{#if isLoggedIn && newsFlashMode !== 'aus'}
-  <NewsFlash 
-    mode={newsFlashMode}
-    userId={null}
-    layout={useJustifiedLayout ? 'justified' : 'grid'}
-    limit={15}
-    showToggles={false}
-    showDistance={showDistance}
-    userLat={userLat}
-    userLon={userLon}
-    getDistanceFromLatLonInMeters={getDistanceFromLatLonInMeters}
-    displayedImageCount={$galleryStats.loadedCount}
-  />
-{/if}
-
-<WelcomeSection />
-
-{#if isManual3x3Mode}
-  <MobileGallery
-    userLat={userLat}
-    userLon={userLon}
-    useJustifiedLayout={useJustifiedLayout}
-    showDistance={showDistance}
-    showCompass={showCompass}
-    getDistanceFromLatLonInMeters={getDistanceFromLatLonInMeters}
-    filterStore={filterStore}
-    sessionStore={sessionStore}
-    dynamicLoader={dynamicImageLoader}
-  />
+{#if gpsStatus === 'denied' || gpsStatus === 'unavailable'}
+  <div style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(30,30,30,0.92);z-index:10000;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+    <div style="background:#222;padding:2rem 2.5rem;border-radius:1rem;box-shadow:0 2px 16px #0008;max-width:90vw;text-align:center;">
+      <h2 style="color:#fff;margin-bottom:1rem;">Standort-Freigabe benötigt</h2>
+      <p style="color:#ccc;font-size:1.1rem;margin-bottom:1.5rem;">
+        Um die Galerie nach Entfernung zu sortieren, benötigen wir Zugriff auf deinen Standort.<br>
+        Du kannst aber auch ohne Standort die Galerie nutzen.
+      </p>
+      <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;">
+        <button on:click={initializeGPS} style="padding: 0.9rem 2.2rem; font-size: 1.15rem; border-radius: 0.5rem; background: #3a7; color: #fff; border: none; cursor: pointer; font-weight:600;">
+          📍 Standort verwenden
+        </button>
+        <button on:click={() => gpsStatus = 'none'} style="padding: 0.9rem 2.2rem; font-size: 1.15rem; border-radius: 0.5rem; background: #666; color: #fff; border: none; cursor: pointer; font-weight:600;">
+          Ohne Standort fortfahren
+        </button>
+      </div>
+      {#if gpsStatus === 'denied'}
+        <div style="margin-top:1.2rem;color:#f66;font-size:1.05rem;">
+          Standort-Freigabe wurde abgelehnt.<br>Du kannst die Galerie trotzdem nutzen.
+        </div>
+      {/if}
+      {#if gpsStatus === 'unavailable'}
+        <div style="margin-top:1.2rem;color:#f66;font-size:1.05rem;">
+          Standort konnte nicht ermittelt werden.<br>Du kannst die Galerie trotzdem nutzen.
+        </div>
+      {/if}
+    </div>
+  </div>
 {:else}
-  <NormalGallery
-    useJustifiedLayout={useJustifiedLayout}
-    showDistance={showDistance}
-    showCompass={showCompass}
-    userLat={userLat}
-    userLon={userLon}
-    getDistanceFromLatLonInMeters={getDistanceFromLatLonInMeters}
-    filterStore={filterStore}
-    sessionStore={sessionStore}
-  />
-{/if}
-
-<StatusOverlay visible={showStatusOverlay} message={statusOverlayMessage} />
-<StatusOverlay visible={false} message={""} />
-
-{#if !isInIframe}
-  <FloatingActionButtons
-    {showScrollToTop}
-    showTestMode={true}
-    showMapButton={true}
-    isLoggedIn={isLoggedIn}
-    {simulationMode}
-    profileAvatar={profileAvatar}
-    settingsIconRotation={settingsIconRotation}
-    continuousRotation={continuousRotation}
-    rotationSpeed={rotationSpeed}
-    on:upload={() => isLoggedIn ? window.location.href = '/bulk-upload' : showLoginOverlay = true}
-    on:publicContent={() => {}}
-    on:bulkUpload={() => isLoggedIn ? window.location.href = '/bulk-upload' : showLoginOverlay = true}
-    on:profile={() => isLoggedIn ? window.location.href = '/profile' : showLoginOverlay = true}
-    on:settings={() => isLoggedIn ? window.location.href = '/settings' : showLoginOverlay = true}
-    on:map={() => showFullscreenMap = true}
-    on:testMode={() => simulationMode ? window.location.href = '/' : window.location.href = '/simulation'}
-  />
-{/if}
-
-{#if showLoginOverlay}
-  <LoginOverlay
-    show={true}
-    isLoggedIn={isLoggedIn}
-    authChecked={authChecked}
-    onClose={() => showLoginOverlay = false}
-    loginWithProvider={() => {}}
-    loginWithEmail={() => {}}
-    signupWithEmail={() => {}}
-    resetPassword={() => {}}
-    setAnonymousMode={() => {}}
-  />
-{/if}
-
-{#if showFullscreenMap}
-  <FullscreenMap 
-    images={[]}
+  <!-- Galerie-Komponenten und restliche Seite -->
+  <FilterBar
     {userLat}
     {userLon}
-    {deviceHeading}
-    on:close={() => showFullscreenMap = false}
-    on:imageClick={() => {}}
-    on:locationSelected={() => {}}
+    {showDistance}
+    {isLoggedIn}
+    gpsStatus={gpsStatus}
+    lastGPSUpdateTime={lastGPSUpdateTime}
+    isManual3x3Mode={isManual3x3Mode}
+    onLocationFilterClear={clearLocationFilterAndReloadGallery}
   />
+  <SearchBar
+    searchQuery={$searchQuery}
+    isSearching={$isSearching}
+    showSearchField={true}
+    onSearch={performSearch}
+    onInput={q => setSearchQuery(q)}
+    onToggleSearchField={() => {}}
+    onClear={clearSearchAndReloadGallery}
+  />
+  {#if isLoggedIn && newsFlashMode !== 'aus'}
+    <NewsFlash 
+      mode={newsFlashMode}
+      userId={null}
+      layout={useJustifiedLayout ? 'justified' : 'grid'}
+      limit={15}
+      showToggles={false}
+      showDistance={showDistance}
+      userLat={userLat}
+      userLon={userLon}
+      getDistanceFromLatLonInMeters={getDistanceFromLatLonInMeters}
+      displayedImageCount={$galleryStats.loadedCount}
+    />
+  {/if}
+  <WelcomeSection />
+  {#if isManual3x3Mode}
+    <MobileGallery
+      userLat={userLat}
+      userLon={userLon}
+      useJustifiedLayout={useJustifiedLayout}
+      showDistance={showDistance}
+      showCompass={showCompass}
+      getDistanceFromLatLonInMeters={getDistanceFromLatLonInMeters}
+      filterStore={filterStore}
+      sessionStore={sessionStore}
+      dynamicLoader={dynamicImageLoader}
+    />
+  {:else}
+    <NormalGallery
+      useJustifiedLayout={useJustifiedLayout}
+      showDistance={showDistance}
+      showCompass={showCompass}
+      userLat={userLat}
+      userLon={userLon}
+      getDistanceFromLatLonInMeters={getDistanceFromLatLonInMeters}
+      filterStore={filterStore}
+      sessionStore={sessionStore}
+    />
+  {/if}
+  <StatusOverlay visible={showStatusOverlay} message={statusOverlayMessage} />
+  <StatusOverlay visible={false} message={""} />
+  {#if !isInIframe}
+    <FloatingActionButtons
+      {showScrollToTop}
+      showTestMode={true}
+      showMapButton={true}
+      isLoggedIn={isLoggedIn}
+      {simulationMode}
+      profileAvatar={profileAvatar}
+      settingsIconRotation={settingsIconRotation}
+      continuousRotation={continuousRotation}
+      rotationSpeed={rotationSpeed}
+      on:upload={() => isLoggedIn ? window.location.href = '/bulk-upload' : window.location.href = '/login'}
+      on:publicContent={() => {}}
+      on:bulkUpload={() => isLoggedIn ? window.location.href = '/bulk-upload' : window.location.href = '/login'}
+      on:profile={() => isLoggedIn ? window.location.href = '/profile' : window.location.href = '/login'}
+      on:settings={() => isLoggedIn ? window.location.href = '/settings' : window.location.href = '/login'}
+      on:map={() => showFullscreenMap = true}
+      on:testMode={() => simulationMode ? window.location.href = '/' : window.location.href = '/simulation'}
+    />
+  {/if}
+  {#if showLoginOverlay}
+    <LoginOverlay
+      show={true}
+      isLoggedIn={isLoggedIn}
+      authChecked={authChecked}
+      onClose={() => showLoginOverlay = false}
+      loginWithProvider={() => {}}
+      loginWithEmail={() => {}}
+      signupWithEmail={() => {}}
+      resetPassword={() => {}}
+      setAnonymousMode={() => {}}
+    />
+  {/if}
+  {#if showFullscreenMap}
+    <FullscreenMap 
+      images={[]}
+      {userLat}
+      {userLon}
+      {deviceHeading}
+      on:close={() => showFullscreenMap = false}
+      on:imageClick={() => {}}
+      on:locationSelected={() => {}}
+    />
+  {/if}
+  <a class="impressum-link" href="/impressum" target="_blank" rel="noopener">Impressum</a>
+  <a class="datenschutz-link" href="/datenschutz" target="_blank" rel="noopener">Datenschutz</a>
 {/if}
-
-<a class="impressum-link" href="/impressum" target="_blank" rel="noopener">Impressum</a>
-<a class="datenschutz-link" href="/datenschutz" target="_blank" rel="noopener">Datenschutz</a>
 
 <style>
 /* Nur globale Styles, falls benötigt */

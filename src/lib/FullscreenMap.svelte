@@ -2,7 +2,6 @@
   import { onMount, onDestroy } from 'svelte';
   import { createEventDispatcher } from 'svelte';
   import { get } from 'svelte/store';
-  import FilterBar from './FilterBar.svelte';
   import { filterStore, userFilter, locationFilter, shouldShowCustomerBranding } from './filterStore';
   import { sessionStore } from './sessionStore';
   import { authFetch } from './authFetch';
@@ -1321,8 +1320,6 @@
 </script>
 
 <div class="fullscreen-map">
-  <!-- Filter Bar for Map -->
-  <FilterBar showOnMap={true} userLat={userLat} userLon={userLon} isPermalinkMode={false} permalinkImageId={null} showDistance={true} isLoggedIn={true} />
   <!-- Map container -->
   <div bind:this={mapEl} class="map-container"></div>
   <!-- Logo (exactly same position as main page) -->

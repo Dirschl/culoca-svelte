@@ -7,7 +7,6 @@
 		shouldShowCustomerBranding, 
 		isDuplicateDisplay 
 	} from './sessionStore';
-	import { X } from 'lucide-svelte';
 	import { browser } from '$app/environment';
 
 	export let showOnMap = false; // Different styling for map vs gallery
@@ -19,9 +18,11 @@
 	export let isLoggedIn = false; // New prop to determine if user is logged in
 	export let gpsStatus: 'active' | 'cached' | 'none' | 'checking' | 'denied' | 'unavailable' = 'none';
 	export let lastGPSUpdateTime: number | null = null; // Add this prop
+	export let isManual3x3Mode = false;
+	export let onLocationFilterClear: (() => void) | undefined = undefined; // New callback for location filter clearing
+	
 	let cachedLat: number | null = null;
 	let cachedLon: number | null = null;
-	export let isManual3x3Mode = false;
 	
 	// Reactive GPS status info
 	$: gpsStatusInfo = (() => {
@@ -214,14 +215,25 @@
 						<svg width="18" height="18" viewBox="0 0 83.86 100.88" fill="currentColor" class="location-icon">
 							<path d="M0,41.35c0-5.67,1.1-11.03,3.29-16.07,2.19-5.04,5.19-9.43,8.98-13.17,3.79-3.74,8.25-6.69,13.36-8.86,5.11-2.17,10.54-3.25,16.29-3.25s11.18,1.08,16.29,3.25c5.11,2.17,9.56,5.12,13.36,8.86,3.79,3.74,6.79,8.13,8.98,13.17,2.19,5.04,3.29,10.4,3.29,16.07s-1.1,11.03-3.29,16.07c-2.2,5.04-5.19,9.43-8.98,13.17-3.8,3.74-8.25,6.7-13.36,8.86-5.11,2.17-9.49,21.42-15.25,21.42s-12.23-19.25-17.34-21.42c-5.11-2.17-9.56-5.12-13.36-8.86-3.79-3.74-6.79-8.13-8.98-13.17-2.2-5.04-3.29-10.4-3.29-16.07ZM25.16,41.35c0,2.29.44,4.43,1.32,6.44.88,2.01,2.07,3.76,3.59,5.26,1.52,1.5,3.29,2.68,5.33,3.55,2.04.87,4.21,1.3,6.53,1.3s4.49-.43,6.53-1.3c2.04-.87,3.81-2.05,5.33-3.55,1.52-1.5,2.71-3.25,3.59-5.26.88-2.01,1.32-4.15,1.32-6.44s-.44-4.43-1.32-6.44c-.88-2.01-2.08-3.76-3.59-5.26-1.52-1.5-3.29-2.68-5.33-3.55-2.03-.87-4.21-1.3-6.53-1.3s-4.49.43-6.53,1.3c-2.04.87-3.81,2.05-5.33,3.55-1.52,1.5-2.72,3.25-3.59,5.26-.88,2.01-1.32,4.16-1.32,6.44Z"/>
 						</svg>
-						<span class="location-name" class:clickable={isPermalinkMode} on:click={() => isPermalinkMode && permalinkImageId && (() => { const url = new URL(`/item/${permalinkImageId}`, window.location.origin); url.searchParams.set('anchor', permalinkImageId); window.location.href = url.toString(); })()}>{$locationFilter.name}</span>
-						<button 
-							class="remove-filter"
-							on:click={() => filterStore.clearLocationFilter()}
-							aria-label="Standort-Filter entfernen"
+						<span class="location-name" 
+							class:clickable={true} 
+							on:click={() => {
+								if (isPermalinkMode && permalinkImageId) {
+									const url = new URL(`/item/${permalinkImageId}`, window.location.origin); 
+									url.searchParams.set('anchor', permalinkImageId); 
+									window.location.href = url.toString();
+								} else {
+									filterStore.clearLocationFilter();
+									// Rufe Callback auf um Galerie neu zu laden
+									if (onLocationFilterClear) {
+										onLocationFilterClear();
+									}
+								}
+							}}
+							title="Filter entfernen"
 						>
-							<X size={14} />
-						</button>
+							{$locationFilter.name}
+						</span>
 					</div>
 				{:else if gpsStatus === 'active' && userLat !== null && userLon !== null}
 					<div class="gps-status active">

@@ -16,7 +16,7 @@ export const GET = async ({ url, request }) => {
     // Query-Parameter: limit (default 100), user_id (optional), offset (optional)
     // New filter parameters: filter_user_id, lat, lon, radius (for GPS-based filtering)
     // Special parameter: for_map (for map clustering - bypasses limit)
-    const limit = parseInt(url.searchParams.get('limit') || '999999', 10);
+    const limit = parseInt(url.searchParams.get('limit') || '100', 10);
     const offset = parseInt(url.searchParams.get('offset') || '0', 10);
     const user_id = url.searchParams.get('user_id');
     const filter_user_id = url.searchParams.get('filter_user_id');
@@ -25,7 +25,7 @@ export const GET = async ({ url, request }) => {
     const radius = url.searchParams.get('radius');
     const for_map = url.searchParams.get('for_map') === 'true';
     
-    // For map clustering, use a much higher limit
+    // For map clustering, use a much higher limit, otherwise use requested limit
     const effectiveLimit = for_map ? 50000 : limit;
     
     // Extract user ID from Authorization header
@@ -61,6 +61,10 @@ export const GET = async ({ url, request }) => {
       console.log('🔍 API Debug - User-Agent:', userAgent);
     }
 
+    // Suche: Server-seitige Datenbanksuche implementieren
+    const search = url.searchParams.get('s');
+    console.log('🔍 API Debug - Search parameter:', search);
+    
     // GPS-Filtering: Load all matching images, sort by distance, then paginate
     const useGpsFiltering = lat && lon && lat !== 'null' && lon !== 'null' && !isNaN(parseFloat(lat)) && !isNaN(parseFloat(lon));
     console.log('🔍 API Debug - GPS filtering decision:', { 
@@ -80,7 +84,6 @@ export const GET = async ({ url, request }) => {
     });
     if (useGpsFiltering) {
       console.log('🔍 API Debug - Using GPS filtering with coordinates:', { lat, lon });
-      const maxGpsImages = Infinity; // Keine Begrenzung - alle Bilder laden
       
       // For maps, use service role client to bypass RLS 1000-row limit
       const dbClient = for_map ? supabaseService : supabase;
@@ -90,12 +93,36 @@ export const GET = async ({ url, request }) => {
       
       let gpsQuery = dbClient
         .from('items')
-        .select('id, path_512, path_2048, path_64, original_name, created_at, user_id, profile_id, title, description, lat, lon, width, height, is_private')
+        .select('id, path_512, path_2048, path_64, original_name, created_at, user_id, profile_id, title, description, lat, lon, width, height, is_private, keywords')
         .not('lat', 'is', null)
         .not('lon', 'is', null)
         .not('path_512', 'is', null)
-        .eq('gallery', true) // Only show images with gallery = true
-        .limit(1000000); // Very high limit to load all images
+        .eq('gallery', true); // Only show images with gallery = true
+      
+      // Server-seitige Suche anwenden
+      if (search && search.trim()) {
+        const searchTerm = search.trim();
+        console.log('🔍 API Debug - Applying server-side search for:', searchTerm);
+        gpsQuery = gpsQuery.or(
+          `title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%,keywords.cs.{${searchTerm}}`
+        );
+      }
+      
+      // Für GPS-Queries: Lade alle passenden Bilder (ohne Limit für Sortierung)
+      if (!for_map) {
+        // Normal pagination: Alle Bilder laden für korrekte Entfernungsberechnung
+        if (supabaseServiceKey) {
+          // Mit Service Key: Kein Limit nötig da RLS umgangen wird
+          console.log('🔍 API Debug - Using service key, no limit needed');
+        } else {
+          // Ohne Service Key: Sehr hohes Limit setzen
+          gpsQuery = gpsQuery.limit(100000);
+          console.log('🔍 API Debug - No service key, setting limit to 100000');
+        }
+      } else {
+        // Map mode: Service-Limit verwenden
+        gpsQuery = gpsQuery.limit(50000);
+      }
       
       // User-Filter anwenden
       if (user_id) {
@@ -114,14 +141,119 @@ export const GET = async ({ url, request }) => {
         }
       }
       
-      // Load all images without batching
+      // For maps without service key, use batch loading to get more than 1000 items
       let allGpsData = [];
-      console.log(`🔍 API Debug - Loading all images without batching`);
+      console.log(`🔍 API Debug - Batch loading check: for_map=${for_map}, supabaseServiceKey=${!!supabaseServiceKey}, condition=${for_map && !supabaseServiceKey}`);
       
-      // Single query to get all images
-      const { data: gpsData, error: gpsError } = await gpsQuery;
-      if (gpsError) throw error(500, gpsError.message);
-      allGpsData = gpsData || [];
+      // Verwende Service Role Client für GPS-Queries wenn verfügbar
+      const useServiceClient = supabaseServiceKey && (for_map || !for_map);
+      const finalDbClient = useServiceClient ? supabaseService : supabase;
+      
+      if ((for_map && !supabaseServiceKey) || (!supabaseServiceKey && !for_map)) {
+        console.log('🔍 API Debug - Using batch loading (no service key available)');
+        const batchSize = 1000;
+        let hasMore = true;
+        let batchOffset = 0;
+        const maxItems = 200000; // Erhöhtes Limit für mehr Bilder
+        
+        while (hasMore && allGpsData.length < maxItems) {
+          let batchQuery = finalDbClient
+            .from('items')
+            .select('id, path_512, path_2048, path_64, original_name, created_at, user_id, profile_id, title, description, lat, lon, width, height, is_private, keywords')
+            .not('lat', 'is', null)
+            .not('lon', 'is', null)
+            .not('path_512', 'is', null)
+            .eq('gallery', true); // Only show images with gallery = true
+            
+          // Apply server-side search to batch
+          if (search && search.trim()) {
+            const searchTerm = search.trim();
+            batchQuery = batchQuery.or(
+              `title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%,keywords.cs.{${searchTerm}}`
+            );
+          }
+            
+          batchQuery = batchQuery.range(batchOffset, batchOffset + batchSize - 1);
+            
+          // Apply same user filters to batch
+          if (user_id) {
+            batchQuery = batchQuery.eq('user_id', user_id);
+          } else if (filter_user_id) {
+            batchQuery = batchQuery.eq('profile_id', filter_user_id);
+          } else {
+            if (current_user_id) {
+              batchQuery = batchQuery.or(`profile_id.eq.${current_user_id},is_private.eq.false,is_private.is.null`);
+            } else {
+              batchQuery = batchQuery.or('is_private.eq.false,is_private.is.null');
+            }
+          }
+          
+          const { data: batchData, error: batchError } = await batchQuery;
+          if (batchError) throw error(500, batchError.message);
+          
+          if (batchData && batchData.length > 0) {
+            allGpsData.push(...batchData);
+            console.log(`🔍 API Debug - Loaded batch ${Math.floor(batchOffset/batchSize) + 1}: ${batchData.length} items, total: ${allGpsData.length}`);
+            
+            // Continue if we got a full batch
+            hasMore = batchData.length === batchSize;
+            batchOffset += batchSize;
+          } else {
+            hasMore = false;
+          }
+        }
+        
+        console.log(`🔍 API Debug - Batch loading complete: ${allGpsData.length} total items loaded`);
+      } else {
+        // Use service client if available for single query
+        console.log(`🔍 API Debug - Using single query with ${useServiceClient ? 'SERVICE' : 'REGULAR'} client`);
+        
+        // Rebuild query with correct client
+        let finalGpsQuery = finalDbClient
+          .from('items')
+          .select('id, path_512, path_2048, path_64, original_name, created_at, user_id, profile_id, title, description, lat, lon, width, height, is_private, keywords')
+          .not('lat', 'is', null)
+          .not('lon', 'is', null)
+          .not('path_512', 'is', null)
+          .eq('gallery', true);
+        
+        // Apply server-side search
+        if (search && search.trim()) {
+          const searchTerm = search.trim();
+          finalGpsQuery = finalGpsQuery.or(
+            `title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%,keywords.cs.{${searchTerm}}`
+          );
+        }
+        
+        // Set limit based on availability of service key
+        if (!for_map) {
+          if (useServiceClient) {
+            console.log('🔍 API Debug - Service client: no limit needed');
+          } else {
+            finalGpsQuery = finalGpsQuery.limit(100000);
+            console.log('🔍 API Debug - Regular client: setting limit to 100000');
+          }
+        } else {
+          finalGpsQuery = finalGpsQuery.limit(50000);
+        }
+        
+        // Apply user filters
+        if (user_id) {
+          finalGpsQuery = finalGpsQuery.eq('user_id', user_id);
+        } else if (filter_user_id) {
+          finalGpsQuery = finalGpsQuery.eq('profile_id', filter_user_id);
+        } else {
+          if (current_user_id) {
+            finalGpsQuery = finalGpsQuery.or(`profile_id.eq.${current_user_id},is_private.eq.false,is_private.is.null`);
+          } else {
+            finalGpsQuery = finalGpsQuery.or('is_private.eq.false,is_private.is.null');
+          }
+        }
+        
+        const { data: gpsData, error: gpsError } = await finalGpsQuery;
+        if (gpsError) throw error(500, gpsError.message);
+        allGpsData = gpsData || [];
+      }
       
       console.log('🔍 API Debug - Raw GPS data loaded:', allGpsData?.length || 0, 'items');
       
@@ -145,20 +277,12 @@ export const GET = async ({ url, request }) => {
         return item;
       });
       
-      // Debug: Markiere die Distanzen mit "+" um zu zeigen, dass sie von der API kommen
-      itemsWithDistance = itemsWithDistance.map(item => ({
-        ...item,
-        distance: (item as any).distance ? (item as any).distance + 0.001 : null // Kleine Abweichung um API-Distanzen zu markieren
-      }));
+      itemsWithDistance.sort((a, b) => ((a as any).distance || Infinity) - ((b as any).distance || Infinity));
       
       console.log('🔍 API Debug - Items with distance calculated:', itemsWithDistance.length);
       
-      itemsWithDistance.sort((a, b) => ((a as any).distance || Infinity) - ((b as any).distance || Infinity));
-      
       console.log('🔍 API Debug - Items after sorting by distance:', itemsWithDistance.length);
       console.log('🔍 API Debug - First 3 items after sorting:', itemsWithDistance.slice(0, 3).map(item => ({ id: item.id, distance: (item as any).distance })));
-      
-
       
       // Apply radius filter if specified
       if (radius && !isNaN(parseFloat(radius))) {
@@ -193,12 +317,15 @@ export const GET = async ({ url, request }) => {
         totalCount: itemsWithDistance.length,
         loadedCount: pagedItems.length,
         gpsMode: true,
+        apiVersion: 'fast-v2',
+        receivedParams: { lat, lon, radius, offset, limit, user_id, filter_user_id, for_map, s: search },
         debug: {
           userLat,
           userLon,
           radius: radius ? parseFloat(radius) : null,
           totalItems: itemsWithDistance.length,
-          returnedItems: pagedItems.length
+          returnedItems: pagedItems.length,
+          searchTerm: search
         }
       });
     }
@@ -211,13 +338,24 @@ export const GET = async ({ url, request }) => {
     
     let imagesQuery = dbClient
       .from('items')
-      .select('id, path_512, path_2048, path_64, original_name, created_at, user_id, profile_id, title, description, lat, lon, width, height, is_private')
+      .select('id, path_512, path_2048, path_64, original_name, created_at, user_id, profile_id, title, description, lat, lon, width, height, is_private, keywords')
       .not('lat', 'is', null)
       .not('lon', 'is', null)
       .not('path_512', 'is', null)
-      .eq('gallery', true) // Only show images with gallery = true
-      .order('created_at', { ascending: false }) // Neueste zuerst
+      .eq('gallery', true); // Only show images with gallery = true
+    
+    // Server-seitige Suche anwenden
+    if (search && search.trim()) {
+      const searchTerm = search.trim();
+      console.log('🔍 API Debug - Applying server-side search for:', searchTerm);
+      imagesQuery = imagesQuery.or(
+        `title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%,keywords.cs.{${searchTerm}}`
+      );
+    }
+    
+    imagesQuery = imagesQuery.order('created_at', { ascending: false }) // Neueste zuerst
       .range(offset, offset + effectiveLimit - 1);
+      
     if (user_id) {
       imagesQuery = imagesQuery.eq('user_id', user_id);
     } else if (filter_user_id) {
@@ -229,14 +367,25 @@ export const GET = async ({ url, request }) => {
         imagesQuery = imagesQuery.or('is_private.eq.false,is_private.is.null');
       }
     }
+    
     let totalQuery = dbClient
       .from('items')
       .select('id', { count: 'exact' })
       .not('lat', 'is', null)
       .not('lon', 'is', null)
       .not('path_512', 'is', null)
-      .eq('gallery', true) // Only count images with gallery = true
-      .order('created_at', { ascending: false }); // Konsistente Sortierung
+      .eq('gallery', true); // Only count images with gallery = true
+    
+    // Server-seitige Suche auch für Count-Query anwenden
+    if (search && search.trim()) {
+      const searchTerm = search.trim();
+      totalQuery = totalQuery.or(
+        `title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%,keywords.cs.{${searchTerm}}`
+      );
+    }
+    
+    totalQuery = totalQuery.order('created_at', { ascending: false }); // Konsistente Sortierung
+    
     if (user_id) {
       totalQuery = totalQuery.eq('user_id', user_id);
     } else if (filter_user_id) {
@@ -248,6 +397,7 @@ export const GET = async ({ url, request }) => {
         totalQuery = totalQuery.or('is_private.eq.false,is_private.is.null');
       }
     }
+    
     const [{ data, error: dbError }, { count, error: countError }] = await Promise.all([
       imagesQuery,
       totalQuery
@@ -263,7 +413,8 @@ export const GET = async ({ url, request }) => {
       totalCount: count || 0,
       returnedItems: data?.length || 0,
       offset,
-      effectiveLimit
+      effectiveLimit,
+      searchTerm: search
     });
     
     return json({ 
@@ -271,7 +422,9 @@ export const GET = async ({ url, request }) => {
       images: data || [], 
       totalCount: count || 0,
       loadedCount: data?.length || 0,
-      gpsMode: false
+      gpsMode: false,
+      apiVersion: 'fast-v2',
+      receivedParams: { lat, lon, radius, offset, limit, user_id, filter_user_id, for_map, s: search }
     });
   } catch (err) {
     console.error('API /api/items error:', err);
