@@ -83,6 +83,42 @@
 
   $: imageId = $page.params.id;
 
+  let nearbySentinel: HTMLDivElement;
+  let nearbyOffset = 0;
+  const nearbyLimit = 50;
+  let isLoadingNearby = false;
+  let hasMoreNearby = true;
+
+  async function loadMoreNearby() {
+    if (isLoadingNearby || !image || !image.lat || !image.lon || !hasMoreNearby) return;
+    isLoadingNearby = true;
+    try {
+      const url = new URL('/api/items', window.location.origin);
+      url.searchParams.set('lat', String(image.lat));
+      url.searchParams.set('lon', String(image.lon));
+      url.searchParams.set('radius', String(radius));
+      url.searchParams.set('offset', String(nearbyOffset));
+      url.searchParams.set('limit', String(nearbyLimit));
+      url.searchParams.set('fromItem', 'true');
+      const res = await fetch(url.toString());
+      const data = await res.json();
+      if (data && data.images) {
+        if (nearbyOffset === 0) {
+          nearby = data.images;
+        } else {
+          nearby = [...nearby, ...data.images];
+        }
+        nearbyOffset += data.images.length;
+        hasMoreNearby = data.images.length === nearbyLimit;
+      } else {
+        hasMoreNearby = false;
+      }
+    } catch (e) {
+      hasMoreNearby = false;
+    }
+    isLoadingNearby = false;
+  }
+
   onMount(async () => {
     console.log('[Detail] onMount start');
     try {
@@ -1434,6 +1470,26 @@
     const item = nearby.find(n => n.id === itemId);
     return item?.gallery ?? true;
   }
+
+  import { onMount } from 'svelte';
+  onMount(() => {
+    if (typeof window === 'undefined') return;
+    // Initial load
+    loadMoreNearby();
+    // Infinite scroll observer
+    let observer: IntersectionObserver | null = null;
+    if (nearbySentinel) {
+      observer = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting) {
+          loadMoreNearby();
+        }
+      }, { rootMargin: '200px' });
+      observer.observe(nearbySentinel);
+    }
+    return () => {
+      if (observer && nearbySentinel) observer.unobserve(nearbySentinel);
+    };
+  });
 </script>
 
 <svelte:head>
@@ -1533,6 +1589,13 @@
               onGalleryToggle={handleNearbyGalleryToggle}
               getGalleryStatus={getNearbyGalleryStatus}
             />
+            <div bind:this={nearbySentinel} style="height: 1px;"></div>
+            {#if isLoadingNearby}
+              <div style="text-align:center; color:var(--text-secondary); margin:1rem;">Lade weitere Bilder...</div>
+            {/if}
+            {#if !hasMoreNearby}
+              <div style="text-align:center; color:var(--text-secondary); margin:1rem;">Alle Bilder geladen.</div>
+            {/if}
           {:else}
             <p class="no-nearby">
               Keine Items in der Nähe gefunden. Vergrößere den Radius oder es gibt keine anderen Items mit GPS-Koordinaten in der Nähe.
@@ -1585,6 +1648,7 @@
 
         <!-- Location / Sharing Section: Map-Section als eigener Block nach Meta-Section -->
         <div class="location-section" style="background: transparent;">
+          <!-- Map aus Sicherung -->
           {#if image.lat && image.lon}
             <div class="map-wrapper">
               <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.7rem;">
@@ -1623,7 +1687,9 @@
             <div class="map-wrapper">
               <div style="display: flex; align-items: center; justify-content: space-between;">
                 <h2 class="map-title">Standort</h2>
-                <!-- map-pin-btn (GPS setzen) Button testweise entfernt -->
+                <button class="map-pin-btn" on:click={() => openMapPicker(null, null)} title="GPS setzen">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21c-4.418 0-8-4.03-8-9 0-4.418 3.582-8 8-8s8 3.582 8 8c0 4.97-3.582 9-8 9zm0-13a4 4 0 100 8 4 4 0 000-8z"/></svg>
+                </button>
               </div>
               <div style="padding: 20px; text-align: center; color: #666;">
                 GPS-Daten nicht verfügbar<br>
@@ -1712,7 +1778,7 @@
     display: grid;
     grid-template-columns: 2fr 1fr 1fr;
     gap: 2rem;
-  margin: 2rem 0 1.5rem;
+    margin: 2rem 0 1.5rem;
     background: transparent;
     border-radius: 0;
     padding: 1rem;
@@ -1886,4 +1952,110 @@
   color: white;
 }
 
+/* Map-Container wie im Backup */
+.map {
+  height: 500px;
+  width: 100%;
+  background: transparent;
+  border: none;
+}
+
+.scroll-to-top {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  width: 48px;
+  height: 48px;
+  background: var(--accent-color);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s ease;
+  z-index: 1000;
+  opacity: 0.85;
+  transform: translateY(20px);
+  animation: fadeInUp 0.3s ease forwards;
+}
+.scroll-to-top:hover {
+  background: var(--culoca-orange);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+  opacity: 1;
+}
+.scroll-to-top svg {
+  width: 24px;
+  height: 24px;
+}
+@keyframes fadeInUp {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (max-width: 768px) {
+  .scroll-to-top {
+    bottom: 1rem;
+    right: 1rem;
+    width: 44px;
+    height: 44px;
+  }
+  .scroll-to-top svg {
+    width: 20px;
+    height: 20px;
+  }
+}
+@media (max-width: 900px) {
+  .meta-section.single-exif {
+    grid-template-columns: 1fr;
+    padding: 1rem 0.5rem;
+    gap: 1.5rem;
+  }
+  :global(.creator-title),
+  :global(.avatar),
+  :global(.avatar-placeholder),
+  :global(.creator-contact),
+  :global(.creator-socials),
+  :global(.keywords-column),
+  :global(.file-details),
+  :global(.keywords-title),
+  :global(.map-title) {
+    text-align: center !important;
+    align-items: center !important;
+    justify-content: center !important;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  :global(.keywords) {
+    justify-content: center !important;
+  }
+}
+@media (max-width: 1200px) {
+  .meta-section.single-exif {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+  :global(.creator-title),
+  :global(.avatar),
+  :global(.avatar-placeholder),
+  :global(.creator-contact),
+  :global(.creator-socials),
+  :global(.keywords-column),
+  :global(.file-details),
+  :global(.keywords-title),
+  :global(.map-title) {
+    text-align: center !important;
+    align-items: center !important;
+    justify-content: center !important;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  :global(.keywords) {
+    justify-content: center !important;
+  }
+}
 </style> 

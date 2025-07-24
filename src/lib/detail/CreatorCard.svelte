@@ -227,4 +227,10 @@
 .social-link:hover .social-icon {
   color: var(--culoca-orange);
 }
+@media (max-width: 1200px), (max-width: 900px) {
+  .creator-details {
+    text-align: center;
+    align-items: center;
+  }
+}
 </style> 
