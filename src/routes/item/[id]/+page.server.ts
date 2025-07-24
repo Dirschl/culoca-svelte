@@ -44,6 +44,15 @@ export const load: PageServerLoad = async ({ params }) => {
       };
     }
 
+    // Wenn kein Bild gefunden wurde
+    if (!img) {
+      return {
+        image: null,
+        error: 'Bild nicht gefunden',
+        nearby: []
+      };
+    }
+
     // Fetch nearby items if image has GPS coordinates
     let nearby: any[] = [];
     if (img && img.lat && img.lon) {

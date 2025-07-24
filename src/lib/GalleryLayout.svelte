@@ -135,7 +135,6 @@
     } else {
       // Navigate to item detail page with anchor parameter
       const url = new URL(`/item/${itemId}`, window.location.origin);
-      url.searchParams.set('anchor', itemId);
       location.href = url.toString();
     }
   }

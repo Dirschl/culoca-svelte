@@ -134,7 +134,7 @@
 								{userFilterInfo.name.charAt(0).toUpperCase()}
 							</div>
 						{/if}
-						<span class="user-name" class:clickable={isPermalinkMode} on:click={() => isPermalinkMode && permalinkImageId && (() => { const url = new URL(`/item/${permalinkImageId}`, window.location.origin); url.searchParams.set('anchor', permalinkImageId); window.location.href = url.toString(); })()}>
+						<span class="user-name" class:clickable={isPermalinkMode} on:click={() => isPermalinkMode && permalinkImageId && (() => { const url = new URL(`/item/${permalinkImageId}`, window.location.origin); window.location.href = url.toString(); })()}>
 							{userFilterInfo.name}
 						</span>
 						<!-- Show X button if removal is allowed -->
@@ -162,7 +162,7 @@
 								{$userFilter.username.charAt(0).toUpperCase()}
 							</div>
 						{/if}
-						<span class="user-name" class:clickable={isPermalinkMode} on:click={() => isPermalinkMode && permalinkImageId && (() => { const url = new URL(`/item/${permalinkImageId}`, window.location.origin); url.searchParams.set('anchor', permalinkImageId); window.location.href = url.toString(); })()}>
+						<span class="user-name" class:clickable={isPermalinkMode} on:click={() => isPermalinkMode && permalinkImageId && (() => { const url = new URL(`/item/${permalinkImageId}`, window.location.origin); window.location.href = url.toString(); })()}>
 							{$userFilter.accountName || $userFilter.username}
 						</span>
 						<button 
@@ -187,7 +187,7 @@
 								{customerBrandInfo.name.charAt(0).toUpperCase()}
 							</div>
 						{/if}
-						<span class="customer-name" class:clickable={isPermalinkMode} on:click={() => isPermalinkMode && permalinkImageId && (() => { const url = new URL(`/item/${permalinkImageId}`, window.location.origin); url.searchParams.set('anchor', permalinkImageId); window.location.href = url.toString(); })()}>
+						<span class="customer-name" class:clickable={isPermalinkMode} on:click={() => isPermalinkMode && permalinkImageId && (() => { const url = new URL(`/item/${permalinkImageId}`, window.location.origin); window.location.href = url.toString(); })()}>
 							{customerBrandInfo.name}
 						</span>
 						<!-- Show X button if removal is allowed -->
@@ -246,7 +246,6 @@
 								
 								if (isPermalinkMode && permalinkImageId) {
 									const url = new URL(`/item/${permalinkImageId}`, window.location.origin); 
-									url.searchParams.set('anchor', permalinkImageId); 
 									window.location.href = url.toString();
 								} else {
 									console.log('[FilterBar] Clearing location filter');
