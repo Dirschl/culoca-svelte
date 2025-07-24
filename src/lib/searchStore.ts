@@ -33,8 +33,8 @@ export async function performSearch(q: string, trigger = true) {
   const delay = trigger ? 150 : 50; // Reduziert von 300ms auf 150ms
   
   if (searchTimeout) clearTimeout(searchTimeout);
-  searchTimeout = setTimeout(async () => {
-    try {
+    searchTimeout = setTimeout(async () => {
+      try {
       console.log('🔍 SearchStore: Starting search for:', q);
       
       // Verwende galleryStore für die Suche
@@ -45,7 +45,7 @@ export async function performSearch(q: string, trigger = true) {
         isSearching.set(false);
       }, 100);
       
-    } catch (e) {
+      } catch (e) {
       console.error('🔍 SearchStore: Search error:', e);
       isSearching.set(false);
     }

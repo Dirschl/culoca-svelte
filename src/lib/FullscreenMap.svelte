@@ -68,8 +68,8 @@
     keepMarkerCentered = false;
     console.log('[FullscreenMap] Normal Mode → Marker-Zentrierung deaktiviert (freie Erkundung)');
   }
-
-  // Load saved map state from localStorage
+  
+    // Load saved map state from localStorage
   function loadMapState() {
     // Load track visibility state
     if (typeof window !== 'undefined') {

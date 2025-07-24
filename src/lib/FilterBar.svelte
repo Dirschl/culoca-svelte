@@ -9,6 +9,7 @@
 	} from './sessionStore';
 	import { browser } from '$app/environment';
 	import { X } from 'lucide-svelte';
+	import { resetGallery } from './galleryStore';
 
 	export let showOnMap = false; // Different styling for map vs gallery
 	export let userLat: number | null = null;
@@ -250,6 +251,7 @@
 								} else {
 									console.log('[FilterBar] Clearing location filter');
 									filterStore.clearLocationFilter();
+									resetGallery();
 									
 									// Rufe Callback auf um Galerie neu zu laden
 									if (onLocationFilterClear) {

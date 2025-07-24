@@ -17,38 +17,38 @@
   </header>
 
   <main class="content">
-    <section id="impressum">
-      <h2>Impressum</h2>
-      <p><strong>Autor, Herausgeber, Design und technische Umsetzung</strong><br>
-      DIRSCHL.com GmbH<br>
-      Waldberg 84<br>
-      84571 Reischach<br>
-      Deutschland</p>
-      <p><strong>Geschäftsführer:</strong><br>
-      Johann Dirschl</p>
-      <p><strong>Kontakt:</strong><br>
-      Mobil: 0179 9766666<br>
-      Festnetz: 08670 5590127<br>
-      E-Mail: <a href="mailto:johann.dirschl@gmx.de">johann.dirschl@gmx.de</a></p>
-      <p><strong>Handelsregister:</strong><br>
-      Amtsgericht Traunstein, HRB 18130</p>
-      <p><strong>USt-IdNr.:</strong><br>
-      DE258218256</p>
-      <p><strong>Steuernummer:</strong><br>
-      141/124/50220</p>
-      <p><strong>Verantwortlich für den Inhalt gemäß § 55 Abs. 2 RStV:</strong><br>
-      Johann Dirschl<br>
-      Waldberg 84<br>
-      84571 Reischach</p>
-      <p><strong>Social Media:</strong><br>
-      <a href="https://www.facebook.com/johann.dirschl" target="_blank" rel="noopener noreferrer">Facebook – DIRSCHL.com GmbH</a></p>
-      <h3>Haftungsausschluss</h3>
-      <p>Die Inhalte dieser Website wurden mit größter Sorgfalt erstellt. Für die Richtigkeit, Vollständigkeit und Aktualität der Inhalte übernehmen wir jedoch keine Gewähr. Als Diensteanbieter sind wir gemäß § 7 Abs. 1 TMG für eigene Inhalte verantwortlich. Für Links auf externe Webseiten übernehmen wir keine Haftung – für deren Inhalte sind ausschließlich deren Betreiber verantwortlich.</p>
-      <h3>Datenschutzerklärung</h3>
-      <p>Bitte beachten Sie unsere <a href="/datenschutz">Datenschutzerklärung</a>.</p>
-      <h3>Allgemeine Geschäftsbedingungen (AGB)</h3>
-      <p>Unsere vollständigen AGB finden Sie <a href="/agb">hier</a>.</p>
-    </section>
+<section id="impressum">
+  <h2>Impressum</h2>
+  <p><strong>Autor, Herausgeber, Design und technische Umsetzung</strong><br>
+  DIRSCHL.com GmbH<br>
+  Waldberg 84<br>
+  84571 Reischach<br>
+  Deutschland</p>
+  <p><strong>Geschäftsführer:</strong><br>
+  Johann Dirschl</p>
+  <p><strong>Kontakt:</strong><br>
+  Mobil: 0179 9766666<br>
+  Festnetz: 08670 5590127<br>
+  E-Mail: <a href="mailto:johann.dirschl@gmx.de">johann.dirschl@gmx.de</a></p>
+  <p><strong>Handelsregister:</strong><br>
+  Amtsgericht Traunstein, HRB 18130</p>
+  <p><strong>USt-IdNr.:</strong><br>
+  DE258218256</p>
+  <p><strong>Steuernummer:</strong><br>
+  141/124/50220</p>
+  <p><strong>Verantwortlich für den Inhalt gemäß § 55 Abs. 2 RStV:</strong><br>
+  Johann Dirschl<br>
+  Waldberg 84<br>
+  84571 Reischach</p>
+  <p><strong>Social Media:</strong><br>
+  <a href="https://www.facebook.com/johann.dirschl" target="_blank" rel="noopener noreferrer">Facebook – DIRSCHL.com GmbH</a></p>
+  <h3>Haftungsausschluss</h3>
+  <p>Die Inhalte dieser Website wurden mit größter Sorgfalt erstellt. Für die Richtigkeit, Vollständigkeit und Aktualität der Inhalte übernehmen wir jedoch keine Gewähr. Als Diensteanbieter sind wir gemäß § 7 Abs. 1 TMG für eigene Inhalte verantwortlich. Für Links auf externe Webseiten übernehmen wir keine Haftung – für deren Inhalte sind ausschließlich deren Betreiber verantwortlich.</p>
+  <h3>Datenschutzerklärung</h3>
+  <p>Bitte beachten Sie unsere <a href="/datenschutz">Datenschutzerklärung</a>.</p>
+  <h3>Allgemeine Geschäftsbedingungen (AGB)</h3>
+  <p>Unsere vollständigen AGB finden Sie <a href="/agb">hier</a>.</p>
+</section>
   </main>
 </div>
 
@@ -69,7 +69,7 @@
     background: var(--bg-secondary);
     box-shadow: 0 2px 8px var(--shadow);
   }
-
+  
   .back-button {
     display: flex;
     align-items: center;
@@ -84,7 +84,7 @@
     border: none;
     cursor: pointer;
   }
-
+  
   .back-button:hover {
     background: var(--accent-color);
   }
@@ -96,7 +96,7 @@
     margin: 0 auto;
     width: 100%;
   }
-
+  
   section#impressum {
     background: var(--bg-primary);
     color: var(--text-primary);

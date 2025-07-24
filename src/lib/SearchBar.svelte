@@ -49,7 +49,7 @@
         <svg class="layout-icon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" on:click={handleLayoutToggle} title="Zu Justified-Layout wechseln">
           <rect x="2" y="6" width="20" height="4" rx="1"/>
           <rect x="2" y="14" width="20" height="4" rx="1"/>
-        </svg>
+      </svg>
       {/if}
       <input 
         type="text" 

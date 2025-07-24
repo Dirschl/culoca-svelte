@@ -5,7 +5,7 @@ const getInitialDarkMode = (): boolean => {
   if (typeof window !== 'undefined') {
     const stored = localStorage.getItem('darkMode');
     if (stored !== null) {
-      return stored === 'true';
+    return stored === 'true';
     }
     // Default to dark mode for new users (better UX)
     return true;

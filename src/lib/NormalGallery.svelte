@@ -26,15 +26,15 @@
   $: {
     displayedImageCount = $galleryItems.length;
     updateGalleryStats($galleryTotalCount, displayedImageCount);
-  }
-
+      }
+      
   // WICHTIG: Reagiere auf Filter-Änderungen und lade neue Daten
   $: if (filterStore && $filterStore.locationFilter) {
     console.log('[NormalGallery] Location filter changed, resetting gallery:', $filterStore.locationFilter);
     resetGallery({
       lat: $filterStore.locationFilter.lat,
       lon: $filterStore.locationFilter.lon,
-      fromItem: $filterStore.locationFilter.fromItem
+      fromItem: true // explizit setzen!
     });
   }
 
@@ -67,11 +67,16 @@
       if (scrollTop >= threshold) {
         if ($hasMoreGalleryItems && !$isGalleryLoading) {
           console.log(`[NormalGallery] Loading more images (threshold: ${Math.round(dynamicThreshold)}px, velocity: ${scrollVelocity.toFixed(3)})`);
+          
+          // Use location filter coordinates if available, otherwise fall back to user coordinates
+          const apiLat = $filterStore.locationFilter?.lat || userLat;
+          const apiLon = $filterStore.locationFilter?.lon || userLon;
+          
           loadMoreGallery({
-            lat: userLat || undefined,
-            lon: userLon || undefined
+            lat: apiLat || undefined,
+            lon: apiLon || undefined
           });
-        }
+    }
       }
     }, 25); // Reduziert von 50ms auf 25ms für noch schnellere Reaktion
   }
@@ -79,9 +84,11 @@
   onMount(() => {
     console.log('[NormalGallery] Component mounted');
     
-    // WICHTIG: Initial load der Galerie beim ersten Mount (nur wenn kein Location Filter aktiv)
+    // Nur initial laden, wenn KEIN Location-Filter aktiv ist!
     if ($galleryItems.length === 0 && !$isGalleryLoading && !$filterStore.locationFilter) {
       console.log('[NormalGallery] Triggering initial gallery load (no location filter)');
+      
+      // Use user coordinates for initial load when no location filter
       loadMoreGallery({
         lat: userLat || undefined,
         lon: userLon || undefined
@@ -105,25 +112,21 @@
 </script>
 
 {#if $galleryItems.length > 0}
-  <GalleryLayout 
+<GalleryLayout
     items={$galleryItems}
-    layout={useJustifiedLayout ? 'justified' : 'grid'}
+  layout={useJustifiedLayout ? 'justified' : 'grid'}
     {showDistance}
     {showCompass}
     {userLat}
     {userLon}
     {getDistanceFromLatLonInMeters}
-  />
+/>
 {:else if $isGalleryLoading}
   <div class="loading-container">
     <div class="spinner"></div>
-    <p>Lade Galerie...</p>
   </div>
 {:else}
-  <div class="no-images">
-    <h3>Keine Bilder gefunden</h3>
-    <p>Es wurden keine Bilder in der Galerie gefunden.</p>
-  </div>
+  <div>Keine Bilder gefunden.</div>
 {/if}
 
 {#if $isGalleryLoading && $galleryItems.length > 0}

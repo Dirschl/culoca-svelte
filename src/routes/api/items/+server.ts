@@ -136,41 +136,41 @@ export const GET = async ({ url, request }) => {
       
       // Use batch loading to get all items (bypass RLS 1000-item limit)
       let allGpsData = [];
-      const batchSize = 1000;
-      let hasMore = true;
-      let batchOffset = 0;
+        const batchSize = 1000;
+        let hasMore = true;
+        let batchOffset = 0;
       
       console.log('🔍 API Debug - Starting batch loading for unlimited GPS results');
-      
-      while (hasMore && allGpsData.length < maxGpsImages) {
+        
+        while (hasMore && allGpsData.length < maxGpsImages) {
         const batchQuery = gpsQuery
           .range(batchOffset, batchOffset + batchSize - 1)
           .order('created_at', { ascending: false });
           
-        const { data: batchData, error: batchError } = await batchQuery;
+          const { data: batchData, error: batchError } = await batchQuery;
         
         if (batchError) {
           console.error('🔍 API Error - Batch loading failed:', batchError);
           throw error(500, batchError.message);
         }
-        
+          
         if (!batchData || batchData.length === 0) {
           hasMore = false;
           console.log(`🔍 API Debug - Batch ${Math.floor(batchOffset / batchSize)} empty, stopping`);
         } else {
-          allGpsData.push(...batchData);
+            allGpsData.push(...batchData);
           console.log(`🔍 API Debug - Batch ${Math.floor(batchOffset / batchSize)}: loaded ${batchData.length} items, total: ${allGpsData.length}`);
-          
+            
           if (batchData.length < batchSize) {
             hasMore = false;
             console.log(`🔍 API Debug - Last batch (${batchData.length} < ${batchSize}), stopping`);
           } else {
             batchOffset += batchSize;
           }
+          }
         }
-      }
-      
-      console.log(`🔍 API Debug - Batch loading complete: ${allGpsData.length} total items loaded`);
+        
+        console.log(`🔍 API Debug - Batch loading complete: ${allGpsData.length} total items loaded`);
       
       // Calculate distances using JavaScript Haversine formula and sort
       const userLat = parseFloat(lat);
@@ -193,8 +193,10 @@ export const GET = async ({ url, request }) => {
         return { ...item, distance: Infinity };
       });
       
-      // Sort by distance (closest first)
-      itemsWithDistance.sort((a, b) => ((a as any).distance || Infinity) - ((b as any).distance || Infinity));
+      // Sort by distance (closest first) - aber NICHT für Location-Filter (fromItem)
+      if (!fromItem) {
+        itemsWithDistance.sort((a, b) => ((a as any).distance || Infinity) - ((b as any).distance || Infinity));
+      }
       
       console.log('🔍 API Debug - Distance calculation and sorting complete:', itemsWithDistance.length);
       console.log('🔍 API Debug - First 3 items after sorting:', itemsWithDistance.slice(0, 3).map(item => ({ 
@@ -203,6 +205,7 @@ export const GET = async ({ url, request }) => {
       })));
       
       // DEBUG: Show items with very small distances (< 10 meters)
+
       const veryCloseItems = itemsWithDistance.filter(item => (item as any).distance < 10);
       if (veryCloseItems.length > 0) {
         console.log('🔍 API Debug - Items with distance < 10m:', veryCloseItems.map(item => ({ 
@@ -234,29 +237,7 @@ export const GET = async ({ url, request }) => {
         }
       }
       
-      // Special handling for fromItem: If this is a location filter from an item,
-      // prioritize the closest item (likely the source item) by setting its distance to 0
-      if (fromItem && itemsWithDistance.length > 0) {
-        const closestItem = itemsWithDistance[0]; // Already sorted by distance
-        const closestDistance = (closestItem as any).distance || 0;
-        
-        console.log('🔍 API Debug - FromItem: Setting closest item distance to 0 (source item):', {
-          id: closestItem.id,
-          originalDistance: `${closestDistance.toFixed(2)}m`,
-          title: closestItem.title?.substring(0, 30) || 'no title'
-        });
-        
-        // Create a new object with distance: 0 to ensure it's not read-only
-        const sourceItem = { ...closestItem, distance: 0, isSourceItem: true };
-        
-        // Replace the first item with the modified version
-        itemsWithDistance[0] = sourceItem;
-        
-        // Re-sort to ensure the source item is first
-        itemsWithDistance.sort((a, b) => ((a as any).distance || Infinity) - ((b as any).distance || Infinity));
-        
-        console.log('🔍 API Debug - FromItem: After setting distance to 0, first item distance is:', (itemsWithDistance[0] as any).distance);
-      }
+
       
       // Apply radius filter if specified
       if (radius && !isNaN(parseFloat(radius))) {
@@ -265,34 +246,52 @@ export const GET = async ({ url, request }) => {
         console.log('🔍 API Debug - Applied radius filter:', maxRadius, 'm, results:', itemsWithDistance.length);
       }
       
-      // FROMITEM FIX: Set closest item distance to 0 BEFORE pagination
-      if (fromItem && itemsWithDistance.length > 0) {
-        console.log('🔍 API Debug - FromItem: Setting closest item distance to 0 (source item):', {
-          id: itemsWithDistance[0].id,
-          originalDistance: `${(itemsWithDistance[0] as any).distance}m`,
-          title: itemsWithDistance[0].title?.substring(0, 30) || 'no title'
-        });
-        
-        // Set the first (closest) item distance to 0 in the MAIN list
-        (itemsWithDistance[0] as any).distance = 0;
-        
-        // CRITICAL: Re-sort the MAIN list to ensure the 0-distance item is first
-        itemsWithDistance.sort((a, b) => {
-          const distA = (a as any).distance || 0;
-          const distB = (b as any).distance || 0;
-          return distA - distB;
-        });
-        
-        console.log('🔍 API Debug - Final distances after fromItem fix and re-sort:', itemsWithDistance.slice(0, 3).map(item => ({
-          id: item.id,
-          distance: `${(item as any).distance}m`,
-          title: item.title?.substring(0, 20) || 'no title'
-        })));
+
+
+      // Apply client-side pagination for LoadMore functionality
+      const totalCount = itemsWithDistance.length;
+      let pagedItems: any[];
+      
+      if (fromItem && offset === 0) {
+        // Suche das exakte Source-Objekt anhand der Koordinaten mit Toleranz
+        const EPSILON = 1e-6;
+        const sourceItem = allGpsData.find(item =>
+          Math.abs(item.lat - userLat) < EPSILON &&
+          Math.abs(item.lon - userLon) < EPSILON &&
+          item.path_512
+        );
+        if (sourceItem) {
+          // Debug: Logge die Koordinaten und Differenz
+          console.log('API-DEBUG: SourceItem-Koordinaten:', {
+            sourceLat: sourceItem.lat,
+            sourceLon: sourceItem.lon,
+            userLat,
+            userLon,
+            diffLat: Math.abs(sourceItem.lat - userLat),
+            diffLon: Math.abs(sourceItem.lon - userLon)
+          });
+          // Entferne das Source-Objekt aus itemsWithDistance
+          const rest = itemsWithDistance.filter((item: any) => item.id !== sourceItem.id);
+          // Baue die Liste: Source-Objekt immer an 0, dann die restlichen Items, dann Pagination
+          pagedItems = [{ ...sourceItem, distance: 0, isSourceItem: true } as any, ...rest].slice(0, limit);
+        } else {
+          pagedItems = for_map ? itemsWithDistance : itemsWithDistance.slice(offset, offset + limit);
+        }
+      } else {
+        pagedItems = for_map ? itemsWithDistance : itemsWithDistance.slice(offset, offset + limit);
       }
       
-      // Apply client-side pagination for LoadMore functionality AFTER fromItem fix
-      const totalCount = itemsWithDistance.length;
-      const pagedItems = for_map ? itemsWithDistance : itemsWithDistance.slice(offset, offset + limit);
+      // CRITICAL FROMITEM FIX: Entfernt, da fehlerhaft
+      // if (fromItem && pagedItems.length > 0) {
+      //   (pagedItems[0] as any).distance = 0;
+      //   (pagedItems[0] as any).isSourceItem = true;
+      // }
+      
+      // Entferne den gesamten Block:
+      // Nach der Sortierung und Pagination: Source-Objekt immer explizit an den Anfang
+      // if (fromItem) {
+      //   ...
+      // }
       
       console.log('🔍 API Debug - Final result with unlimited batch loading:', {
         totalItemsAvailable: totalCount,
@@ -307,6 +306,9 @@ export const GET = async ({ url, request }) => {
         lastDistance: pagedItems[pagedItems.length - 1] ? Math.round((pagedItems[pagedItems.length - 1] as any).distance || 0) + 'm' : undefined
       });
       
+      // Debug: Logge die ersten 5 Items der Rückgabe
+      console.log('API-DEBUG: pagedItems (first 5):', pagedItems.slice(0, 5).map(i => ({id: i.id, lat: i.lat, lon: i.lon, distance: i.distance, isSourceItem: i.isSourceItem})));
+
       return json({
         status: 'success',
         images: pagedItems,

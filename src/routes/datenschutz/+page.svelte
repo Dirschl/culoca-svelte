@@ -160,7 +160,7 @@
     background: var(--bg-secondary);
     box-shadow: 0 2px 8px var(--shadow);
   }
-
+  
   .back-button {
     display: flex;
     align-items: center;
@@ -175,7 +175,7 @@
     border: none;
     cursor: pointer;
   }
-
+  
   .back-button:hover {
     background: var(--accent-color);
   }

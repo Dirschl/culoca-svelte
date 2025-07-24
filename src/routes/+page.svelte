@@ -16,7 +16,7 @@
   import { page as pageStore } from '$app/stores';
   import { galleryStats } from '$lib/galleryStats';
   import { dynamicImageLoader } from '$lib/dynamicImageLoader';
-  import { loadMoreGallery, galleryItems, resetGallery, useJustifiedLayout, toggleLayout, updateGPSPosition } from '$lib/galleryStore';
+  import { loadMoreGallery, galleryItems, resetGallery, useJustifiedLayout, toggleLayout } from '$lib/galleryStore';
   import { browser } from '$app/environment';
   import { getEffectiveGpsPosition } from '$lib/filterStore';
   import { supabase } from '$lib/supabaseClient';
@@ -235,7 +235,7 @@
             }
             
             // Clientseitige Sortierung für bereits geladene Items
-            updateGPSPosition(userLat!, userLon!);
+            // updateGPSPosition(userLat!, userLon!); // Entfernt
             console.log('[GPS-Simulation] Updated GPS position for client-side sorting');
           }, 100); // Kürzerer Debounce für Simulation
         }
@@ -337,7 +337,10 @@
           // Setze auch den searchQuery Store für die UI
           setSearchQuery(searchParam);
         }
-        
+        // Setze fromItem, wenn Location-Filter aktiv
+        if ($filterStore.locationFilter) {
+          galleryParams.fromItem = true;
+        }
         resetGallery(galleryParams);
       }
     };
@@ -398,7 +401,7 @@
         }
         
         // Clientseitige Sortierung für bereits geladene Items (unabhängig vom Modus)
-        updateGPSPosition(effectiveLat, effectiveLon);
+        // updateGPSPosition(effectiveLat, effectiveLon); // Entfernt
         console.log('[GPS-Trigger] Updated GPS position for client-side sorting');
       }, 200); // 200ms Debounce
     }
@@ -574,6 +577,10 @@
     
     // Kurze Verzögerung um sicherzustellen dass clearSearch abgeschlossen ist
     setTimeout(() => {
+      // Setze fromItem, wenn Location-Filter aktiv
+      if ($filterStore.locationFilter) {
+        galleryParams.fromItem = true;
+      }
       resetGallery(galleryParams);
       console.log('[Search-Clear] resetGallery called');
     }, 50);
@@ -602,6 +609,10 @@
     setTimeout(() => {
       // Only reset normal gallery, mobile gallery handles its own state
       if (!isManual3x3Mode) {
+        // Setze fromItem, wenn Location-Filter aktiv
+        if ($filterStore.locationFilter) {
+          galleryParams.fromItem = true;
+        }
         resetGallery(galleryParams);
         console.log('[Location-Clear] resetGallery called for normal gallery');
       } else {
@@ -722,8 +733,8 @@
       useJustifiedLayout={$useJustifiedLayout}
       showDistance={showDistance}
       showCompass={showCompass}
-      userLat={effectiveLat}
-      userLon={effectiveLon}
+      userLat={userLat}
+      userLon={userLon}
       originalGalleryLat={originalGalleryLat}
       originalGalleryLon={originalGalleryLon}
       getDistanceFromLatLonInMeters={getDistanceFromLatLonInMeters}
