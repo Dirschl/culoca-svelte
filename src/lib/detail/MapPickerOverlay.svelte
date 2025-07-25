@@ -3,6 +3,7 @@
   export let visible: boolean = false;
   export let lat: number | null = null;
   export let lon: number | null = null;
+  export let image: any = null;
   export let onCancel: () => void;
   export let onSave: (lat: number, lon: number) => void;
   let mapPickerLat: number | null = lat;
@@ -134,6 +135,15 @@
   <div class="map-modal-fullscreen">
     <div class="map-modal-content-fullscreen">
       <div class="map-modal-header-fullscreen">
+        {#if image?.path_64}
+          <div class="map-picker-thumbnail">
+            <img 
+              src={`https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/${image.path_64}`} 
+              alt={image.title || 'Bild'} 
+              title={image.title || image.original_name || 'Bild'}
+            />
+          </div>
+        {/if}
         <input class="map-search-input" type="text" placeholder="Ort suchen..." bind:value={mapPickerSearch} on:keydown={handleSearchKeydown} />
         <button class="map-type-btn" on:click={toggleMapPickerType} title={mapPickerType === 'standard' ? 'Satellit' : 'Standard'}>
           {#if mapPickerType === 'standard'}
@@ -188,13 +198,14 @@
     justify-content: center;
   }
   .map-modal-content-fullscreen {
-    background: #fff;
+    background: var(--bg-primary);
     border-radius: 16px;
     box-shadow: 0 4px 24px rgba(0,0,0,0.2);
     padding: 1.5rem;
-    width: 95vw;
-    max-width: 600px;
-    max-height: 95vh;
+    width: 90vw;
+    height: 80vh;
+    max-width: 1100px;
+    max-height: 90vh;
     display: flex;
     flex-direction: column;
     gap: 1rem;
@@ -206,12 +217,27 @@
     gap: 1rem;
     margin-bottom: 0.5rem;
   }
+  .map-picker-thumbnail {
+    flex-shrink: 0;
+    width: 64px;
+    height: 64px;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .map-picker-thumbnail img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 8px;
+  }
   .map-search-input {
     flex: 1;
     padding: 0.4rem 0.7rem;
     border-radius: 6px;
     border: 1px solid var(--border-color);
     font-size: 1rem;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
   }
   .map-search-results {
     background: #f3f4f6;
@@ -220,6 +246,7 @@
     max-height: 180px;
     overflow-y: auto;
     box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    color: var(--text-primary);
   }
   .map-search-result {
     padding: 0.5rem 1rem;
@@ -236,7 +263,7 @@
   }
   .map-picker-container-fullscreen {
     width: 100%;
-    height: 300px;
+    height: 100%;
     border-radius: 12px;
     background: #e5e7eb;
     margin-bottom: 0.5rem;
@@ -249,17 +276,21 @@
     transform: translate(-50%, -100%);
     z-index: 10;
     pointer-events: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
   .map-picker-leaflet-fullscreen {
     width: 100%;
     height: 100%;
     border-radius: 12px;
     overflow: hidden;
+    z-index: 4;
   }
   .map-coords-fullscreen {
     text-align: center;
     font-size: 1rem;
-    color: var(--text-secondary);
+    color: var(--text-primary);
     margin-bottom: 0.5rem;
   }
   .map-modal-footer-fullscreen {
@@ -276,6 +307,7 @@
     font-size: 1rem;
     cursor: pointer;
     transition: background 0.2s;
+    color: var(--text-primary);
   }
   .map-cancel-btn:hover {
     background: #e5e7eb;
@@ -299,5 +331,44 @@
     font-size: 1rem;
     transition: background 0.2s;
     margin-right: 1rem;
+  }
+  :global(html.dark) .map-modal-content-fullscreen {
+    background: #18181b;
+  }
+  :global(html.dark) .map-search-input {
+    background: #23232a;
+    color: #fff;
+    border: 1px solid #444;
+  }
+  :global(html.dark) .map-search-results {
+    background: #23232a;
+    color: #fff;
+  }
+  :global(html.dark) .map-picker-container-fullscreen {
+    background: #23232a;
+  }
+  :global(html.dark) .map-coords-fullscreen {
+    color: #fff;
+  }
+  :global(html.dark) .map-cancel-btn, :global(html.dark) .map-confirm-btn {
+    color: #fff;
+    background: #23232a;
+    border: 1px solid #444;
+  }
+  :global(html.dark) .map-cancel-btn:hover {
+    background: #333;
+  }
+  :global(html.dark) .map-confirm-btn {
+    background: #ee7221;
+    border-color: #ee7221;
+    color: #fff;
+  }
+  .map-picker-pin svg {
+    filter: drop-shadow(0 2px 8px rgba(0,0,0,0.25));
+  }
+  :global(.leaflet-container.leaflet-touch-drag.leaflet-touch-zoom) {
+    -ms-touch-action: none;
+    touch-action: none;
+    z-index: 4;
   }
 </style> 

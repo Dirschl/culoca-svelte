@@ -209,6 +209,7 @@ export class DynamicImageLoader {
         .from('items')
         .select(`
           id,
+          slug,
           title,
           description,
           keywords,

@@ -88,6 +88,7 @@
     gap: 0.7rem;
     margin-bottom: 0.2rem;
     background: transparent;
+    margin-top: 12px;
   }
   .action-buttons {
     display: flex;
@@ -182,7 +183,6 @@
     border-color: var(--text-primary);
   }
   .gallery-toggle-btn.active {
-    background: var(--bg-primary);
     color: var(--text-primary);
     border-color: var(--border-color);
   }

@@ -10,6 +10,10 @@
   export let profileAvatar: string | null = null;
   export let showMapButton = false;
   export let showTrackButtons = false;
+  export let showUploadButton = true;
+  export let showProfileButton = true;
+  export let showSettingsButton = true;
+  export let showPublicContentButton = true;
   export let settingsIconRotation = 0; // Rotation for movement mode
 export let continuousRotation = 0; // Kontinuierliche Rotation im mobilen Modus
 export let rotationSpeed = 1; // Geschwindigkeit der kontinuierlichen Rotation
@@ -238,20 +242,22 @@ export let rotationSpeed = 1; // Geschwindigkeit der kontinuierlichen Rotation
   {/if}
 
   <!-- Upload button -->
-  <button 
-    class="fab-button upload"
-    on:click={handleUpload}
-    aria-label="Bilder hochladen"
-    title="Bilder hochladen"
-  >
-    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/>
-      <circle cx="12" cy="13" r="3"/>
-    </svg>
-  </button>
+  {#if showUploadButton}
+    <button 
+      class="fab-button upload"
+      on:click={handleUpload}
+      aria-label="Bilder hochladen"
+      title="Bilder hochladen"
+    >
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/>
+        <circle cx="12" cy="13" r="3"/>
+      </svg>
+    </button>
+  {/if}
   
   <!-- Public Content button - only for logged in users -->
-  {#if isLoggedIn}
+  {#if showPublicContentButton && isLoggedIn}
     <button 
       class="fab-button public-content"
       on:click={handlePublicContent}
@@ -269,33 +275,36 @@ export let rotationSpeed = 1; // Geschwindigkeit der kontinuierlichen Rotation
   {/if}
   
   <!-- Profile button -->
-  <button 
-    class="fab-button profile"
-    on:click={handleProfile}
-    aria-label="Profil"
-    title="Profil"
-  >
-    {#if profileAvatar}
-      <img 
-        src={profileAvatar} 
-        alt="Profilbild" 
-        class="profile-avatar"
-      />
-    {:else}
-      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-        <circle cx="12" cy="7" r="4"/>
-      </svg>
-    {/if}
-  </button>
+  {#if showProfileButton}
+    <button 
+      class="fab-button profile"
+      on:click={handleProfile}
+      aria-label="Profil"
+      title="Profil"
+    >
+      {#if profileAvatar}
+        <img 
+          src={profileAvatar} 
+          alt="Profilbild" 
+          class="profile-avatar"
+        />
+      {:else}
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+          <circle cx="12" cy="7" r="4"/>
+        </svg>
+      {/if}
+    </button>
+  {/if}
   
   <!-- Settings button -->
-  <button 
-    class="fab-button settings"
-    on:click={handleSettings}
-    aria-label="Einstellungen"
-    title="Einstellungen"
-  >
+  {#if showSettingsButton}
+    <button 
+      class="fab-button settings"
+      on:click={handleSettings}
+      aria-label="Einstellungen"
+      title="Einstellungen"
+    >
     <svg 
       width="40" height="40" 
       viewBox="0 0 24 24" 
@@ -306,8 +315,9 @@ export let rotationSpeed = 1; // Geschwindigkeit der kontinuierlichen Rotation
     >
       <circle cx="12" cy="12" r="3"/>
       <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-    </svg>
-  </button>
+          </svg>
+    </button>
+  {/if}
   
   <!-- Fullscreen toggle button (bottom) - shows when not scrolled -->
   {#if !showScrollToTop}

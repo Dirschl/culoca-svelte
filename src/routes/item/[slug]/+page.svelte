@@ -8,6 +8,7 @@
   import type { PageData } from './$types';
   import { authFetch } from '$lib/authFetch';
   import { browser } from '$app/environment';
+  import { supabase } from '$lib/supabaseClient';
 
   // Detail-Komponenten
   import ImageDisplay from '$lib/detail/ImageDisplay.svelte';
@@ -21,6 +22,11 @@
   import RadiusControl from '$lib/detail/RadiusControl.svelte';
   import MapPickerOverlay from '$lib/detail/MapPickerOverlay.svelte';
   let showMapPicker = false;
+  import { useJustifiedLayout } from '$lib/galleryStore';
+  import FloatingActionButtons from '$lib/FloatingActionButtons.svelte';
+
+  // Scroll to top state
+  let showScrollToTop = false;
 
   export let data: any;
   let image = data?.image ?? null;
@@ -85,6 +91,10 @@
     }
   }
   $: filteredNearby = nearby.filter(item => item.distance <= radius && item.id !== image?.id);
+  $: hiddenItems = nearby.filter(item => (item.gallery === false) && item.distance <= radius && item.id !== image?.id);
+  $: visibleNearby = showHiddenItems
+    ? nearby.filter(item => item.distance <= radius && item.id !== image?.id && item.gallery === false)
+    : nearby.filter(item => item.distance <= radius && item.id !== image?.id && item.gallery !== false);
 
   let editingTitle = false;
   let titleEditValue = '';
@@ -102,7 +112,16 @@
     showHiddenItems = !showHiddenItems;
   }
   function setUserFilter() {
-    // Implementiere die Filterlogik oder importiere sie aus dem Store
+    if (!image?.profile_id) return;
+    const username = image.profile?.full_name || image.profile?.accountname || image.profile_id || 'Profil';
+    const accountName = image.profile?.accountname || image.profile?.full_name || image.profile_id || 'Profil';
+    filterStore.setUserFilter({
+      userId: image.profile_id,
+      username,
+      avatarUrl: image.profile?.avatar_url || '',
+      accountName
+    });
+    goto('/');
   }
   function formatFileSize(bytes) {
     if (!bytes) return '';
@@ -340,6 +359,145 @@
   $: if (image && browser) {
     setTimeout(fetchFileSizes, 1000);
   }
+
+  // Scroll event listener for scroll-to-top button
+  onMount(() => {
+    if (browser) {
+      const handleScroll = () => {
+        showScrollToTop = window.scrollY > 100;
+      };
+      
+      window.addEventListener('scroll', handleScroll);
+      handleScroll(); // Initial check
+      
+      return () => {
+        window.removeEventListener('scroll', handleScroll);
+      };
+    }
+  });
+
+  // Layout für NearbyGallery (aus LocalStorage, fallback justified)
+  let galleryLayout = 'justified';
+  if (typeof window !== 'undefined') {
+    const stored = localStorage.getItem('galleryLayout');
+    if (stored === 'grid' || stored === 'justified') {
+      galleryLayout = stored;
+    }
+  }
+  $: galleryLayout = $useJustifiedLayout ? 'justified' : 'grid';
+
+  async function deleteImage() {
+    if (!image || !currentUser || image.profile_id !== currentUser.id) return;
+    if (!confirm('Willst du dieses Bild wirklich löschen?')) return;
+    try {
+      const res = await authFetch(`/api/item/${image.id}`, { method: 'DELETE' });
+      if (res.ok) {
+        goto('/');
+      } else {
+        alert('Löschen fehlgeschlagen.');
+      }
+    } catch (err) {
+      alert('Fehler beim Löschen.');
+    }
+  }
+
+  async function downloadOriginal(imageId: string, originalName: string) {
+    try {
+      // Show loading state
+      const downloadBtn = document.querySelector(`[data-download-id="${imageId}"]`) as HTMLButtonElement;
+      if (downloadBtn) {
+        downloadBtn.disabled = true;
+        downloadBtn.innerHTML = `
+          <svg width="35" height="35" viewBox="0 0 24 24" fill="none" class="animate-spin">
+            <path d="M12 6v7m0 0l-3-3m3 3l3-3M6 18h12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        `;
+      }
+
+      // Get current session token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        alert('Bitte zuerst einloggen');
+        return;
+      }
+
+      const response = await authFetch(`/api/download/${imageId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          alert('Nicht angemeldet. Bitte zuerst einloggen.');
+        } else if (response.status === 403) {
+          alert('Kein Zugriff auf diese Datei.');
+        } else {
+          alert('Download fehlgeschlagen.');
+        }
+        return;
+      }
+
+      // Create blob and download
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = originalName || `image-${imageId}.jpg`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      // Show success feedback
+      if (downloadBtn) {
+        downloadBtn.innerHTML = `
+          <svg width="35" height="35" viewBox="0 0 24 24" fill="none">
+            <path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        `;
+        setTimeout(() => {
+          downloadBtn.disabled = false;
+          downloadBtn.innerHTML = `
+            <svg width="35" height="35" viewBox="0 0 24 24" fill="none">
+              <path d="M12 6v7m0 0l-3-3m3 3l3-3M6 18h12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          `;
+        }, 2000);
+      }
+    } catch (error) {
+      console.error('Download error:', error);
+      alert('Download fehlgeschlagen.');
+      
+      // Reset button on error
+      const downloadBtn = document.querySelector(`[data-download-id="${imageId}"]`) as HTMLButtonElement;
+      if (downloadBtn) {
+        downloadBtn.disabled = false;
+        downloadBtn.innerHTML = `
+          <svg width="35" height="35" viewBox="0 0 24 24" fill="none">
+            <path d="M12 6v7m0 0l-3-3m3 3l3-3M6 18h12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        `;
+      }
+    }
+  }
+
+  function toggleGallery() {
+    if (!image || !currentUser || image.profile_id !== currentUser.id) return;
+    const newGallery = !(image.gallery ?? true);
+    authFetch(`/api/item/${image.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ gallery: newGallery })
+    }).then(res => {
+      if (res.ok) {
+        image.gallery = newGallery;
+      } else {
+        alert('Fehler beim Speichern des Galerie-Status.');
+      }
+    });
+  }
 </script>
 
 <svelte:head>
@@ -359,6 +517,20 @@
   <meta name="robots" content="index, follow">
   <meta name="author" content="culoca.com">
   <link rel="canonical" href={`https://culoca.com/item/${itemSlug}`}> <!-- Slug statt ID -->
+  
+  <!-- Dynamisches Favicon für bessere SEO -->
+  {#if image}
+    <link rel="icon" type="image/jpeg" href={`/api/favicon-small/${itemSlug}`} sizes="32x32">
+    <link rel="icon" type="image/jpeg" href={`/api/favicon-small/${itemSlug}`} sizes="16x16">
+    <link rel="apple-touch-icon" href={`/api/favicon-small/${itemSlug}`}>
+    <!-- Zusätzliche Meta-Tags für bessere SEO -->
+    <meta name="image" content={`https://culoca.com/api/favicon-small/${itemSlug}`}>
+    <meta property="og:image:alt" content={image?.title || `Bild ${itemSlug}`}>
+    <meta name="twitter:image:alt" content={image?.title || `Bild ${itemSlug}`}>
+  {:else}
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  {/if}
+  
   {#if !image}
     <title>Item {itemSlug} - culoca.com</title>
     <meta property="og:title" content="Item {itemSlug} - culoca.com">
@@ -452,9 +624,9 @@
       isCreator={isCreator}
       onSetLocationFilter={setLocationFilter}
       onCopyLink={() => {}}
-      onDeleteImage={() => {}}
-      onDownloadOriginal={() => {}}
-      onToggleGallery={() => {}}
+      onDeleteImage={deleteImage}
+      onDownloadOriginal={downloadOriginal}
+      onToggleGallery={toggleGallery}
     />
     {#if image.lat && image.lon}
       <div class="radius-control">
@@ -473,13 +645,14 @@
       </div>
     {/if}
     <NearbyGallery
-      nearby={filteredNearby}
+      nearby={visibleNearby}
       isCreator={isCreator}
       userLat={image?.lat}
       userLon={image?.lon}
       getDistanceFromLatLonInMeters={getDistanceFromLatLonInMeters}
       onGalleryToggle={handleNearbyGalleryToggle}
       getGalleryStatus={getNearbyGalleryStatus}
+      layout={galleryLayout}
     />
     <div class="meta-section single-exif">
       <!-- Column 1: Keywords -->
@@ -695,11 +868,12 @@
         {/if}
       </div>
     </div>
-    <ImageMapSection {image} nearby={filteredNearby} isCreator={isCreator} onOpenMapPicker={() => { showMapPicker = true; }} />
+    <ImageMapSection {image} nearby={filteredNearby} isCreator={isCreator} on:openMapPicker={() => { showMapPicker = true; }} />
     <MapPickerOverlay
       visible={showMapPicker}
       lat={image?.lat}
       lon={image?.lon}
+      image={image}
       onCancel={() => { showMapPicker = false; }}
       onSave={async (lat, lon) => {
         showMapPicker = false;
@@ -722,6 +896,31 @@
   {:else}
     <div class="error">❌ Bild nicht gefunden</div>
   {/if}
+  
+  <!-- Floating Action Buttons - nur Scroll-to-Top und Vollbild -->
+  <FloatingActionButtons
+    {showScrollToTop}
+    showTestMode={false}
+    showMapButton={false}
+    showTrackButtons={false}
+    showUploadButton={false}
+    showProfileButton={false}
+    showSettingsButton={false}
+    showPublicContentButton={false}
+    isLoggedIn={false}
+    simulationMode={false}
+    profileAvatar={null}
+    settingsIconRotation={0}
+    continuousRotation={0}
+    rotationSpeed={1}
+    on:upload={() => {}}
+    on:publicContent={() => {}}
+    on:bulkUpload={() => {}}
+    on:profile={() => {}}
+    on:settings={() => {}}
+    on:map={() => {}}
+    on:testMode={() => {}}
+  />
 </div>
 
 <style>
@@ -1138,6 +1337,10 @@
     font-size: 0.95em;
     line-height: 1.3;
     background: transparent;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
   }
   .creator-contact > div {
     display: flex;
@@ -1340,6 +1543,9 @@
       justify-content: center;
       align-items: center;
     }
+    .creator-contact > div {
+      justify-content: center;
+    }
     .creator-socials {
       justify-content: center;
     }
@@ -1361,6 +1567,9 @@
     .creator-contact {
       justify-content: center;
       align-items: center;
+    }
+    .creator-contact > div {
+      justify-content: center;
     }
     .creator-socials {
       justify-content: center;

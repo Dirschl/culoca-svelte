@@ -38,7 +38,7 @@ function slugify(text: string): string {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .replace(/--+/g, '-')
-    .substring(0, 60);
+    .substring(0, 100);
 }
 
 export const POST = async ({ request }) => {

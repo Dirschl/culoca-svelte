@@ -109,6 +109,7 @@
       }
       return {
         id: img.id,
+        slug: img.slug,
         src: bestSrc,
         srcHD: img.path_2048 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${img.path_2048}` : bestSrc,
         width: img.width && img.width > 0 ? img.width : 400,
@@ -193,6 +194,7 @@
           }
           return {
             id: img.id,
+            slug: img.slug,
             src: bestSrc,
             srcHD: img.path_2048 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${img.path_2048}` : bestSrc,
             width: img.width && img.width > 0 ? img.width : 400,
