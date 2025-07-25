@@ -23,6 +23,9 @@
       src={imageSource}
       alt={image.title || image.original_name || `Image ${image.id}`}
       class="main-image"
+      width={image.width}
+      height={image.height}
+      data-filename={image.original_name}
     />
   </a>
   <div class="passepartout-info">

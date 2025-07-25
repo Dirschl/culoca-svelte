@@ -1,3 +1,24 @@
+<svelte:head>
+  <title>Culoca – See You Local | Fotos, Events & Anzeigen mit GPS entdecken</title>
+  <meta name="description" content="Entdecke und teile Fotos, Firmen, Events und Anzeigen – alles mit präzisen GPS-Daten. Starte deine kostenlose Galerie auf Culoca." />
+  <meta name="robots" content="index, follow" />
+  <meta name="author" content="DIRSCHL.com GmbH" />
+  <link rel="canonical" href="https://culoca.com/" />
+  <!-- Open Graph Meta-Tags -->
+  <meta property="og:locale" content="de_DE" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Culoca – See You Local | Entdecke deine Umgebung" />
+  <meta property="og:description" content="Fotos, Firmen, Events & Anzeigen mit GPS-Daten – jetzt aus deiner Region entdecken." />
+  <meta property="og:url" content="https://culoca.com/" />
+  <meta property="og:site_name" content="Culoca" />
+  <meta property="og:image" content="https://culoca.com/culoca-see-you-local-entdecke-deine-umgebung.jpg" />
+  <meta property="og:image:alt" content="Culoca Logo – See You Local" />
+  <!-- Twitter Card Meta-Tags -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Culoca – See You Local | Entdecke deine Umgebung" />
+  <meta name="twitter:description" content="Fotos, Firmen, Events & Anzeigen mit GPS-Daten – jetzt lokal entdecken." />
+  <meta name="twitter:image" content="https://culoca.com/culoca-see-you-local-entdecke-deine-umgebung.jpg" />
+</svelte:head>
 <script lang="ts">
   import { onMount } from 'svelte';
   import FilterBar from '$lib/FilterBar.svelte';

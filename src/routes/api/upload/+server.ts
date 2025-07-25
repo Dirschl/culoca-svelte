@@ -28,6 +28,19 @@ function fixEncoding(str: string | null): string | null {
   return str;
 }
 
+// Slugify-Funktion für sprechende URLs
+function slugify(text: string): string {
+  return text
+    .toString()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .replace(/--+/g, '-')
+    .substring(0, 60);
+}
+
 export const POST = async ({ request }) => {
   try {
     console.log('=== UPLOAD API CALLED ===');
@@ -414,6 +427,23 @@ export const POST = async ({ request }) => {
           console.log('⚠️ Truncated description to 200 chars:', description);
         }
 
+        // === SLUG-GENERIERUNG ===
+        let creatorName = userProfile?.full_name || userProfile?.accountname || 'user';
+        let slugBase = slugify(`${title}-${creatorName}`);
+        let slug = slugBase;
+        let counter = 2;
+        // Prüfe, ob Slug schon existiert (Supabase Query)
+        while (true) {
+          const { data: existing, error: slugError } = await supabase
+            .from('items')
+            .select('id')
+            .eq('slug', slug)
+            .maybeSingle();
+          if (!existing) break;
+          slug = `${slugBase}-${counter++}`;
+        }
+        // === ENDE SLUG-GENERIERUNG ===
+
         // STEP 4: Upload resized versions to Supabase storage
         console.log('📤 STEP 4: Uploading resized versions to Supabase storage...');
         
@@ -622,7 +652,8 @@ export const POST = async ({ request }) => {
           original_url: originalUrl, // Include original_url in main record
           is_private: privacyMode === 'private', // Set is_private based on user's privacy mode
           ...(keywordsArray ? { keywords: keywordsArray } : {}),
-          exif_data: Object.keys(exifToStore).length ? exifToStore : null
+          exif_data: Object.keys(exifToStore).length ? exifToStore : null,
+          slug // <--- Slug speichern
         };
 
         // Füge EXIF-Felder nur hinzu, wenn sie nicht null sind

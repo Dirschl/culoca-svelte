@@ -42,6 +42,11 @@
 <div class="filename">
   {browser ? window.location.href : ''}
 </div>
+{#if image.slug}
+  <div class="filename">
+    Slug: {image.slug}
+  </div>
+{/if}
 <div class="filename">
   64px: {fileSizes.size64 ? formatFileSize(fileSizes.size64) : 'unbekannt'}  |  512px: {fileSizes.size512 ? formatFileSize(fileSizes.size512) : 'unbekannt'}  |  2048px: {fileSizes.size2048 ? formatFileSize(fileSizes.size2048) : 'unbekannt'}
 </div>

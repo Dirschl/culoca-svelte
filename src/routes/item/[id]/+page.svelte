@@ -25,7 +25,7 @@
 
   export let data: any;
   
-  let image: any = null;
+  let image = data?.image;
   let loading = true;
   let error = '';
   let profile: any = null;
@@ -89,17 +89,22 @@
   let isLoadingNearby = false;
   let hasMoreNearby = true;
 
-  async function loadMoreNearby() {
+  async function loadMoreNearby(reset = false) {
     if (isLoadingNearby || !image || !image.lat || !image.lon || !hasMoreNearby) return;
     isLoadingNearby = true;
     try {
+      if (reset) {
+        nearbyOffset = 0;
+        hasMoreNearby = true;
+        nearby = [];
+      }
       const url = new URL('/api/items', window.location.origin);
       url.searchParams.set('lat', String(image.lat));
       url.searchParams.set('lon', String(image.lon));
       url.searchParams.set('radius', String(radius));
       url.searchParams.set('offset', String(nearbyOffset));
       url.searchParams.set('limit', String(nearbyLimit));
-      url.searchParams.set('fromItem', 'true');
+      // KEIN fromItem mehr!
       const res = await fetch(url.toString());
       const data = await res.json();
       if (data && data.images) {
@@ -1399,15 +1404,6 @@
 
   export const prerender = false;
 
-  // Update state when server data changes (SSR-friendly)
-  $: if (data) {
-+    console.log('[SSR] reactive data assignment', typeof window === 'undefined', data.image?.id);
-     image = data.image;
-     loading = !data.image;
-     error = data.error || '';
-     nearby = data.nearby || [];
-   }
-
   // Extract itemId for SEO tags without relying on $page store
   let itemId: string = '';
   $: if (image?.id) {
@@ -1471,25 +1467,10 @@
     return item?.gallery ?? true;
   }
 
-  import { onMount } from 'svelte';
-  onMount(() => {
-    if (typeof window === 'undefined') return;
-    // Initial load
-    loadMoreNearby();
-    // Infinite scroll observer
-    let observer: IntersectionObserver | null = null;
-    if (nearbySentinel) {
-      observer = new IntersectionObserver((entries) => {
-        if (entries[0].isIntersecting) {
-          loadMoreNearby();
-        }
-      }, { rootMargin: '200px' });
-      observer.observe(nearbySentinel);
-    }
-    return () => {
-      if (observer && nearbySentinel) observer.unobserve(nearbySentinel);
-    };
-  });
+  // ... bestehender Code ...
+  // ENTFERNE diese Zeile im unteren Bereich:
+  // import { onMount } from "svelte";
+  // ... bestehender Code ...
 </script>
 
 <svelte:head>
@@ -1537,23 +1518,44 @@
     <div class="error">❌ Fehler: {error}</div>
   {:else if image}
     <div class="content">
+      {#if image && image.path_2048}
+      <img
+        src={"https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/" + image.path_2048}
+        alt={image.title || image.description || image.original_name || 'Bild'}
+        width={image.width}
+        height={image.height}
+        data-filename={image.original_name}
+        loading="eager"
+        style="display:block;max-width:100%;height:auto;margin:0 auto 2rem auto;"
+      />
+    {:else if image && image.path_512}
+      <img
+        src={"https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/" + image.path_512}
+        alt={image.title || image.description || image.original_name || 'Bild'}
+        width={image.width}
+        height={image.height}
+        data-filename={image.original_name}
+        loading="eager"
+        style="display:block;max-width:100%;height:auto;margin:0 auto 2rem auto;"
+      />
+    {/if}
       <ImageDisplay
-        {image}
-        {isCreator}
-        {editingTitle}
-        {titleEditValue}
-        {editingDescription}
-        {descriptionEditValue}
-        {startEditTitle}
-        {saveTitle}
-        {cancelEditTitle}
-        {handleTitleKeydown}
-        {startEditDescription}
-        {saveDescription}
-        {cancelEditDescription}
-        {handleDescriptionKeydown}
-        {imageSource}
-        darkMode={$darkMode}
+        image={image}
+        imageSource={image && image.path_2048 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${image.path_2048}` : ''}
+        darkMode={darkMode}
+        isCreator={isCreator}
+        editingTitle={editingTitle}
+        titleEditValue={titleEditValue}
+        editingDescription={editingDescription}
+        descriptionEditValue={descriptionEditValue}
+        startEditTitle={startEditTitle}
+        saveTitle={saveTitle}
+        cancelEditTitle={cancelEditTitle}
+        handleTitleKeydown={handleTitleKeydown}
+        startEditDescription={startEditDescription}
+        saveDescription={saveDescription}
+        cancelEditDescription={cancelEditDescription}
+        handleDescriptionKeydown={handleDescriptionKeydown}
       />
       <ImageControlsSection
         {image}
