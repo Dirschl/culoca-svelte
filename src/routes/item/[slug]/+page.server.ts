@@ -20,8 +20,10 @@ function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: num
   return Math.round(R * c);
 }
 
-export const load: PageServerLoad = async ({ params }) => {
+export const load: PageServerLoad = async ({ params, url }) => {
   const { slug } = params;
+  console.log('🔍 [DetailPage] Loading item with slug:', slug);
+  
   try {
     // Fetch image data by slug
     const { data: image, error } = await supabase
@@ -29,9 +31,25 @@ export const load: PageServerLoad = async ({ params }) => {
       .select('*')
       .eq('slug', slug)
       .or('is_private.eq.false,is_private.is.null');
+    
+    console.log('🔍 [DetailPage] Supabase query result:', { 
+      hasData: !!image, 
+      dataLength: Array.isArray(image) ? image.length : (image ? 1 : 0),
+      error: error?.message,
+      slug
+    });
+    
     const img = Array.isArray(image) ? image[0] : image;
+    
+    console.log('🔍 [DetailPage] Processed image:', { 
+      hasImage: !!img, 
+      imageId: img?.id,
+      imageTitle: img?.title,
+      imageSlug: img?.slug
+    });
 
     if (error) {
+      console.error('🔍 [DetailPage] Supabase error:', error);
       return {
         image: null,
         error: error.message,
@@ -39,6 +57,7 @@ export const load: PageServerLoad = async ({ params }) => {
       };
     }
     if (!img) {
+      console.log('🔍 [DetailPage] No image found for slug:', slug);
       return {
         image: null,
         error: 'Bild nicht gefunden',
@@ -46,11 +65,28 @@ export const load: PageServerLoad = async ({ params }) => {
       };
     }
 
+    console.log('🔍 [DetailPage] Successfully loaded image:', { 
+      id: img.id, 
+      title: img.title, 
+      slug: img.slug 
+    });
+
+    // Lade das Profil des Erstellers
+    let profile = null;
+    if (img?.profile_id) {
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', img.profile_id)
+        .single();
+      profile = profileData;
+    }
+
     // Fetch nearby items if image has GPS coordinates
     let nearby: any[] = [];
     if (img && img.lat && img.lon) {
       try {
-        const maxRadius = 1000;
+        const maxRadius = 5000;
         const degOffset = maxRadius / 111000;
         const latMin = img.lat - degOffset;
         const latMax = img.lat + degOffset;
@@ -62,7 +98,7 @@ export const load: PageServerLoad = async ({ params }) => {
         while (true) {
           const { data: batch, error: nearbyError } = await supabase
             .from('items')
-            .select('id, path_512, path_2048, path_64, original_name, title, description, lat, lon, width, height, is_private, gallery')
+            .select('id, slug, path_512, path_2048, path_64, original_name, title, description, lat, lon, width, height, is_private, gallery')
             .not('lat', 'is', null)
             .not('lon', 'is', null)
             .not('path_512', 'is', null)
@@ -79,11 +115,12 @@ export const load: PageServerLoad = async ({ params }) => {
           offset += pageSize;
         }
         nearby = fetched
-          .filter((item: any) => item.id !== img.id && item.lat && item.lon)
+          .filter((item: any) => item.slug !== img.id && item.lat && item.lon)
           .map((item: any) => {
             const distance = getDistanceInMeters(img.lat, img.lon, item.lat, item.lon);
             return {
               id: item.id,
+              slug: item.slug,
               lat: item.lat,
               lon: item.lon,
               distance,
@@ -101,7 +138,7 @@ export const load: PageServerLoad = async ({ params }) => {
       } catch (nearbyErr) {}
     }
     return {
-      image: img,
+      image: { ...img, profile },
       error: null,
       nearby
     };

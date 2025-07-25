@@ -100,6 +100,7 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
         width: item.width,
         height: item.height,
         id: item.id,
+        slug: item.slug, // <-- hinzugefügt
         lat: item.lat,
         lon: item.lon,
         title: item.title,

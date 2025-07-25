@@ -5,6 +5,7 @@
   export let filenameEditValue: string;
   export let startEditFilename: () => void;
   export let saveFilename: () => void;
+  export let cancelEditFilename: () => void;
   export let handleFilenameKeydown: (e: KeyboardEvent) => void;
   export let fileSizes: { size64: number|null, size512: number|null, size2048: number|null };
   export let formatFileSize: (bytes: number) => string;
@@ -48,7 +49,9 @@
   </div>
 {/if}
 <div class="filename">
-  64px: {fileSizes.size64 ? formatFileSize(fileSizes.size64) : 'unbekannt'}  |  512px: {fileSizes.size512 ? formatFileSize(fileSizes.size512) : 'unbekannt'}  |  2048px: {fileSizes.size2048 ? formatFileSize(fileSizes.size2048) : 'unbekannt'}
+  64px: {fileSizes && fileSizes.size64 ? formatFileSize(fileSizes.size64) : 'unbekannt'}  |
+  512px: {fileSizes && fileSizes.size512 ? formatFileSize(fileSizes.size512) : 'unbekannt'}  |
+  2048px: {fileSizes && fileSizes.size2048 ? formatFileSize(fileSizes.size2048) : 'unbekannt'}
 </div>
 
 <style>
@@ -69,22 +72,27 @@ h2 {
     cursor: pointer;
     color: var(--accent-color);
   }
-  .filename.editing {
-    background: #f3f4f6;
+  .filename.editing, .filename-edit-container {
+    background: #fff;
     border-radius: 6px;
-    padding: 0.3rem 0.7rem;
   }
-  .filename-edit-container {
-    display: flex;
-    align-items: center;
-    gap: 0.7rem;
+  :global(body[data-theme='dark']) .filename.editing,
+  :global(body[data-theme='dark']) .filename-edit-container {
+    background: #222;
   }
   .filename-edit-input {
     font-size: 1rem;
     padding: 0.2rem 0.5rem;
     border-radius: 6px;
-    border: 1px solid var(--border-color);
+    border: 1px solid #ccc;
     width: 220px;
+    color: #222;
+    background: #fff;
+  }
+  :global(body[data-theme='dark']) .filename-edit-input {
+    color: #fff;
+    background: #222;
+    border: 1px solid #444;
   }
   .char-count {
     font-size: 0.95rem;

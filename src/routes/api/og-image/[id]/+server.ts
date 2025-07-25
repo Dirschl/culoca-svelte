@@ -13,11 +13,23 @@ export const GET: RequestHandler = async ({ params, fetch }) => {
   console.log(`🔍 OG-Image API: Processing image ${id}`);
 
   // 1. Hole Bilddaten aus Supabase DB
-  const { data: images, error } = await supabase
+  // Versuche zuerst nach slug zu suchen
+  let { data: images, error } = await supabase
     .from('items')
     .select('*')
-    .eq('id', id)
+    .eq('slug', id)
     .limit(1);
+
+  if ((!images || images.length === 0) && !error) {
+    // Fallback: Suche nach id
+    const res = await supabase
+      .from('items')
+      .select('*')
+      .eq('id', id)
+      .limit(1);
+    images = res.data;
+    error = res.error;
+  }
 
   if (error) {
     console.error(`❌ Supabase error: ${error.message}`);
@@ -25,7 +37,7 @@ export const GET: RequestHandler = async ({ params, fetch }) => {
   }
 
   if (!images || images.length === 0) {
-    console.error(`❌ No image found with ID: ${id}`);
+    console.error(`❌ No image found with slug or ID: ${id}`);
     return new Response('Image not found', { status: 404 });
   }
 

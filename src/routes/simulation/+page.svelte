@@ -625,7 +625,7 @@
 
       marker.on('click', () => {
         // Navigate to image detail page with anchor parameter
-        const url = new URL(`/item/${img.id}`, window.location.origin);
+        const url = new URL(`/item/${img.slug}`, window.location.origin);
         window.open(url.toString(), '_blank');
       });
 
@@ -1099,7 +1099,7 @@
       </div>
       <div class="compact-list">
         {#each noGpsImagesList as img}
-          <div class="compact-item" on:click={() => { const url = new URL(`/item/${img.id}`, window.location.origin); url.searchParams.set('anchor', img.id); window.open(url.toString(), '_blank'); }}>
+          <div class="compact-item" on:click={() => { const url = new URL(`/item/${img.slug}`, window.location.origin); url.searchParams.set('anchor', img.id); window.open(url.toString(), '_blank'); }}>
             <img 
               src="https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/{img.path_64 || img.path_512}"
               alt={img.title || 'Bild'}
@@ -1127,7 +1127,7 @@
       </div>
       <div class="compact-list">
         {#each incompleteImagesList as img}
-          <div class="compact-item" on:click={() => { const url = new URL(`/item/${img.id}`, window.location.origin); url.searchParams.set('anchor', img.id); window.open(url.toString(), '_blank'); }}>
+          <div class="compact-item" on:click={() => { const url = new URL(`/item/${img.slug}`, window.location.origin); url.searchParams.set('anchor', img.id); window.open(url.toString(), '_blank'); }}>
             <img 
               src="https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/{img.path_64 || img.path_512}"
               alt={img.title || 'Bild'}

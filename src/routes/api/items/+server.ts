@@ -102,7 +102,7 @@ export const GET = async ({ url, request }) => {
       
       let gpsQuery = dbClient
         .from('items')
-        .select('id, path_512, path_2048, path_64, original_name, created_at, user_id, profile_id, title, description, lat, lon, width, height, is_private, keywords')
+        .select('id, slug, path_512, path_2048, path_64, original_name, created_at, user_id, profile_id, title, description, lat, lon, width, height, is_private, keywords')
         .not('lat', 'is', null)
         .not('lon', 'is', null)
         .not('path_512', 'is', null)
@@ -343,7 +343,7 @@ export const GET = async ({ url, request }) => {
     
     let imagesQuery = dbClient
       .from('items')
-      .select('id, path_512, path_2048, path_64, original_name, created_at, user_id, profile_id, title, description, lat, lon, width, height, is_private, keywords')
+      .select('id, slug, path_512, path_2048, path_64, original_name, created_at, user_id, profile_id, title, description, lat, lon, width, height, is_private, keywords')
       .not('lat', 'is', null)
       .not('lon', 'is', null)
       .not('path_512', 'is', null)

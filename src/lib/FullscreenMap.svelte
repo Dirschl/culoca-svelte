@@ -585,7 +585,7 @@
       
       // Click handler for navigation
       marker.on('click', () => {
-        dispatch('imageClick', { imageId: image.id });
+        dispatch('imageClick', { imageSlug: image.slug, imageId: image.id });
       });
       
       // Store reference to image data

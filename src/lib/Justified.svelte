@@ -140,16 +140,15 @@
     };
   });
 
-  function handleImageClick(itemId: string) {
-    // Navigate to item detail page with anchor parameter
-    const url = new URL(`/item/${itemId}`, window.location.origin);
+  function handleImageClick(slug: string) {
+    const url = new URL(`/item/${slug}`, window.location.origin);
     location.href = url.toString();
   }
 
-  function handleKeydown(event: KeyboardEvent, itemId: string) {
+  function handleKeydown(event: KeyboardEvent, slug: string) {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
-      handleImageClick(itemId);
+      handleImageClick(slug);
     }
   }
 
@@ -247,8 +246,8 @@
             width:{boxes[i].width}px;
             height:{boxes[i].height}px;
           "
-          on:click={() => handleImageClick(item.id)}
-          on:keydown={(e) => handleKeydown(e, item.id)}
+          on:click={() => handleImageClick(item.slug)}
+          on:keydown={(e) => handleKeydown(e, item.slug)}
         >
           <img
             class="pic"

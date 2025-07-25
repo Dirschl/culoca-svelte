@@ -1,5 +1,6 @@
 <script lang="ts">
-  export let keywordsList: string[];
+  export let image: any;
+  $: keywords = image?.keywords ?? [];
   export let isCreator: boolean;
   export let editingKeywords: boolean;
   export let keywordsEditValue: string;
@@ -37,9 +38,9 @@
     </span>
   </div>
 {:else}
-  {#if keywordsList.length}
+  {#if keywords && keywords.length > 0}
     <div class="keywords">
-      {#each keywordsList as kw}
+      {#each keywords as kw}
         <a href="/?s={encodeURIComponent(kw)}" class="chip keyword-link">{kw}</a>
       {/each}
     </div>
@@ -81,14 +82,26 @@
     flex-direction: column;
     gap: 0.3rem;
     margin-bottom: 0.5rem;
+    background: #fff;
+    border-radius: 6px;
+  }
+  :global(body[data-theme='dark']) .keywords-edit-container {
+    background: #222;
   }
   .keywords-edit-input {
     font-size: 1rem;
     padding: 0.4rem 0.7rem;
     border-radius: 6px;
-    border: 1px solid var(--border-color);
+    border: 1px solid #ccc;
     min-height: 80px;
     resize: vertical;
+    color: #222;
+    background: #fff;
+  }
+  :global(body[data-theme='dark']) .keywords-edit-input {
+    color: #fff;
+    background: #222;
+    border: 1px solid #444;
   }
   .char-count {
     font-size: 0.95rem;

@@ -63,4 +63,50 @@ export const DELETE = async ({ params }) => {
   }
 
   return json({ success: true, hetznerDeleted });
+};
+
+export const PATCH = async ({ params, request, locals }) => {
+  const { id } = params;
+  if (!id) {
+    throw error(400, 'Missing id');
+  }
+
+  // Parse JSON body
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    throw error(400, 'Invalid JSON');
+  }
+
+  // Erlaubte Felder
+  const allowedFields = ['title', 'description', 'keywords', 'original_name'];
+  const updateData = {};
+  for (const key of allowedFields) {
+    if (body[key] !== undefined) {
+      updateData[key] = body[key];
+    }
+  }
+  if (Object.keys(updateData).length === 0) {
+    throw error(400, 'No valid fields to update');
+  }
+
+  // Optional: Authentifizierung und Besitz prüfen (hier nur als Beispiel, ggf. anpassen)
+  // const user = locals.user; // oder aus JWT, falls vorhanden
+  // const { data: item } = await supabase.from('items').select('profile_id').eq('id', id).single();
+  // if (!item || item.profile_id !== user.id) throw error(403, 'Not allowed');
+
+  // Update in DB
+  const { data, error: updateError } = await supabase
+    .from('items')
+    .update(updateData)
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (updateError) {
+    throw error(500, updateError.message);
+  }
+
+  return json({ success: true, item: data });
 }; 

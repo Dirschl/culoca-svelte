@@ -39,7 +39,7 @@ async function loadNewsFlashImagesDirectFromDB(): Promise<NewsFlashImage[]> {
     
     let query = supabase
       .from('items')
-      .select('id, lat, lon, path_512, title, description, original_name, profile_id, is_private, created_at')
+      .select('id, slug, lat, lon, path_512, title, description, original_name, profile_id, is_private, created_at')
       .not('path_512', 'is', null)
       .eq('gallery', true) // Only show images with gallery = true
       .order('created_at', { ascending: false })
@@ -68,6 +68,7 @@ async function loadNewsFlashImagesDirectFromDB(): Promise<NewsFlashImage[]> {
     
     const images = (data || []).map(item => ({
       id: item.id,
+      slug: item.slug, // Slug mitgeben!
       lat: item.lat,
       lon: item.lon,
       path_512: item.path_512!,
@@ -75,6 +76,7 @@ async function loadNewsFlashImagesDirectFromDB(): Promise<NewsFlashImage[]> {
       description: item.description,
       original_name: item.original_name
     }));
+    console.log('[NewsFlash] Geladene Images:', images.slice(0, 5));
     
     console.log(`[NewsFlash DirectDB] Successfully loaded ${images.length} images`);
     return images;
@@ -158,7 +160,8 @@ onDestroy(() => {
 // }
 
 function handleImageClick(img: NewsFlashImage) {
-  goto(`/item/${img.id}`);
+  console.log('[NewsFlash] handleImageClick:', img);
+  goto(`/item/${img.slug}`);
 }
 
 function toggleMode() {

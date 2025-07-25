@@ -807,10 +807,9 @@
       {isManual3x3Mode}
       on:close={() => showFullscreenMap = false}
       on:imageClick={(event) => {
-        const imageId = event.detail.imageId;
-        console.log('[FullscreenMap] Image clicked:', imageId);
-        // Navigate to item detail page
-        window.location.href = `/item/${imageId}`;
+        const imageSlug = event.detail.imageSlug || event.detail.slug || event.detail.imageId;
+        console.log('[FullscreenMap] Image clicked:', imageSlug);
+        window.location.href = `/item/${imageSlug}`;
       }}
       on:locationSelected={(event) => {
         const { lat, lon } = event.detail;

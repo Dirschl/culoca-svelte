@@ -26,6 +26,7 @@
     lon?: number; 
     distance?: number;
     title?: string;
+    slug?: string; // Added slug to the interface
   }[] = [];
   export let layout: 'justified' | 'grid' = 'justified';
   export let containerWidth = 1024;
@@ -130,11 +131,9 @@
   });
 
   function handleImageClick(itemId: string) {
-    if (onImageClick) {
-      onImageClick(itemId);
-    } else {
-      // Navigate to item detail page with anchor parameter
-      const url = new URL(`/item/${itemId}`, window.location.origin);
+    const item = items.find(item => item.id === itemId);
+    if (item && item.slug) {
+      const url = new URL(`/item/${item.slug}`, window.location.origin);
       location.href = url.toString();
     }
   }

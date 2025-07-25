@@ -1,5 +1,6 @@
 export type NewsFlashImage = {
   id: string;
+  slug?: string;
   path_512: string;
   path_2048?: string;
   original_name?: string;

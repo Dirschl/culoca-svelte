@@ -21,7 +21,7 @@
       </span>
     {/if}
   </div>
-  <input id="radius" type="range" min="50" max="5000" step="50" bind:value={radius} on:input={onRadiusInput} on:change={onRadiusChange}>
+  <input id="radius" type="range" min="50" max="3000" step="50" bind:value={radius} on:input={onRadiusInput} on:change={onRadiusChange}>
 </div>
 
 <style>

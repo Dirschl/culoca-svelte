@@ -175,12 +175,30 @@
   gap: 0.5rem;
   background: transparent;
 }
+.passepartout-container:not(.dark) .title-edit-container,
+.passepartout-container:not(.dark) .description-edit-container {
+  background: #fff;
+  border-radius: 4px;
+}
+.passepartout-container.dark .title-edit-container,
+.passepartout-container.dark .description-edit-container {
+  background: #222;
+  border-radius: 4px;
+}
 .title-edit-input, .description-edit-input {
   font-size: 1.1rem;
   padding: 0.3rem 0.5rem;
   border-radius: 4px;
-  border: 1px solid #ccc;
   width: 100%;
+  color: #222;
+  background: #fff;
+  border: 1px solid #ccc;
+}
+.passepartout-container.dark .title-edit-input,
+.passepartout-container.dark .description-edit-input {
+  color: #fff;
+  background: #222;
+  border: 1px solid #444;
 }
 .char-count {
   font-size: 0.9rem;
