@@ -37,8 +37,20 @@ export async function performSearch(q: string, trigger = true) {
       try {
       console.log('🔍 SearchStore: Starting search for:', q);
       
+      // NEU: GPS-Koordinaten aus dem Hauptspeicher holen
+      let searchParams: any = { search: q };
+      if (typeof window !== 'undefined') {
+        const userLat = (window as any).userLat;
+        const userLon = (window as any).userLon;
+        if (userLat && userLon) {
+          searchParams.lat = userLat;
+          searchParams.lon = userLon;
+          console.log('🔍 SearchStore: Using GPS coordinates:', userLat, userLon);
+        }
+      }
+      
       // Verwende galleryStore für die Suche - dieser verwendet jetzt die neue API
-      resetGallery({ search: q });
+      resetGallery(searchParams);
       
       // Lade-Status wird vom galleryStore verwaltet
       setTimeout(() => {
@@ -57,4 +69,17 @@ export function clearSearch() {
   isSearching.set(false);
   useSearchResults.set(false);
   console.log('🔍 SearchStore: Search cleared - flags reset');
+  
+  // NEU: Zurück zur normalen Galerie mit GPS-Koordinaten
+  let resetParams: any = {};
+  if (typeof window !== 'undefined') {
+    const userLat = (window as any).userLat;
+    const userLon = (window as any).userLon;
+    if (userLat && userLon) {
+      resetParams.lat = userLat;
+      resetParams.lon = userLon;
+      console.log('🔍 SearchStore: Clearing search with GPS coordinates:', userLat, userLon);
+    }
+  }
+  resetGallery(resetParams);
 } 

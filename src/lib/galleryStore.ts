@@ -58,15 +58,46 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
   } catch (e) {
     // fallback: keine Änderung
   }
+  
+  // NEU: GPS-Koordinaten aus dem Hauptspeicher holen, falls nicht verfügbar
+  if (!mergedParams.lat || !mergedParams.lon) {
+    // Versuche GPS-Koordinaten aus dem Browser zu holen
+    if (typeof window !== 'undefined') {
+      // Hole GPS-Koordinaten aus dem Hauptspeicher (falls verfügbar)
+      const userLat = (window as any).userLat;
+      const userLon = (window as any).userLon;
+      if (userLat && userLon) {
+        mergedParams.lat = userLat;
+        mergedParams.lon = userLon;
+        console.log('[GalleryStore] Using GPS from window object:', mergedParams.lat, mergedParams.lon);
+      }
+    }
+  }
+  
+  // NEU: GPS-Koordinaten aus dem Hauptspeicher holen, falls nicht verfügbar
+  if (!mergedParams.lat || !mergedParams.lon) {
+    // Versuche GPS-Koordinaten aus dem Browser zu holen
+    if (typeof window !== 'undefined') {
+      // Hole GPS-Koordinaten aus dem Hauptspeicher (falls verfügbar)
+      const userLat = (window as any).userLat;
+      const userLon = (window as any).userLon;
+      if (userLat && userLon) {
+        mergedParams.lat = userLat;
+        mergedParams.lon = userLon;
+        console.log('[GalleryStore] Using GPS from window object:', mergedParams.lat, mergedParams.lon);
+      }
+    }
+  }
+  
   galleryParams.set(mergedParams);
 
   // Normale Limits für alle Filter
   const effectiveLimit = limit; // Normale Limits für alle Filter
 
-  // NEU: Gallery-Items-Search API verwenden
+  // NEU: Gallery-Items-Normal API verwenden
   let url;
   if (mergedParams.search) {
-    // Always use new gallery endpoint when search is provided
+    // Suche: Verwende gallery-items-search API
     url = new URL('/api/gallery-items-search', window.location.origin);
     url.searchParams.set('page', String(Math.floor(offset / effectiveLimit)));
     url.searchParams.set('search', mergedParams.search);
@@ -74,17 +105,24 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
       url.searchParams.set('lat', String(mergedParams.lat));
       url.searchParams.set('lon', String(mergedParams.lon));
     }
-  } else if (mergedParams.lat && mergedParams.lon) {
-    // Use new gallery endpoint when GPS coordinates are available
-    url = new URL('/api/gallery-items-search', window.location.origin);
-    url.searchParams.set('page', String(Math.floor(offset / effectiveLimit)));
-    url.searchParams.set('lat', String(mergedParams.lat));
-    url.searchParams.set('lon', String(mergedParams.lon));
+    // NEU: LocationFilter-Parameter hinzufügen
+    if (mergedParams.locationFilterLat && mergedParams.locationFilterLon) {
+      url.searchParams.set('locationFilterLat', String(mergedParams.locationFilterLat));
+      url.searchParams.set('locationFilterLon', String(mergedParams.locationFilterLon));
+    }
   } else {
-    // Use existing items endpoint when no GPS coordinates and no search
-    url = new URL('/api/items', window.location.origin);
-    url.searchParams.set('offset', String(offset));
-    url.searchParams.set('limit', String(effectiveLimit));
+    // Normale Galerie: Verwende gallery-items-normal API
+    url = new URL('/api/gallery-items-normal', window.location.origin);
+    url.searchParams.set('page', String(Math.floor(offset / effectiveLimit)));
+    if (mergedParams.lat && mergedParams.lon) {
+      url.searchParams.set('lat', String(mergedParams.lat));
+      url.searchParams.set('lon', String(mergedParams.lon));
+    }
+    // NEU: LocationFilter-Parameter hinzufügen
+    if (mergedParams.locationFilterLat && mergedParams.locationFilterLon) {
+      url.searchParams.set('locationFilterLat', String(mergedParams.locationFilterLat));
+      url.searchParams.set('locationFilterLon', String(mergedParams.locationFilterLon));
+    }
   }
   // radius, fromItem, offset, limit werden NICHT mehr benötigt
 

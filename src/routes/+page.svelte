@@ -41,6 +41,19 @@
   import { browser } from '$app/environment';
   import { getEffectiveGpsPosition } from '$lib/filterStore';
   import { supabase } from '$lib/supabaseClient';
+  import { get } from 'svelte/store';
+
+  // Gallery store
+  const pics = galleryItems;
+
+  // Effective GPS position for components
+  $: effectiveLat = getEffectiveGpsPosition()?.lat || userLat;
+  $: effectiveLon = getEffectiveGpsPosition()?.lon || userLon;
+
+  // Check if location filter is active
+  $: hasLocationFilter = !!$locationFilter;
+
+
 
   // Globale States für Umschaltung, Overlay, etc.
   let showLoginOverlay = false;
@@ -59,6 +72,7 @@
   let simulationMode = false;
   let isInIframe = false;
   let gpsStatus: 'active' | 'cached' | 'none' | 'checking' | 'denied' | 'unavailable' = 'none';
+  let autoguide = false;
   let lastGPSUpdateTime: number | null = null;
   let settingsIconRotation = 0;
   let continuousRotation = 0;
@@ -71,6 +85,8 @@
   let lastLoadedSource: string | null = null;
   let galleryLoadPending = false;
   let gpsWatchId: number | null = null;
+  let galleryInitialized = false;
+  let gpsUpdateTimeout: any = null;
   
   // Ursprüngliche GPS-Koordinaten für Normal Mode (werden nur einmal gesetzt)
   let originalGalleryLat: number | null = null;
@@ -78,6 +94,23 @@
 
   // Debug-Variable für die aktuelle API-URL
   let lastApiUrl = '';
+
+  // Speech synthesis for autoguide
+  let speechSynthesis: SpeechSynthesis | null = null;
+  let currentSpeech: SpeechSynthesisUtterance | null = null;
+  let autoguideBarVisible = true; // Always visible when autoguide is enabled
+  let autoguideText = '';
+  let lastSpokenText = '';
+
+  let audioActivated = false;
+  let currentImageTitle = ''; // Track current image title for display
+
+  // Global variable to track speech state
+  let speechRetryCount = 0;
+  let lastSpeechText = '';
+  let currentImageId = ''; // Track current image ID to know when to update text
+  let lastAnnouncedImageId = ''; // Track last announced image to prevent duplicates
+  let scrollTimeout: number | null = null;
 
   // Anonyme User bekommen justified Layout als Default
   $: if (browser && !isLoggedIn) {
@@ -142,19 +175,597 @@
     }
   }
 
+  // Function to load user settings including autoguide
+  async function loadUserSettings() {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.log('[Settings] No user found, using defaults');
+        return;
+      }
+      
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('show_distance, show_compass, autoguide, enable_search, use_justified_layout, newsflash_mode, home_lat, home_lon')
+        .eq('id', user.id)
+        .single();
+        
+      if (error) {
+        console.error('[Settings] Error loading user settings:', error);
+        return;
+      }
+      
+      if (data) {
+        showDistance = data?.show_distance ?? true;
+        showCompass = data?.show_compass ?? false;
+        autoguide = data?.autoguide ?? false;
+        newsFlashMode = data?.newsflash_mode ?? 'alle';
+        
+        console.log('[Settings] Loaded user settings:', {
+          showDistance,
+          showCompass,
+          autoguide,
+          newsFlashMode
+        });
+        
+        // Activate autoguide if enabled
+        if (autoguide && !audioActivated) {
+          console.log('🎤 Autoguide enabled in settings, activating audio...');
+          setTimeout(() => {
+            activateAudioGuide();
+            // Also announce first image after a delay
+            setTimeout(() => {
+              console.log('🎤 Announcing first image after autoguide activation...');
+              announceFirstImage();
+            }, 1500);
+          }, 1000);
+        }
+      }
+    } catch (error) {
+      console.error('[Settings] Error loading user settings:', error);
+    }
+  }
+
+  // Function to get currently visible image for autoguide
+  function getCurrentlyVisibleImage() {
+    if (!browser) return null;
+    
+    const galleryContainer = document.querySelector('.gallery-container, .justified-wrapper');
+    if (!galleryContainer) return null;
+    
+    const images = galleryContainer.querySelectorAll('.pic-container, .justified-item');
+    if (images.length === 0) return null;
+    
+    const containerRect = galleryContainer.getBoundingClientRect();
+    const containerCenter = containerRect.top + containerRect.height / 2;
+    
+    let closestImage: any = null;
+    let closestDistance = Infinity;
+    
+    images.forEach((img: any) => {
+      const rect = img.getBoundingClientRect();
+      const imageCenter = rect.top + rect.height / 2;
+      const distance = Math.abs(imageCenter - containerCenter);
+      
+      if (distance < closestDistance) {
+        closestDistance = distance;
+        closestImage = img;
+      }
+    });
+    
+    return closestImage;
+  }
+  
+  // Function to announce current visible image
+  function announceCurrentImage() {
+    console.log('🎤 announceCurrentImage called');
+    
+    if (!autoguide || !audioActivated) {
+      console.log('🎤 Autoguide not enabled or audio not activated');
+      return;
+    }
+    
+    const currentImage: any = getCurrentlyVisibleImage();
+    if (!currentImage) {
+      console.log('🎤 No current image found');
+      return;
+    }
+    
+    // Don't announce the same image twice
+    if (currentImage.id === lastAnnouncedImageId) {
+      console.log('🎤 Same image as last announced, skipping');
+      return;
+    }
+    
+    console.log('🎤 Current visible image:', currentImage);
+    console.log('🎤 Current visible image title:', currentImage.title);
+    
+    if (currentImage.title) {
+      console.log('🎤 Current image has title:', currentImage.title);
+      speakTitle(currentImage.title, currentImage.id);
+      lastAnnouncedImageId = currentImage.id;
+    } else {
+      console.log('🎤 Current image has no title, using fallback');
+      const fallbackText = currentImage.original_name || 'Bild ohne Titel';
+      speakTitle(fallbackText, currentImage.id);
+      lastAnnouncedImageId = currentImage.id;
+    }
+  }
+
+  // Function to update current image title (even when audio is disabled)
+  function updateCurrentImageTitle() {
+    console.log('🎤 updateCurrentImageTitle called');
+    
+    // Always update the title, even when autoguide is disabled
+    const currentImage: any = getCurrentlyVisibleImage();
+    if (!currentImage) {
+      console.log('🎤 No current image found');
+      return;
+    }
+    
+    // Don't update if it's the same image
+    if (currentImage.id === lastAnnouncedImageId) {
+      console.log('🎤 Same image as last updated, skipping');
+      return;
+    }
+    
+    console.log('🎤 Current visible image:', currentImage);
+    console.log('🎤 Current visible image title:', currentImage.title);
+    
+    let displayTitle = '';
+    if (currentImage.title) {
+      displayTitle = currentImage.title;
+    } else {
+      displayTitle = currentImage.original_name || 'Bild ohne Titel';
+    }
+    
+    // Only display text up to first comma
+    const commaIndex = displayTitle.indexOf(',');
+    if (commaIndex !== -1) {
+      displayTitle = displayTitle.substring(0, commaIndex);
+    }
+    
+    // Clean the text
+    displayTitle = displayTitle
+      .replace(/;/g, ' - ')  // Replace semicolons with dashes
+      .replace(/\s+/g, ' ')  // Replace multiple spaces with single space
+      .trim();               // Remove leading/trailing whitespace
+    
+    console.log('🎤 Display title (up to first comma):', displayTitle);
+    
+    // Update the display title
+    currentImageTitle = displayTitle;
+    lastAnnouncedImageId = currentImage.id;
+    
+    // If autoguide and audio are activated, also speak it
+    if (autoguide && audioActivated) {
+      speakTitle(currentImage.title || currentImage.original_name || 'Bild ohne Titel', currentImage.id);
+    }
+  }
+  
+  // Function to handle scroll events for audioguide
+  function handleScrollForAudioguide() {
+    // Always handle scroll events to update image title, even when autoguide is disabled
+    
+    // Clear existing timeout
+    if (scrollTimeout) {
+      clearTimeout(scrollTimeout);
+    }
+    
+    // Set new timeout to update image title after scrolling stops
+    scrollTimeout = window.setTimeout(() => {
+      updateCurrentImageTitle(); // This handles both audio and non-audio cases
+    }, 1000); // Wait 1 second after scrolling stops
+  }
+  
+  // Autoguide functions
+  function initSpeechSynthesis() {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      speechSynthesis = window.speechSynthesis;
+      
+      // On mobile, we need to resume speech synthesis if it was paused
+      if (speechSynthesis && speechSynthesis.paused) {
+        speechSynthesis.resume();
+      }
+      
+      // Check if speech synthesis is supported and working
+      console.log('Speech synthesis available:', !!speechSynthesis);
+      console.log('Speech synthesis speaking:', speechSynthesis.speaking);
+      console.log('Speech synthesis paused:', speechSynthesis.paused);
+      
+      // Enhanced user interaction handling for speech synthesis
+      if (speechSynthesis && autoguide && speechSynthesis) {
+        // Add event listeners to enable speech synthesis on user interaction
+        const enableSpeech = () => {
+          console.log('User interaction detected - enabling speech synthesis');
+          try {
+            if (speechSynthesis) {
+              speechSynthesis.resume();
+              
+              // Test speech synthesis with a silent utterance
+              const testUtterance = new SpeechSynthesisUtterance('');
+              testUtterance.volume = 0;
+              testUtterance.onend = () => {
+                console.log('Speech synthesis test completed successfully');
+              };
+              testUtterance.onerror = (event) => {
+                console.log('Speech synthesis test error (expected):', event.error);
+              };
+              speechSynthesis.speak(testUtterance);
+            }
+          } catch (error) {
+            console.error('Error enabling speech synthesis:', error);
+          }
+        };
+        
+        // Listen for various user interactions
+        document.addEventListener('click', enableSpeech, { once: true });
+        document.addEventListener('touchstart', enableSpeech, { once: true });
+        document.addEventListener('keydown', enableSpeech, { once: true });
+        document.addEventListener('scroll', enableSpeech, { once: true });
+      }
+    }
+  }
+  
+  function speakTitle(text: string, imageId?: string) {
+    if (!autoguide || !speechSynthesis) return;
+    
+    // Clean and prepare text for speech synthesis
+    let cleanText = text;
+    
+    // Only speak text up to first comma (as requested)
+    const commaIndex = cleanText.indexOf(',');
+    if (commaIndex !== -1) {
+      cleanText = cleanText.substring(0, commaIndex);
+    }
+    
+    // Replace other problematic characters that might cause speech issues
+    cleanText = cleanText
+      .replace(/;/g, ' - ')  // Replace semicolons with dashes
+      .replace(/\s+/g, ' ')  // Replace multiple spaces with single space
+      .trim();               // Remove leading/trailing whitespace
+    
+    console.log('🎤 Original text:', text);
+    console.log('🎤 Cleaned text (up to first comma):', cleanText);
+    
+    // Don't speak the same text twice in a row for the same image
+    if (cleanText === lastSpeechText && imageId === currentImageId) {
+      console.log('🎤 Skipping duplicate speech for same image:', cleanText);
+      return;
+    }
+    
+    lastSpeechText = cleanText;
+    currentImageId = imageId || '';
+    speechRetryCount = 0;
+    
+    console.log('🎤 Speaking:', cleanText, 'for image:', imageId);
+    autoguideText = cleanText; // Show cleaned text in the UI too
+    currentImageTitle = cleanText; // Update current image title for display
+    
+    // Cancel any ongoing speech, but only if we're not already speaking the same text
+    if (speechSynthesis && lastSpeechText !== cleanText) {
+      speechSynthesis.cancel();
+    }
+    
+    const currentSpeech = new SpeechSynthesisUtterance(cleanText);
+    currentSpeech.lang = 'de-DE';
+    currentSpeech.volume = 1.0;
+    
+    // Platform-specific optimizations
+    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const isAndroid = /Android/i.test(navigator.userAgent);
+    const isCarPlay = isIOS && (navigator.userAgent.includes('CarPlay') || window.innerWidth > 800);
+    
+    if (isCarPlay) {
+      currentSpeech.rate = 0.85;
+      currentSpeech.pitch = 1.1;
+    } else if (isAndroid) {
+      currentSpeech.rate = 0.9;
+    }
+    
+    currentSpeech.onstart = () => {
+      console.log('🎤 Speech started:', text);
+    };
+    
+    currentSpeech.onend = () => {
+      console.log('🎤 Speech ended:', text);
+      // Don't clear the text automatically - it should stay until image changes
+    };
+    
+    currentSpeech.onerror = (event) => {
+      if (event.error === 'canceled') {
+        console.log('🎤 Speech was canceled (expected behavior)');
+        return;
+      }
+      
+      console.error('🎤 Speech error:', event.error);
+      
+      if (event.error === 'not-allowed') {
+        console.log('🎤 Speech not allowed - user interaction required');
+        // Try to enable speech synthesis with user interaction
+        const enableSpeech = () => {
+          console.log('🎤 User interaction detected - retrying speech');
+          try {
+            if (speechSynthesis) {
+              speechSynthesis.resume();
+              speechSynthesis.speak(currentSpeech);
+            }
+          } catch (error) {
+            console.error('🎤 Retry after user interaction failed:', error);
+          }
+          document.removeEventListener('click', enableSpeech);
+          document.removeEventListener('touchstart', enableSpeech);
+        };
+        
+        document.addEventListener('click', enableSpeech, { once: true });
+        document.addEventListener('touchstart', enableSpeech, { once: true });
+        return;
+      }
+      
+      // For other errors, try to recover with retry logic
+      console.log('🎤 Speech error occurred, attempting to recover...');
+      
+      // Clear any pending speech
+      if (speechSynthesis) {
+        speechSynthesis.cancel();
+        
+        // Resume if paused (common on mobile)
+        if (speechSynthesis.paused) {
+          speechSynthesis.resume();
+        }
+      }
+      
+      // Retry logic (max 3 attempts)
+      if (speechRetryCount < 3) {
+        speechRetryCount++;
+        console.log(`🎤 Retrying speech (attempt ${speechRetryCount}/3):`, text);
+        
+        setTimeout(() => {
+          try {
+            if (speechSynthesis) {
+              speechSynthesis.speak(currentSpeech);
+            }
+          } catch (error) {
+            console.error('🎤 Retry failed:', error);
+          }
+        }, 1000);
+      } else {
+        console.log('🎤 Max retry attempts reached, giving up');
+      }
+    };
+    
+    // Chrome and cross-platform handling
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const isChrome = /Chrome/.test(navigator.userAgent);
+    
+    if (isMobile) {
+      console.log('🎤 Mobile/CarPlay device detected - using enhanced speech handling');
+      
+      // Android-specific optimizations
+      if (isAndroid) {
+        console.log('🎤 Android device detected - applying Android-specific optimizations');
+        currentSpeech.rate = 0.9; // Slightly slower for Android
+        currentSpeech.volume = 1.0; // Full volume for Android
+      }
+      
+      // On mobile, we need to resume speech synthesis if it was paused
+      if (speechSynthesis && speechSynthesis.paused) {
+        console.log('🎤 Mobile: Resuming paused speech synthesis');
+        speechSynthesis.resume();
+      }
+      
+      // Enhanced delay for mobile devices and CarPlay
+      const delay = isCarPlay ? 300 : (isAndroid ? 250 : 200);
+      setTimeout(() => {
+        try {
+          if (speechSynthesis) {
+            speechSynthesis.speak(currentSpeech);
+            console.log('🎤 Mobile/CarPlay: Speech synthesis speak called');
+          }
+        } catch (error) {
+          console.error('🎤 Mobile/CarPlay: Error calling speech synthesis:', error);
+        }
+      }, delay);
+    } else {
+      // Desktop handling with Chrome-specific fixes
+      if (isChrome) {
+        console.log('🎤 Chrome detected - using Chrome-specific speech handling');
+        // Chrome fix: Small delay to ensure speech synthesis is ready
+        setTimeout(() => {
+          try {
+            if (speechSynthesis) {
+              speechSynthesis.speak(currentSpeech);
+              console.log('🎤 Chrome: Speech synthesis speak called');
+            }
+          } catch (error) {
+            console.error('🎤 Chrome: Error calling speech synthesis:', error);
+          }
+        }, 50);
+      } else {
+        // Other desktop browsers
+        try {
+          if (speechSynthesis) {
+            speechSynthesis.speak(currentSpeech);
+            console.log('🎤 Desktop: Speech synthesis speak called');
+          }
+        } catch (error) {
+          console.error('🎤 Desktop: Error calling speech synthesis:', error);
+        }
+      }
+    }
+  }
+
+  function announceFirstImage() {
+    console.log('🎤 announceFirstImage called');
+    
+    // Always update the first image title, even when autoguide is disabled
+    const currentPics = get(pics);
+    if (currentPics.length === 0) {
+      console.log('🎤 No images available for announcement');
+      return;
+    }
+    
+    const firstImage = currentPics[0];
+    console.log('🎤 First image:', firstImage);
+    console.log('🎤 First image title:', firstImage.title);
+    
+    let displayTitle = '';
+    if (firstImage.title) {
+      displayTitle = firstImage.title;
+    } else {
+      displayTitle = firstImage.original_name || 'Bild ohne Titel';
+    }
+    
+    // Only display text up to first comma
+    const commaIndex = displayTitle.indexOf(',');
+    if (commaIndex !== -1) {
+      displayTitle = displayTitle.substring(0, commaIndex);
+    }
+    
+    // Clean the text
+    displayTitle = displayTitle
+      .replace(/;/g, ' - ')  // Replace semicolons with dashes
+      .replace(/\s+/g, ' ')  // Replace multiple spaces with single space
+      .trim();               // Remove leading/trailing whitespace
+    
+    console.log('🎤 Display title (up to first comma):', displayTitle);
+    
+    // Update the display title
+    currentImageTitle = displayTitle;
+    lastAnnouncedImageId = firstImage.id;
+    
+    // If autoguide and audio are activated, also speak it
+    if (autoguide && audioActivated) {
+      speakTitle(firstImage.title || firstImage.original_name || 'Bild ohne Titel', firstImage.id);
+    }
+  }
+
+  function activateAudioGuide() {
+    if (!speechSynthesis) initSpeechSynthesis();
+    if (speechSynthesis) {
+      console.log('🎤 Activating audio guide with user interaction...');
+      
+      // Chrome-specific fix: Cancel any existing speech first
+      speechSynthesis.cancel();
+      
+      // Enhanced iOS/CarPlay activation
+      const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+      
+      if (isIOS) {
+        // iOS: Einmal Dummy sprechen, um zu aktivieren
+        const dummy = new SpeechSynthesisUtterance(' ');
+        dummy.lang = 'de-DE';
+        dummy.volume = 0;
+        speechSynthesis.speak(dummy);
+        speechSynthesis.resume();
+        
+        // Enhanced CarPlay and iOS specific audio routing
+        if ('webkitAudioContext' in window) {
+          try {
+            const audioContext = new (window as any).webkitAudioContext();
+            audioContext.resume();
+            console.log('CarPlay: Audio context activated for external routing');
+          } catch (e) {
+            console.log('CarPlay: Audio context not available:', e);
+          }
+        }
+        
+        // Additional iOS audio session setup for CarPlay
+        if ('webkitAudioContext' in window) {
+          try {
+            const audioContext = new (window as any).webkitAudioContext();
+            if (audioContext.state === 'suspended') {
+              audioContext.resume();
+            }
+            console.log('CarPlay: Additional audio context setup completed');
+          } catch (e) {
+            console.log('CarPlay: Additional audio context setup failed:', e);
+          }
+        }
+      } else {
+        // Non-iOS devices - Chrome fix
+        speechSynthesis.resume();
+      }
+      
+      // Teste die Sprachausgabe mit einem kurzen Text - nur nach direkter Benutzerinteraktion
+      const testUtterance = new SpeechSynthesisUtterance('Audio aktiviert');
+      testUtterance.lang = 'de-DE';
+      testUtterance.volume = 1.0;
+      testUtterance.rate = 0.9; // Slightly slower for better clarity
+      
+      testUtterance.onstart = () => {
+        console.log('🎤 Audio guide activation started');
+        audioActivated = true;
+      };
+      
+      // Set audioActivated immediately for better reactivity
+      audioActivated = true;
+      
+      testUtterance.onend = () => {
+        console.log('🎤 Audio guide activated successfully');
+        // Announce first image after activation
+        setTimeout(() => {
+          announceFirstImage();
+        }, 500);
+      };
+      
+      // Also announce immediately if audio is activated
+      setTimeout(() => {
+        announceFirstImage();
+      }, 200);
+      
+      // Don't log canceled errors as errors - they're expected
+      testUtterance.onerror = (event) => {
+        if (event.error === 'canceled') {
+          console.log('🎤 Speech was canceled (expected behavior)');
+          return;
+        }
+        
+        console.error('🎤 Audio guide activation error:', event.error);
+        
+        if (event.error === 'not-allowed') {
+          console.log('🎤 Speech not allowed - user interaction required');
+          // Wait for user interaction and retry
+          const retryActivation = () => {
+            console.log('🎤 User interaction detected - retrying audio guide activation');
+            try {
+              if (speechSynthesis) {
+                speechSynthesis.resume();
+                speechSynthesis.speak(testUtterance);
+              }
+            } catch (error) {
+              console.error('🎤 Retry activation failed:', error);
+            }
+            document.removeEventListener('click', retryActivation);
+            document.removeEventListener('touchstart', retryActivation);
+          };
+          document.addEventListener('click', retryActivation, { once: true });
+          document.addEventListener('touchstart', retryActivation, { once: true });
+        }
+      };
+      
+      // Chrome fix: Small delay to ensure speech synthesis is ready
+      setTimeout(() => {
+        try {
+          if (speechSynthesis) {
+            speechSynthesis.speak(testUtterance);
+            console.log('🎤 Audio guide activation test spoken');
+          }
+        } catch (error) {
+          console.error('🎤 Audio guide activation error:', error);
+        }
+      }, 100);
+    }
+  }
+
   function buildGalleryApiUrl() {
     if (!browser) return '';
     const gps = getEffectiveGpsPosition();
-    const url = new URL('/api/items', window.location.origin);
-    url.searchParams.set('offset', '0');
-    url.searchParams.set('limit', '100');
+    const url = new URL('/api/gallery-items-normal', window.location.origin);
+    url.searchParams.set('page', '0');
     if (gps && gps.lat !== undefined && gps.lon !== undefined) {
       url.searchParams.set('lat', String(gps.lat));
       url.searchParams.set('lon', String(gps.lon));
-      // Set fromItem parameter for Location Filter
-      if (gps.fromItem) {
-        url.searchParams.set('fromItem', 'true');
-      }
     }
     return url.toString();
   }
@@ -164,9 +775,12 @@
   $: isLoggedIn = $sessionStore.isAuthenticated;
   $: simulationMode = $pageStore.url.pathname.startsWith('/simulation');
 
-  // Lade Avatar wenn Login-Status sich ändert
-  $: if (isLoggedIn && !profileAvatar) {
-    loadUserAvatar();
+  // Lade Avatar und Settings wenn Login-Status sich ändert
+  $: if (isLoggedIn) {
+    if (!profileAvatar) {
+      loadUserAvatar();
+    }
+    loadUserSettings();
   }
 
   // Setze anonyme User Defaults wenn Login-Status sich ändert
@@ -181,19 +795,19 @@
     
     // Wenn sich Location-Filter ändert, lade Gallery neu
     if (currentLocationFilter) {
-      console.log('[Reactive] Location filter changed, reloading gallery:', currentLocationFilter);
-      resetGallery();
+      console.log('[Reactive] Location filter changed, loading more gallery:', currentLocationFilter);
       loadMoreGallery({
         lat: currentLocationFilter.lat,
         lon: currentLocationFilter.lon,
-        fromItem: currentLocationFilter.fromItem
+        fromItem: currentLocationFilter.fromItem,
+        locationFilterLat: currentLocationFilter.lat,
+        locationFilterLon: currentLocationFilter.lon
       });
     }
     
     // Wenn sich User-Filter ändert, lade Gallery neu
     if (currentUserFilter) {
-      console.log('[Reactive] User filter changed, reloading gallery:', currentUserFilter);
-      resetGallery();
+      console.log('[Reactive] User filter changed, loading more gallery:', currentUserFilter);
       loadMoreGallery({
         user_id: currentUserFilter.userId
       });
@@ -218,7 +832,6 @@
   }
 
   // Initiale Galerie-Initialisierung
-  let galleryInitialized = false;
   
   // Setze Default-Settings für anonyme User
   function setAnonymousUserDefaults() {
@@ -245,6 +858,12 @@
       showScrollToTop = window.scrollY > 200;
     };
     window.addEventListener('scroll', onScroll);
+    
+    // Add scroll event listener for autoguide
+    const onScrollForAudioguide = () => {
+      handleScrollForAudioguide();
+    };
+    window.addEventListener('scroll', onScrollForAudioguide);
     isInIframe = window.self !== window.top;
     
     // Event-Listener für FilterBar Events
@@ -399,6 +1018,7 @@
     
     return () => {
       window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('scroll', onScrollForAudioguide);
       window.removeEventListener('toggle3x3Mode', handleToggle3x3Mode);
       window.removeEventListener('openMap', handleOpenMap);
       window.removeEventListener('message', handleGPSSimulation);
@@ -408,12 +1028,14 @@
       if (gpsUpdateTimeout) {
         clearTimeout(gpsUpdateTimeout);
       }
+      if (scrollTimeout) {
+        clearTimeout(scrollTimeout);
+      }
       stopGPSTracking();
     };
   });
 
   // GPS-Trigger für neue GPS-Daten mit Debouncing
-  let gpsUpdateTimeout: any = null;
   let lastTriggerLog = '';
   
   $: if (galleryInitialized && browser) {
@@ -662,6 +1284,8 @@
         // Setze fromItem, wenn Location-Filter aktiv
         if ($filterStore.locationFilter) {
           galleryParams.fromItem = true;
+          galleryParams.locationFilterLat = $filterStore.locationFilter.lat;
+          galleryParams.locationFilterLon = $filterStore.locationFilter.lon;
         }
         resetGallery(galleryParams);
         console.log('[Location-Clear] resetGallery called for normal gallery');
@@ -676,6 +1300,12 @@
     const gps = getEffectiveGpsPosition();
     effectiveLat = gps?.lat || userLat;
     effectiveLon = gps?.lon || userLon;
+    
+    // NEU: Mache GPS-Koordinaten global verfügbar für galleryStore
+    if (typeof window !== 'undefined') {
+      (window as any).userLat = effectiveLat;
+      (window as any).userLon = effectiveLon;
+    }
   }
   
   let effectiveLat: number | null = null;
@@ -766,6 +1396,38 @@
     />
   {/if}
   <WelcomeSection />
+  
+  <!-- Autoguide Bar -->
+  {#if isLoggedIn && autoguide}
+    <div class="autoguide-bar {audioActivated ? 'audio-active' : 'audio-inactive'}">
+      <div class="autoguide-content">
+        <div class="autoguide-text">
+          {currentImageTitle || (audioActivated ? 'Bildtitel werden vorgelesen' : 'Audio deaktiviert - Klicke auf den Lautsprecher')}
+        </div>
+        <button class="speaker-btn" on:click={() => {
+          console.log('🎤 Speaker button clicked, audioActivated:', audioActivated);
+          if (audioActivated) {
+            console.log('🎤 Deactivating audio...');
+            speechSynthesis?.cancel();
+            audioActivated = false;
+          } else {
+            console.log('🎤 Activating audio...');
+            activateAudioGuide();
+            // Also announce first image after activation
+            setTimeout(() => {
+              console.log('🎤 Announcing first image after manual activation...');
+              announceFirstImage();
+            }, 1500);
+          }
+        }}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  {/if}
+  
   {#if isManual3x3Mode && !hasLocationFilter}
     <MobileGallery
       userLat={userLat}
@@ -864,5 +1526,83 @@
   opacity: 1;
   background: var(--bg-tertiary);
   color: var(--text-primary);
+}
+
+/* Autoguide Bar */
+.autoguide-bar {
+  position: static;
+  color: white;
+  padding: 0.75rem 1rem;
+  box-shadow: 0 2px 10px var(--shadow);
+  animation: slideDown 0.3s ease-out;
+  border-bottom: 2px solid var(--bg-primary);
+}
+
+.autoguide-bar.audio-active {
+  background: linear-gradient(135deg, var(--accent-color), var(--accent-hover));
+}
+
+.autoguide-bar.audio-inactive {
+  background: #4b5563;
+}
+
+.autoguide-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.autoguide-logo {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  filter: brightness(0) invert(1); /* Make logo white */
+}
+
+.autoguide-text {
+  font-weight: 600;
+  font-size: 1rem;
+  text-align: center;
+}
+
+.speaker-btn {
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.speaker-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@media (max-width: 768px) {
+  .autoguide-bar {
+    padding: 0.5rem 0.75rem;
+  }
+  
+  .autoguide-text {
+    font-size: 0.9rem;
+  }
 }
 </style>

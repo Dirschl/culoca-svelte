@@ -70,19 +70,19 @@ class IntelligentImageLoader {
     
     console.log(`[IntelligentLoader] Debug - nearbyLoaded: ${nearbyLoaded.length}, newImages: ${newImages.length}, using: ${allAvailableImages.length}`);
     
-    // Ensure all images have distances calculated
+    // Calculate distances for images that don't have them
     allAvailableImages.forEach(img => {
       if (img.distance === undefined || img.distance === null) {
         img.distance = this.calculateDistance(lat, lon, img.lat, img.lon);
       }
     });
     
-    // Sort all images by distance to ensure correct order
-    const sortedImages = allAvailableImages.sort((a, b) => (a.distance || 0) - (b.distance || 0));
+    // NEU: Keine client-seitige Sortierung mehr - PostGIS-API sortiert bereits korrekt
+    // const sortedImages = allAvailableImages.sort((a, b) => (a.distance || 0) - (b.distance || 0));
     
-    console.log(`[IntelligentLoader] Final sorted images - first 3 distances:`, sortedImages.slice(0, 3).map(img => img.distance?.toFixed(0) + 'm'));
+    console.log(`[IntelligentLoader] Using server-sorted images - first 3 distances:`, allAvailableImages.slice(0, 3).map(img => img.distance?.toFixed(0) + 'm'));
     
-    return sortedImages.slice(0, requestedCount);
+    return allAvailableImages.slice(0, requestedCount);
   }
   
   /**
@@ -150,10 +150,10 @@ class IntelligentImageLoader {
         distance: this.calculateDistance(lat, lon, item.lat, item.lon) // Calculate distance client-side in meters
       }));
       
-      // Sort by distance
-      fallbackImages.sort((a, b) => (a.distance || 0) - (b.distance || 0));
+      // NEU: Keine client-seitige Sortierung mehr - PostGIS-API sortiert bereits korrekt
+      // fallbackImages.sort((a, b) => (a.distance || 0) - (b.distance || 0));
       
-      console.log(`[IntelligentLoader] After sorting - first 3 distances:`, fallbackImages.slice(0, 3).map(img => img.distance?.toFixed(0) + 'm'));
+      console.log(`[IntelligentLoader] Using server-sorted images - first 3 distances:`, fallbackImages.slice(0, 3).map(img => img.distance?.toFixed(0) + 'm'));
       
       // No radius filtering - use all images
       const radiusFilteredImages = fallbackImages;

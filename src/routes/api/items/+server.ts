@@ -16,7 +16,7 @@ export const GET = async ({ url, request }) => {
     // Query-Parameter: limit (default 100), user_id (optional), offset (optional)
     // New filter parameters: filter_user_id, lat, lon, radius (for GPS-based filtering)
     // Special parameter: for_map (for map clustering - bypasses limit)
-    const limit = parseInt(url.searchParams.get('limit') || '100', 10);
+    const limit = parseInt(url.searchParams.get('limit') || '2040', 10);
     const offset = parseInt(url.searchParams.get('offset') || '0', 10);
     const user_id = url.searchParams.get('user_id');
     const filter_user_id = url.searchParams.get('filter_user_id');

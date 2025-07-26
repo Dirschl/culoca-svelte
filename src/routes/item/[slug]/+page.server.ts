@@ -86,44 +86,82 @@ export const load: PageServerLoad = async ({ params, url }) => {
     let nearby: any[] = [];
     if (img && img.lat && img.lon) {
       try {
-        const maxRadius = 5000;
-        const degOffset = maxRadius / 111000;
-        const latMin = img.lat - degOffset;
-        const latMax = img.lat + degOffset;
-        const lonMin = img.lon - degOffset;
-        const lonMax = img.lon + degOffset;
-        const pageSize = 1000;
-        let offset = 0;
-        let fetched: any[] = [];
-        while (true) {
-          const { data: batch, error: nearbyError } = await supabase
-            .from('items')
-            .select('id, slug, path_512, path_2048, path_64, original_name, title, description, lat, lon, width, height, is_private, gallery')
-            .not('lat', 'is', null)
-            .not('lon', 'is', null)
-            .not('path_512', 'is', null)
-            .or('is_private.eq.false,is_private.is.null')
-            .gte('lat', latMin)
-            .lte('lat', latMax)
-            .gte('lon', lonMin)
-            .lte('lon', lonMax)
-            .range(offset, offset + pageSize - 1);
-          if (nearbyError) break;
-          if (!batch || batch.length === 0) break;
-          fetched = fetched.concat(batch);
-          if (batch.length < pageSize) break;
-          offset += pageSize;
-        }
-        nearby = fetched
-          .filter((item: any) => item.slug !== img.id && item.lat && item.lon)
-          .map((item: any) => {
-            const distance = getDistanceInMeters(img.lat, img.lon, item.lat, item.lon);
-            return {
+        // NEU: Verwende PostGIS-Funktion für effiziente Nearby-Suche
+        const { data: nearbyData, error: nearbyError } = await supabase.rpc('gallery_items_unified_postgis', {
+          user_lat: img.lat,
+          user_lon: img.lon,
+          page_value: 0,
+          page_size_value: 100, // Mehr Nearby-Items laden
+          current_user_id: null, // Alle öffentlichen Items
+          search_term: null, // Keine Suche für Nearby
+          location_filter_lat: null, // Kein LocationFilter für Nearby
+          location_filter_lon: null
+        });
+
+        if (nearbyError) {
+          console.error('[DetailPage] PostGIS nearby error:', nearbyError);
+          // Fallback auf alte Methode
+          const maxRadius = 5000;
+          const degOffset = maxRadius / 111000;
+          const latMin = img.lat - degOffset;
+          const latMax = img.lat + degOffset;
+          const lonMin = img.lon - degOffset;
+          const lonMax = img.lon + degOffset;
+          const pageSize = 1000;
+          let offset = 0;
+          let fetched: any[] = [];
+          while (true) {
+            const { data: batch, error: nearbyError } = await supabase
+              .from('items')
+              .select('id, slug, path_512, path_2048, path_64, original_name, title, description, lat, lon, width, height, is_private, gallery')
+              .not('lat', 'is', null)
+              .not('lon', 'is', null)
+              .not('path_512', 'is', null)
+              .or('is_private.eq.false,is_private.is.null')
+              .gte('lat', latMin)
+              .lte('lat', latMax)
+              .gte('lon', lonMin)
+              .lte('lon', lonMax)
+              .range(offset, offset + pageSize - 1);
+            if (nearbyError) break;
+            if (!batch || batch.length === 0) break;
+            fetched = fetched.concat(batch);
+            if (batch.length < pageSize) break;
+            offset += pageSize;
+          }
+          nearby = fetched
+            .filter((item: any) => item.slug !== img.id && item.lat && item.lon)
+            .map((item: any) => {
+              const distance = getDistanceInMeters(img.lat, img.lon, item.lat, item.lon);
+              return {
+                id: item.id,
+                slug: item.slug,
+                lat: item.lat,
+                lon: item.lon,
+                distance,
+                src: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${item.path_512}`,
+                srcHD: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${item.path_2048}`,
+                src64: item.path_64 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/${item.path_64}` : `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${item.path_512}`,
+                width: item.width,
+                height: item.height,
+                title: item.title || null,
+                gallery: item.gallery ?? true
+              };
+            })
+            .filter((item: any) => item.distance <= maxRadius)
+            .sort((a: any, b: any) => a.distance - b.distance);
+        } else {
+          // NEU: Verwende PostGIS-Ergebnisse
+          console.log('[DetailPage] PostGIS nearby success, items:', nearbyData?.length || 0);
+          
+          nearby = (nearbyData || [])
+            .filter((item: any) => item.id !== img.id) // Aktuelles Bild ausschließen
+            .map((item: any) => ({
               id: item.id,
               slug: item.slug,
               lat: item.lat,
               lon: item.lon,
-              distance,
+              distance: item.distance,
               src: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${item.path_512}`,
               srcHD: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${item.path_2048}`,
               src64: item.path_64 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/${item.path_64}` : `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${item.path_512}`,
@@ -131,11 +169,12 @@ export const load: PageServerLoad = async ({ params, url }) => {
               height: item.height,
               title: item.title || null,
               gallery: item.gallery ?? true
-            };
-          })
-          .filter((item: any) => item.distance <= maxRadius)
-          .sort((a: any, b: any) => a.distance - b.distance);
-      } catch (nearbyErr) {}
+            }))
+            .filter((item: any) => item.distance <= 5000); // 5km Radius
+        }
+      } catch (nearbyErr) {
+        console.error('[DetailPage] Nearby error:', nearbyErr);
+      }
     }
     return {
       image: { ...img, profile },

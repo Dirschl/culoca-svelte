@@ -52,7 +52,7 @@
   }
 </script>
 
-{#if isLoggedIn && $welcomeVisible && !isWelcomeDismissed() && mounted}
+{#if $welcomeVisible && !isWelcomeDismissed() && mounted}
   <div class="welcome-section">
     <div class="welcome-content">
       <!-- Edit Button for Creator -->

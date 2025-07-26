@@ -25,7 +25,7 @@ RETURNS TABLE (
     created_at timestamp with time zone,
     user_id uuid,
     profile_id uuid,
-    title character varying(255),
+    title text,
     description text,
     lat double precision,
     lon double precision,
@@ -34,7 +34,8 @@ RETURNS TABLE (
     is_private boolean,
     keywords text[],
     gallery boolean,
-    distance double precision
+    distance double precision,
+    total_count integer
 ) AS $$
 BEGIN
     RETURN QUERY
@@ -65,7 +66,8 @@ BEGIN
                     sin(radians(user_lat)) * sin(radians(i.lat))
                 ))
             ELSE NULL
-        END AS distance
+        END AS distance,
+        COUNT(*) OVER() AS total_count
     FROM items i
     WHERE
         i.lat IS NOT NULL

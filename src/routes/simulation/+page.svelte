@@ -673,9 +673,6 @@
     userLat = lat;
     userLon = lon;
 
-    // Resort images by distance (local sort only)
-    resortImagesByDistance();
-    
     // Check if we need to update the grid (center cell changed)
     if (dynamicLoader && !dynamicLoader.isInCenterCell(lat, lon)) {
       console.log(`🗺️ Position ${lat},${lon} is outside center cell - triggering grid update`);
@@ -706,21 +703,8 @@
     userLat = lat;
     userLon = lon;
 
-    // Resort images by distance
-    resortImagesByDistance();
-    
     // Update URL hash for iframe communication
     updateURLHash(lat, lon, simulationActive);
-  }
-
-  function resortImagesByDistance() {
-    const currentPics = get(pics);
-    const sortedPics = currentPics.sort((a, b) => {
-      const distA = getDistanceInMeters(userLat!, userLon!, a.lat, a.lon);
-      const distB = getDistanceInMeters(userLat!, userLon!, b.lat, b.lon);
-      return distA - distB;
-    });
-    pics.set(sortedPics);
   }
 
   function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -816,7 +800,6 @@
     simulationActive = true;
     userLat = simulatedLat;
     userLon = simulatedLon;
-    resortImagesByDistance();
     updateURLHash(simulatedLat, simulatedLon, true);
     
     // Immediately send GPS data to iframe
@@ -1041,6 +1024,16 @@
       // Update duplicate count
       duplicateCount += removedDuplicates.length;
     }
+  }
+
+  function resortImagesByDistance() {
+    const currentPics = get(pics);
+    const sortedPics = currentPics.sort((a, b) => {
+      const distA = getDistanceInMeters(userLat!, userLon!, a.lat, a.lon);
+      const distB = getDistanceInMeters(userLat!, userLon!, b.lat, b.lon);
+      return distA - distB;
+    });
+    pics.set(sortedPics);
   }
 </script>
 

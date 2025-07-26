@@ -39,6 +39,7 @@
   }
 
   function handleScroll() {
+    console.log('[NormalGallery][Scroll] handleScroll called');
     if (scrollTimeout) clearTimeout(scrollTimeout);
     
     // Berechne Scroll-Geschwindigkeit
@@ -63,26 +64,35 @@
       const scrollHeight = document.documentElement.scrollHeight;
       const scrollTop = window.innerHeight + window.scrollY;
       const threshold = scrollHeight - dynamicThreshold;
-      
+
+      // DEBUG: Log aktuelle Scroll-Infos und Store-Werte
+      console.log('[NormalGallery][Scroll] scrollTop:', scrollTop, 'threshold:', threshold, 'scrollHeight:', scrollHeight, 'window.innerHeight:', window.innerHeight, 'window.scrollY:', window.scrollY);
+      console.log('[NormalGallery][Scroll] $hasMoreGalleryItems:', $hasMoreGalleryItems, '$isGalleryLoading:', $isGalleryLoading, 'displayedImageCount:', displayedImageCount);
+
       if (scrollTop >= threshold) {
         if ($hasMoreGalleryItems && !$isGalleryLoading) {
-          console.log(`[NormalGallery] Loading more images (threshold: ${Math.round(dynamicThreshold)}px, velocity: ${scrollVelocity.toFixed(3)})`);
+          console.log(`[NormalGallery][Scroll] Loading more images (threshold: ${Math.round(dynamicThreshold)}px, velocity: ${scrollVelocity.toFixed(3)})`);
           
           // Use location filter coordinates if available, otherwise fall back to user coordinates
           const apiLat = $filterStore.locationFilter?.lat || userLat;
           const apiLon = $filterStore.locationFilter?.lon || userLon;
-          
+          console.log('[NormalGallery][Scroll] Trigger loadMoreGallery with lat:', apiLat, 'lon:', apiLon);
           loadMoreGallery({
             lat: apiLat || undefined,
             lon: apiLon || undefined
           });
-    }
+        } else {
+          console.log('[NormalGallery][Scroll] No more images to load or already loading.');
+        }
+      } else {
+        console.log('[NormalGallery][Scroll] Not near threshold, no load triggered.');
       }
     }, 25); // Reduziert von 50ms auf 25ms für noch schnellere Reaktion
   }
 
   onMount(() => {
     console.log('[NormalGallery] Component mounted');
+    console.log('[NormalGallery][onMount] Adding scroll event listener');
     
     // Nur initial laden, wenn KEIN Location-Filter aktiv ist!
     if ($galleryItems.length === 0 && !$isGalleryLoading && !$filterStore.locationFilter) {
@@ -101,12 +111,14 @@
     window.addEventListener('scroll', handleScroll);
     
     return () => {
+      console.log('[NormalGallery][onMount] Removing scroll event listener');
       window.removeEventListener('scroll', handleScroll);
       if (scrollTimeout) clearTimeout(scrollTimeout);
     };
   });
 
   onDestroy(() => {
+    console.log('[NormalGallery][onDestroy] Removing scroll event listener');
     if (scrollTimeout) clearTimeout(scrollTimeout);
   });
 </script>
