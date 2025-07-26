@@ -351,7 +351,7 @@
         
         // Prüfe Querystring für Suchparameter
         const urlParams = new URLSearchParams(window.location.search);
-        const searchParam = urlParams.get('s');
+        const searchParam = urlParams.get('search') || urlParams.get('s');
         
         console.log('[Gallery-Init] Initialisiere Galerie mit GPS:', gps);
         console.log('[Gallery-Init] UserLat/Lon:', userLat, userLon);
@@ -385,7 +385,6 @@
         // Füge Suchparameter hinzu falls vorhanden
         if (searchParam) {
           galleryParams.search = searchParam;
-          // Setze auch den searchQuery Store für die UI
           setSearchQuery(searchParam);
         }
         // Setze fromItem, wenn Location-Filter aktiv
@@ -830,7 +829,7 @@
   {/if}
   {#if showFullscreenMap}
     <FullscreenMap 
-      images={[]}
+      images={$galleryItems}
       userLat={effectiveLat}
       userLon={effectiveLon}
       {deviceHeading}
@@ -838,7 +837,6 @@
       on:close={() => showFullscreenMap = false}
       on:imageClick={(event) => {
         const imageSlug = event.detail.imageSlug || event.detail.slug || event.detail.imageId;
-        console.log('[FullscreenMap] Image clicked:', imageSlug);
         window.location.href = `/item/${imageSlug}`;
       }}
       on:locationSelected={(event) => {

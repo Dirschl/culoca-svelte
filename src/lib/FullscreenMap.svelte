@@ -58,6 +58,15 @@
   // Internal images array for clustering
   let allImages: any[] = [];
   
+  // Use images prop if available
+  $: if (images && images.length > 0) {
+    console.log('[FullscreenMap] Using images prop:', images.length, 'images');
+    allImages = images;
+  } else {
+    console.log('[FullscreenMap] No images prop available');
+    allImages = [];
+  }
+  
     // Reaktive Zentrierung basierend auf Mobile Mode
   $: if (isManual3x3Mode) {
     // Mobile Mode aktiviert → Automatische Zentrierung aktivieren (wie Navi)
@@ -416,7 +425,7 @@
     mapInitialized = true;
     
     // Load all images for clustering
-    loadAllImagesForMap();
+    // Removed: loadAllImagesForMap(); // Removed as per edit hint
   }
   
   function addImageMarkers() {
@@ -581,8 +590,6 @@
         })
       });
       
-      console.log(`[FullscreenMap] Marker created for image ${image.id}`);
-      
       // Click handler for navigation
       marker.on('click', () => {
         dispatch('imageClick', { imageSlug: image.slug, imageId: image.id });
@@ -594,7 +601,6 @@
       
       // Add marker to cluster group instead of directly to map
       markerClusterGroup.addLayer(marker);
-      console.log(`[FullscreenMap] Marker added to cluster group for image ${image.id}`);
     });
     
     console.log(`[FullscreenMap] Finished adding ${imageMarkers.length} markers to cluster group`);
@@ -1170,150 +1176,7 @@
     }
   }
 
-  // Load all images for the map using direct database query (no API limits)
-  async function loadAllImagesForMap() {
-    try {
-      console.log('[FullscreenMap] Loading all images for map with direct DB query...');
-      
-      // Use direct database query to bypass API issues entirely
-      const images = await loadMapImagesDirectFromDB();
-      
-      if (images && images.length > 0) {
-        const processedImages = images.map((img: any) => {
-          // Try to find the best available image path
-          let src = '';
-          let srcHD = '';
-          
-          if (img.path_512) {
-            src = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${img.path_512}`;
-          } else if (img.path_2048) {
-            src = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${img.path_2048}`;
-          } else if (img.path_64) {
-            src = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/${img.path_64}`;
-          }
-          
-          if (img.path_2048) {
-            srcHD = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${img.path_2048}`;
-          } else {
-            srcHD = src;
-          }
-          
-          return {
-            id: img.id,
-            src: src,
-            srcHD: srcHD,
-            width: img.width && img.width > 0 ? img.width : 400,
-            height: img.height && img.height > 0 ? img.height : 300,
-            lat: img.lat,
-            lon: img.lon,
-            title: img.title,
-            description: img.description,
-            keywords: img.keywords,
-            path_64: img.path_64,
-            path_512: img.path_512,
-            path_2048: img.path_2048,
-            profile_id: img.profile_id,
-            is_private: img.is_private
-          };
-        }).filter(img => img.src); // Only include images with valid paths
-        
-        console.log(`[FullscreenMap] Loaded ${processedImages.length} images for map via direct DB query`);
-        
-        // Update the internal images array
-        allImages = processedImages;
-        
-        // Re-add markers if map is initialized
-        if (mapInitialized && markerClusterGroup) {
-          addImageMarkers();
-        }
-      } else {
-        console.log('[FullscreenMap] No images found via direct DB query');
-        allImages = [];
-      }
-    } catch (err) {
-      console.error('[FullscreenMap] Error in loadAllImagesForMap:', err);
-      allImages = [];
-    }
-  }
-
-  // Direct database query for map images with batch loading (bypasses all API limitations)
-  async function loadMapImagesDirectFromDB(): Promise<any[]> {
-    try {
-      console.log('[FullscreenMap DirectDB] Loading map images with batch loading...');
-      
-      // Get current session to determine privacy filtering
-      const { data: { session } } = await supabase.auth.getSession();
-      const currentUserId = session?.user?.id || null;
-      
-      // Batch loading to get all images (bypass 1000 limit)
-      const allImages = [];
-      let offset = 0;
-      const batchSize = 1000;
-      let hasMore = true;
-      
-      while (hasMore) {
-        // Load batch of images - exclude gallery = false
-        let query = supabase
-          .from('items')
-          .select('id, lat, lon, path_64, title, is_private, profile_id')
-          .not('lat', 'is', null)
-          .not('lon', 'is', null)
-          .not('path_64', 'is', null)
-          .or('gallery.eq.true,gallery.is.null') // Show all except gallery = false (duplicates)
-          .range(offset, offset + batchSize - 1);
-          // Optimized for map: only essential fields, exclude duplicates
-        
-        // Apply privacy filtering
-        if (currentUserId) {
-          // For logged in users: show their own images (all) + other users' public images
-          query = query.or(`profile_id.eq.${currentUserId},is_private.eq.false,is_private.is.null`);
-        } else {
-          // For anonymous users: only show public images
-          query = query.or('is_private.eq.false,is_private.is.null');
-        }
-        
-        const { data, error } = await query;
-        
-        if (error) {
-          console.error('[FullscreenMap DirectDB] Database error:', error);
-          break;
-        }
-        
-        if (data && data.length > 0) {
-          console.log(`[FullscreenMap DirectDB] Loaded batch ${offset / batchSize + 1}: ${data.length} images`);
-          allImages.push(...data);
-          offset += batchSize;
-          
-          // If we got less than batchSize, we've reached the end
-          if (data.length < batchSize) {
-            hasMore = false;
-          }
-        } else {
-          hasMore = false;
-        }
-      }
-      
-      if (allImages.length > 0) {
-        console.log(`[FullscreenMap DirectDB] Successfully loaded ${allImages.length} total images`);
-        
-        const images = allImages.map(item => ({
-          ...item,
-          lat: item.lat!,
-          lon: item.lon!,
-          path_512: item.path_64! // Use path_64 as path_512 for map thumbnails
-        }));
-        
-        return images;
-      } else {
-        console.log('[FullscreenMap DirectDB] No images found');
-        return [];
-      }
-      
-    } catch (error) {
-      console.error('[FullscreenMap DirectDB] Error:', error);
-      return [];
-    }
-  }
+  // Removed: loadMapImagesDirectFromDB function - now using images prop only
   
   // Reactive statement to update markers when allImages changes
   $: if (mapInitialized && markerClusterGroup && allImages.length > 0) {

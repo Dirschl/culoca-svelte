@@ -1250,7 +1250,7 @@
         
         let query = supabase
           .from('items')
-          .select('id, lat, lon, path_512, path_2048, path_64, title, description, width, height, is_private, profile_id')
+          .select('id, slug, lat, lon, path_512, path_2048, path_64, title, description, width, height, is_private, profile_id')
           .not('lat', 'is', null)
           .not('lon', 'is', null)
           .not('path_512', 'is', null)

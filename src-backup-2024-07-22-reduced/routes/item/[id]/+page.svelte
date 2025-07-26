@@ -651,15 +651,14 @@
         const nearbyMarker = leaflet.marker([nearbyItem.lat, nearbyItem.lon], { icon: nearbyIcon }).addTo(map);
         nearbyMarker.on('click', () => {
           // Navigate to item detail page with anchor parameter
-          const url = new URL(`/item/${nearbyItem.id}`, window.location.origin);
-          url.searchParams.set('anchor', nearbyItem.id);
+          const url = new URL(`/item/${nearbyItem.slug}`, window.location.origin);
           window.location.href = url.toString();
         });
         const popupContent = `
           <div style="text-align: center; min-width: 200px;">
             <strong>${nearbyItem.title || 'Item'}</strong><br>
             <small>Entfernung: ${getDistanceFromLatLonInMeters(image.lat, image.lon, nearbyItem.lat, nearbyItem.lon)}</small><br>
-            <a href="javascript:void(0)" onclick="(() => { const url = new URL('/item/${nearbyItem.id}', window.location.origin); url.searchParams.set('anchor', '${nearbyItem.id}'); window.location.href = url.toString(); })()" style="color: #0066cc; text-decoration: none; font-weight: 500;">Item anzeigen →</a>
+            <a href="javascript:void(0)" onclick="(() => { const url = new URL('/item/${nearbyItem.slug}', window.location.origin); window.location.href = url.toString(); })()" style="color: #0066cc; text-decoration: none; font-weight: 500;">Item anzeigen →</a>
           </div>
         `;
         nearbyMarker.bindPopup(popupContent);

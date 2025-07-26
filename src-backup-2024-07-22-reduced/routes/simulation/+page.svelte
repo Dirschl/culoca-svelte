@@ -625,8 +625,7 @@
 
       marker.on('click', () => {
         // Navigate to image detail page with anchor parameter
-        const url = new URL(`/item/${img.id}`, window.location.origin);
-        url.searchParams.set('anchor', img.id);
+        const url = new URL(`/item/${img.slug}`, window.location.origin);
         window.open(url.toString(), '_blank');
       });
 

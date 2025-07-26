@@ -1237,7 +1237,7 @@
         // Load batch of images - exclude gallery = false
         let query = supabase
           .from('items')
-          .select('id, lat, lon, path_64, title, is_private, profile_id')
+          .select('id, slug, lat, lon, path_64, title, is_private, profile_id')
           .not('lat', 'is', null)
           .not('lon', 'is', null)
           .not('path_64', 'is', null)

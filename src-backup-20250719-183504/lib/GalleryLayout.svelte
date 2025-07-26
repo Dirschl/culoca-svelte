@@ -135,12 +135,8 @@
     };
   });
 
-  function handleImageClick(itemId: string) {
-    if (onImageClick) {
-      onImageClick(itemId);
-    } else {
-      location.href = `/item/${itemId}`;
-    }
+  function handleImageClick(itemSlug: string) {
+    location.href = `/item/${itemSlug}`;
   }
 
   function handleKeydown(event: KeyboardEvent, itemId: string) {

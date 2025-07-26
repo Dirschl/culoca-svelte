@@ -1,4 +1,4 @@
-import { writable } from 'svelte/store';
+import { writable, get } from 'svelte/store';
 import { resetGallery } from './galleryStore';
 
 export const searchQuery = writable('');
@@ -37,7 +37,7 @@ export async function performSearch(q: string, trigger = true) {
       try {
       console.log('🔍 SearchStore: Starting search for:', q);
       
-      // Verwende galleryStore für die Suche
+      // Verwende galleryStore für die Suche - dieser verwendet jetzt die neue API
       resetGallery({ search: q });
       
       // Lade-Status wird vom galleryStore verwaltet

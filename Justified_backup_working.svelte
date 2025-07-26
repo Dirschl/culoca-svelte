@@ -119,8 +119,8 @@
     };
   });
 
-  function handleImageClick(itemId: string) {
-    location.href = `/item/${itemId}`;
+  function handleImageClick(itemSlug: string) {
+    location.href = `/item/${itemSlug}`;
   }
 
   function handleKeydown(event: KeyboardEvent, itemId: string) {

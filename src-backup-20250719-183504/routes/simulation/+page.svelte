@@ -609,7 +609,7 @@
 
       marker.on('click', () => {
         // Navigate to image detail page
-        window.open(`/item/${img.id}`, '_blank');
+        window.open(`/item/${img.slug}`, '_blank');
       });
 
       marker.addTo(map);

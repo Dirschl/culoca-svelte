@@ -63,16 +63,30 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
   // Normale Limits für alle Filter
   const effectiveLimit = limit; // Normale Limits für alle Filter
 
-  const url = new URL('/api/items', window.location.origin);
-  url.searchParams.set('offset', String(offset));
-  url.searchParams.set('limit', String(effectiveLimit));
-  if (mergedParams.search) url.searchParams.set('s', mergedParams.search);
-  if (mergedParams.lat && mergedParams.lon) {
+  // NEU: Gallery-Items-Search API verwenden
+  let url;
+  if (mergedParams.search) {
+    // Always use new gallery endpoint when search is provided
+    url = new URL('/api/gallery-items-search', window.location.origin);
+    url.searchParams.set('page', String(Math.floor(offset / effectiveLimit)));
+    url.searchParams.set('search', mergedParams.search);
+    if (mergedParams.lat && mergedParams.lon) {
+      url.searchParams.set('lat', String(mergedParams.lat));
+      url.searchParams.set('lon', String(mergedParams.lon));
+    }
+  } else if (mergedParams.lat && mergedParams.lon) {
+    // Use new gallery endpoint when GPS coordinates are available
+    url = new URL('/api/gallery-items-search', window.location.origin);
+    url.searchParams.set('page', String(Math.floor(offset / effectiveLimit)));
     url.searchParams.set('lat', String(mergedParams.lat));
     url.searchParams.set('lon', String(mergedParams.lon));
+  } else {
+    // Use existing items endpoint when no GPS coordinates and no search
+    url = new URL('/api/items', window.location.origin);
+    url.searchParams.set('offset', String(offset));
+    url.searchParams.set('limit', String(effectiveLimit));
   }
-  if (mergedParams.radius) url.searchParams.set('radius', String(mergedParams.radius));
-  if (mergedParams.fromItem) url.searchParams.set('fromItem', 'true');
+  // radius, fromItem, offset, limit werden NICHT mehr benötigt
 
   console.log('[GalleryStore] API-Request:', {
     params: mergedParams,
@@ -93,6 +107,8 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
   }
 
   const data = await res.json();
+  // NEU: Items aus data.items lesen (für gallery endpoint) oder data.images (für items endpoint)
+  const items = data.items || data.images || [];
     console.log('[GalleryStore] API Response:', {
       status: data.status,
       imageCount: data.images?.length || 0,
@@ -103,22 +119,25 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
       debug: data.debug
     });
 
-  if (data && data.images) {
-    let mapped = data.images
+  if (items && items.length) {
+    let mapped = items
       .filter((item: any) => item.path_512)
       .map((item: any) => ({
         src: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${item.path_512}`,
         width: item.width,
         height: item.height,
         id: item.id,
-        slug: item.slug, // <-- hinzugefügt
+        slug: item.slug,
         lat: item.lat,
         lon: item.lon,
         title: item.title,
         distance: item.distance,
         description: item.description,
         profile_id: item.profile_id,
-        isSourceItem: item.isSourceItem
+        isSourceItem: item.isSourceItem,
+        path_64: item.path_64,
+        path_512: item.path_512,
+        path_2048: item.path_2048
       }));
 
     // Nur beim ersten Laden (offset === 0) das Source-Objekt zulassen

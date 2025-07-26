@@ -130,18 +130,22 @@
     };
   });
 
-  function handleImageClick(itemId: string) {
-    const item = items.find(item => item.id === itemId);
+  function handleImageClick(itemSlug: string) {
+    const item = items.find(item => item.slug === itemSlug);
     if (item && item.slug) {
       const url = new URL(`/item/${item.slug}`, window.location.origin);
       location.href = url.toString();
     }
   }
 
-  function handleKeydown(event: KeyboardEvent, itemId: string) {
+  function handleKeydown(event: KeyboardEvent, itemSlug: string) {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
-      handleImageClick(itemId);
+      const item = items.find(item => item.slug === itemSlug);
+      if (item && item.slug) {
+        const url = new URL(`/item/${item.slug}`, window.location.origin);
+        location.href = url.toString();
+      }
     }
   }
 
@@ -374,8 +378,8 @@
                   width:{boxes[i].width}px;
                   height:{boxes[i].height}px;
                 "
-                on:click={() => handleImageClick(item.id)}
-                on:keydown={(e) => handleKeydown(e, item.id)}
+                on:click={() => handleImageClick(item.slug)}
+                on:keydown={(e) => handleKeydown(e, item.slug)}
               >
                 <img
                   class="justified-pic"
@@ -452,11 +456,11 @@
       {#each items as item}
         <div 
           class="grid-item" 
-          on:click={() => handleImageClick(item.id)}
-          on:keydown={(e) => handleKeydown(e, item.id)}
+          on:click={() => handleImageClick(item.slug)}
+          on:keydown={(e) => handleKeydown(e, item.slug)}
           tabindex="0" 
           role="button" 
-          aria-label="View image {item.id}"
+          aria-label="View image {item.slug}"
           title={item.title || ''}
         >
           <img 

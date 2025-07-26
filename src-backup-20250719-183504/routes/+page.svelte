@@ -6166,7 +6166,7 @@
     on:close={() => showFullscreenMap = false}
     on:imageClick={(event) => {
       showFullscreenMap = false;
-      location.href = `/item/${event.detail.imageId}`;
+      location.href = `/item/${event.detail.imageSlug || event.detail.slug}`;
     }}
     on:locationSelected={(event) => setLocationFromMap(event.detail.lat, event.detail.lon)}
   />

@@ -6871,8 +6871,7 @@
     on:imageClick={(event) => {
       showFullscreenMap = false;
       // Navigate to item detail page with anchor parameter
-      const url = new URL(`/item/${event.detail.imageId}`, window.location.origin);
-      url.searchParams.set('anchor', event.detail.imageId);
+      const url = new URL(`/item/${event.detail.imageSlug || event.detail.slug}`, window.location.origin);
       location.href = url.toString();
     }}
     on:locationSelected={(event) => setLocationFromMap(event.detail.lat, event.detail.lon)}
