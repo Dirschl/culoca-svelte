@@ -116,15 +116,7 @@
     color: var(--text-primary);
   }
 
-  section#impressum h4 {
-    margin: 1.5rem 0 0.5rem 0;
-    font-size: 1.2rem;
-    color: var(--text-primary);
-  }
-
-  section#impressum p,
-  section#impressum ul,
-  section#impressum li {
+  section#impressum p {
     color: var(--text-secondary);
     margin-bottom: 1rem;
     font-size: 1.1rem;

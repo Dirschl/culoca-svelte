@@ -18,11 +18,15 @@
   onMount(() => {
     mounted = true;
     loadWelcomeContent();
+  });
+
+  // Subscribe to session changes
+  $: {
     const session = get(sessionStore);
     isLoggedIn = session.isAuthenticated;
     currentUserId = session.userId || '';
     userName = session.user?.user_metadata?.name || session.user?.user_metadata?.full_name || 'Fotograf';
-  });
+  }
 
   async function loadWelcomeContent() {
     try {
@@ -48,7 +52,7 @@
   }
 </script>
 
-{#if $welcomeVisible && !isWelcomeDismissed() && mounted}
+{#if isLoggedIn && $welcomeVisible && !isWelcomeDismissed() && mounted}
   <div class="welcome-section">
     <div class="welcome-content">
       <!-- Edit Button for Creator -->
