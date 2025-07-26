@@ -10,7 +10,7 @@ RETURNS TABLE (
   id UUID,
   slug TEXT,
   path_64 TEXT,
-  title TEXT,
+  title CHARACTER VARYING(255),
   lat DOUBLE PRECISION,
   lon DOUBLE PRECISION,
   distance DOUBLE PRECISION

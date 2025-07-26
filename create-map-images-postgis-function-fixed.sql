@@ -1,6 +1,5 @@
--- Optimierte PostGIS-Funktion für Kartenansicht
--- Lädt nur die minimalen Daten: id, slug, path_64, title, distance, lat, lon
--- Für bessere Performance bei 2000+ Datensätzen
+-- PostGIS-Funktion für Kartenansicht mit korrekten Datentypen
+-- Angepasst an die tatsächliche Datenbank-Struktur
 
 CREATE OR REPLACE FUNCTION map_images_postgis(
   user_lat DOUBLE PRECISION DEFAULT 0,
@@ -19,7 +18,7 @@ RETURNS TABLE (
 AS $$
 BEGIN
   RETURN QUERY
-  SELECT 
+  SELECT
     i.id,
     i.slug,
     i.path_64,

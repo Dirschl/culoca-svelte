@@ -1,8 +1,7 @@
--- Optimierte PostGIS-Funktion für Kartenansicht
--- Lädt nur die minimalen Daten: id, slug, path_64, title, distance, lat, lon
--- Für bessere Performance bei 2000+ Datensätzen
+-- Vereinfachte PostGIS-Funktion für Kartenansicht mit korrekten Datentypen
+-- Weniger anfällig für Fehler, einfachere Logik
 
-CREATE OR REPLACE FUNCTION map_images_postgis(
+CREATE OR REPLACE FUNCTION map_images_postgis_simple(
   user_lat DOUBLE PRECISION DEFAULT 0,
   user_lon DOUBLE PRECISION DEFAULT 0,
   current_user_id UUID DEFAULT NULL
@@ -36,16 +35,11 @@ BEGIN
         999999999
     END AS distance
   FROM items i
-  WHERE i.path_512 IS NOT NULL
-    AND i.gallery = true
+  WHERE i.gallery = true
     AND i.lat IS NOT NULL
     AND i.lon IS NOT NULL
     AND i.path_64 IS NOT NULL
-    AND (
-      (current_user_id IS NOT NULL AND (i.profile_id = current_user_id OR i.is_private = false OR i.is_private IS NULL))
-      OR
-      (current_user_id IS NULL AND (i.is_private = false OR i.is_private IS NULL))
-    )
+    AND (i.is_private = false OR i.is_private IS NULL)
   ORDER BY distance ASC;
 END;
 $$ LANGUAGE plpgsql; 
