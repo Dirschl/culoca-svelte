@@ -179,6 +179,7 @@ function createFilterStore() {
 			const latParam = searchParams.get('lat');
 			const lonParam = searchParams.get('lon');
 			const locationParam = searchParams.get('location');
+			const radiusParam = searchParams.get('r');
 
 			if (userParam) {
 				newState.userFilter = {
@@ -197,8 +198,43 @@ function createFilterStore() {
 				};
 			}
 
+			// Handle radius parameter
+			if (radiusParam) {
+				const radiusValue = parseInt(radiusParam);
+				if (!isNaN(radiusValue) && radiusValue > 0) {
+					// Store radius in localStorage for persistence
+					localStorage.setItem('radius', radiusValue.toString());
+				}
+			}
+
 			set(newState);
 			saveToStorage(newState);
+		},
+
+		// Update radius and URL
+		updateRadius: (radius: number) => {
+			if (!browser) return;
+			
+			// Store radius in localStorage
+			localStorage.setItem('radius', radius.toString());
+			
+			// Update URL with current state
+			const currentState = get(filterStore);
+			updateURL(currentState);
+		},
+
+		// Get current radius value
+		getRadius: () => {
+			if (!browser) return 1000;
+			
+			const storedRadius = localStorage.getItem('radius');
+			if (storedRadius) {
+				const radiusValue = parseInt(storedRadius);
+				if (!isNaN(radiusValue) && radiusValue > 0) {
+					return radiusValue;
+				}
+			}
+			return 1000; // Default fallback
 		}
 	};
 }
@@ -216,6 +252,7 @@ function updateURL(state: FilterState) {
 	params.delete('lat');
 	params.delete('lon');
 	params.delete('location');
+	params.delete('r');
 
 	// Add current filters
 	if (state.userFilter && state.userFilter.userId) {
@@ -229,6 +266,15 @@ function updateURL(state: FilterState) {
 		params.set('lat', state.locationFilter.lat.toString());
 		params.set('lon', state.locationFilter.lon.toString());
 		params.set('location', state.locationFilter.name);
+	}
+
+	// Add radius parameter if available in localStorage
+	const storedRadius = localStorage.getItem('radius');
+	if (storedRadius) {
+		const radiusValue = parseInt(storedRadius);
+		if (!isNaN(radiusValue) && radiusValue > 0) {
+			params.set('r', radiusValue.toString());
+		}
 	}
 
 	// Update URL without triggering navigation
