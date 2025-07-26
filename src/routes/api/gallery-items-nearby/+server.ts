@@ -29,7 +29,7 @@ export async function GET({ url }) {
       user_lat: effectiveLat,
       user_lon: effectiveLon,
       page_value: page,
-      page_size_value: 100, // Mehr Nearby-Items laden
+      page_size_value: 1000, // Alle Nearby-Items laden für Kartenansicht
       current_user_id: currentUserId,
       search_term: null, // Keine Suche für Nearby
       location_filter_lat: locationFilterLat || null,

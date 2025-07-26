@@ -91,7 +91,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
           user_lat: img.lat,
           user_lon: img.lon,
           page_value: 0,
-          page_size_value: 100, // Mehr Nearby-Items laden
+          page_size_value: 1000, // Alle Nearby-Items laden für Kartenansicht
           current_user_id: null, // Alle öffentlichen Items
           search_term: null, // Keine Suche für Nearby
           location_filter_lat: null, // Kein LocationFilter für Nearby
