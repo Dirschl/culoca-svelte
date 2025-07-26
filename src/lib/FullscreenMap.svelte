@@ -263,12 +263,15 @@
     const sessionData = get(sessionStore);
     let filteredImages = allImages;
     
+    console.log(`[FullscreenMap] getFilteredImages: allImages=${allImages?.length || 0}, userFilter=${!!currentFilters.userFilter}, isAuthenticated=${sessionData.isAuthenticated}`);
+    
     // Apply privacy and user filtering
     if (currentFilters.userFilter) {
       // If user filter is active, show all images from that user (including private)
       filteredImages = filteredImages.filter(img => 
         img.profile_id === currentFilters.userFilter!.userId
       );
+      console.log(`[FullscreenMap] After user filter: ${filteredImages.length} images`);
     } else {
       // If no user filter, apply privacy filtering based on login status
       if (sessionData.isAuthenticated && sessionData.userId) {
@@ -276,14 +279,17 @@
         filteredImages = filteredImages.filter(img => 
           img.profile_id === sessionData.userId || img.is_private === false || img.is_private === null
         );
+        console.log(`[FullscreenMap] After privacy filter (authenticated): ${filteredImages.length} images`);
       } else {
         // For anonymous users: only show public images
         filteredImages = filteredImages.filter(img => 
           img.is_private === false || img.is_private === null
         );
+        console.log(`[FullscreenMap] After privacy filter (anonymous): ${filteredImages.length} images`);
       }
     }
     
+    console.log(`[FullscreenMap] Final filtered images: ${filteredImages.length}`);
     return filteredImages;
   }
   
@@ -1273,6 +1279,7 @@
         allImages = fallbackWithDistance;
       } else {
         console.log('[FullscreenMap] PostGIS loaded', mapImagesData?.length || 0, 'images for map');
+        console.log('[FullscreenMap] Sample image data:', mapImagesData?.[0]);
         allImages = mapImagesData || [];
       }
       
