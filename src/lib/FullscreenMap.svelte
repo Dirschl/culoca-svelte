@@ -1209,17 +1209,45 @@
       const { data: { user } } = await supabase.auth.getUser();
       const currentUserId = user?.id || null;
       
-      // Use optimized PostGIS function for map images
-      const { data: mapImagesData, error } = await supabase.rpc('map_images_postgis', {
-        user_lat: userLat || 0,
-        user_lon: userLon || 0,
-        current_user_id: currentUserId
-      });
+      // Try multiple PostGIS functions and fallback options
+      console.log('[FullscreenMap] Calling PostGIS with params:', { userLat, userLon, currentUserId });
       
-      if (error) {
-        console.error('[FullscreenMap] PostGIS RPC error:', error);
-        // Fallback to direct query if PostGIS function fails
-        console.log('[FullscreenMap] Falling back to direct query...');
+      let mapImagesData = null;
+      let error = null;
+      
+      // Try the original function first
+      try {
+        const result = await supabase.rpc('map_images_postgis', {
+          user_lat: userLat || 0,
+          user_lon: userLon || 0,
+          current_user_id: currentUserId
+        });
+        mapImagesData = result.data;
+        error = result.error;
+        console.log('[FullscreenMap] Original PostGIS response:', { data: mapImagesData, error });
+      } catch (e) {
+        console.log('[FullscreenMap] Original PostGIS function failed, trying simple version...');
+      }
+      
+      // If original failed, try simple version
+      if (error || !mapImagesData || mapImagesData.length === 0) {
+        try {
+          const result = await supabase.rpc('map_images_postgis_simple', {
+            user_lat: userLat || 0,
+            user_lon: userLon || 0,
+            current_user_id: currentUserId
+          });
+          mapImagesData = result.data;
+          error = result.error;
+          console.log('[FullscreenMap] Simple PostGIS response:', { data: mapImagesData, error });
+        } catch (e) {
+          console.log('[FullscreenMap] Simple PostGIS function also failed...');
+        }
+      }
+      
+      // If both PostGIS functions failed, use direct query
+      if (error || !mapImagesData || mapImagesData.length === 0) {
+        console.log('[FullscreenMap] PostGIS functions failed, falling back to direct query...');
         const { data: fallbackData, error: fallbackError } = await supabase
           .from('items')
           .select('id, slug, path_64, title, lat, lon')
@@ -1228,6 +1256,8 @@
           .not('path_64', 'is', null)
           .eq('gallery', true)
           .or('is_private.eq.false,is_private.is.null');
+        
+        console.log('[FullscreenMap] Fallback response:', { data: fallbackData, error: fallbackError });
         
         if (fallbackError) {
           console.error('[FullscreenMap] Fallback query error:', fallbackError);
