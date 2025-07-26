@@ -33,7 +33,7 @@
   import FullscreenMap from '$lib/FullscreenMap.svelte';
   import { searchQuery, isSearching, useSearchResults, performSearch, clearSearch, setSearchQuery } from '$lib/searchStore';
   import { sessionStore } from '$lib/sessionStore';
-  import { filterStore } from '$lib/filterStore';
+  import { filterStore, locationFilter, userFilter } from '$lib/filterStore';
   import { page as pageStore } from '$app/stores';
   import { galleryStats } from '$lib/galleryStats';
   import { dynamicImageLoader } from '$lib/dynamicImageLoader';
@@ -151,6 +151,10 @@
     if (gps && gps.lat !== undefined && gps.lon !== undefined) {
       url.searchParams.set('lat', String(gps.lat));
       url.searchParams.set('lon', String(gps.lon));
+      // Set fromItem parameter for Location Filter
+      if (gps.fromItem) {
+        url.searchParams.set('fromItem', 'true');
+      }
     }
     return url.toString();
   }
@@ -168,6 +172,32 @@
   // Setze anonyme User Defaults wenn Login-Status sich ändert
   $: if (browser) {
     setAnonymousUserDefaults();
+  }
+
+  // NEU: Reaktive Gallery-Neuladen bei Filter-Änderungen
+  $: if (browser && galleryInitialized) {
+    const currentLocationFilter = $locationFilter;
+    const currentUserFilter = $userFilter;
+    
+    // Wenn sich Location-Filter ändert, lade Gallery neu
+    if (currentLocationFilter) {
+      console.log('[Reactive] Location filter changed, reloading gallery:', currentLocationFilter);
+      resetGallery();
+      loadMoreGallery({
+        lat: currentLocationFilter.lat,
+        lon: currentLocationFilter.lon,
+        fromItem: currentLocationFilter.fromItem
+      });
+    }
+    
+    // Wenn sich User-Filter ändert, lade Gallery neu
+    if (currentUserFilter) {
+      console.log('[Reactive] User filter changed, reloading gallery:', currentUserFilter);
+      resetGallery();
+      loadMoreGallery({
+        user_id: currentUserFilter.userId
+      });
+    }
   }
 
   // Kontinuierliche Rotation im 3x3-Modus

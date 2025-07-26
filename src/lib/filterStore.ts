@@ -262,11 +262,21 @@ export function getEffectiveGpsPosition() {
 	const state = get(filterStore);
 	// 1. Location-Filter (z.B. aus Suchfeld)
 	if (state.locationFilter && state.locationFilter.lat && state.locationFilter.lon) {
-		return { lat: state.locationFilter.lat, lon: state.locationFilter.lon, source: 'locationFilter' };
+		return { 
+			lat: state.locationFilter.lat, 
+			lon: state.locationFilter.lon, 
+			source: 'locationFilter',
+			fromItem: state.locationFilter.fromItem || false
+		};
 	}
 	// 2. Letzte GPS-Position (live)
 	if (state.lastGpsPosition && state.lastGpsPosition.lat && state.lastGpsPosition.lon) {
-		return { lat: state.lastGpsPosition.lat, lon: state.lastGpsPosition.lon, source: 'lastGpsPosition' };
+		return { 
+			lat: state.lastGpsPosition.lat, 
+			lon: state.lastGpsPosition.lon, 
+			source: 'lastGpsPosition',
+			fromItem: false
+		};
 	}
 	// 3. Persistierter Wert (aus localStorage)
 	if (typeof window !== 'undefined') {
@@ -275,7 +285,12 @@ export function getEffectiveGpsPosition() {
 			try {
 				const parsed = JSON.parse(stored);
 				if (parsed.lastGpsPosition && parsed.lastGpsPosition.lat && parsed.lastGpsPosition.lon) {
-					return { lat: parsed.lastGpsPosition.lat, lon: parsed.lastGpsPosition.lon, source: 'persisted' };
+					return { 
+						lat: parsed.lastGpsPosition.lat, 
+						lon: parsed.lastGpsPosition.lon, 
+						source: 'persisted',
+						fromItem: false
+					};
 				}
 			} catch (e) {}
 		}

@@ -60,9 +60,12 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
   }
   galleryParams.set(mergedParams);
 
+  // Normale Limits für alle Filter
+  const effectiveLimit = limit; // Normale Limits für alle Filter
+
   const url = new URL('/api/items', window.location.origin);
   url.searchParams.set('offset', String(offset));
-  url.searchParams.set('limit', String(limit));
+  url.searchParams.set('limit', String(effectiveLimit));
   if (mergedParams.search) url.searchParams.set('s', mergedParams.search);
   if (mergedParams.lat && mergedParams.lon) {
     url.searchParams.set('lat', String(mergedParams.lat));
@@ -74,7 +77,12 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
   console.log('[GalleryStore] API-Request:', {
     params: mergedParams,
     url: url.toString(),
-    hasGPS: !!(mergedParams.lat && mergedParams.lon)
+    hasGPS: !!(mergedParams.lat && mergedParams.lon),
+    effectiveLimit,
+    isLocationFilter: !!mergedParams.fromItem,
+    originalLimit: limit,
+    offset,
+    currentItemsCount: get(galleryItems).length
   });
 
   try {
@@ -89,7 +97,10 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
       status: data.status,
       imageCount: data.images?.length || 0,
       totalCount: data.totalCount,
-      gpsMode: data.gpsMode
+      loadedCount: data.loadedCount,
+      gpsMode: data.gpsMode,
+      apiVersion: data.apiVersion,
+      debug: data.debug
     });
 
   if (data && data.images) {
@@ -133,16 +144,25 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
         // Progressives Hinzufügen für flüssigere UX
       galleryItems.update(items => [...items, ...mapped]);
     }
-    offset += mapped.length;
-    galleryTotalCount.set(data.totalCount || 0);
-    hasMoreGalleryItems.set(offset < (data.totalCount || 0));
-
-      console.log('[GalleryStore] Updated store:', {
-        itemsCount: mapped.length,
-        totalOffset: offset,
-        totalCount: data.totalCount,
-        hasMore: offset < (data.totalCount || 0)
-      });
+    
+                    // Normale Paginierung für alle Filter (auch Location Filter)
+                offset += mapped.length;
+                hasMoreGalleryItems.set(offset < (data.totalCount || 0));
+    
+    // FALLBACK: Falls totalCount nicht gesetzt ist, verwende die Anzahl der geladenen Items
+    const effectiveTotalCount = data.totalCount || mapped.length;
+    galleryTotalCount.set(effectiveTotalCount);
+    
+    // FALLBACK: Falls loadedCount nicht gesetzt ist, verwende die Anzahl der gemappten Items
+    const effectiveLoadedCount = data.loadedCount || mapped.length;
+    
+    console.log('[GalleryStore] Final store update:', {
+      effectiveTotalCount,
+      effectiveLoadedCount,
+      mappedLength: mapped.length,
+      currentStoreItems: get(galleryItems).length,
+      hasMore: get(hasMoreGalleryItems)
+    });
   } else {
       console.log('[GalleryStore] No images in response');
       hasMoreGalleryItems.set(false);
