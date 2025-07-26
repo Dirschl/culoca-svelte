@@ -45,7 +45,9 @@ export const POST = async ({ request }) => {
   try {
     console.log('=== UPLOAD API CALLED ===');
     console.log('🔍 DEBUG: Environment variables check:');
+    console.log('  PUBLIC_SUPABASE_URL:', process.env.PUBLIC_SUPABASE_URL ? 'SET' : 'NOT SET');
     console.log('  VITE_SUPABASE_URL:', process.env.VITE_SUPABASE_URL ? 'SET' : 'NOT SET');
+    console.log('  PUBLIC_SUPABASE_ANON_KEY:', process.env.PUBLIC_SUPABASE_ANON_KEY ? 'SET' : 'NOT SET');
     console.log('  VITE_SUPABASE_ANON_KEY:', process.env.VITE_SUPABASE_ANON_KEY ? 'SET' : 'NOT SET');
     console.log('  NODE_ENV:', process.env.NODE_ENV);
     console.log('  VERCEL_URL:', process.env.VERCEL_URL);
@@ -67,8 +69,8 @@ export const POST = async ({ request }) => {
     console.log(`Received ${filenames.length} filenames to process`);
 
     // Supabase-Client dynamisch mit JWT initialisieren
-    const supabaseUrl = process.env.VITE_SUPABASE_URL as string;
-    const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY as string;
+    const supabaseUrl = (process.env.PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL) as string;
+    const supabaseAnonKey = (process.env.PUBLIC_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY) as string;
     if (!supabaseUrl || !supabaseAnonKey) {
       throw error(500, 'Supabase-Umgebungsvariablen fehlen!');
     }

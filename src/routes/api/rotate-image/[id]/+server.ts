@@ -3,7 +3,7 @@ import type { RequestHandler } from './$types';
 import { createClient } from '@supabase/supabase-js';
 import sharp from 'sharp';
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL!;
+const supabaseUrl = (process.env.PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL)!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 export const POST: RequestHandler = async ({ params, request }) => {
@@ -17,7 +17,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     
     // User prüfen mit separatem Client für Auth
-    const authSupabase = createClient(supabaseUrl, process.env.VITE_SUPABASE_ANON_KEY!, {
+    const authSupabase = createClient(supabaseUrl, (process.env.PUBLIC_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY)!, {
       global: { headers: { Authorization: `Bearer ${token}` } }
     });
     

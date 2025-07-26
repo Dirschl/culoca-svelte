@@ -2,8 +2,8 @@ import type { PageServerLoad } from './$types';
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
-  (process.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL) as string,
-  (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY) as string,
+  (process.env.PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL || import.meta.env.PUBLIC_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL) as string,
+  (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.PUBLIC_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || import.meta.env.PUBLIC_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY) as string,
   {
     auth: { persistSession: false }
   }
