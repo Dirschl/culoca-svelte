@@ -1200,44 +1200,51 @@
     window.open(`mailto:?subject=${subject}&body=${body}`);
   }
 
-  // Load all images for the map (not just the current gallery items)
+  // Load all images for the map using optimized PostGIS function
   async function loadAllImagesForMap() {
     try {
-      console.log('[FullscreenMap] Loading all images for map...');
+      console.log('[FullscreenMap] Loading all images for map with optimized PostGIS...');
       
       // Get current user for privacy filtering
       const { data: { user } } = await supabase.auth.getUser();
       const currentUserId = user?.id || null;
       
-      // Load all images with GPS coordinates
-      let query = supabase
-        .from('items')
-        .select('id, slug, path_512, path_2048, path_64, original_name, title, description, lat, lon, width, height, is_private, gallery, profile_id')
-        .not('lat', 'is', null)
-        .not('lon', 'is', null)
-        .not('path_512', 'is', null)
-        .eq('gallery', true);
-      
-      // Apply privacy filter based on user
-      if (currentUserId) {
-        // Logged in user: show their private images + all public images
-        query = query.or(`is_private.eq.false,is_private.is.null,profile_id.eq.${currentUserId}`);
-      } else {
-        // Anonymous user: show only public images
-        query = query.or('is_private.eq.false,is_private.is.null');
-      }
-      
-      const { data: allImagesData, error } = await query.order('created_at', { ascending: false });
+      // Use optimized PostGIS function for map images
+      const { data: mapImagesData, error } = await supabase.rpc('map_images_postgis', {
+        user_lat: userLat || 0,
+        user_lon: userLon || 0,
+        current_user_id: currentUserId
+      });
       
       if (error) {
-        console.error('[FullscreenMap] Error loading all images:', error);
-        return;
+        console.error('[FullscreenMap] PostGIS RPC error:', error);
+        // Fallback to direct query if PostGIS function fails
+        console.log('[FullscreenMap] Falling back to direct query...');
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from('items')
+          .select('id, slug, path_64, title, lat, lon')
+          .not('lat', 'is', null)
+          .not('lon', 'is', null)
+          .not('path_64', 'is', null)
+          .eq('gallery', true)
+          .or('is_private.eq.false,is_private.is.null');
+        
+        if (fallbackError) {
+          console.error('[FullscreenMap] Fallback query error:', fallbackError);
+          return;
+        }
+        
+        // Add distance calculation for fallback data
+        const fallbackWithDistance = (fallbackData || []).map(item => ({
+          ...item,
+          distance: userLat && userLon ? getDistanceInMeters(userLat, userLon, item.lat, item.lon) : 999999999
+        }));
+        
+        allImages = fallbackWithDistance;
+      } else {
+        console.log('[FullscreenMap] PostGIS loaded', mapImagesData?.length || 0, 'images for map');
+        allImages = mapImagesData || [];
       }
-      
-      console.log('[FullscreenMap] Loaded', allImagesData?.length || 0, 'images for map');
-      
-      // Update allImages array
-      allImages = allImagesData || [];
       
       // Re-add markers if map is already initialized
       if (mapInitialized && map) {
