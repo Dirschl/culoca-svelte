@@ -34,7 +34,7 @@ export async function GET({ url }) {
       search_term: null, // Keine Suche für Nearby
       location_filter_lat: locationFilterLat || null,
       location_filter_lon: locationFilterLon || null
-    });
+    }, { head: false });
 
     if (error) {
       console.error('[Nearby API] PostGIS RPC error:', error);
