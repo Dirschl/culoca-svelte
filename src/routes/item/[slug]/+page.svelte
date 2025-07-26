@@ -73,22 +73,40 @@
     goto('/');
   }
 
-  // Radius initial aus localStorage lesen (Fallback 1000)
+  // Radius initial setzen - URL-Parameter haben Vorrang
   let radius = 1000;
-  if (typeof window !== 'undefined') {
-    const storedRadius = Number(localStorage.getItem('radius'));
-    if (!isNaN(storedRadius) && storedRadius > 0) {
-      radius = storedRadius;
-    }
-  }
+  let radiusInitialized = false;
   
   // Initialize filterStore from URL parameters (includes radius)
   onMount(() => {
     if (browser) {
       const urlParams = new URLSearchParams(window.location.search);
       filterStore.initFromUrl(urlParams);
+      
+      // Check if radius parameter is in URL - it has priority over localStorage
+      const radiusParam = urlParams.get('r');
+      if (radiusParam) {
+        const radiusValue = parseInt(radiusParam);
+        if (!isNaN(radiusValue) && radiusValue > 0) {
+          radius = radiusValue;
+          console.log(`[Item Detail] Radius from URL parameter: ${radius}m`);
+        }
+      } else {
+        // Fallback to localStorage if no URL parameter
+        const storedRadius = Number(localStorage.getItem('radius'));
+        if (!isNaN(storedRadius) && storedRadius > 0) {
+          radius = storedRadius;
+          console.log(`[Item Detail] Radius from localStorage: ${radius}m`);
+        }
+      }
+      radiusInitialized = true;
     }
   });
+  
+  // Reactive statement to ensure radius is properly set
+  $: if (radiusInitialized && browser) {
+    console.log(`[Item Detail] Current radius value: ${radius}m`);
+  }
   function onRadiusInput(e) {
     radius = +e.target.value;
   }
