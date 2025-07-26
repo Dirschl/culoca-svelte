@@ -107,6 +107,41 @@
   $: if (radiusInitialized && browser) {
     console.log(`[Item Detail] Current radius value: ${radius}m`);
   }
+  
+  // Copy current link to clipboard
+  async function copyCurrentLink() {
+    if (!browser) return;
+    
+    try {
+      // Get current URL with all parameters
+      const currentUrl = window.location.href;
+      
+      // Copy to clipboard
+      await navigator.clipboard.writeText(currentUrl);
+      
+      // Show success feedback
+      console.log('✅ Link copied to clipboard:', currentUrl);
+      
+      // Optional: Show a brief success message
+      // You could add a toast notification here
+      
+    } catch (error) {
+      console.error('❌ Failed to copy link:', error);
+      
+      // Fallback for older browsers
+      try {
+        const textArea = document.createElement('textarea');
+        textArea.value = window.location.href;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        console.log('✅ Link copied using fallback method');
+      } catch (fallbackError) {
+        console.error('❌ Fallback copy also failed:', fallbackError);
+      }
+    }
+  }
   function onRadiusInput(e) {
     radius = +e.target.value;
   }
@@ -651,7 +686,7 @@
       {image}
       isCreator={isCreator}
       onSetLocationFilter={setLocationFilter}
-      onCopyLink={() => {}}
+      onCopyLink={copyCurrentLink}
       onDeleteImage={deleteImage}
       onDownloadOriginal={downloadOriginal}
       onToggleGallery={toggleGallery}
