@@ -58,13 +58,13 @@
   // Internal images array for clustering
   let allImages: any[] = [];
   
-  // Use images prop if available
-  $: if (images && images.length > 0) {
-    console.log('[FullscreenMap] Using images prop:', images.length, 'images');
-    allImages = images;
-  } else {
-    console.log('[FullscreenMap] No images prop available');
-    allImages = [];
+  // Always load all images directly from database, ignore images prop
+  $: {
+    console.log('[FullscreenMap] Ignoring images prop, loading all images directly');
+    // Load all images when component mounts or when needed
+    if (mapInitialized && !allImages.length) {
+      loadAllImagesForMap();
+    }
   }
   
     // Reaktive Zentrierung basierend auf Mobile Mode
@@ -917,6 +917,14 @@
     loadMapState();
     initMap();
     
+    // Load all images for map after map is initialized
+    setTimeout(() => {
+      if (mapInitialized) {
+        console.log('[FullscreenMap] onMount: Loading all images for map');
+        loadAllImagesForMap();
+      }
+    }, 1000); // Wait for map to be fully initialized
+    
     // Subscribe to track store changes for real-time track updates
     const unsubscribe = trackStore.subscribe((state: any) => {
       if (mapInitialized && map) {
@@ -1251,32 +1259,11 @@
         }
       }
       
-      // If both PostGIS functions failed, use direct query
+      // Use PostGIS data if available, otherwise show error
       if (error || !mapImagesData || mapImagesData.length === 0) {
-        console.log('[FullscreenMap] PostGIS functions failed, falling back to direct query...');
-        const { data: fallbackData, error: fallbackError } = await supabase
-          .from('items')
-          .select('id, slug, path_64, title, lat, lon')
-          .not('lat', 'is', null)
-          .not('lon', 'is', null)
-          .not('path_64', 'is', null)
-          .eq('gallery', true)
-          .or('is_private.eq.false,is_private.is.null');
-        
-        console.log('[FullscreenMap] Fallback response:', { data: fallbackData, error: fallbackError });
-        
-        if (fallbackError) {
-          console.error('[FullscreenMap] Fallback query error:', fallbackError);
-          return;
-        }
-        
-        // Add distance calculation for fallback data
-        const fallbackWithDistance = (fallbackData || []).map(item => ({
-          ...item,
-          distance: userLat && userLon ? getDistanceInMeters(userLat, userLon, item.lat, item.lon) : 999999999
-        }));
-        
-        allImages = fallbackWithDistance;
+        console.error('[FullscreenMap] PostGIS functions failed, no fallback available');
+        console.error('[FullscreenMap] Error details:', error);
+        return;
       } else {
         console.log('[FullscreenMap] PostGIS loaded', mapImagesData?.length || 0, 'images for map');
         console.log('[FullscreenMap] Sample image data:', mapImagesData?.[0]);
