@@ -1491,7 +1491,6 @@
   {/if}
   {#if showFullscreenMap}
     <FullscreenMap 
-      images={$galleryItems}
       userLat={effectiveLat}
       userLon={effectiveLon}
       {deviceHeading}
