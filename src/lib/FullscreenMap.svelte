@@ -425,7 +425,7 @@
     mapInitialized = true;
     
     // Load all images for clustering
-    // Removed: loadAllImagesForMap(); // Removed as per edit hint
+    loadAllImagesForMap();
   }
   
   function addImageMarkers() {
@@ -1198,6 +1198,55 @@
     const subject = encodeURIComponent(`GPS-Track: ${lastTrack.name}`);
     const body = encodeURIComponent('Hier ist dein GPS-Track (GPX):\n\n' + gpx);
     window.open(`mailto:?subject=${subject}&body=${body}`);
+  }
+
+  // Load all images for the map (not just the current gallery items)
+  async function loadAllImagesForMap() {
+    try {
+      console.log('[FullscreenMap] Loading all images for map...');
+      
+      // Get current user for privacy filtering
+      const { data: { user } } = await supabase.auth.getUser();
+      const currentUserId = user?.id || null;
+      
+      // Load all images with GPS coordinates
+      let query = supabase
+        .from('items')
+        .select('id, slug, path_512, path_2048, path_64, original_name, title, description, lat, lon, width, height, is_private, gallery, profile_id')
+        .not('lat', 'is', null)
+        .not('lon', 'is', null)
+        .not('path_512', 'is', null)
+        .eq('gallery', true);
+      
+      // Apply privacy filter based on user
+      if (currentUserId) {
+        // Logged in user: show their private images + all public images
+        query = query.or(`is_private.eq.false,is_private.is.null,profile_id.eq.${currentUserId}`);
+      } else {
+        // Anonymous user: show only public images
+        query = query.or('is_private.eq.false,is_private.is.null');
+      }
+      
+      const { data: allImagesData, error } = await query.order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('[FullscreenMap] Error loading all images:', error);
+        return;
+      }
+      
+      console.log('[FullscreenMap] Loaded', allImagesData?.length || 0, 'images for map');
+      
+      // Update allImages array
+      allImages = allImagesData || [];
+      
+      // Re-add markers if map is already initialized
+      if (mapInitialized && map) {
+        addImageMarkers();
+      }
+      
+    } catch (err) {
+      console.error('[FullscreenMap] Error in loadAllImagesForMap:', err);
+    }
   }
 </script>
 
