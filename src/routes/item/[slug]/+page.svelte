@@ -81,6 +81,14 @@
       radius = storedRadius;
     }
   }
+  
+  // Initialize filterStore from URL parameters (includes radius)
+  onMount(() => {
+    if (browser) {
+      const urlParams = new URLSearchParams(window.location.search);
+      filterStore.initFromUrl(urlParams);
+    }
+  });
   function onRadiusInput(e) {
     radius = +e.target.value;
   }
@@ -88,6 +96,8 @@
     radius = +e.target.value;
     if (typeof window !== 'undefined') {
       localStorage.setItem('radius', String(radius));
+      // Update URL with radius parameter
+      filterStore.updateRadius(radius);
     }
   }
   $: filteredNearby = nearby.filter(item => item.distance <= radius && item.id !== image?.id);
