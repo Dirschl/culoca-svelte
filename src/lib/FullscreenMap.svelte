@@ -52,8 +52,9 @@
   let previousPosition: { lat: number; lon: number; timestamp: number } | null = null;
   let positionWatchId: number | null = null;
   
-  // Import supabase client for loading all images
+  // Import supabase client and PostGIS loader for loading all images
   import { supabase } from './supabaseClient';
+  import { loadAllMapImages } from './postgisLoader';
   
   // Internal images array for clustering
   let allImages: any[] = [];
@@ -1214,61 +1215,48 @@
     window.open(`mailto:?subject=${subject}&body=${body}`);
   }
 
-  // Load all images for the map using optimized PostGIS function
+  // Load all images for the map using robust PostGIS pagination
   async function loadAllImagesForMap() {
     try {
-      console.log('[FullscreenMap] Loading all images for map with optimized PostGIS...');
+      console.log('[FullscreenMap] Loading all images for map with robust pagination...');
       
       // Get current user for privacy filtering
       const { data: { user } } = await supabase.auth.getUser();
       const currentUserId = user?.id || null;
       
-      // Try multiple PostGIS functions and fallback options
-      console.log('[FullscreenMap] Calling PostGIS with params:', { userLat, userLon, currentUserId });
+      // Get current filters for PostGIS function
+      const currentFilters = get(filterStore);
       
-      let mapImagesData = null;
-      let error = null;
+      // Prepare filter parameters
+      const userFilterId = currentFilters.userFilter?.userId || null;
+      const locationFilterLat = currentFilters.locationFilter?.lat || null;
+      const locationFilterLon = currentFilters.locationFilter?.lon || null;
       
-      // Try the original function first
-      try {
-        const result = await supabase.rpc('map_images_postgis', {
-          user_lat: userLat || 0,
-          user_lon: userLon || 0,
-          current_user_id: currentUserId
-        });
-        mapImagesData = result.data;
-        error = result.error;
-        console.log('[FullscreenMap] Original PostGIS response:', { data: mapImagesData, error });
-      } catch (e) {
-        console.log('[FullscreenMap] Original PostGIS function failed, trying simple version...');
-      }
+      console.log('[FullscreenMap] Filter parameters:', {
+        userFilterId,
+        locationFilterLat,
+        locationFilterLon,
+        currentUserId
+      });
       
-      // If original failed, try simple version
-      if (error || !mapImagesData || mapImagesData.length === 0) {
-        try {
-          const result = await supabase.rpc('map_images_postgis_simple', {
-            user_lat: userLat || 0,
-            user_lon: userLon || 0,
-            current_user_id: currentUserId
-          });
-          mapImagesData = result.data;
-          error = result.error;
-          console.log('[FullscreenMap] Simple PostGIS response:', { data: mapImagesData, error });
-        } catch (e) {
-          console.log('[FullscreenMap] Simple PostGIS function also failed...');
-        }
-      }
+      // Use the robust PostGIS loader with pagination
+      const mapImagesData = await loadAllMapImages(
+        userLat,
+        userLon,
+        currentUserId,
+        userFilterId,
+        locationFilterLat,
+        locationFilterLon
+      );
       
-      // Use PostGIS data if available, otherwise show error
-      if (error || !mapImagesData || mapImagesData.length === 0) {
-        console.error('[FullscreenMap] PostGIS functions failed, no fallback available');
-        console.error('[FullscreenMap] Error details:', error);
+      if (!mapImagesData || mapImagesData.length === 0) {
+        console.error('[FullscreenMap] No images loaded from PostGIS functions');
         return;
-      } else {
-        console.log('[FullscreenMap] PostGIS loaded', mapImagesData?.length || 0, 'images for map');
-        console.log('[FullscreenMap] Sample image data:', mapImagesData?.[0]);
-        allImages = mapImagesData || [];
       }
+      
+      console.log('[FullscreenMap] PostGIS loaded', mapImagesData.length, 'images for map');
+      console.log('[FullscreenMap] Sample image data:', mapImagesData[0]);
+      allImages = mapImagesData;
       
       // Re-add markers if map is already initialized
       if (mapInitialized && map) {

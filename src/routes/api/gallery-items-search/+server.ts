@@ -26,7 +26,7 @@ export async function GET({ url }) {
       search_term: search,
       location_filter_lat: locationFilterLat || null,
       location_filter_lon: locationFilterLon || null
-    });
+    }, { head: false });
 
     if (error) {
       console.error('[Search API] PostGIS RPC error:', error);

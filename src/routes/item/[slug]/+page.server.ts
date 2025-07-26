@@ -96,7 +96,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
           search_term: null, // Keine Suche für Nearby
           location_filter_lat: null, // Kein LocationFilter für Nearby
           location_filter_lon: null
-        });
+        }, { head: false });
 
         if (nearbyError) {
           console.error('[DetailPage] PostGIS nearby error:', nearbyError);
