@@ -821,9 +821,15 @@
       console.log('[Reactive] User filter changed, loading more gallery:', currentUserFilter);
       isHandlingFilterChange = true;
       lastUserFilter = JSON.parse(JSON.stringify(currentUserFilter));
-      resetGallery({
-        user_id: currentUserFilter.userId
-      });
+      
+      // WICHTIG: GPS-Koordinaten für User-Filter bereitstellen
+      const gpsParams = {
+        user_id: currentUserFilter.userId,
+        lat: userLat || 0,
+        lon: userLon || 0
+      };
+      
+      resetGallery(gpsParams);
       setTimeout(() => { isHandlingFilterChange = false; }, 100);
     }
     

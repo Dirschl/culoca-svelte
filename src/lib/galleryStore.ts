@@ -62,6 +62,7 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
   }
   
   // WICHTIG: GPS-Koordinaten aus dem Hauptspeicher holen, falls nicht verfügbar
+  // Auch bei User-Filtern brauchen wir GPS für die Sortierung
   if (!mergedParams.lat || !mergedParams.lon) {
     // Versuche GPS-Koordinaten aus dem Browser zu holen
     if (typeof window !== 'undefined') {
@@ -76,11 +77,19 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
     }
   }
   
-  // WICHTIG: Wenn immer noch keine GPS-Koordinaten verfügbar sind, warte
+  // WICHTIG: Bei User-Filtern auch ohne GPS laden (für Sortierung nach Datum)
+  // Nur bei normalen Filtern ohne GPS warten
   if (!mergedParams.lat || !mergedParams.lon) {
-    console.log('[GalleryStore] No GPS coordinates available, waiting for GPS...');
-    isGalleryLoading.set(false);
-    return; // Beende ohne zu laden
+    if (mergedParams.user_id) {
+      // Bei User-Filter auch ohne GPS laden (Sortierung nach Datum)
+      console.log('[GalleryStore] User filter active, loading without GPS coordinates');
+      mergedParams.lat = 0;
+      mergedParams.lon = 0;
+    } else {
+      console.log('[GalleryStore] No GPS coordinates available, waiting for GPS...');
+      isGalleryLoading.set(false);
+      return; // Beende ohne zu laden
+    }
   }
   
   galleryParams.set(mergedParams);

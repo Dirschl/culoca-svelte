@@ -1,10 +1,10 @@
--- Erweiterte einheitliche PostGIS-Funktion mit LocationFilter-Unterstützung
--- Bestehende Funktionen löschen
-DROP FUNCTION IF EXISTS gallery_items_normal_postgis(double precision, double precision, integer, integer, uuid);
-DROP FUNCTION IF EXISTS gallery_items_search_postgis(double precision, double precision, integer, integer, uuid, text);
-DROP FUNCTION IF EXISTS gallery_items_unified_postgis(double precision, double precision, integer, integer, uuid, text);
+-- Update PostGIS function to support user filtering
+-- Run this in Supabase SQL Editor
 
--- Erweiterte einheitliche PostGIS-Funktion mit LocationFilter-Unterstützung
+-- Drop existing function
+DROP FUNCTION IF EXISTS gallery_items_unified_postgis(double precision, double precision, integer, integer, uuid, text, double precision, double precision);
+
+-- Create updated function with user filter support
 CREATE OR REPLACE FUNCTION gallery_items_unified_postgis(
   user_lat DOUBLE PRECISION DEFAULT 0,
   user_lon DOUBLE PRECISION DEFAULT 0,
