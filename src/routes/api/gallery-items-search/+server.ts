@@ -16,32 +16,49 @@ export async function GET({ url }) {
     const { data: { user } } = await supabase.auth.getUser();
     const currentUserId = user?.id || null;
 
-    // NEU: Verwende die aktualisierte gallery_items_unified_postgis Funktion mit Search- und LocationFilter-Unterstützung
-    const { data, error } = await supabase.rpc('gallery_items_unified_postgis', {
-      user_lat: lat || 0,
-      user_lon: lon || 0,
-      page_value: page,
-      page_size_value: 50,
-      current_user_id: currentUserId,
-      search_term: search || null,
-      location_filter_lat: locationFilterLat || null,
-      location_filter_lon: locationFilterLon || null
-    }, { head: false });
+    // TEMPORÄR: Verwende einfache SQL-Abfrage statt PostGIS-Funktion
+    let query = supabase
+      .from('items')
+      .select('*', { count: 'exact' })
+      .not('path_512', 'is', null)
+      .eq('gallery', true);
+
+    // Privacy-Filter
+    if (currentUserId) {
+      query = query.or(`profile_id.eq.${currentUserId},is_private.eq.false,is_private.is.null`);
+    } else {
+      query = query.or('is_private.eq.false,is_private.is.null');
+    }
+
+    // Search-Filter
+    if (search) {
+      query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%`);
+    }
+
+    // Pagination
+    const pageSize = 50;
+    const offset = page * pageSize;
+    query = query.range(offset, offset + pageSize - 1);
+
+    // Order by created_at (temporär ohne Distance-Sortierung)
+    query = query.order('created_at', { ascending: false });
+
+    const { data, error, count } = await query;
 
     if (error) {
-      console.error('[Search API] PostGIS RPC error:', error);
+      console.error('[Search API] SQL error:', error);
       return json({ error: 'Failed to fetch gallery items', details: error }, { status: 500 });
     }
 
-    console.log('[Search API] PostGIS RPC success, items:', data?.length || 0);
+    console.log('[Search API] SQL success, items:', data?.length || 0);
 
-    // Nur total_count entfernen, distance behalten für Frontend-Sortierung
-    const items = data?.map(item => {
-      const { total_count, ...itemWithoutTotalCount } = item;
-      return itemWithoutTotalCount;
-    }) || [];
+    // Map items to include distance (temporär 0)
+    const items = data?.map(item => ({
+      ...item,
+      distance: 0 // Temporär ohne Distance-Berechnung
+    })) || [];
 
-    const totalCount = data?.[0]?.total_count || 0;
+    const totalCount = count || 0;
 
     return json({
       items,
