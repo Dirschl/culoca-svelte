@@ -869,6 +869,7 @@
     // Event-Listener für FilterBar Events
     window.addEventListener('toggle3x3Mode', handleToggle3x3Mode);
     window.addEventListener('openMap', handleOpenMap);
+    window.addEventListener('locationSelected', handleLocationSelected);
     
     // GPS-Simulation Message-Listener
     const handleGPSSimulation = (event: MessageEvent) => {
@@ -1046,6 +1047,7 @@
       window.removeEventListener('scroll', onScrollForAudioguide);
       window.removeEventListener('toggle3x3Mode', handleToggle3x3Mode);
       window.removeEventListener('openMap', handleOpenMap);
+      window.removeEventListener('locationSelected', handleLocationSelected);
       window.removeEventListener('message', handleGPSSimulation);
       if (rotationInterval) {
         clearInterval(rotationInterval);
@@ -1134,6 +1136,40 @@
 
   function handleOpenMap() {
     showFullscreenMap = true;
+  }
+  
+  // Handle location selection from map
+  function handleLocationSelected(event: CustomEvent) {
+    const { lat, lon } = event.detail;
+    console.log('[Location-Selected] User selected location from map:', { lat, lon });
+    
+    // Set the selected location as "GPS gemerkt"
+    userLat = lat;
+    userLon = lon;
+    
+    // Update GPS status to active (as if GPS was working)
+    gpsStatus = 'active';
+    lastGPSUpdateTime = Date.now();
+    
+    // Save to localStorage as "GPS gemerkt"
+    if (browser) {
+      localStorage.setItem('gpsAllowed', 'true');
+      const gpsData = { lat, lon, timestamp: Date.now() };
+      localStorage.setItem('userGps', JSON.stringify(gpsData));
+      console.log('[Location-Selected] Saved selected location as GPS gemerkt:', gpsData);
+    }
+    
+    // Update filterStore with the selected location
+    filterStore.updateGpsStatus(true, { lat, lon });
+    
+    // Close the map
+    showFullscreenMap = false;
+    
+    // Trigger gallery reload with new coordinates
+    if (galleryInitialized) {
+      console.log('[Location-Selected] Reloading gallery with selected location');
+      resetGallery({ lat, lon });
+    }
   }
 
   // Haversine-Formel für Entfernungsberechnung
@@ -1363,15 +1399,20 @@
 {#if gpsStatus === 'denied' || gpsStatus === 'unavailable'}
   <div style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(30,30,30,0.92);z-index:10000;display:flex;flex-direction:column;align-items:center;justify-content:center;">
     <div style="background:#222;padding:2rem 2.5rem;border-radius:1rem;box-shadow:0 2px 16px #0008;max-width:90vw;text-align:center;">
-      <h2 style="color:#fff;margin-bottom:1rem;">Standort-Freigabe benötigt</h2>
+      <h2 style="color:#fff;margin-bottom:1rem;">Standort auswählen</h2>
       <p style="color:#ccc;font-size:1.1rem;margin-bottom:1.5rem;">
-        Um die Galerie nach Entfernung zu sortieren, benötigen wir Zugriff auf deinen Standort.<br>
-        Du kannst aber auch ohne Standort die Galerie nutzen.
+        GPS ist nicht verfügbar. Wähle deinen Standort auf der Karte aus, um die Galerie nach Entfernung zu sortieren.
       </p>
       <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;">
-      <button on:click={initializeGPS} style="padding: 0.9rem 2.2rem; font-size: 1.15rem; border-radius: 0.5rem; background: #3a7; color: #fff; border: none; cursor: pointer; font-weight:600;">
-        📍 Standort verwenden
-      </button>
+        <button on:click={initializeGPS} style="padding: 0.9rem 2.2rem; font-size: 1.15rem; border-radius: 0.5rem; background: #3a7; color: #fff; border: none; cursor: pointer; font-weight:600;">
+          📍 Standort verwenden
+        </button>
+        <button on:click={() => {
+          gpsStatus = 'none';
+          showFullscreenMap = true;
+        }} style="padding: 0.9rem 2.2rem; font-size: 1.15rem; border-radius: 0.5rem; background: #4CAF50; color: #fff; border: none; cursor: pointer; font-weight:600;">
+          🗺️ Standort auf Karte auswählen
+        </button>
         <button on:click={() => gpsStatus = 'none'} style="padding: 0.9rem 2.2rem; font-size: 1.15rem; border-radius: 0.5rem; background: #666; color: #fff; border: none; cursor: pointer; font-weight:600;">
           Ohne Standort fortfahren
         </button>
@@ -1535,7 +1576,34 @@
       on:locationSelected={(event) => {
         const { lat, lon } = event.detail;
         console.log('[FullscreenMap] Location selected:', lat, lon);
-        // Optional: Set location filter or handle location selection
+        
+        // Set the selected location as "GPS gemerkt"
+        userLat = lat;
+        userLon = lon;
+        
+        // Update GPS status to active (as if GPS was working)
+        gpsStatus = 'active';
+        lastGPSUpdateTime = Date.now();
+        
+        // Save to localStorage as "GPS gemerkt"
+        if (browser) {
+          localStorage.setItem('gpsAllowed', 'true');
+          const gpsData = { lat, lon, timestamp: Date.now() };
+          localStorage.setItem('userGps', JSON.stringify(gpsData));
+          console.log('[FullscreenMap] Saved selected location as GPS gemerkt:', gpsData);
+        }
+        
+        // Update filterStore with the selected location
+        filterStore.updateGpsStatus(true, { lat, lon });
+        
+        // Close the map
+        showFullscreenMap = false;
+        
+        // Trigger gallery reload with new coordinates
+        if (galleryInitialized) {
+          console.log('[FullscreenMap] Reloading gallery with selected location');
+          resetGallery({ lat, lon });
+        }
       }}
     />
   {/if}
