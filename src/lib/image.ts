@@ -44,7 +44,11 @@ export async function resizeJPG(buffer: Buffer) {
   // Hole die Qualitätseinstellungen aus den Environment-Variablen
   const settings = getImageQualitySettings();
   
-  const metadata = await sharp(buffer).metadata();
+  // NEU: Sharp automatisch EXIF-Orientierung anwenden
+  // Sharp wendet automatisch die EXIF-Orientierung an, wenn .rotate() ohne Parameter aufgerufen wird
+  const sharpBuffer = sharp(buffer).rotate();
+  
+  const metadata = await sharpBuffer.metadata();
   const { width: originalWidth, height: originalHeight } = metadata;
   
   // Calculate target dimensions to make longest edge 2048px
@@ -64,11 +68,12 @@ export async function resizeJPG(buffer: Buffer) {
     targetHeight2048 = 2048;
   }
 
-  console.log(`Resizing from ${originalWidth}x${originalHeight} to ${targetWidth2048}x${targetHeight2048}`);
+  console.log(`Resizing from ${originalWidth}x${originalHeight} to ${targetWidth2048}x${targetHeight2048} (with EXIF orientation applied)`);
 
   // Helper function to generate image in the correct format and quality
   const generateImage = async (width: number, height: number, format: 'webp' | 'jpg', quality: number) => {
-    const sharpInstance = sharp(buffer)
+    // NEU: Verwende sharpBuffer statt buffer, um EXIF-Orientierung zu berücksichtigen
+    const sharpInstance = sharpBuffer
       .resize(width, height, { 
         fit: 'inside', 
         withoutEnlargement: true 
