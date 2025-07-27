@@ -54,8 +54,8 @@ BEGIN
       effective_lon := user_lon;
     END IF;
     
-    -- WICHTIG: Fallback für keine GPS-Daten - aber nur wenn keine LocationFilter vorhanden
-    IF effective_lat = 0 AND effective_lon = 0 AND location_filter_lat IS NULL AND location_filter_lon IS NULL THEN
+    -- WICHTIG: Fallback für keine GPS-Daten
+    IF effective_lat = 0 AND effective_lon = 0 THEN
       effective_lat := NULL;
       effective_lon := NULL;
     END IF;
@@ -81,7 +81,7 @@ BEGIN
       i.keywords,
       i.original_name,
       CASE
-        WHEN effective_lat IS NOT NULL AND effective_lon IS NOT NULL AND i.lat IS NOT NULL AND i.lon IS NOT NULL THEN
+        WHEN effective_lat != 0 AND effective_lon != 0 AND i.lat IS NOT NULL AND i.lon IS NOT NULL THEN
           ST_Distance(
             ST_MakePoint(effective_lon, effective_lat)::geography,
             ST_MakePoint(i.lon, i.lat)::geography
