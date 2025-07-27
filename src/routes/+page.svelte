@@ -951,9 +951,8 @@
     
     // Galerie intelligenter initialisieren - warte kurz auf GPS falls Permission bereits erteilt
     const initializeGalleryIntelligently = async () => {
-      // WICHTIG: Immer initialisieren, nicht nur wenn galleryInitialized false ist!
-      // Das stellt sicher, dass Suche auch nach Refresh funktioniert
-      console.log('[Gallery-Init] Starting gallery initialization...');
+      if (!galleryInitialized) {
+        galleryInitialized = true;
         
         // Prüfe ob GPS-Permission bereits erteilt ist
         let shouldWaitForGPS = false;
@@ -970,7 +969,7 @@
         // Wenn GPS-Permission erteilt ist, warte kurz auf GPS-Daten
         if (shouldWaitForGPS && !userLat && !userLon) {
           console.log('[Gallery-Init] Waiting briefly for GPS data...');
-          await new Promise(resolve => setTimeout(resolve, 300)); // 300ms warten auf GPS
+          await new Promise(resolve => setTimeout(resolve, 500)); // Erhöht auf 500ms für bessere Zuverlässigkeit
         }
         
         const gps = getEffectiveGpsPosition();
@@ -1018,14 +1017,9 @@
           galleryParams.fromItem = true;
         }
         
-        // WICHTIG: Immer Galerie initialisieren, auch ohne GPS!
-        // Das ermöglicht sofortige Suche nach Refresh
-        console.log('[Gallery-Init] Initializing gallery (with or without GPS)');
+        // WICHTIG: Immer Galerie laden, auch ohne GPS-Daten
+        console.log('[Gallery-Init] Loading gallery with params:', galleryParams);
         resetGallery(galleryParams);
-        
-        // Markiere Galerie als initialisiert
-        galleryInitialized = true;
-        console.log('[Gallery-Init] Gallery initialization complete');
       }
     };
     
@@ -1328,13 +1322,6 @@
       (window as any).userLat = effectiveLat;
       (window as any).userLon = effectiveLon;
     }
-  }
-  
-  // WICHTIG: Setze GPS-Koordinaten auch direkt aus userLat/userLon
-  // Das stellt sicher, dass sie auch ohne filterStore verfügbar sind
-  $: if (typeof window !== 'undefined' && (userLat !== null || userLon !== null)) {
-    (window as any).userLat = userLat;
-    (window as any).userLon = userLon;
   }
   
   let effectiveLat: number | null = null;
