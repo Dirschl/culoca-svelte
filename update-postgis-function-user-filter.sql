@@ -40,75 +40,82 @@ RETURNS TABLE (
 )
 AS $$
 BEGIN
-  -- Bestimme die effektiven GPS-Koordinaten (LocationFilter hat Vorrang)
-  DECLARE
-    effective_lat DOUBLE PRECISION;
-    effective_lon DOUBLE PRECISION;
-  BEGIN
-    -- LocationFilter hat Vorrang über user_lat/user_lon
-    IF location_filter_lat IS NOT NULL AND location_filter_lon IS NOT NULL THEN
-      effective_lat := location_filter_lat;
-      effective_lon := location_filter_lon;
-    ELSE
-      effective_lat := user_lat;
-      effective_lon := user_lon;
-    END IF;
-    
-    RETURN QUERY
-    SELECT
-      i.id,
-      i.slug,
-      i.title,
-      i.description,
-      i.lat,
-      i.lon,
-      i.path_512,
-      i.path_2048,
-      i.path_64,
-      i.width,
-      i.height,
-      i.created_at,
-      i.profile_id,
-      i.user_id,
-      i.is_private,
-      i.gallery,
-      i.keywords,
-      i.original_name,
+  RETURN QUERY
+  SELECT
+    i.id,
+    i.slug,
+    i.title,
+    i.description,
+    i.lat,
+    i.lon,
+    i.path_512,
+    i.path_2048,
+    i.path_64,
+    i.width,
+    i.height,
+    i.created_at,
+    i.profile_id,
+    i.user_id,
+    i.is_private,
+    i.gallery,
+    i.keywords,
+    i.original_name,
+    -- WICHTIG: Entfernungsberechnung zur übergebenen GPS-Koordinate
+    CASE
+      WHEN (location_filter_lat IS NOT NULL AND location_filter_lon IS NOT NULL) THEN
+        -- LocationFilter hat Vorrang
+        CASE
+          WHEN i.lat IS NOT NULL AND i.lon IS NOT NULL THEN
+            ST_Distance(
+              ST_MakePoint(location_filter_lon, location_filter_lat)::geography,
+              ST_MakePoint(i.lon, i.lat)::geography
+            )
+          ELSE
+            999999999
+        END
+      WHEN (user_lat != 0 AND user_lon != 0) THEN
+        -- Normale GPS-Koordinaten
+        CASE
+          WHEN i.lat IS NOT NULL AND i.lon IS NOT NULL THEN
+            ST_Distance(
+              ST_MakePoint(user_lon, user_lat)::geography,
+              ST_MakePoint(i.lon, i.lat)::geography
+            )
+          ELSE
+            999999999
+        END
+      ELSE
+        -- Keine GPS-Koordinaten verfügbar
+        999999999
+    END AS distance,
+    COUNT(*) OVER() AS total_count
+  FROM items i
+  WHERE i.path_512 IS NOT NULL
+    AND i.gallery = true
+    AND (
+      -- User-Filter: Wenn filter_user_id gesetzt, nur Bilder dieses Users
       CASE
-        WHEN effective_lat != 0 AND effective_lon != 0 AND i.lat IS NOT NULL AND i.lon IS NOT NULL THEN
-          ST_Distance(
-            ST_MakePoint(effective_lon, effective_lat)::geography,
-            ST_MakePoint(i.lon, i.lat)::geography
-          )
+        WHEN filter_user_id IS NOT NULL THEN
+          i.profile_id = filter_user_id
+        WHEN current_user_id IS NOT NULL THEN
+          i.profile_id = current_user_id OR i.is_private = false OR i.is_private IS NULL
         ELSE
-          999999999
-      END AS distance,
-      COUNT(*) OVER() AS total_count
-    FROM items i
-    WHERE i.path_512 IS NOT NULL
-      AND i.gallery = true
-      AND (
-        CASE
-          WHEN filter_user_id IS NOT NULL THEN
-            i.profile_id = filter_user_id
-          WHEN current_user_id IS NOT NULL THEN
-            i.profile_id = current_user_id OR i.is_private = false OR i.is_private IS NULL
-          ELSE
-            i.is_private = false OR i.is_private IS NULL
-        END
-      )
-      AND (
-        CASE
-          WHEN search_term IS NOT NULL AND search_term != '' THEN
-            i.title ILIKE '%' || search_term || '%' OR 
-            i.description ILIKE '%' || search_term || '%'
-          ELSE
-            TRUE
-        END
-      )
-    ORDER BY distance ASC
-    OFFSET (page_value * page_size_value)
-    LIMIT page_size_value;
-  END;
+          i.is_private = false OR i.is_private IS NULL
+      END
+    )
+    AND (
+      -- Suchfilter: Wenn search_term vorhanden, dann suchen
+      CASE
+        WHEN search_term IS NOT NULL AND search_term != '' THEN
+          i.title ILIKE '%' || search_term || '%' OR 
+          i.description ILIKE '%' || search_term || '%'
+        ELSE
+          TRUE -- Keine Suche, alle Items
+      END
+    )
+  -- WICHTIG: Sortierung nach Entfernung aufsteigend (näheste zuerst)
+  ORDER BY distance ASC
+  OFFSET (page_value * page_size_value)
+  LIMIT page_size_value;
 END;
 $$ LANGUAGE plpgsql; 
