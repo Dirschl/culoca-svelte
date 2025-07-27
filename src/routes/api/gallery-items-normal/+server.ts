@@ -17,8 +17,8 @@ export async function GET({ url }) {
 
     // Verwende erweiterte PostGIS-Funktion mit LocationFilter-Unterstützung
     const { data, error } = await supabase.rpc('gallery_items_unified_postgis', {
-      user_lat: lat,
-      user_lon: lon,
+      user_lat: lat || 0,
+      user_lon: lon || 0,
       page_value: page,
       page_size_value: 50,
       current_user_id: currentUserId,

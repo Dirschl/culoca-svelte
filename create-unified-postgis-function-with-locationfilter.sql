@@ -53,6 +53,12 @@ BEGIN
       effective_lon := user_lon;
     END IF;
     
+    -- WICHTIG: Fallback für keine GPS-Daten
+    IF effective_lat = 0 AND effective_lon = 0 THEN
+      effective_lat := NULL;
+      effective_lon := NULL;
+    END IF;
+    
     RETURN QUERY
     SELECT
       i.id,
@@ -103,7 +109,12 @@ BEGIN
             TRUE
         END
       )
-    ORDER BY distance ASC
+    ORDER BY 
+      CASE 
+        WHEN effective_lat IS NOT NULL AND effective_lon IS NOT NULL THEN distance 
+        ELSE 0 
+      END ASC,
+      i.created_at DESC
     OFFSET (page_value * page_size_value)
     LIMIT page_size_value;
   END;

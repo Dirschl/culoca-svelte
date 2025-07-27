@@ -45,6 +45,8 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
   // Prüfe sofort ohne weitere Verzögerung
   if (get(isGalleryLoading) || !get(hasMoreGalleryItems)) return;
   isGalleryLoading.set(true);
+  
+  console.log('[GalleryStore] loadMoreGallery called with params:', params);
 
   // --- NEU: Location Filter Koordinaten bevorzugen ---
   let mergedParams = { ...get(galleryParams), ...params };
@@ -114,10 +116,9 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
     // Normale Galerie: Verwende gallery-items-normal API
     url = new URL('/api/gallery-items-normal', window.location.origin);
     url.searchParams.set('page', String(Math.floor(offset / effectiveLimit)));
-    if (mergedParams.lat && mergedParams.lon) {
-      url.searchParams.set('lat', String(mergedParams.lat));
-      url.searchParams.set('lon', String(mergedParams.lon));
-    }
+    // WICHTIG: Immer lat/lon setzen, auch wenn 0 (für Fallback ohne GPS)
+    url.searchParams.set('lat', String(mergedParams.lat || 0));
+    url.searchParams.set('lon', String(mergedParams.lon || 0));
     // NEU: LocationFilter-Parameter hinzufügen
     if (mergedParams.locationFilterLat && mergedParams.locationFilterLon) {
       url.searchParams.set('locationFilterLat', String(mergedParams.locationFilterLat));
