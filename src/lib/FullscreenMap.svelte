@@ -54,7 +54,7 @@
   
   // Import supabase client and PostGIS loader for loading all images
   import { supabase } from './supabaseClient';
-  import { loadAllPostgisImages } from './postgisLoader';
+  import { loadAllMapImages } from './postgisLoader';
   
   // Internal images array for clustering
   let allImages: any[] = [];
@@ -1240,11 +1240,13 @@
       });
       
       // Use the robust PostGIS loader with pagination
-      const mapImagesData = await loadAllPostgisImages(
-        supabase,
+      const mapImagesData = await loadAllMapImages(
         userLat,
         userLon,
-        currentUserId
+        currentUserId,
+        userFilterId,
+        locationFilterLat,
+        locationFilterLon
       );
       
       if (!mapImagesData || mapImagesData.length === 0) {
