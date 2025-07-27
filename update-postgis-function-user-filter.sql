@@ -54,12 +54,6 @@ BEGIN
       effective_lon := user_lon;
     END IF;
     
-    -- WICHTIG: Fallback für keine GPS-Daten
-    IF effective_lat = 0 AND effective_lon = 0 THEN
-      effective_lat := NULL;
-      effective_lon := NULL;
-    END IF;
-    
     RETURN QUERY
     SELECT
       i.id,
@@ -88,7 +82,7 @@ BEGIN
           )
         ELSE
           999999999
-        END AS distance,
+      END AS distance,
       COUNT(*) OVER() AS total_count
     FROM items i
     WHERE i.path_512 IS NOT NULL
@@ -110,16 +104,11 @@ BEGIN
             i.description ILIKE '%' || search_term || '%'
           ELSE
             TRUE
-          END
-        )
-      ORDER BY 
-        CASE 
-          WHEN effective_lat IS NOT NULL AND effective_lon IS NOT NULL THEN distance 
-          ELSE 0 
-        END ASC,
-        i.created_at DESC
-      OFFSET (page_value * page_size_value)
-      LIMIT page_size_value;
+        END
+      )
+    ORDER BY distance ASC
+    OFFSET (page_value * page_size_value)
+    LIMIT page_size_value;
   END;
 END;
 $$ LANGUAGE plpgsql; 
