@@ -16,13 +16,16 @@ export async function GET({ url }) {
     const { data: { user } } = await supabase.auth.getUser();
     const currentUserId = user?.id || null;
 
-    // TEMPORÄR: Verwende die funktionierende gallery_items_normal_postgis Funktion
-    const { data, error } = await supabase.rpc('gallery_items_normal_postgis', {
+    // NEU: Verwende die aktualisierte gallery_items_unified_postgis Funktion mit LocationFilter-Unterstützung
+    const { data, error } = await supabase.rpc('gallery_items_unified_postgis', {
       user_lat: lat || 0,
       user_lon: lon || 0,
       page_value: page,
       page_size_value: 50,
-      current_user_id: currentUserId
+      current_user_id: currentUserId,
+      search_term: null, // Keine Suche für normale Galerie
+      location_filter_lat: locationFilterLat || null,
+      location_filter_lon: locationFilterLon || null
     }, { head: false });
 
     if (error) {
