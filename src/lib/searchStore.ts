@@ -1,5 +1,6 @@
 import { writable, get } from 'svelte/store';
 import { resetGallery } from './galleryStore';
+import { browser } from '$app/environment';
 
 export const searchQuery = writable('');
 export const isSearching = writable(false);
@@ -7,9 +8,35 @@ export const useSearchResults = writable(false);
 
 let searchTimeout: ReturnType<typeof setTimeout> | null = null;
 
+// Function to update URL with search parameters
+function updateSearchUrl(query: string) {
+  if (!browser) return;
+  
+  const url = new URL(window.location.href);
+  if (query.trim()) {
+    url.searchParams.set('search', query.trim());
+  } else {
+    url.searchParams.delete('search');
+  }
+  
+  // Update URL without reloading the page
+  window.history.pushState({}, '', url.toString());
+}
+
+// Function to get search query from URL
+function getSearchFromUrl(): string {
+  if (!browser) return '';
+  
+  const urlParams = new URLSearchParams(window.location.search);
+  return urlParams.get('search') || '';
+}
+
 export function setSearchQuery(q: string) {
   searchQuery.set(q);
   useSearchResults.set(!!q.trim());
+  
+  // Update URL with search query
+  updateSearchUrl(q);
   
   // Sofortige Suche ohne Debounce für bessere UX
   performSearch(q, false);
@@ -20,6 +47,9 @@ export async function performSearch(q: string, trigger = true) {
   isSearching.set(true);
   searchQuery.set(q);
   useSearchResults.set(!!q.trim());
+  
+  // Update URL with search query
+  updateSearchUrl(q);
   
   if (!q.trim()) {
     // Suche leeren - zurück zur normalen Galerie
@@ -70,6 +100,9 @@ export function clearSearch() {
   useSearchResults.set(false);
   console.log('🔍 SearchStore: Search cleared - flags reset');
   
+  // Clear search from URL
+  updateSearchUrl('');
+  
   // NEU: Zurück zur normalen Galerie mit GPS-Koordinaten
   let resetParams: any = {};
   if (typeof window !== 'undefined') {
@@ -82,4 +115,18 @@ export function clearSearch() {
     }
   }
   resetGallery(resetParams);
+}
+
+// Initialize search from URL on page load
+if (browser) {
+  const initialSearch = getSearchFromUrl();
+  if (initialSearch) {
+    console.log('🔍 SearchStore: Initializing search from URL:', initialSearch);
+    // Only set if the store is empty to avoid conflicts with main page initialization
+    const currentQuery = get(searchQuery);
+    if (!currentQuery) {
+      searchQuery.set(initialSearch);
+      useSearchResults.set(true);
+    }
+  }
 } 
