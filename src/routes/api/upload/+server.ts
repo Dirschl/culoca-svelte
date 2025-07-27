@@ -232,16 +232,19 @@ export const POST = async ({ request }) => {
         const sizes = await resizeJPG(buf);
         console.log('✅ Image resized successfully');
 
-        // Get ACTUAL dimensions of the original image
+        // NEU: Get ACTUAL dimensions after EXIF orientation is applied
         let width = 2048;
         let height = 2048;
         
         try {
-          // Get metadata from the original image
-          const originalMetadata = await sharp(buf).metadata();
+          // Get metadata from the image with EXIF orientation applied
+          // Sharp wendet automatisch die EXIF-Orientierung an, wenn .rotate() ohne Parameter aufgerufen wird
+          const originalMetadata = await sharp(buf).rotate().metadata();
           width = originalMetadata.width || 2048;
           height = originalMetadata.height || 2048;
+          console.log(`✅ Image dimensions after EXIF orientation: ${width}x${height}`);
         } catch (metaError) {
+          console.warn('Failed to get image metadata with EXIF orientation, using defaults');
           // Use defaults if metadata extraction fails
         }
 
