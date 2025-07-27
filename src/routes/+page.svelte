@@ -1049,8 +1049,6 @@
       stopGPSTracking();
     };
   });
-    };
-  });
 
   // GPS-Trigger für neue GPS-Daten mit Debouncing
   let lastTriggerLog = '';
