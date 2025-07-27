@@ -951,8 +951,9 @@
     
     // Galerie intelligenter initialisieren - warte kurz auf GPS falls Permission bereits erteilt
     const initializeGalleryIntelligently = async () => {
-      if (!galleryInitialized) {
-        galleryInitialized = true;
+      // WICHTIG: Immer initialisieren, nicht nur wenn galleryInitialized false ist!
+      // Das stellt sicher, dass Suche auch nach Refresh funktioniert
+      console.log('[Gallery-Init] Starting gallery initialization...');
         
         // Prüfe ob GPS-Permission bereits erteilt ist
         let shouldWaitForGPS = false;
@@ -1021,6 +1022,10 @@
         // Das ermöglicht sofortige Suche nach Refresh
         console.log('[Gallery-Init] Initializing gallery (with or without GPS)');
         resetGallery(galleryParams);
+        
+        // Markiere Galerie als initialisiert
+        galleryInitialized = true;
+        console.log('[Gallery-Init] Gallery initialization complete');
       }
     };
     
