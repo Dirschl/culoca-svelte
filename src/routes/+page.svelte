@@ -949,63 +949,80 @@
       }
     }
     
-    // Galerie intelligenter initialisieren - warte kurz auf GPS falls Permission bereits erteilt
+    // Galerie intelligenter initialisieren - WARTE auf GPS wie in der mobilen Galerie
     const initializeGalleryIntelligently = async () => {
       if (!galleryInitialized) {
         galleryInitialized = true;
         
-        // Prüfe ob GPS-Permission bereits erteilt ist
-        let shouldWaitForGPS = false;
-        if ('permissions' in navigator) {
-          try {
-            const permissionStatus = await navigator.permissions.query({ name: 'geolocation' });
-            shouldWaitForGPS = permissionStatus.state === 'granted';
-            console.log('[Gallery-Init] GPS permission status:', permissionStatus.state, 'shouldWait:', shouldWaitForGPS);
-          } catch (e) {
-            console.log('[Gallery-Init] Permission check failed, proceeding immediately');
-          }
-        }
-        
-        // Wenn GPS-Permission erteilt ist, warte kurz auf GPS-Daten
-        if (shouldWaitForGPS && !userLat && !userLon) {
-          console.log('[Gallery-Init] Waiting briefly for GPS data...');
-          await new Promise(resolve => setTimeout(resolve, 500)); // Erhöht auf 500ms für bessere Zuverlässigkeit
-        }
-        
-        const gps = getEffectiveGpsPosition();
+        console.log('[Gallery-Init] Starting intelligent gallery initialization...');
         
         // Prüfe Querystring für Suchparameter
         const urlParams = new URLSearchParams(window.location.search);
         const searchParam = urlParams.get('search') || urlParams.get('s');
         
-        console.log('[Gallery-Init] Initialisiere Galerie mit GPS:', gps);
-        console.log('[Gallery-Init] UserLat/Lon:', userLat, userLon);
-        console.log('[Gallery-Init] Search param from URL:', searchParam);
+        // WICHTIG: Warte auf GPS-Koordinaten wie in der mobilen Galerie
+        let attempts = 0;
+        const maxAttempts = 30; // 30 Sekunden warten
+        const checkInterval = 1000; // Jede Sekunde prüfen
         
-        // Verwende GPS von getEffectiveGpsPosition oder fallback auf userLat/userLon
-        const effectiveLat = gps?.lat || userLat || undefined;
-        const effectiveLon = gps?.lon || userLon || undefined;
-        
-        console.log('[Gallery-Init] Effective GPS:', effectiveLat, effectiveLon);
-        
-        // Setze lastLoaded-Werte um doppelte GPS-Trigger zu vermeiden
-        if (effectiveLat && effectiveLon) {
-          lastLoadedLat = effectiveLat;
-          lastLoadedLon = effectiveLon;
-          lastLoadedSource = gps?.source || 'direct';
+        while (attempts < maxAttempts) {
+          const gps = getEffectiveGpsPosition();
+          const effectiveLat = gps?.lat || userLat;
+          const effectiveLon = gps?.lon || userLon;
           
-          // Setze ursprüngliche Galerie-Koordinaten für Normal Mode (nur einmal)
-          if (originalGalleryLat === null && originalGalleryLon === null) {
-            originalGalleryLat = effectiveLat;
-            originalGalleryLon = effectiveLon;
-            console.log('[Gallery-Init] Set original gallery coordinates:', { originalGalleryLat, originalGalleryLon });
+          console.log(`[Gallery-Init] Attempt ${attempts + 1}/${maxAttempts}: GPS check:`, {
+            gps,
+            userLat,
+            userLon,
+            effectiveLat,
+            effectiveLon
+          });
+          
+          // Wenn GPS-Koordinaten verfügbar sind, lade Galerie
+          if (effectiveLat && effectiveLon) {
+            console.log('[Gallery-Init] GPS coordinates available, loading gallery...');
+            
+            // Setze lastLoaded-Werte um doppelte GPS-Trigger zu vermeiden
+            lastLoadedLat = effectiveLat;
+            lastLoadedLon = effectiveLon;
+            lastLoadedSource = gps?.source || 'direct';
+            
+            // Setze ursprüngliche Galerie-Koordinaten für Normal Mode (nur einmal)
+            if (originalGalleryLat === null && originalGalleryLon === null) {
+              originalGalleryLat = effectiveLat;
+              originalGalleryLon = effectiveLon;
+              console.log('[Gallery-Init] Set original gallery coordinates:', { originalGalleryLat, originalGalleryLon });
+            }
+            
+            const galleryParams: any = {
+              lat: effectiveLat,
+              lon: effectiveLon
+            };
+            
+            // Füge Suchparameter hinzu falls vorhanden
+            if (searchParam) {
+              galleryParams.search = searchParam;
+              setSearchQuery(searchParam);
+            }
+            // Setze fromItem, wenn Location-Filter aktiv
+            if ($filterStore.locationFilter) {
+              galleryParams.fromItem = true;
+            }
+            
+            console.log('[Gallery-Init] Loading gallery with GPS coordinates:', galleryParams);
+            resetGallery(galleryParams);
+            return; // Galerie geladen, beende Warteschleife
           }
+          
+          // Warte eine Sekunde bevor nächster Versuch
+          await new Promise(resolve => setTimeout(resolve, checkInterval));
+          attempts++;
         }
         
-        const galleryParams: any = {
-          lat: effectiveLat,
-          lon: effectiveLon
-        };
+        // Fallback: Wenn nach 30 Sekunden keine GPS-Daten verfügbar sind
+        console.warn('[Gallery-Init] No GPS coordinates available after 30 seconds, loading without GPS...');
+        
+        const galleryParams: any = {};
         
         // Füge Suchparameter hinzu falls vorhanden
         if (searchParam) {
@@ -1017,8 +1034,7 @@
           galleryParams.fromItem = true;
         }
         
-        // WICHTIG: Immer Galerie laden, auch ohne GPS-Daten
-        console.log('[Gallery-Init] Loading gallery with params:', galleryParams);
+        console.log('[Gallery-Init] Loading gallery without GPS as fallback:', galleryParams);
         resetGallery(galleryParams);
       }
     };
