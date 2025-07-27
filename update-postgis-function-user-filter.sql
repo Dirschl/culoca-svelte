@@ -41,78 +41,85 @@ RETURNS TABLE (
 AS $$
 BEGIN
   RETURN QUERY
+  WITH items_with_distance AS (
+    SELECT
+      i.*,
+      -- WICHTIG: Entfernungsberechnung zur übergebenen GPS-Koordinate
+      CASE
+        WHEN (location_filter_lat IS NOT NULL AND location_filter_lon IS NOT NULL) THEN
+          -- LocationFilter hat Vorrang
+          CASE
+            WHEN i.lat IS NOT NULL AND i.lon IS NOT NULL THEN
+              ST_Distance(
+                ST_MakePoint(location_filter_lon, location_filter_lat)::geography,
+                ST_MakePoint(i.lon, i.lat)::geography
+              )
+            ELSE
+              999999999
+          END
+        WHEN (user_lat != 0 AND user_lon != 0) THEN
+          -- Normale GPS-Koordinaten
+          CASE
+            WHEN i.lat IS NOT NULL AND i.lon IS NOT NULL THEN
+              ST_Distance(
+                ST_MakePoint(user_lon, user_lat)::geography,
+                ST_MakePoint(i.lon, i.lat)::geography
+              )
+            ELSE
+              999999999
+          END
+        ELSE
+          -- Keine GPS-Koordinaten verfügbar
+          999999999
+      END AS distance,
+      COUNT(*) OVER() AS total_count
+    FROM items i
+    WHERE i.path_512 IS NOT NULL
+      AND i.gallery = true
+      AND (
+        -- User-Filter: Wenn filter_user_id gesetzt, nur Bilder dieses Users
+        CASE
+          WHEN filter_user_id IS NOT NULL THEN
+            i.profile_id = filter_user_id
+          WHEN current_user_id IS NOT NULL THEN
+            i.profile_id = current_user_id OR i.is_private = false OR i.is_private IS NULL
+          ELSE
+            i.is_private = false OR i.is_private IS NULL
+        END
+      )
+      AND (
+        -- Suchfilter: Wenn search_term vorhanden, dann suchen
+        CASE
+          WHEN search_term IS NOT NULL AND search_term != '' THEN
+            i.title ILIKE '%' || search_term || '%' OR 
+            i.description ILIKE '%' || search_term || '%'
+          ELSE
+            TRUE -- Keine Suche, alle Items
+        END
+      )
+  )
   SELECT
-    i.id,
-    i.slug,
-    i.title,
-    i.description,
-    i.lat,
-    i.lon,
-    i.path_512,
-    i.path_2048,
-    i.path_64,
-    i.width,
-    i.height,
-    i.created_at,
-    i.profile_id,
-    i.user_id,
-    i.is_private,
-    i.gallery,
-    i.keywords,
-    i.original_name,
-    -- WICHTIG: Entfernungsberechnung zur übergebenen GPS-Koordinate
-    CASE
-      WHEN (location_filter_lat IS NOT NULL AND location_filter_lon IS NOT NULL) THEN
-        -- LocationFilter hat Vorrang
-        CASE
-          WHEN i.lat IS NOT NULL AND i.lon IS NOT NULL THEN
-            ST_Distance(
-              ST_MakePoint(location_filter_lon, location_filter_lat)::geography,
-              ST_MakePoint(i.lon, i.lat)::geography
-            )
-          ELSE
-            999999999
-        END
-      WHEN (user_lat != 0 AND user_lon != 0) THEN
-        -- Normale GPS-Koordinaten
-        CASE
-          WHEN i.lat IS NOT NULL AND i.lon IS NOT NULL THEN
-            ST_Distance(
-              ST_MakePoint(user_lon, user_lat)::geography,
-              ST_MakePoint(i.lon, i.lat)::geography
-            )
-          ELSE
-            999999999
-        END
-      ELSE
-        -- Keine GPS-Koordinaten verfügbar
-        999999999
-    END AS distance,
-    COUNT(*) OVER() AS total_count
-  FROM items i
-  WHERE i.path_512 IS NOT NULL
-    AND i.gallery = true
-    AND (
-      -- User-Filter: Wenn filter_user_id gesetzt, nur Bilder dieses Users
-      CASE
-        WHEN filter_user_id IS NOT NULL THEN
-          i.profile_id = filter_user_id
-        WHEN current_user_id IS NOT NULL THEN
-          i.profile_id = current_user_id OR i.is_private = false OR i.is_private IS NULL
-        ELSE
-          i.is_private = false OR i.is_private IS NULL
-      END
-    )
-    AND (
-      -- Suchfilter: Wenn search_term vorhanden, dann suchen
-      CASE
-        WHEN search_term IS NOT NULL AND search_term != '' THEN
-          i.title ILIKE '%' || search_term || '%' OR 
-          i.description ILIKE '%' || search_term || '%'
-        ELSE
-          TRUE -- Keine Suche, alle Items
-      END
-    )
+    id,
+    slug,
+    title,
+    description,
+    lat,
+    lon,
+    path_512,
+    path_2048,
+    path_64,
+    width,
+    height,
+    created_at,
+    profile_id,
+    user_id,
+    is_private,
+    gallery,
+    keywords,
+    original_name,
+    distance,
+    total_count
+  FROM items_with_distance
   -- WICHTIG: Sortierung nach Entfernung aufsteigend (näheste zuerst)
   ORDER BY distance ASC
   OFFSET (page_value * page_size_value)
