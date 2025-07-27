@@ -1275,6 +1275,116 @@
       initializeGPS();
     }
   }
+  
+  // Neue Funktion: Versuche GPS zu initialisieren mit besserer Fehlerbehandlung
+  function tryInitializeGPS() {
+    console.log('[GPS] User clicked "Standort verwenden" - trying to initialize GPS...');
+    
+    if (!navigator.geolocation) {
+      gpsStatus = "unavailable";
+      return;
+    }
+    
+    // Prüfe zuerst den aktuellen Berechtigungsstatus
+    if ('permissions' in navigator) {
+      navigator.permissions.query({ name: 'geolocation' }).then((permissionStatus) => {
+        console.log('[GPS] Permission status:', permissionStatus.state);
+        
+        if (permissionStatus.state === 'granted') {
+          // Berechtigung bereits erteilt - starte GPS
+          console.log('[GPS] Permission granted - starting GPS...');
+          initializeGPS();
+        } else if (permissionStatus.state === 'denied') {
+          // Berechtigung verweigert - zeige Hinweis für Browser-Einstellungen
+          console.log('[GPS] Permission denied - showing browser settings hint');
+          showGPSSettingsHint();
+        } else {
+          // Berechtigung noch nicht entschieden - versuche GPS zu starten
+          console.log('[GPS] Permission not decided - trying GPS...');
+          initializeGPS();
+        }
+      }).catch(() => {
+        // Fallback: Versuche GPS zu starten
+        console.log('[GPS] Permission check failed - trying GPS as fallback...');
+        initializeGPS();
+      });
+    } else {
+      // Fallback für Browser ohne Permissions API
+      console.log('[GPS] No permissions API - trying GPS directly...');
+      initializeGPS();
+    }
+  }
+  
+  // Funktion: Zeige Hinweis für Browser-Einstellungen
+  function showGPSSettingsHint() {
+    // Erstelle ein Modal mit Hinweis für Browser-Einstellungen
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0,0,0,0.8);
+      z-index: 10001;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    `;
+    
+    const content = document.createElement('div');
+    content.style.cssText = `
+      background: #222;
+      padding: 2rem;
+      border-radius: 1rem;
+      max-width: 90vw;
+      text-align: center;
+      color: white;
+    `;
+    
+    content.innerHTML = `
+      <h2 style="margin-bottom: 1rem;">GPS-Berechtigung erforderlich</h2>
+      <p style="margin-bottom: 1.5rem; color: #ccc; font-size: 1.1rem;">
+        GPS wurde in den Browser-Einstellungen blockiert. Um deinen Standort zu verwenden, musst du die Berechtigung manuell aktivieren:
+      </p>
+      <div style="margin-bottom: 1.5rem; text-align: left; background: #333; padding: 1rem; border-radius: 0.5rem;">
+        <h3 style="margin-bottom: 0.5rem;">Chrome/Edge:</h3>
+        <p style="margin-bottom: 0.5rem; color: #ccc;">1. Klicke auf das Schloss-Symbol in der Adressleiste</p>
+        <p style="margin-bottom: 0.5rem; color: #ccc;">2. Ändere "Standort" von "Blockiert" zu "Erlauben"</p>
+        <p style="margin-bottom: 1rem; color: #ccc;">3. Lade die Seite neu</p>
+        
+        <h3 style="margin-bottom: 0.5rem;">Firefox:</h3>
+        <p style="margin-bottom: 0.5rem; color: #ccc;">1. Klicke auf das Schloss-Symbol in der Adressleiste</p>
+        <p style="margin-bottom: 0.5rem; color: #ccc;">2. Klicke auf "Berechtigungen verwalten"</p>
+        <p style="margin-bottom: 0.5rem; color: #ccc;">3. Ändere "Standortzugriff" zu "Erlauben"</p>
+        <p style="margin-bottom: 1rem; color: #ccc;">4. Lade die Seite neu</p>
+        
+        <h3 style="margin-bottom: 0.5rem;">Safari:</h3>
+        <p style="margin-bottom: 0.5rem; color: #ccc;">1. Safari → Einstellungen → Websites → Standort</p>
+        <p style="margin-bottom: 0.5rem; color: #ccc;">2. Finde diese Website und ändere zu "Erlauben"</p>
+        <p style="margin-bottom: 0.5rem; color: #ccc;">3. Lade die Seite neu</p>
+      </div>
+      <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+        <button onclick="window.location.reload()" style="padding: 0.9rem 2.2rem; font-size: 1.15rem; border-radius: 0.5rem; background: #4CAF50; color: #fff; border: none; cursor: pointer; font-weight: 600;">
+          🔄 Seite neu laden
+        </button>
+        <button onclick="this.closest('.gps-settings-modal').remove()" style="padding: 0.9rem 2.2rem; font-size: 1.15rem; border-radius: 0.5rem; background: #666; color: #fff; border: none; cursor: pointer; font-weight: 600;">
+          Schließen
+        </button>
+      </div>
+    `;
+    
+    content.className = 'gps-settings-modal';
+    modal.appendChild(content);
+    document.body.appendChild(modal);
+    
+    // Schließe Modal bei Klick außerhalb
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        modal.remove();
+      }
+    });
+  }
 
   function stopGPSTracking() {
     if (gpsWatchId !== null) {
@@ -1404,7 +1514,7 @@
         GPS ist nicht verfügbar. Wähle deinen Standort auf der Karte aus, um die Galerie nach Entfernung zu sortieren.
       </p>
       <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;">
-        <button on:click={initializeGPS} style="padding: 0.9rem 2.2rem; font-size: 1.15rem; border-radius: 0.5rem; background: #3a7; color: #fff; border: none; cursor: pointer; font-weight:600;">
+        <button on:click={tryInitializeGPS} style="padding: 0.9rem 2.2rem; font-size: 1.15rem; border-radius: 0.5rem; background: #3a7; color: #fff; border: none; cursor: pointer; font-weight:600;">
           📍 Standort verwenden
         </button>
         <button on:click={() => {
