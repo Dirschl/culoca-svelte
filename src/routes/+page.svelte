@@ -1016,6 +1016,10 @@
         if ($filterStore.locationFilter) {
           galleryParams.fromItem = true;
         }
+        
+        // WICHTIG: Immer Galerie initialisieren, auch ohne GPS!
+        // Das ermöglicht sofortige Suche nach Refresh
+        console.log('[Gallery-Init] Initializing gallery (with or without GPS)');
         resetGallery(galleryParams);
       }
     };
@@ -1319,6 +1323,13 @@
       (window as any).userLat = effectiveLat;
       (window as any).userLon = effectiveLon;
     }
+  }
+  
+  // WICHTIG: Setze GPS-Koordinaten auch direkt aus userLat/userLon
+  // Das stellt sicher, dass sie auch ohne filterStore verfügbar sind
+  $: if (typeof window !== 'undefined' && (userLat !== null || userLon !== null)) {
+    (window as any).userLat = userLat;
+    (window as any).userLon = userLon;
   }
   
   let effectiveLat: number | null = null;
