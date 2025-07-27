@@ -881,6 +881,9 @@
         gpsStatus = 'active';
         lastGPSUpdateTime = Date.now();
         
+        // WICHTIG: GPS-Position in filterStore speichern für getEffectiveGpsPosition()
+        filterStore.updateGpsStatus(true, { lat: userLat, lon: userLon });
+        
         console.log('[GPS-Simulation] Updated GPS position:', { userLat, userLon });
         
         // Trigger GPS-basierte Sortierung und Galerie-Updates
@@ -917,6 +920,9 @@
         userLon = null;
         gpsStatus = 'none';
         lastGPSUpdateTime = null;
+        
+        // WICHTIG: GPS-Status in filterStore zurücksetzen
+        filterStore.updateGpsStatus(false);
         
         console.log('[GPS-Simulation] Cleared simulated GPS data');
         
@@ -1149,21 +1155,28 @@
         lastGPSUpdateTime = Date.now();
         if (browser) localStorage.setItem('gpsAllowed', 'true');
         console.log("[GPS] Position geändert:", userLat, userLon);
+        
+        // WICHTIG: GPS-Position in filterStore speichern für getEffectiveGpsPosition()
+        filterStore.updateGpsStatus(true, { lat: userLat, lon: userLon });
       },
       (error) => {
         switch (error.code) {
           case error.PERMISSION_DENIED:
             gpsStatus = "denied";
             if (browser) localStorage.removeItem('gpsAllowed');
+            filterStore.updateGpsStatus(false);
             break;
           case error.POSITION_UNAVAILABLE:
             gpsStatus = "unavailable";
+            filterStore.updateGpsStatus(false);
             break;
           case error.TIMEOUT:
             gpsStatus = "unavailable";
+            filterStore.updateGpsStatus(false);
             break;
           default:
             gpsStatus = "unavailable";
+            filterStore.updateGpsStatus(false);
         }
         console.warn("GPS-Fehler:", error.message);
       },
