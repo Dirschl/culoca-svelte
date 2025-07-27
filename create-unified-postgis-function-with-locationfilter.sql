@@ -13,7 +13,8 @@ CREATE OR REPLACE FUNCTION gallery_items_unified_postgis(
   current_user_id UUID DEFAULT NULL,
   search_term TEXT DEFAULT NULL,
   location_filter_lat DOUBLE PRECISION DEFAULT NULL,
-  location_filter_lon DOUBLE PRECISION DEFAULT NULL
+  location_filter_lon DOUBLE PRECISION DEFAULT NULL,
+  filter_user_id UUID DEFAULT NULL
 )
 RETURNS TABLE (
   id UUID,
@@ -94,6 +95,8 @@ BEGIN
       AND i.gallery = true
       AND (
         CASE
+          WHEN filter_user_id IS NOT NULL THEN
+            i.profile_id = filter_user_id
           WHEN current_user_id IS NOT NULL THEN
             i.profile_id = current_user_id OR i.is_private = false OR i.is_private IS NULL
           ELSE

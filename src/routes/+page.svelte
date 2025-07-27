@@ -789,28 +789,50 @@
   }
 
   // NEU: Reaktive Gallery-Neuladen bei Filter-Änderungen
-  $: if (browser && galleryInitialized) {
+  let lastLocationFilter = null;
+  let lastUserFilter = null;
+  let isHandlingFilterChange = false; // Prevent infinite loops
+  
+  $: if (browser && galleryInitialized && !isHandlingFilterChange) {
     const currentLocationFilter = $locationFilter;
     const currentUserFilter = $userFilter;
     
+    // Prevent infinite loops by checking if filters actually changed
+    const locationFilterChanged = JSON.stringify(currentLocationFilter) !== JSON.stringify(lastLocationFilter);
+    const userFilterChanged = JSON.stringify(currentUserFilter) !== JSON.stringify(lastUserFilter);
+    
     // Wenn sich Location-Filter ändert, lade Gallery neu
-    if (currentLocationFilter) {
+    if (locationFilterChanged && currentLocationFilter) {
       console.log('[Reactive] Location filter changed, loading more gallery:', currentLocationFilter);
-      loadMoreGallery({
+      isHandlingFilterChange = true;
+      lastLocationFilter = JSON.parse(JSON.stringify(currentLocationFilter));
+      resetGallery({
         lat: currentLocationFilter.lat,
         lon: currentLocationFilter.lon,
         fromItem: currentLocationFilter.fromItem,
         locationFilterLat: currentLocationFilter.lat,
         locationFilterLon: currentLocationFilter.lon
       });
+      setTimeout(() => { isHandlingFilterChange = false; }, 100);
     }
     
     // Wenn sich User-Filter ändert, lade Gallery neu
-    if (currentUserFilter) {
+    if (userFilterChanged && currentUserFilter) {
       console.log('[Reactive] User filter changed, loading more gallery:', currentUserFilter);
-      loadMoreGallery({
+      isHandlingFilterChange = true;
+      lastUserFilter = JSON.parse(JSON.stringify(currentUserFilter));
+      resetGallery({
         user_id: currentUserFilter.userId
       });
+      setTimeout(() => { isHandlingFilterChange = false; }, 100);
+    }
+    
+    // Update last values for next comparison
+    if (!locationFilterChanged) {
+      lastLocationFilter = currentLocationFilter ? JSON.parse(JSON.stringify(currentLocationFilter)) : null;
+    }
+    if (!userFilterChanged) {
+      lastUserFilter = currentUserFilter ? JSON.parse(JSON.stringify(currentUserFilter)) : null;
     }
   }
 

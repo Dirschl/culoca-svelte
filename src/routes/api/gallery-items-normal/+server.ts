@@ -8,8 +8,9 @@ export async function GET({ url }) {
     const lon = parseFloat(url.searchParams.get('lon') || '0');
     const locationFilterLat = parseFloat(url.searchParams.get('locationFilterLat') || '0');
     const locationFilterLon = parseFloat(url.searchParams.get('locationFilterLon') || '0');
+    const userId = url.searchParams.get('user_id'); // NEU: User-Filter Parameter
     
-    console.log('[Normal API] Request params:', { page, lat, lon, locationFilterLat, locationFilterLon });
+    console.log('[Normal API] Request params:', { page, lat, lon, locationFilterLat, locationFilterLon, userId });
 
     // Hole aktuelle User-ID für Privacy-Filter
     const { data: { user } } = await supabase.auth.getUser();
@@ -24,7 +25,8 @@ export async function GET({ url }) {
       current_user_id: currentUserId,
       search_term: null, // Keine Suche für normale Galerie
       location_filter_lat: locationFilterLat || null,
-      location_filter_lon: locationFilterLon || null
+      location_filter_lon: locationFilterLon || null,
+      filter_user_id: userId || null // NEU: User-Filter an PostGIS-Funktion weitergeben
     }, { head: false });
 
     if (error) {
@@ -47,7 +49,8 @@ export async function GET({ url }) {
       totalCount,
       page,
       hasGPS: lat !== 0 && lon !== 0,
-      hasLocationFilter: locationFilterLat !== 0 && locationFilterLon !== 0
+      hasLocationFilter: locationFilterLat !== 0 && locationFilterLon !== 0,
+      hasUserFilter: !!userId
     });
 
   } catch (error) {
