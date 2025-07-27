@@ -37,7 +37,7 @@ let offset = 0;
 const limit = 50; // Erhöht auf 50 für besseres Preloading
 let currentRequestId = 0;
 
-export async function loadMoreGallery(params: { search?: string; lat?: number; lon?: number; radius?: number } = {}) {
+export async function loadMoreGallery(params: { search?: string; lat?: number; lon?: number; radius?: number; user_id?: string } = {}) {
   if (typeof window === 'undefined') return; // Nur im Browser ausführen!
   currentRequestId++;
   const thisRequestId = currentRequestId;
@@ -111,6 +111,10 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
     // WICHTIG: Immer lat/lon setzen, auch wenn 0 (für Fallback ohne GPS)
     url.searchParams.set('lat', String(mergedParams.lat || 0));
     url.searchParams.set('lon', String(mergedParams.lon || 0));
+    // NEU: User-Filter Parameter hinzufügen
+    if (mergedParams.user_id) {
+      url.searchParams.set('user_id', String(mergedParams.user_id));
+    }
     // NEU: LocationFilter-Parameter hinzufügen
     if (mergedParams.locationFilterLat && mergedParams.locationFilterLon) {
       url.searchParams.set('locationFilterLat', String(mergedParams.locationFilterLat));
@@ -225,21 +229,23 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
   isGalleryLoading.set(false);
 }
 
-export function resetGallery(params: { search?: string; lat?: number; lon?: number; radius?: number } = {}) {
+export function resetGallery(params: { search?: string; lat?: number; lon?: number; radius?: number; user_id?: string } = {}) {
   // Prüfe ob sich die Parameter wirklich geändert haben
   const currentParams = get(galleryParams);
   const newParams = { 
     search: params.search || '', 
     lat: params.lat || null, 
     lon: params.lon || null, 
-    radius: params.radius || null 
+    radius: params.radius || null,
+    user_id: params.user_id || null
   };
   
   // Nur zurücksetzen wenn sich Parameter geändert haben
   const hasChanged = currentParams.search !== newParams.search ||
                     currentParams.lat !== newParams.lat ||
                     currentParams.lon !== newParams.lon ||
-                    currentParams.radius !== newParams.radius;
+                    currentParams.radius !== newParams.radius ||
+                    currentParams.user_id !== newParams.user_id;
   
   if (!hasChanged && get(galleryItems).length > 0) {
     console.log('[GalleryStore] Parameters unchanged, skipping reset');
@@ -255,5 +261,6 @@ export function resetGallery(params: { search?: string; lat?: number; lon?: numb
   // Setze neue Parameter
   galleryParams.set(newParams);
   
+  // Load gallery without triggering reactive updates
   loadMoreGallery(params);
 } 
