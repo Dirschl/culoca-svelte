@@ -1090,7 +1090,15 @@
        class:drag-over={dragOver}
        on:dragover={handleDragOver}
        on:dragleave={handleDragLeave}
-       on:drop={handleDrop}>
+       on:drop={handleDrop}
+       role="button"
+       tabindex="0"
+       on:keydown={(e) => {
+         if (e.key === 'Enter' || e.key === ' ') {
+           e.preventDefault();
+           document.getElementById('file-input')?.click();
+         }
+       }}>
     
     <input type="file" 
            id="file-input" 
@@ -1174,7 +1182,7 @@
               
               <!-- Title Input -->
               <div class="input-group title-group">
-                <label for="title-{image.id}" style="cursor:pointer" on:click={() => { image.title = ''; document.getElementById(`title-${image.id}`)?.focus(); }}>Titel *</label>
+                <button type="button" class="clear-field-btn" on:click={() => { image.title = ''; document.getElementById(`title-${image.id}`)?.focus(); }}>Titel *</button>
                 <div class="title-row">
                   <input 
                     type="text" 
@@ -1202,7 +1210,7 @@
 
               <!-- Description Input -->
               <div class="input-group">
-                <label for="desc-{image.id}" style="cursor:pointer" on:click={() => { image.description = ''; document.getElementById(`desc-${image.id}`)?.focus(); }}>Beschreibung *</label>
+                <button type="button" class="clear-field-btn" on:click={() => { image.description = ''; document.getElementById(`desc-${image.id}`)?.focus(); }}>Beschreibung *</button>
                 <div class="desc-row">
                   <textarea 
                     id="desc-{image.id}"
@@ -1224,7 +1232,7 @@
 
               <!-- Keywords Input -->
               <div class="input-group">
-                <label for="keywords-{image.id}" style="cursor:pointer" on:click={() => { image.keywords = ''; document.getElementById(`keywords-${image.id}`)?.focus(); }}>Keywords *</label>
+                <button type="button" class="clear-field-btn" on:click={() => { image.keywords = ''; document.getElementById(`keywords-${image.id}`)?.focus(); }}>Keywords *</button>
                 <div class="keywords-row">
                   <textarea 
                     id="keywords-{image.id}"
@@ -1246,7 +1254,7 @@
 
               <!-- GPS Coordinates -->
               <div class="input-group">
-                <label>GPS-Koordinaten *</label>
+                <span class="field-label">GPS-Koordinaten *</span>
                 <div class="gps-inputs">
                   <input 
                     type="number" 
@@ -1409,11 +1417,7 @@
     text-decoration: none;
   }
 
-  h1 {
-    text-align: center;
-    margin-bottom: 30px;
-    color: var(--text-color);
-  }
+
 
   .message {
     padding: 12px 16px;
@@ -1568,6 +1572,30 @@
   }
 
   .input-group label {
+    display: block;
+    margin-bottom: 4px;
+    font-weight: 500;
+    color: var(--text-color);
+  }
+
+  .clear-field-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    margin-bottom: 4px;
+    font-weight: 500;
+    color: var(--text-color);
+    cursor: pointer;
+    font-size: 14px;
+    text-align: left;
+    display: block;
+  }
+
+  .clear-field-btn:hover {
+    color: var(--accent-color);
+  }
+
+  .field-label {
     display: block;
     margin-bottom: 4px;
     font-weight: 500;
@@ -1922,15 +1950,7 @@
     color: var(--text-muted);
   }
 
-  .empty-state h2 {
-    margin-bottom: 1rem;
-    color: var(--text-color);
-  }
 
-  .empty-state p {
-    font-size: 1.1rem;
-    line-height: 1.6;
-  }
 
   /* Large screens - optimize for 3 columns */
   @media (min-width: 1400px) {
