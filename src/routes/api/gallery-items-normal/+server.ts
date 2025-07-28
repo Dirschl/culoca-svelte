@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { supabase } from '$lib/supabaseClient';
+import { safeFunctionCall, logDatabaseOperation } from '$lib/databaseConfig';
 
 export async function GET({ url }) {
   try {
@@ -8,7 +9,7 @@ export async function GET({ url }) {
     const lon = parseFloat(url.searchParams.get('lon') || '0');
     const locationFilterLat = parseFloat(url.searchParams.get('locationFilterLat') || '0');
     const locationFilterLon = parseFloat(url.searchParams.get('locationFilterLon') || '0');
-    const userId = url.searchParams.get('user_id'); // NEU: User-Filter Parameter
+    const userId = url.searchParams.get('user_id');
     
     console.log('[Normal API] Request params:', { page, lat, lon, locationFilterLat, locationFilterLon, userId });
 
@@ -16,14 +17,16 @@ export async function GET({ url }) {
     const { data: { user } } = await supabase.auth.getUser();
     const currentUserId = user?.id || null;
 
-    // TEMPORÄR: Verwende die funktionierende gallery_items_normal_postgis Funktion
-    const { data, error } = await supabase.rpc('gallery_items_normal_postgis', {
+    // Verwende safeFunctionCall für automatische Validierung
+    logDatabaseOperation('Calling gallery_items_normal_postgis', { page, lat, lon });
+    
+    const { data, error } = await safeFunctionCall(supabase, 'gallery_items_normal_postgis', {
       user_lat: lat || 0,
       user_lon: lon || 0,
       page_value: page,
       page_size_value: 50,
       current_user_id: currentUserId
-    }, { head: false });
+    });
 
     if (error) {
       console.error('[Normal API] PostGIS RPC error:', error);
