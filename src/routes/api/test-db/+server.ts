@@ -1,121 +1,66 @@
 import { json } from '@sveltejs/kit';
 import { supabase } from '$lib/supabaseClient';
 
-export const POST = async () => {
+export async function GET() {
   try {
-    // Test the current function
-    const { data: testData, error: testError } = await supabase
-      .rpc('images_by_distance_optimized', {
-        user_lat: 48.3380921172401,
-        user_lon: 12.6950471210948,
-        max_radius_meters: 50000,
-        max_results: 10
+    console.log('[Test DB] Starting database test...');
+
+    // 1. Test basic connection
+    const { data: connectionTest, error: connectionError } = await supabase
+      .from('items')
+      .select('count(*)', { count: 'exact', head: true });
+
+    if (connectionError) {
+      console.error('[Test DB] Connection error:', connectionError);
+      return json({ error: 'Database connection failed', details: connectionError }, { status: 500 });
+    }
+
+    console.log('[Test DB] Connection successful');
+
+    // 2. Test if function exists
+    const { data: functionTest, error: functionError } = await supabase
+      .rpc('gallery_items_normal_postgis', {
+        user_lat: 0,
+        user_lon: 0,
+        page_value: 0,
+        page_size_value: 1,
+        current_user_id: null
       });
 
-    if (testError) {
-      console.error('Test function error:', testError);
-      
-      // Try to fix the function
-      const fixQuery = `
-        DROP FUNCTION IF EXISTS images_by_distance_optimized(DOUBLE PRECISION, DOUBLE PRECISION, INTEGER, INTEGER);
-        
-        CREATE OR REPLACE FUNCTION images_by_distance_optimized(
-          user_lat DOUBLE PRECISION,
-          user_lon DOUBLE PRECISION,
-          max_radius_meters INTEGER DEFAULT 5000,
-          max_results INTEGER DEFAULT 100
-        )
-        RETURNS TABLE (
-          id UUID,
-          path_512 TEXT,
-          path_2048 TEXT,
-          path_64 TEXT,
-          width INTEGER,
-          height INTEGER,
-          lat DOUBLE PRECISION,
-          lon DOUBLE PRECISION,
-          title TEXT,
-          description TEXT,
-          keywords TEXT[],
-          distance_meters DOUBLE PRECISION,
-          created_at TIMESTAMPTZ
-        ) AS $$
-        BEGIN
-          RETURN QUERY
-          SELECT 
-            i.id,
-            i.path_512,
-            i.path_2048,
-            i.path_64,
-            i.width,
-            i.height,
-            i.lat,
-            i.lon,
-            i.title,
-            i.description,
-            i.keywords,
-            (6371000 * acos(
-              cos(radians(user_lat)) * 
-              cos(radians(i.lat)) * 
-              cos(radians(i.lon) - radians(user_lon)) + 
-              sin(radians(user_lat)) * 
-              sin(radians(i.lat))
-            )) as distance_meters,
-            i.created_at
-          FROM items i
-          WHERE 
-            i.lat IS NOT NULL 
-            AND i.lon IS NOT NULL
-            AND i.path_512 IS NOT NULL
-            AND i.path_2048 IS NOT NULL
-            AND (6371000 * acos(
-              cos(radians(user_lat)) * 
-              cos(radians(i.lat)) * 
-              cos(radians(i.lon) - radians(user_lon)) + 
-              sin(radians(user_lat)) * 
-              sin(radians(i.lat))
-            )) <= max_radius_meters
-          ORDER BY distance_meters ASC
-          LIMIT max_results;
-        END;
-        $$ LANGUAGE plpgsql;
-      `;
-      
-      const { error: fixError } = await supabase.rpc('exec_sql', { sql: fixQuery });
-      
-      if (fixError) {
-        console.error('Fix function error:', fixError);
-        return json({ error: 'Failed to fix function', details: fixError });
-      }
-      
-      // Test the fixed function
-      const { data: fixedData, error: fixedError } = await supabase
-        .rpc('images_by_distance_optimized', {
-          user_lat: 48.3380921172401,
-          user_lon: 12.6950471210948,
-          max_radius_meters: 50000,
-          max_results: 10
-        });
-      
-      if (fixedError) {
-        return json({ error: 'Function still broken after fix', details: fixedError });
-      }
-      
+    if (functionError) {
+      console.error('[Test DB] Function error:', functionError);
       return json({ 
-        status: 'Function fixed successfully', 
-        testData: fixedData,
-        count: fixedData?.length || 0
-      });
+        error: 'Function call failed', 
+        details: functionError,
+        connection: 'OK'
+      }, { status: 500 });
     }
-    
-    return json({ 
-      status: 'Function working correctly', 
-      testData,
-      count: testData?.length || 0
+
+    console.log('[Test DB] Function call successful, returned:', functionTest?.length || 0, 'items');
+
+    // 3. Check basic data
+    const { data: itemsData, error: itemsError } = await supabase
+      .from('items')
+      .select('id, title, gallery, path_512, lat, lon, is_private')
+      .not('path_512', 'is', null)
+      .eq('gallery', true)
+      .limit(5);
+
+    if (itemsError) {
+      console.error('[Test DB] Items query error:', itemsError);
+    }
+
+    return json({
+      success: true,
+      connection: 'OK',
+      function: 'OK',
+      functionResult: functionTest?.length || 0,
+      basicItems: itemsData?.length || 0,
+      sampleItems: itemsData || []
     });
-    
+
   } catch (error) {
-    console.error('Test DB error:', error);
-    return json({ error: 'Test failed', details: error });
+    console.error('[Test DB] Unexpected error:', error);
+    return json({ error: 'Test failed', details: error }, { status: 500 });
   }
-}; 
+} 
