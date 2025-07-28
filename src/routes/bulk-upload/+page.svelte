@@ -1396,7 +1396,7 @@
     margin-bottom: 24px;
     padding: 10px 20px;
     background: var(--accent-color);
-    color: #fff;
+    color: var(--text-primary);
     border-radius: 8px;
     font-weight: 600;
     text-decoration: none;
@@ -1405,7 +1405,7 @@
   }
   .back-to-app-btn:hover {
     background: var(--accent-hover);
-    color: #fff;
+    color: var(--text-primary);
     text-decoration: none;
   }
 
@@ -1541,7 +1541,7 @@
     left: 0;
     right: 0;
     background-color: rgba(0, 0, 0, 0.7);
-    color: white;
+    color: var(--text-primary);
     padding: 8px;
     text-align: center;
   }
@@ -1588,7 +1588,8 @@
   .input-group input.error,
   .input-group textarea.error {
     border-color: #dc3545;
-    background-color: #fff5f5;
+    background-color: var(--bg-primary);
+    color: var(--text-color);
   }
 
   .char-counter {
@@ -1616,7 +1617,7 @@
   .map-picker-btn {
     padding: 8px 12px;
     background-color: var(--accent-color);
-    color: white;
+    color: var(--text-primary);
     border: none;
     border-radius: 6px;
     cursor: pointer;
@@ -1643,7 +1644,7 @@
   .upload-single-btn {
     padding: 6px 12px;
     background-color: var(--accent-color);
-    color: white;
+    color: var(--text-primary);
     border: none;
     border-radius: 6px;
     cursor: pointer;
@@ -1663,7 +1664,7 @@
   .remove-btn {
     padding: 6px 12px;
     background-color: #dc3545;
-    color: white;
+    color: var(--text-primary);
     border: none;
     border-radius: 6px;
     cursor: pointer;
@@ -1691,7 +1692,7 @@
   .upload-btn {
     padding: 16px 32px;
     background-color: var(--accent-color);
-    color: white;
+    color: var(--text-primary);
     border: none;
     border-radius: 8px;
     font-size: 16px;
@@ -1760,7 +1761,7 @@
   
   .location-btn {
     padding: 8px 12px;
-    background-color: white;
+    background-color: var(--bg-primary);
     color: #28a745;
     border: 1px solid #28a745;
     border-radius: 6px;
@@ -1851,7 +1852,7 @@
   .map-type-btn {
     padding: 6px 12px;
     background-color: var(--accent-color);
-    color: white;
+    color: var(--text-primary);
     border: none;
     border-radius: 6px;
     cursor: pointer;
@@ -1861,7 +1862,7 @@
   .map-close-btn {
     padding: 6px 12px;
     background-color: #6c757d;
-    color: white;
+    color: var(--text-primary);
     border: none;
     border-radius: 6px;
     cursor: pointer;
@@ -1900,7 +1901,7 @@
   .map-cancel-btn {
     padding: 8px 16px;
     background-color: #6c757d;
-    color: white;
+    color: var(--text-primary);
     border: none;
     border-radius: 6px;
     cursor: pointer;
@@ -1909,7 +1910,7 @@
   .map-confirm-btn {
     padding: 8px 16px;
     background-color: var(--accent-color);
-    color: white;
+    color: var(--text-primary);
     border: none;
     border-radius: 6px;
     cursor: pointer;
@@ -2097,7 +2098,7 @@
   /* CSS für den grünen Button bei erfolgreichem Standort */
   .location-success {
     background: linear-gradient(135deg, #28a745, #20c997) !important;
-    color: white !important;
+    color: var(--text-primary) !important;
     box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3) !important;
   }
   /* CSS für Upload-Header-Row */
@@ -2153,7 +2154,7 @@
   font-size: 2.3rem;
   padding: 0;
   background: linear-gradient(135deg, #007bff, #0056b3);
-  color: white;
+  color: var(--text-primary);
   border: none;
   box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
   transition: background 0.2s, color 0.2s, box-shadow 0.2s;
@@ -2163,7 +2164,7 @@
 }
 .camera-round-btn:hover:not(:disabled) {
   background: linear-gradient(135deg, #0056b3, #004085);
-  color: #fff;
+  color: var(--text-primary);
   box-shadow: 0 6px 20px rgba(0, 123, 255, 0.4);
 }
 .camera-round-btn:disabled {
