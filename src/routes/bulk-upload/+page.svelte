@@ -1136,14 +1136,19 @@
         {/if}
       </div>
     </div>
-    <label for="file-input" class="upload-label">
+    <div class="upload-label" role="button" tabindex="0" on:click={() => document.getElementById('file-input')?.click()} on:keydown={(e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        document.getElementById('file-input')?.click();
+      }
+    }}>
       <div class="upload-text">
         <strong>Dateien hierher ziehen</strong> oder klicken zum Auswählen
       </div>
       <div class="upload-hint">
         Unterstützte Formate: JPEG, PNG, WebP (max. 50MB pro Datei)
       </div>
-    </label>
+    </div>
   </div>
 
   <!-- Image List -->
@@ -1571,12 +1576,7 @@
     margin-bottom: 16px;
   }
 
-  .input-group label {
-    display: block;
-    margin-bottom: 4px;
-    font-weight: 500;
-    color: var(--text-color);
-  }
+
 
   .clear-field-btn {
     background: none;
