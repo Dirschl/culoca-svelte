@@ -94,20 +94,10 @@
     console.log('[NormalGallery] Component mounted');
     console.log('[NormalGallery][onMount] Adding scroll event listener');
     
-    // Nur initial laden, wenn KEIN Location-Filter aktiv ist!
-    if ($galleryItems.length === 0 && !$isGalleryLoading && !$filterStore.locationFilter) {
-      console.log('[NormalGallery] Triggering initial gallery load (no location filter)');
-      
-      // Use user coordinates for initial load when no location filter
-      loadMoreGallery({
-        lat: userLat || undefined,
-        lon: userLon || undefined
-      });
-    } else if ($filterStore.locationFilter) {
-      console.log('[NormalGallery] Skipping initial load - location filter active:', $filterStore.locationFilter);
-    }
+    // WICHTIG: Keine initiale Ladung hier, da die Hauptseite das übernimmt
+    // Die Galerie wird bereits von der Hauptseite initialisiert
+    console.log('[NormalGallery] Skipping initial gallery load - handled by main page');
     
-    // Scroll-Handler hinzufügen
     window.addEventListener('scroll', handleScroll);
     
     return () => {

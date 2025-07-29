@@ -55,7 +55,32 @@ export async function performSearch(q: string, trigger = true) {
     // Suche leeren - zurück zur normalen Galerie
     isSearching.set(false);
     useSearchResults.set(false);
-    resetGallery();
+    
+    // WICHTIG: User-Filter aus dem Store holen und anwenden
+    let resetParams: any = {};
+    try {
+      const { filterStore } = await import('./filterStore');
+      const filterState = get(filterStore);
+      if (filterState.userFilter && filterState.userFilter.userId) {
+        resetParams.user_id = filterState.userFilter.userId;
+        console.log('🔍 SearchStore: Applying user filter when clearing search:', filterState.userFilter.userId);
+      }
+    } catch (e) {
+      console.warn('🔍 SearchStore: Error getting filter state when clearing search:', e);
+    }
+    
+    // GPS-Koordinaten hinzufügen
+    if (typeof window !== 'undefined') {
+      const userLat = (window as any).userLat;
+      const userLon = (window as any).userLon;
+      if (userLat && userLon) {
+        resetParams.lat = userLat;
+        resetParams.lon = userLon;
+        console.log('🔍 SearchStore: Clearing search with GPS coordinates:', userLat, userLon);
+      }
+    }
+    
+    resetGallery(resetParams);
     return;
   }
   
@@ -77,6 +102,18 @@ export async function performSearch(q: string, trigger = true) {
           searchParams.lon = userLon;
           console.log('🔍 SearchStore: Using GPS coordinates:', userLat, userLon);
         }
+      }
+      
+      // WICHTIG: User-Filter aus dem Store holen und anwenden
+      try {
+        const { filterStore } = await import('./filterStore');
+        const filterState = get(filterStore);
+        if (filterState.userFilter && filterState.userFilter.userId) {
+          searchParams.user_id = filterState.userFilter.userId;
+          console.log('🔍 SearchStore: Applying user filter from store:', filterState.userFilter.userId);
+        }
+      } catch (e) {
+        console.warn('🔍 SearchStore: Error getting filter state:', e);
       }
       
       // Verwende galleryStore für die Suche - dieser verwendet jetzt die neue API
@@ -114,6 +151,19 @@ export function clearSearch() {
       console.log('🔍 SearchStore: Clearing search with GPS coordinates:', userLat, userLon);
     }
   }
+  
+  // WICHTIG: User-Filter aus dem Store holen und anwenden
+  try {
+    const { filterStore } = require('./filterStore');
+    const filterState = get(filterStore);
+    if (filterState.userFilter && filterState.userFilter.userId) {
+      resetParams.user_id = filterState.userFilter.userId;
+      console.log('🔍 SearchStore: Applying user filter when clearing search:', filterState.userFilter.userId);
+    }
+  } catch (e) {
+    console.warn('🔍 SearchStore: Error getting filter state when clearing search:', e);
+  }
+  
   resetGallery(resetParams);
 }
 

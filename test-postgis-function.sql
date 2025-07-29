@@ -1,48 +1,34 @@
--- Test PostGIS function existence and functionality
--- Run this in Supabase SQL Editor
+-- Test PostGIS Function Availability
+-- Run this in Supabase SQL Editor to check if functions exist
 
--- 1. Check if function exists
+-- 1. Check if the function exists
 SELECT 
-  routine_name,
+  routine_name, 
   routine_type,
   data_type
 FROM information_schema.routines 
-WHERE routine_name = 'gallery_items_unified_postgis';
+WHERE routine_name = 'gallery_items_normal_postgis'
+AND routine_schema = 'public';
 
--- 2. Test function with basic parameters
-SELECT * FROM gallery_items_unified_postgis(
-  user_lat := 0,
-  user_lon := 0,
-  page_value := 0,
-  page_size_value := 10,
-  current_user_id := NULL,
-  search_term := NULL,
-  location_filter_lat := NULL,
-  location_filter_lon := NULL,
-  filter_user_id := NULL
-) LIMIT 5;
-
--- 3. Check if there are any gallery items at all
+-- 2. Check function parameters
 SELECT 
-  COUNT(*) as total_items,
-  COUNT(CASE WHEN gallery = true THEN 1 END) as gallery_items,
-  COUNT(CASE WHEN path_512 IS NOT NULL THEN 1 END) as items_with_512,
-  COUNT(CASE WHEN is_private = false OR is_private IS NULL THEN 1 END) as public_items
-FROM items;
+  parameter_name,
+  parameter_mode,
+  data_type,
+  parameter_default
+FROM information_schema.parameters 
+WHERE specific_name = 'gallery_items_normal_postgis'
+AND parameter_schema = 'public'
+ORDER BY ordinal_position;
 
--- 4. Check sample items that should be visible
-SELECT 
-  id,
-  slug,
-  title,
-  gallery,
-  is_private,
-  path_512,
-  lat,
-  lon
-FROM items 
-WHERE path_512 IS NOT NULL
-  AND gallery = true
-  AND (is_private = false OR is_private IS NULL)
-ORDER BY created_at DESC
-LIMIT 10; 
+-- 3. Test the function with minimal parameters
+SELECT * FROM gallery_items_normal_postgis(0, 0, 0, 50, NULL) LIMIT 5;
+
+-- 4. Check if PostGIS extension is available
+SELECT * FROM pg_extension WHERE extname = 'postgis';
+
+-- 5. Check if items table has data
+SELECT COUNT(*) as total_items FROM items WHERE path_512 IS NOT NULL AND gallery = true;
+
+-- 6. Check if items have GPS data
+SELECT COUNT(*) as items_with_gps FROM items WHERE lat IS NOT NULL AND lon IS NOT NULL AND path_512 IS NOT NULL AND gallery = true; 

@@ -174,7 +174,7 @@ function createFilterStore() {
 			let newState = { ...initialState, ...storedState };
 
 			// Check URL parameters
-			const userParam = searchParams.get('user');
+			const userParam = searchParams.get('user_id') || searchParams.get('user'); // Support both for backward compatibility
 			const accountParam = searchParams.get('account');
 			const latParam = searchParams.get('lat');
 			const lonParam = searchParams.get('lon');
@@ -247,6 +247,7 @@ function updateURL(state: FilterState) {
 	const params = url.searchParams;
 
 	// Clear existing filter params
+	params.delete('user_id');
 	params.delete('user');
 	params.delete('account');
 	params.delete('lat');
@@ -256,7 +257,7 @@ function updateURL(state: FilterState) {
 
 	// Add current filters
 	if (state.userFilter && state.userFilter.userId) {
-		params.set('user', state.userFilter.userId);
+		params.set('user_id', state.userFilter.userId);
 		if (state.userFilter.accountName) {
 			params.set('account', state.userFilter.accountName);
 		}
