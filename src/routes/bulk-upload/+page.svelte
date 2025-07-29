@@ -4,6 +4,7 @@
   import * as exifr from 'exifr';
   import { env as publicEnv } from '$env/dynamic/public';
   import { authFetch } from '$lib/authFetch';
+  import AIButton from '$lib/AIButton.svelte';
 
   // Map picker state
   let mapContainer: HTMLElement;
@@ -1187,7 +1188,24 @@
               
               <!-- Title Input -->
               <div class="input-group title-group">
-                <button type="button" class="clear-field-btn" on:click={() => { image.title = ''; document.getElementById(`title-${image.id}`)?.focus(); }}>Titel *</button>
+                <div class="title-header">
+                  <button type="button" class="clear-field-btn" on:click={() => { image.title = ''; document.getElementById(`title-${image.id}`)?.focus(); }}>Titel *</button>
+                  <AIButton 
+                    userTitle={image.title}
+                    imageFile={image.file}
+                    originalTitle={image.originalFileName}
+                    disabled={image.isUploading}
+                    on:analysisComplete={(event) => {
+                      image.description = event.detail.description;
+                      image.keywords = event.detail.keywords;
+                      validateImage(image);
+                    }}
+                    on:analysisError={(event) => {
+                      message = `❌ KI-Fehler: ${event.detail.error}`;
+                      messageType = 'error';
+                    }}
+                  />
+                </div>
                 <div class="title-row">
                   <input 
                     type="text" 
@@ -1600,6 +1618,17 @@
     margin-bottom: 4px;
     font-weight: 500;
     color: var(--text-color);
+  }
+
+  .title-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 4px;
+  }
+
+  .title-header .clear-field-btn {
+    margin-bottom: 0;
   }
 
   .input-group input,
