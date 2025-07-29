@@ -92,28 +92,29 @@ class AIImageAnalyzer {
    * Build optimized prompt for image analysis
    */
   private buildPrompt(userTitle: string, originalTitle?: string): string {
-    const context = originalTitle ? `Original filename: ${originalTitle}` : '';
+    const context = originalTitle ? `Originaldateiname: ${originalTitle}` : '';
     
-    return `Analyze this image and generate a detailed description and keywords for a photography website.
+    return `SPRACHE: Antworte ausschließlich auf Deutsch.
 
-User-provided title: "${userTitle}"
+Analysiere dieses Bild und generiere eine Beschreibung und Schlüsselwörter für eine Fotografie-Website.
+
+Nutzer-Titel: "${userTitle}"
 ${context}
 
-Requirements:
-1. Description: Write a detailed, engaging description (100-160 characters) that describes what's visible in the image, including location, mood, lighting, and composition. Focus on visual elements and atmosphere.
+Anforderungen:
+1. Beschreibung: 100-160 Zeichen, beschreibe sichtbare Elemente, Stimmung, Beleuchtung
+2. Schlüsselwörter: 40-50 Begriffe, getrennt durch Kommas. Berücksichtige:
+   - Orte/Ortsnamen
+   - Visuelle Elemente (Farben, Objekte, Architektur)
+   - Stimmung/Atmosphäre
+   - Fotografie-Stil/Technik
+   - Geografische Region
 
-2. Keywords: Generate 10-15 relevant keywords separated by commas. Include:
-   - Location/place names
-   - Visual elements (colors, objects, architecture)
-   - Mood/atmosphere
-   - Photography style/technique
-   - Geographic region if identifiable
+Format:
+DESCRIPTION: [Deine Beschreibung hier]
+KEYWORDS: [schlüsselwort1, schlüsselwort2, schlüsselwort3, ...]
 
-Format your response exactly like this:
-DESCRIPTION: [Your description here]
-KEYWORDS: [keyword1, keyword2, keyword3, ...]
-
-Keep the description concise but informative, and ensure keywords are relevant to the image content.`;
+WICHTIG: Antworte nur auf Deutsch.`;
   }
 
   /**

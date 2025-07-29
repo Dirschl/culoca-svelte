@@ -51,13 +51,23 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
   // --- NEU: Location Filter Koordinaten bevorzugen ---
   let mergedParams = { ...get(galleryParams), ...params };
   try {
-    const filterState = get(require('./filterStore').filterStore);
+    // WICHTIG: User-Filter aus dem Store holen und anwenden
+    const { filterStore } = await import('./filterStore');
+    const filterState = get(filterStore);
     if (filterState.locationFilter) {
       mergedParams.lat = filterState.locationFilter.lat;
       mergedParams.lon = filterState.locationFilter.lon;
       mergedParams.fromItem = true; // Immer setzen, wenn Location-Filter aktiv
     }
+    // WICHTIG: User-Filter aus dem Store holen und anwenden
+    if (filterState.userFilter && filterState.userFilter.userId) {
+      mergedParams.user_id = filterState.userFilter.userId;
+      console.log('[GalleryStore] Applying user filter from store:', filterState.userFilter.userId);
+    } else {
+      console.log('[GalleryStore] No user filter found in store');
+    }
   } catch (e) {
+    console.warn('[GalleryStore] Error getting filter state:', e);
     // fallback: keine Änderung
   }
   
@@ -108,6 +118,10 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
       url.searchParams.set('lat', String(mergedParams.lat));
       url.searchParams.set('lon', String(mergedParams.lon));
     }
+    // NEU: User-Filter Parameter hinzufügen (auch für Suche!)
+    if (mergedParams.user_id) {
+      url.searchParams.set('user_id', String(mergedParams.user_id));
+    }
     // NEU: LocationFilter-Parameter hinzufügen
     if (mergedParams.locationFilterLat && mergedParams.locationFilterLon) {
       url.searchParams.set('locationFilterLat', String(mergedParams.locationFilterLat));
@@ -140,7 +154,8 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
     isLocationFilter: !!mergedParams.fromItem,
     originalLimit: limit,
     offset,
-    currentItemsCount: get(galleryItems).length
+    currentItemsCount: get(galleryItems).length,
+    hasUserFilter: !!mergedParams.user_id
   });
 
   try {

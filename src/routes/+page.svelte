@@ -817,20 +817,45 @@
     }
     
     // Wenn sich User-Filter ändert, lade Gallery neu
-    if (userFilterChanged && currentUserFilter) {
-      console.log('[Reactive] User filter changed, loading more gallery:', currentUserFilter);
-      isHandlingFilterChange = true;
-      lastUserFilter = JSON.parse(JSON.stringify(currentUserFilter));
+    if (userFilterChanged) {
+      // WICHTIG: Prüfe ob die Galerie bereits mit diesem User-Filter geladen wurde
+      const isInitialLoadWithUserFilter = galleryInitialized && 
+        currentUserFilter && 
+        lastUserFilter && 
+        currentUserFilter.userId === lastUserFilter.userId;
       
-      // WICHTIG: GPS-Koordinaten für User-Filter bereitstellen
-      const gpsParams = {
-        user_id: currentUserFilter.userId,
-        lat: userLat || 0,
-        lon: userLon || 0
-      };
-      
-      resetGallery(gpsParams);
-      setTimeout(() => { isHandlingFilterChange = false; }, 100);
+      if (isInitialLoadWithUserFilter) {
+        console.log('[Reactive] Skipping user filter change - already loaded with this filter');
+      } else if (currentUserFilter) {
+        // User-Filter gesetzt
+        console.log('[Reactive] User filter set, loading filtered gallery:', currentUserFilter);
+        isHandlingFilterChange = true;
+        lastUserFilter = JSON.parse(JSON.stringify(currentUserFilter));
+        
+        // WICHTIG: GPS-Koordinaten für User-Filter bereitstellen
+        const gpsParams = {
+          user_id: currentUserFilter.userId,
+          lat: userLat || 0,
+          lon: userLon || 0
+        };
+        
+        resetGallery(gpsParams);
+        setTimeout(() => { isHandlingFilterChange = false; }, 100);
+      } else {
+        // User-Filter gelöscht
+        console.log('[Reactive] User filter cleared, loading all images');
+        isHandlingFilterChange = true;
+        lastUserFilter = null;
+        
+        // Galerie ohne User-Filter neu laden
+        const gpsParams = {
+          lat: userLat || 0,
+          lon: userLon || 0
+        };
+        
+        resetGallery(gpsParams);
+        setTimeout(() => { isHandlingFilterChange = false; }, 100);
+      }
     }
     
     // Update last values for next comparison
@@ -881,6 +906,17 @@
     // Initialize filter store from URL parameters
     filterStore.initFromUrl($pageStore.url.searchParams);
     console.log('[onMount] Initialized filterStore from URL parameters');
+    
+    // WICHTIG: Kurze Verzögerung um sicherzustellen, dass der FilterStore korrekt initialisiert wurde
+    setTimeout(() => {
+      console.log('[onMount] FilterStore state after initialization:', {
+        userFilter: $filterStore.userFilter,
+        locationFilter: $filterStore.locationFilter
+      });
+      
+      // WICHTIG: Galerie erst nach FilterStore-Initialisierung starten
+      initializeGalleryIntelligently();
+    }, 100);
     
     const onScroll = () => {
       showScrollToTop = window.scrollY > 200;
@@ -1009,6 +1045,12 @@
           lon: 0
         };
         
+        // WICHTIG: User-Filter beibehalten falls gesetzt
+        if ($filterStore.userFilter) {
+          galleryParams.user_id = $filterStore.userFilter.userId;
+          console.log('[Gallery-Init] Including user filter in initial load:', $filterStore.userFilter.userId);
+        }
+        
         // Füge Suchparameter hinzu falls vorhanden
         if (searchParam) {
           galleryParams.search = searchParam;
@@ -1045,7 +1087,7 @@
             
             // Wenn GPS-Koordinaten verfügbar sind, lade Galerie neu
             if (effectiveLat && effectiveLon) {
-              console.log('[Gallery-Init] GPS coordinates available, reloading gallery...');
+              console.log('[Gallery-Init] GPS coordinates available, updating coordinates...');
               
               // Setze lastLoaded-Werte um doppelte GPS-Trigger zu vermeiden
               lastLoadedLat = effectiveLat;
@@ -1059,24 +1101,36 @@
                 console.log('[Gallery-Init] Updated original gallery coordinates:', { originalGalleryLat, originalGalleryLon });
               }
               
-              const galleryParams: any = {
-                lat: effectiveLat,
-                lon: effectiveLon
-              };
-              
-              // Füge Suchparameter hinzu falls vorhanden
-              if (searchParam) {
-                galleryParams.search = searchParam;
-                setSearchQuery(searchParam);
+              // Nur für Mobile Mode: Galerie neu laden
+              if (isManual3x3Mode) {
+                const galleryParams: any = {
+                  lat: effectiveLat,
+                  lon: effectiveLon
+                };
+                
+                // WICHTIG: User-Filter beibehalten falls gesetzt
+                if ($filterStore.userFilter) {
+                  galleryParams.user_id = $filterStore.userFilter.userId;
+                }
+                
+                // Füge Suchparameter hinzu falls vorhanden
+                if (searchParam) {
+                  galleryParams.search = searchParam;
+                  setSearchQuery(searchParam);
+                }
+                // Setze fromItem, wenn Location-Filter aktiv
+                if ($filterStore.locationFilter) {
+                  galleryParams.fromItem = true;
+                }
+                
+                console.log('[Gallery-Init] Reloading mobile gallery with GPS coordinates:', galleryParams);
+                resetGallery(galleryParams);
+              } else {
+                // Normal Mode: Nur Koordinaten aktualisieren, keine Neuladung
+                console.log('[Gallery-Init] Normal mode: Updated GPS coordinates without reloading gallery');
               }
-              // Setze fromItem, wenn Location-Filter aktiv
-              if ($filterStore.locationFilter) {
-                galleryParams.fromItem = true;
-              }
               
-              console.log('[Gallery-Init] Reloading gallery with GPS coordinates:', galleryParams);
-              resetGallery(galleryParams);
-              return; // Galerie neu geladen, beende Warteschleife
+              return; // Koordinaten aktualisiert, beende Warteschleife
             }
             
             // Warte eine Sekunde bevor nächster Versuch
@@ -1088,8 +1142,6 @@
         }, 1000); // 1 Sekunde warten bevor GPS-Versuch
       }
     };
-    
-    initializeGalleryIntelligently();
     
     return () => {
       window.removeEventListener('scroll', onScroll);
@@ -1144,8 +1196,8 @@
           // Mobile Mode: Keine Galerie-Reset, Mobile Galerie sortiert sich selbst reaktiv
           console.log('[GPS-Trigger] Mobile Mode: Skipping gallery reset, mobile gallery will sort itself');
         } else {
-          // Normal Mode: KEINE automatischen Reloads - nur LoadMore basierend auf ursprünglichen GPS-Daten
-          console.log('[GPS-Trigger] Normal Mode: No automatic reloads, only LoadMore based on original GPS coordinates');
+          // Normal Mode: KEINE automatischen Reloads - nur clientseitige Sortierung
+          console.log('[GPS-Trigger] Normal Mode: No automatic reloads, only client-side sorting');
         }
         
         // Clientseitige Sortierung für bereits geladene Items (unabhängig vom Modus)
