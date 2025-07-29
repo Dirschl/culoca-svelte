@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import { darkMode } from '$lib/darkMode';
-  import { filterStore } from '$lib/filterStore';
+  import { filterStore, getEffectiveGpsPosition } from '$lib/filterStore';
   import { goto } from '$app/navigation';
   import { sessionStore, sessionReady } from '$lib/sessionStore';
   import type { PageData } from './$types';
@@ -77,8 +77,44 @@
   let radius = 1000;
   let radiusInitialized = false;
   
+  // Item view logging
+  let viewLogged = false;
+  
+  // Function to initialize GPS if not available
+  async function initializeGpsIfNeeded() {
+    if (!browser) return;
+    
+    // Check if we have GPS position
+    const effectiveGps = getEffectiveGpsPosition();
+    if (effectiveGps) {
+      console.log('[Item Detail] GPS position available:', effectiveGps);
+      return;
+    }
+    
+    // Try to get GPS position from browser
+    console.log('[Item Detail] No GPS position available, requesting from browser...');
+    try {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 60000
+        });
+      });
+      
+      const { lat, lon } = position.coords;
+      console.log('[Item Detail] Got GPS position from browser:', { lat, lon });
+      
+      // Update filterStore with GPS position
+      filterStore.updateGpsStatus(true, { lat, lon });
+      
+    } catch (error) {
+      console.warn('[Item Detail] Failed to get GPS position:', error);
+    }
+  }
+  
   // Initialize filterStore from URL parameters (includes radius)
-  onMount(() => {
+  onMount(async () => {
     if (browser) {
       const urlParams = new URLSearchParams(window.location.search);
       filterStore.initFromUrl(urlParams);
@@ -99,9 +135,73 @@
           console.log(`[Item Detail] Radius from localStorage: ${radius}m`);
         }
       }
-      radiusInitialized = true;
+      
+      // Initialize GPS if needed, then log item view
+      await initializeGpsIfNeeded();
+      
+      // Log item view when page loads
+      if (image?.id && !viewLogged) {
+        logItemView();
+      }
     }
   });
+  
+  // Function to log item view
+  async function logItemView() {
+    if (!image?.id || viewLogged) return;
+    
+    try {
+      // Get current user session
+      const { data: { session } } = await supabase.auth.getSession();
+      const visitorId = session?.user?.id || null;
+      
+      // Get current GPS coordinates using the effective GPS position function
+      const effectiveGps = getEffectiveGpsPosition();
+      const visitorLat = effectiveGps?.lat || null;
+      const visitorLon = effectiveGps?.lon || null;
+      
+      // Debug: Log all available location information
+      console.log('[Item Detail] Debug location info:', {
+        effectiveGps,
+        filterStoreLocation: $filterStore.locationFilter,
+        lastGpsPosition: $filterStore.lastGpsPosition,
+        gpsAvailable: $filterStore.gpsAvailable,
+        visitorLat,
+        visitorLon,
+        imageLat: image?.lat,
+        imageLon: image?.lon
+      });
+      
+      console.log('[Item Detail] Logging view with visitor ID:', visitorId, 'GPS:', visitorLat, visitorLon);
+      
+      const response = await fetch('/api/log-item-view', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          itemId: image.id,
+          visitorId: visitorId,
+          visitorLat: visitorLat,
+          visitorLon: visitorLon,
+          referer: document.referrer,
+          userAgent: navigator.userAgent
+        })
+      });
+      
+      if (response.ok) {
+        viewLogged = true;
+        const responseData = await response.json();
+        console.log(`[Item Detail] View logged for item: ${image.id} with visitor ID: ${visitorId}, distance: ${visitorLat && visitorLon ? 'calculated' : 'unknown'}`);
+        console.log('[Item Detail] API response:', responseData);
+      } else {
+        const errorData = await response.json();
+        console.error('[Item Detail] Failed to log item view:', errorData);
+      }
+    } catch (error) {
+      console.error('[Item Detail] Error logging item view:', error);
+    }
+  }
   
   // Reactive statement to ensure radius is properly set
   $: if (radiusInitialized && browser) {

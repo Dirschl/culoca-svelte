@@ -1,5 +1,6 @@
 <script lang="ts">
   import '../app.css';
+  import '../admin.css';
   import { darkMode } from '$lib/darkMode';
   import { onMount } from 'svelte';
   import { sessionStore } from '$lib/sessionStore';
