@@ -1,5 +1,3 @@
-import { env } from '$env/dynamic/private';
-
 interface AIAnalysisResult {
   description: string;
   keywords: string;
@@ -14,68 +12,30 @@ interface AIAnalysisRequest {
 }
 
 /**
- * AI Image Analyzer using Google Gemini API
- * Generates descriptions and keywords from images and titles
+ * AI Image Analyzer using Server API
+ * Client-side implementation that calls server API
  */
 export class AIImageAnalyzer {
-  private apiKey: string;
-  private baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
-
-  constructor() {
-    this.apiKey = env.GOOGLE_GEMINI_API_KEY;
-    if (!this.apiKey) {
-      throw new Error('GOOGLE_GEMINI_API_KEY environment variable is required');
-    }
-  }
-
   /**
    * Analyze image and generate description + keywords
    */
   async analyzeImage(request: AIAnalysisRequest): Promise<AIAnalysisResult> {
     try {
-      const prompt = this.buildPrompt(request.userTitle, request.originalTitle);
-      
-      const response = await fetch(`${this.baseUrl}?key=${this.apiKey}`, {
+      const response = await fetch('/api/ai-analyze', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              {
-                text: prompt
-              },
-              {
-                inline_data: {
-                  mime_type: 'image/jpeg',
-                  data: request.imageBase64
-                }
-              }
-            ]
-          }],
-          generationConfig: {
-            temperature: 0.7,
-            topK: 40,
-            topP: 0.95,
-            maxOutputTokens: 1024,
-          }
-        })
+        body: JSON.stringify(request)
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(`Gemini API error: ${errorData.error?.message || response.statusText}`);
+        throw new Error(`AI Analysis API error: ${errorData.error || response.statusText}`);
       }
 
-      const data = await response.json();
-      const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      
-      if (!generatedText) {
-        throw new Error('No response from Gemini API');
-      }
-
-      return this.parseAIResponse(generatedText);
+      const result = await response.json();
+      return result;
     } catch (error) {
       console.error('AI Analysis failed:', error);
       return {
@@ -83,65 +43,6 @@ export class AIImageAnalyzer {
         keywords: '',
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error'
-      };
-    }
-  }
-
-  /**
-   * Build optimized prompt for image analysis
-   */
-  private buildPrompt(userTitle: string, originalTitle?: string): string {
-    const context = originalTitle ? `Original filename: ${originalTitle}` : '';
-    
-    return `Analyze this image and generate a detailed description and keywords for a photography website.
-
-User-provided title: "${userTitle}"
-${context}
-
-Requirements:
-1. Description: Write a detailed, engaging description (100-160 characters) that describes what's visible in the image, including location, mood, lighting, and composition. Focus on visual elements and atmosphere.
-
-2. Keywords: Generate 10-15 relevant keywords separated by commas. Include:
-   - Location/place names
-   - Visual elements (colors, objects, architecture)
-   - Mood/atmosphere
-   - Photography style/technique
-   - Geographic region if identifiable
-
-Format your response exactly like this:
-DESCRIPTION: [Your description here]
-KEYWORDS: [keyword1, keyword2, keyword3, ...]
-
-Keep the description concise but informative, and ensure keywords are relevant to the image content.`;
-  }
-
-  /**
-   * Parse AI response into structured data
-   */
-  private parseAIResponse(response: string): AIAnalysisResult {
-    try {
-      const descriptionMatch = response.match(/DESCRIPTION:\s*(.+?)(?=\n|KEYWORDS:|$)/i);
-      const keywordsMatch = response.match(/KEYWORDS:\s*(.+?)(?=\n|$)/i);
-
-      const description = descriptionMatch?.[1]?.trim() || '';
-      const keywords = keywordsMatch?.[1]?.trim() || '';
-
-      if (!description || !keywords) {
-        throw new Error('Could not parse AI response');
-      }
-
-      return {
-        description,
-        keywords,
-        success: true
-      };
-    } catch (error) {
-      console.error('Failed to parse AI response:', response);
-      return {
-        description: '',
-        keywords: '',
-        success: false,
-        error: 'Failed to parse AI response'
       };
     }
   }
