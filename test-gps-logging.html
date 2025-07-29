@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPS Test</title>
+</head>
+<body>
+    <h1>GPS Test</h1>
+    <button onclick="testGps()">Test GPS</button>
+    <button onclick="testLogging()">Test Logging</button>
+    <div id="output"></div>
+
+    <script>
+        function log(message) {
+            const output = document.getElementById('output');
+            output.innerHTML += '<p>' + new Date().toLocaleTimeString() + ': ' + message + '</p>';
+        }
+
+        async function testGps() {
+            log('Testing GPS...');
+            try {
+                const position = await new Promise((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(resolve, reject, {
+                        enableHighAccuracy: true,
+                        timeout: 10000,
+                        maximumAge: 60000
+                    });
+                });
+                
+                const { lat, lon } = position.coords;
+                log(`GPS Position: ${lat}, ${lon}`);
+                
+                // Test logging with GPS
+                await testLoggingWithGps(lat, lon);
+                
+            } catch (error) {
+                log('GPS Error: ' + error.message);
+            }
+        }
+
+        async function testLogging() {
+            log('Testing logging without GPS...');
+            await testLoggingWithGps(null, null);
+        }
+
+        async function testLoggingWithGps(lat, lon) {
+            try {
+                const response = await fetch('/api/log-item-view', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        itemId: '00000000-0000-0000-0000-000000000001', // Test item ID
+                        visitorId: null, // Anonymous
+                        visitorLat: lat,
+                        visitorLon: lon,
+                        referer: 'test-gps-logging.html',
+                        userAgent: navigator.userAgent
+                    })
+                });
+                
+                const data = await response.json();
+                log('Logging response: ' + JSON.stringify(data, null, 2));
+                
+            } catch (error) {
+                log('Logging Error: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html> 
