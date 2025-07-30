@@ -33,7 +33,8 @@
         body: JSON.stringify({
           title: shareTitle,
           description: shareDescription,
-          params: shareUrl.split('?')[1] // Extract query parameters
+          params: shareUrl.split('?')[1], // Extract query parameters
+          screenshot: screenshot // Send the actual screenshot from client
         })
       });
 
