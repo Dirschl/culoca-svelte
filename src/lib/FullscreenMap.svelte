@@ -306,9 +306,12 @@
     }
     const canvas = await html2canvas(mapContainer, {
       useCORS: true,
-      backgroundColor: null
+      backgroundColor: null,
+      scale: 0.5, // Reduziere die Auflösung auf 50%
+      width: 800, // Begrenze die Breite
+      height: 600 // Begrenze die Höhe
     });
-    return canvas.toDataURL('image/png');
+    return canvas.toDataURL('image/jpeg', 0.7); // Komprimiere als JPEG mit 70% Qualität
   }
 
   // Handle modal close
