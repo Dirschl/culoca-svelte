@@ -25,7 +25,7 @@ export const POST: RequestHandler = async ({ request }) => {
       .insert({
         title: title || 'CULOCA - Map View Share',
         description: description || 'Map View Snippet - CULOCA.com',
-        screenshot_url: screenshot,
+        screenshot: screenshot, // This will be the base64 data URL
         params: params,
         created_by: user?.id || null
       })

@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS public.map_shares (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title VARCHAR(60) NOT NULL DEFAULT 'CULOCA - Map View Share',
   description VARCHAR(160) NOT NULL DEFAULT 'Map View Snippet - CULOCA.com',
-  screenshot_url TEXT,
+  screenshot TEXT, -- Base64 data URL of the screenshot
   params TEXT NOT NULL, -- URL parameters (lat, lon, zoom, map_type, user)
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   created_by UUID REFERENCES auth.users(id),
