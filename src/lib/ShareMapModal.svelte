@@ -1,10 +1,11 @@
 <script lang="ts">
-  import { createEventDispatcher } from 'svelte';
+  import { createEventDispatcher, onMount } from 'svelte';
   
   export let showModal = false;
   export let shareUrl = '';
   export let shareTitle = '';
   export let shareDescription = '';
+  export let screenshot: string | null = null;
   
   const dispatch = createEventDispatcher();
   
@@ -32,6 +33,7 @@
         body: JSON.stringify({
           title: shareTitle,
           description: shareDescription,
+          screenshot: screenshot,
           params: shareUrl.split('?')[1] // Extract query parameters
         })
       });
@@ -49,6 +51,27 @@
       console.error('Error saving share:', error);
     }
   }
+  
+  // Delete screenshot after modal is fully loaded
+  onMount(() => {
+    if (showModal && screenshot) {
+      // Delete screenshot after a short delay to ensure it's loaded
+      setTimeout(async () => {
+        try {
+          // Extract share ID from URL
+          const shareId = shareUrl.split('/').pop();
+          if (shareId) {
+            await fetch(`/api/delete-screenshot/${shareId}`, {
+              method: 'DELETE'
+            });
+            console.log('Screenshot deleted from database');
+          }
+        } catch (error) {
+          console.error('Error deleting screenshot:', error);
+        }
+      }, 2000); // 2 second delay to ensure screenshot is loaded
+    }
+  });
 </script>
 
 {#if showModal}
@@ -60,20 +83,11 @@
       </div>
       
       <div class="share-modal-content">
-        <div class="map-preview">
-          <div class="map-preview-container">
-            <div class="map-preview-placeholder">
-              <div class="map-preview-dimensions">
-                <span>1200 × 630</span>
-                <small>Social Media Optimiert</small>
-              </div>
-              <div class="map-preview-info">
-                <p>Kartenvorschau wird beim Aufruf des Links generiert</p>
-                <p>Optimale Abmessungen für Facebook, Twitter & Co.</p>
-              </div>
-            </div>
+        {#if screenshot}
+          <div class="map-preview">
+            <img src={screenshot} alt="Kartenausschnitt" />
           </div>
-        </div>
+        {/if}
         
         <form class="share-form">
           <div class="form-group">
@@ -170,49 +184,21 @@
     border-radius: 8px;
     overflow: hidden;
     border: 1px solid var(--border-color);
-  }
-  
-  .map-preview-container {
-    width: 100%;
-    max-width: 400px;
-    margin: 0 auto;
-    aspect-ratio: 1200/630;
-    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
     display: flex;
     align-items: center;
     justify-content: center;
-    position: relative;
-  }
-  
-  .map-preview-placeholder {
-    text-align: center;
+    height: 200px; /* Fixed height for preview */
+    background-color: var(--bg-secondary);
     color: var(--text-primary);
+    font-size: 1rem;
+    font-weight: 500;
     padding: 1rem;
   }
   
-  .map-preview-dimensions {
-    margin-bottom: 1rem;
-  }
-  
-  .map-preview-dimensions span {
-    font-size: 1.5rem;
-    font-weight: bold;
-    color: var(--text-primary);
+  .map-preview img {
+    width: 100%;
+    height: auto;
     display: block;
-  }
-  
-  .map-preview-dimensions small {
-    font-size: 0.875rem;
-    color: var(--text-muted);
-    display: block;
-    margin-top: 0.25rem;
-  }
-  
-  .map-preview-info p {
-    margin: 0.5rem 0;
-    font-size: 0.875rem;
-    color: var(--text-muted);
-    line-height: 1.4;
   }
   
   .share-form {
