@@ -28,6 +28,10 @@ let currentOffset = 0;
 let refreshInterval: number | null = null;
 let mounted = false;
 
+// Container references for auto-scroll
+let stripContainer: HTMLElement;
+let gridContainer: HTMLElement;
+
 // Direct database query for NewsFlash images (bypasses API limitations)
 async function loadNewsFlashImagesDirectFromDB(): Promise<NewsFlashImage[]> {
   try {
@@ -111,16 +115,37 @@ async function fetchImages(isLoadMore: boolean = false) {
       }
       loadingMore = false;
     } else {
+      // Check if we have new images (not just a refresh)
+      const hasNewImages = newImages.length > 0 && 
+        (images.length === 0 || newImages[0]?.id !== images[0]?.id);
+      
       images = newImages;
       lastImageId = images[0]?.id || null;
       lastUpdate = new Date();
       loading = false;
       errorMsg = '';
+      
+      // Auto-scroll to the right if we have new images
+      if (hasNewImages) {
+        setTimeout(() => {
+          scrollToRight();
+        }, 100); // Small delay to ensure DOM is updated
+      }
     }
   } catch (err) {
     console.error('NewsFlash: Unexpected error', err);
     errorMsg = 'Fehler beim Laden der Bilder.';
     if (isLoadMore) loadingMore = false;
+  }
+}
+
+function scrollToRight() {
+  const container = stripContainer || gridContainer;
+  if (container) {
+    container.scrollTo({
+      left: 0, // Scroll to the beginning (newest images are on the left)
+      behavior: 'smooth'
+    });
   }
 }
 
@@ -222,7 +247,7 @@ function handleScroll(event: Event) {
       <div class="newsflash-empty">Keine Uploads gefunden.</div>
     {:else}
       {#if layout === 'strip' || layout === 'justified'}
-        <div class="newsflash-strip" tabindex="0" on:scroll={handleScroll}>
+        <div class="newsflash-strip" tabindex="0" on:scroll={handleScroll} bind:this={stripContainer}>
           <div class="newsflash-time">{lastUpdate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} {displayedImageCount}/{$galleryStats.totalCount}</div>
           {#each images as img (img.id)}
             <div class="newsflash-thumb" on:click={() => handleImageClick(img)} tabindex="0" role="button" aria-label={img.title || img.original_name || 'Bild'}>
@@ -239,7 +264,7 @@ function handleScroll(event: Event) {
           {/if}
         </div>
       {:else if layout === 'grid'}
-        <div class="newsflash-grid" tabindex="0" on:scroll={handleScroll}>
+        <div class="newsflash-grid" tabindex="0" on:scroll={handleScroll} bind:this={gridContainer}>
           <div class="newsflash-time">{lastUpdate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} {displayedImageCount}/{$galleryStats.totalCount}</div>
           {#each images as img (img.id)}
             <div class="newsflash-thumb" on:click={() => handleImageClick(img)} tabindex="0" role="button" aria-label={img.title || img.original_name || 'Bild'}>

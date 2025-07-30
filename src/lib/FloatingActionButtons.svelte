@@ -14,6 +14,7 @@
   export let showProfileButton = true;
   export let showSettingsButton = true;
   export let showPublicContentButton = true;
+  export let showShareButton = false;
   export let settingsIconRotation = 0; // Rotation for movement mode
 export let continuousRotation = 0; // Kontinuierliche Rotation im mobilen Modus
 export let rotationSpeed = 1; // Geschwindigkeit der kontinuierlichen Rotation
@@ -83,6 +84,10 @@ export let rotationSpeed = 1; // Geschwindigkeit der kontinuierlichen Rotation
   
   function handleMap() {
     dispatch('map');
+  }
+  
+  function handleShare() {
+    dispatch('share');
   }
   
   function startTrack() {
@@ -270,6 +275,22 @@ export let rotationSpeed = 1; // Geschwindigkeit der kontinuierlichen Rotation
         <circle cx="18" cy="16" r="3"/>
         <path d="M12 11v3"/>
         <path d="M9 16h6"/>
+      </svg>
+    </button>
+  {/if}
+  
+  <!-- Share button -->
+  {#if showShareButton}
+    <button 
+      class="fab-button share"
+      on:click={handleShare}
+      aria-label="Kartenausschnitt teilen"
+      title="Kartenausschnitt teilen"
+    >
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
+        <polyline points="16,6 12,2 8,6"/>
+        <line x1="12" y1="2" x2="12" y2="15"/>
       </svg>
     </button>
   {/if}
