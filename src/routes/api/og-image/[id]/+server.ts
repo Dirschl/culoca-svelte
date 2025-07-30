@@ -4,13 +4,15 @@ import { supabase } from '$lib/supabaseClient';
 
 const SUPABASE_STORAGE_URL = 'https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public';
 
-export const GET: RequestHandler = async ({ params, fetch }) => {
+export const GET: RequestHandler = async ({ params, fetch, url }) => {
   const { id } = params;
+  const favicon = url.searchParams.get('favicon') === 'true';
+  
   if (!id) {
     return new Response('Missing id', { status: 400 });
   }
 
-  console.log(`🔍 OG-Image API: Processing image ${id}`);
+  console.log(`🔍 OG-Image API: Processing image ${id}${favicon ? ' (favicon mode)' : ''}`);
 
   // 1. Hole Bilddaten aus Supabase DB
   // Versuche zuerst nach slug zu suchen
@@ -67,6 +69,29 @@ export const GET: RequestHandler = async ({ params, fetch }) => {
   
   const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
   console.log(`✅ Image loaded, size: ${imgBuffer.length} bytes`);
+
+  if (favicon) {
+    // Favicon generieren (512x512 quadratisch)
+    console.log(`🖼️ Generating favicon (512x512)`);
+    try {
+      const faviconBuffer = await sharp(imgBuffer)
+        .resize(512, 512, { fit: 'cover' })
+        .jpeg({ quality: 85 })
+        .toBuffer();
+      
+      console.log(`✅ Favicon generated successfully, size: ${faviconBuffer.length} bytes`);
+      
+      return new Response(faviconBuffer, {
+        headers: {
+          'Content-Type': 'image/jpeg',
+          'Cache-Control': 'public, max-age=86400'
+        }
+      });
+    } catch (e: any) {
+      console.error(`❌ Error generating favicon: ${e?.message || 'Unknown error'}`);
+      return new Response('Error generating favicon', { status: 500 });
+    }
+  }
 
   // 3. OG-Image generieren (1200x630, zentriert, bei Hochformat mit Blur-Rand)
   const ogWidth = 1200;
