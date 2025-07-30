@@ -10,6 +10,7 @@
   import FloatingActionButtons from './FloatingActionButtons.svelte';
   import TrackModal from './TrackModal.svelte';
   import ShareMapModal from './ShareMapModal.svelte';
+  import html2canvas from 'html2canvas';
   
   export let images: any[] = [];
   export let userLat: number | null = null;
@@ -299,19 +300,15 @@
 
   // Capture map screenshot
   async function captureMapScreenshot() {
-    if (!map) return null;
-    
-    // Wait for all markers to render
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    try {
-      // Get map canvas
-      const canvas = await map.getCanvas();
-      return canvas.toDataURL('image/png');
-    } catch (error) {
-      console.error('Screenshot capture failed:', error);
-      return null;
+    const mapContainer = document.getElementById('map');
+    if (!mapContainer) {
+      throw new Error('Map container not found');
     }
+    const canvas = await html2canvas(mapContainer, {
+      useCORS: true,
+      backgroundColor: null
+    });
+    return canvas.toDataURL('image/png');
   }
 
   // Handle modal close
@@ -1332,7 +1329,7 @@
 
 <div class="fullscreen-map">
   <!-- Map container -->
-  <div bind:this={mapEl} class="map-container"></div>
+  <div bind:this={mapEl} class="map-container" id="map"></div>
   <!-- Logo (exactly same position as main page) -->
   <img src="/culoca-logo-512px.png" alt="Culoca" class="culoca-logo" />
   <!-- FAB-Leiste -->
