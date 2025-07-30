@@ -22,6 +22,35 @@
       console.error('Failed to copy URL:', error);
     }
   }
+  
+  async function saveShare() {
+    try {
+      const response = await fetch('/api/save-map-share', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: shareTitle,
+          description: shareDescription,
+          screenshot: screenshot,
+          params: new URL(shareUrl).searchParams.toString()
+        })
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        // Update the share URL to the OpenGraph URL
+        shareUrl = result.shareUrl;
+        console.log('Share saved with ID:', result.shareId);
+      } else {
+        console.error('Failed to save share:', result.error);
+      }
+    } catch (error) {
+      console.error('Error saving share:', error);
+    }
+  }
 </script>
 
 {#if showModal}
@@ -68,6 +97,9 @@
               <input readonly value={shareUrl} />
               <button type="button" on:click={copyUrl}>Kopieren</button>
             </div>
+            <button type="button" class="save-share-btn" on:click={saveShare}>
+              Für Social Media speichern
+            </button>
           </div>
         </form>
       </div>
@@ -209,5 +241,22 @@
   
   .url-input-group button:hover {
     background: var(--admin-primary-dark);
+  }
+  
+  .save-share-btn {
+    margin-top: 1rem;
+    width: 100%;
+    padding: 0.75rem 1rem;
+    background: var(--accent-color);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+  }
+  
+  .save-share-btn:hover {
+    background: var(--accent-hover);
   }
 </style> 
