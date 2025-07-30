@@ -24,10 +24,16 @@ export const load: PageServerLoad = async ({ params }) => {
       };
     }
     
+    // Convert base64 screenshot to data URL if it exists
+    let ogImage = '/culoca-logo-512px.png';
+    if (shareData.screenshot && shareData.screenshot.startsWith('data:image')) {
+      ogImage = shareData.screenshot;
+    }
+    
     return {
       ogTitle: shareData.title || 'CULOCA - Map View Share',
       ogDescription: shareData.description || 'Map View Snippet - CULOCA.com',
-      ogImage: shareData.screenshot || '/culoca-logo-512px.png',
+      ogImage: ogImage,
       ogUrl: `https://culoca.com/map-view?${shareData.params}`,
       shareData
     };
