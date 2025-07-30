@@ -120,9 +120,6 @@
               <input readonly value={shareUrl} />
               <button type="button" on:click={copyUrl}>Kopieren</button>
             </div>
-          </div>
-          
-          <div class="share-actions">
             <button type="button" class="save-share-btn" on:click={saveShare}>
               Für Social Media speichern
             </button>
@@ -254,6 +251,7 @@
   .url-input-group {
     display: flex;
     gap: 0.5rem;
+    margin-bottom: 1rem; /* Add space between input and button */
   }
   
   .url-input-group input {
@@ -279,7 +277,6 @@
   }
   
   .save-share-btn {
-    margin-top: 1rem;
     width: 100%;
     padding: 0.75rem 1rem;
     background: var(--accent-color);
@@ -293,11 +290,5 @@
   
   .save-share-btn:hover {
     background: var(--accent-hover);
-  }
-  
-  .share-actions {
-    margin-top: 1rem;
-    padding-top: 1rem;
-    border-top: 1px solid var(--border-color);
   }
 </style> 
