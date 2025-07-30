@@ -30,8 +30,8 @@ export const POST: RequestHandler = async ({ request }) => {
     
     console.log('Auth result:', { user: user?.id, error: authError });
     
-    // Generate screenshot based on params
-    let screenshot = null;
+    // Generate screenshot and save to bucket
+    let screenshotUrl = null;
     try {
       const urlParams = new URLSearchParams(params);
       const lat = urlParams.get('lat');
@@ -40,23 +40,23 @@ export const POST: RequestHandler = async ({ request }) => {
       const mapType = urlParams.get('map_type');
       
       if (lat && lon) {
-        screenshot = await generateScreenshot(lat, lon, zoom, mapType);
+        screenshotUrl = await generateAndSaveScreenshot(lat, lon, zoom, mapType);
       }
     } catch (error) {
       console.error('Error generating screenshot:', error);
     }
     
-    // Save to database with screenshot and last_visit
+    // Save to database with screenshot URL
     const insertData = {
       title: title || 'CULOCA - Map View Share',
       description: description || 'Map View Snippet - CULOCA.com',
-      screenshot: screenshot,
+      screenshot_url: screenshotUrl,
       params: params,
       created_by: user?.id || null,
       last_visit: new Date().toISOString()
     };
     
-    console.log('Inserting data:', { ...insertData, hasScreenshot: !!screenshot });
+    console.log('Inserting data:', { ...insertData, hasScreenshot: !!screenshotUrl });
     
     const { data, error } = await supabase
       .from('map_shares')
@@ -83,7 +83,7 @@ export const POST: RequestHandler = async ({ request }) => {
   }
 };
 
-async function generateScreenshot(lat: string, lon: string, zoom: string, mapType: string) {
+async function generateAndSaveScreenshot(lat: string, lon: string, zoom: string, mapType: string) {
   try {
     const width = 1200;
     const height = 630;
@@ -126,10 +126,33 @@ async function generateScreenshot(lat: string, lon: string, zoom: string, mapTyp
       .jpeg({ quality: 75 })
       .toBuffer();
     
-    return `data:image/jpeg;base64,${buffer.toString('base64')}`;
+    // Generate unique filename
+    const timestamp = Date.now();
+    const filename = `map-share-${timestamp}.jpg`;
+    
+    // Upload to bucket-map
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('bucket-map')
+      .upload(filename, buffer, {
+        contentType: 'image/jpeg',
+        cacheControl: '3600'
+      });
+    
+    if (uploadError) {
+      console.error('Error uploading screenshot:', uploadError);
+      return null;
+    }
+    
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from('bucket-map')
+      .getPublicUrl(filename);
+    
+    console.log('Screenshot saved to bucket:', urlData.publicUrl);
+    return urlData.publicUrl;
     
   } catch (error) {
-    console.error('Error generating screenshot:', error);
+    console.error('Error generating and saving screenshot:', error);
     return null;
   }
 } 

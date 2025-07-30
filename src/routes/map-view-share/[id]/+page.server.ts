@@ -28,17 +28,17 @@ export const load: PageServerLoad = async ({ params }) => {
       return {
         ogTitle: 'CULOCA - Map View Share',
         ogDescription: 'Map View Snippet - CULOCA.com',
-        ogImage: null,
+        ogImage: 'https://culoca.com/culoca-see-you-local-map-view.jpg',
         ogUrl: `https://culoca.com/map-view-share/${id}`
       };
     }
     
     console.log('Share data loaded:', shareData);
     
-    // Use screenshot from database if available
-    let ogImage = null;
-    if (shareData.screenshot && shareData.screenshot.startsWith('data:image')) {
-      ogImage = shareData.screenshot;
+    // Use screenshot URL from database or fallback
+    let ogImage = 'https://culoca.com/culoca-see-you-local-map-view.jpg'; // Default fallback
+    if (shareData.screenshot_url) {
+      ogImage = shareData.screenshot_url;
     }
     
     return {
@@ -53,7 +53,7 @@ export const load: PageServerLoad = async ({ params }) => {
     return {
       ogTitle: 'CULOCA - Map View Share',
       ogDescription: 'Map View Snippet - CULOCA.com',
-      ogImage: null,
+      ogImage: 'https://culoca.com/culoca-see-you-local-map-view.jpg',
       ogUrl: `https://culoca.com/map-view-share/${id}`
     };
   }
