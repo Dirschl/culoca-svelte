@@ -83,6 +83,12 @@ async function saveScreenshotToBucket(base64Screenshot: string) {
     const base64Data = base64Screenshot.replace(/^data:image\/[a-z]+;base64,/, '');
     const buffer = Buffer.from(base64Data, 'base64');
     
+    // Compress with Sharp to reduce file size
+    const compressedBuffer = await sharp(buffer)
+      .resize(1200, 630) // Standard OpenGraph size
+      .jpeg({ quality: 50 }) // Reduced quality for smaller file size
+      .toBuffer();
+    
     // Generate unique filename
     const timestamp = Date.now();
     const filename = `map-share-${timestamp}.jpg`;
@@ -90,7 +96,7 @@ async function saveScreenshotToBucket(base64Screenshot: string) {
     // Upload to map-share bucket
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('map-share')
-      .upload(filename, buffer, {
+      .upload(filename, compressedBuffer, {
         contentType: 'image/jpeg',
         cacheControl: '3600'
       });
