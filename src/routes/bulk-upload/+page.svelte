@@ -399,7 +399,7 @@
 
   async function uploadImages() {
     if (!validateAllImages()) {
-      message = 'Bitte alle Fehler beheben, bevor du den Upload startest';
+      message = 'Titel, Beschreibung, Keywörter und GPS prüfen.';
       messageType = 'error';
       return;
     }
@@ -1163,7 +1163,7 @@
         {:else if validateAllImages()}
           <div class="validation-success">✅ Alle Bilder sind bereit für den Upload</div>
         {:else}
-          <div class="validation-error">⚠️ Bitte alle Fehler beheben</div>
+          <div class="validation-error">⚠️ Titel, Beschreibung, Keywörter und GPS prüfen.</div>
         {/if}
       </div>
 

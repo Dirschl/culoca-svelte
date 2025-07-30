@@ -115,18 +115,51 @@ html, body {
 }
 
 /* Input Styles */
-.input {
+.input,
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="search"],
+input[type="url"],
+input[type="tel"],
+input[type="number"],
+textarea,
+select {
   background: var(--bg-secondary);
   color: var(--text-primary);
   border: 1px solid var(--border-color);
   border-radius: 4px;
   padding: 0.5rem;
   transition: border-color 0.2s ease;
+  font-family: inherit;
+  font-size: inherit;
 }
 
-.input:focus {
+.input:focus,
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus,
+input[type="search"]:focus,
+input[type="url"]:focus,
+input[type="tel"]:focus,
+input[type="number"]:focus,
+textarea:focus,
+select:focus {
   outline: none;
   border-color: var(--accent-color);
+}
+
+/* Placeholder styles for dark mode */
+.input::placeholder,
+input[type="text"]::placeholder,
+input[type="email"]::placeholder,
+input[type="password"]::placeholder,
+input[type="search"]::placeholder,
+input[type="url"]::placeholder,
+input[type="tel"]::placeholder,
+input[type="number"]::placeholder,
+textarea::placeholder {
+  color: var(--text-muted);
 }
 
 /* Modal and Dialog Styles */

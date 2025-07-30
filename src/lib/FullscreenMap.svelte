@@ -9,6 +9,7 @@
   import { downloadTrack, emailTrack } from './trackExport';
   import FloatingActionButtons from './FloatingActionButtons.svelte';
   import TrackModal from './TrackModal.svelte';
+  import ShareMapModal from './ShareMapModal.svelte';
   
   export let images: any[] = [];
   export let userLat: number | null = null;
@@ -47,6 +48,13 @@
   let savedTracks: any[] = [];
   let showTrackModal = false;
   let lastSimulatedPosition: { lat: number; lon: number; timestamp: number } | null = null;
+  
+  // Share functionality
+  let shareMapUrl = '';
+  let showShareModal = false;
+  let shareTitle = 'CULOCA - Map View Share';
+  let shareDescription = 'Map View Snippet - CULOCA.com';
+  let shareScreenshot: string | null = null;
   
   // Previous position for movement tracking
   let previousPosition: { lat: number; lon: number; timestamp: number } | null = null;
@@ -256,6 +264,59 @@
       currentTrackLayer = null;
       console.log('[FullscreenMap] Current track removed from map');
     }
+  }
+
+  // Share map function
+  async function shareMapView() {
+    if (!map) return;
+    
+    const center = map.getCenter();
+    const zoom = map.getZoom();
+    const viewType = isHybridView ? 'hybrid' : 'standard';
+    
+    // Get current filters
+    const currentFilters = get(filterStore);
+    const userFilter = currentFilters.userFilter;
+    
+    // Create shareable URL with map parameters
+    const shareUrl = new URL(window.location.href);
+    shareUrl.pathname = '/map-view';
+    shareUrl.searchParams.set('lat', center.lat.toFixed(6));
+    shareUrl.searchParams.set('lon', center.lng.toFixed(6));
+    shareUrl.searchParams.set('zoom', zoom.toString());
+    shareUrl.searchParams.set('map_type', viewType);
+    if (userFilter) {
+      shareUrl.searchParams.set('user', userFilter);
+    }
+    
+    shareMapUrl = shareUrl.toString();
+    
+    // Capture screenshot
+    shareScreenshot = await captureMapScreenshot();
+    
+    showShareModal = true;
+  }
+
+  // Capture map screenshot
+  async function captureMapScreenshot() {
+    if (!map) return null;
+    
+    // Wait for all markers to render
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    try {
+      // Get map canvas
+      const canvas = await map.getCanvas();
+      return canvas.toDataURL('image/png');
+    } catch (error) {
+      console.error('Screenshot capture failed:', error);
+      return null;
+    }
+  }
+
+  // Handle modal close
+  function handleModalClose() {
+    showShareModal = false;
   }
 
   // Filter images based on active filters and privacy
@@ -1403,6 +1464,18 @@
         </svg>
       {/if}
     </button>
+    <!-- Share FAB -->
+    <button 
+      class="share-fab"
+      on:click={shareMapView}
+      title="Kartenausschnitt teilen"
+    >
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
+        <polyline points="16,6 12,2 8,6"/>
+        <line x1="12" y1="2" x2="12" y2="15"/>
+      </svg>
+    </button>
     <!-- Grid FAB -->
     <button 
       class="grid-fab"
@@ -1419,6 +1492,14 @@
     </button>
   </div>
   <TrackModal bind:isOpen={showTrackModal} />
+  <ShareMapModal 
+    bind:showModal={showShareModal}
+    bind:shareUrl={shareMapUrl}
+    bind:shareTitle
+    bind:shareDescription
+    bind:screenshot={shareScreenshot}
+    on:close={handleModalClose}
+  />
 </div>
 
 <style>
@@ -1476,6 +1557,7 @@
   .display-toggle-fab,
   .auto-rotate-fab,
   .marker-center-fab,
+  .share-fab,
   .grid-fab,
   .track,
   .track-list {
@@ -1500,6 +1582,7 @@
   .display-toggle-fab:hover,
   .auto-rotate-fab:hover,
   .marker-center-fab:hover,
+  .share-fab:hover,
   .grid-fab:hover,
   .track:hover,
   .track-list:hover {
