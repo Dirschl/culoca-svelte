@@ -307,18 +307,18 @@
       throw new Error('Map container not found');
     }
     
-    // Capture screenshot with html2canvas
+    // Capture screenshot with original settings for better preview
     const canvas = await html2canvas(mapContainer, {
       useCORS: true,
       backgroundColor: null,
-      scale: 0.5, // Reduziere die Auflösung auf 50%
-      width: 800, // Begrenze die Breite
-      height: 600 // Begrenze die Höhe
+      scale: 1, // Full resolution
+      width: mapContainer.offsetWidth,
+      height: mapContainer.offsetHeight
     });
     
-    const base64Image = canvas.toDataURL('image/jpeg', 0.7);
+    const base64Image = canvas.toDataURL('image/jpeg', 0.8);
     
-    // Optimize with Sharp via API
+    // Optimize with Sharp via API for final storage
     try {
       const response = await fetch('/api/generate-map-screenshot', {
         method: 'POST',
