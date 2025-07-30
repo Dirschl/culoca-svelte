@@ -11,6 +11,8 @@ export const POST: RequestHandler = async ({ request }) => {
   try {
     const { title, description, screenshot, params } = await request.json();
     
+    console.log('Saving map share:', { title, description, params, hasScreenshot: !!screenshot });
+    
     // Validate required fields
     if (!params) {
       return json({ error: 'Missing required params' }, { status: 400 });
@@ -20,15 +22,19 @@ export const POST: RequestHandler = async ({ request }) => {
     const { data: { user } } = await supabase.auth.getUser();
     
     // Save to database
+    const insertData = {
+      title: title || 'CULOCA - Map View Share',
+      description: description || 'Map View Snippet - CULOCA.com',
+      screenshot: screenshot, // This will be the base64 data URL
+      params: params,
+      created_by: user?.id || null
+    };
+    
+    console.log('Inserting data:', insertData);
+    
     const { data, error } = await supabase
       .from('map_shares')
-      .insert({
-        title: title || 'CULOCA - Map View Share',
-        description: description || 'Map View Snippet - CULOCA.com',
-        screenshot: screenshot, // This will be the base64 data URL
-        params: params,
-        created_by: user?.id || null
-      })
+      .insert(insertData)
       .select()
       .single();
     
@@ -36,6 +42,8 @@ export const POST: RequestHandler = async ({ request }) => {
       console.error('Error saving map share:', error);
       return json({ error: 'Failed to save share' }, { status: 500 });
     }
+    
+    console.log('Share saved successfully:', data);
     
     return json({ 
       success: true, 
