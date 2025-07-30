@@ -269,6 +269,7 @@
 
   // Share map function
   async function shareMapView() {
+    console.log('Share button clicked!'); // Debug log
     try {
       // Build share URL with current map parameters
       const currentFilters = get(filterStore);
