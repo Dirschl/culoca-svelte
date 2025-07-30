@@ -55,6 +55,7 @@
   let showShareModal = false;
   let shareTitle = 'CULOCA - Map View Share';
   let shareDescription = 'Map View Snippet - CULOCA.com';
+  let shareScreenshot: string | null = null;
   
   // Previous position for movement tracking
   let previousPosition: { lat: number; lon: number; timestamp: number } | null = null;
@@ -69,7 +70,6 @@
   
   // Always load all images directly from database, ignore images prop
   $: {
-    console.log('[FullscreenMap] Ignoring images prop, loading all images directly');
     // Load all images when component mounts or when needed
     if (mapInitialized && !allImages.length) {
       loadAllImagesForMap();
@@ -291,6 +291,14 @@
       shareTitle = 'CULOCA - Map View Share';
       shareDescription = 'Map View Snippet - CULOCA.com';
       
+      // Capture screenshot for preview
+      try {
+        shareScreenshot = await captureMapScreenshot();
+      } catch (error) {
+        console.error('Error capturing screenshot:', error);
+        shareScreenshot = null;
+      }
+      
       showShareModal = true;
     } catch (error) {
       console.error('Error sharing map view:', error);
@@ -304,40 +312,16 @@
       throw new Error('Map container not found');
     }
     
-    // Capture screenshot with original settings for better preview
+    // Capture screenshot with optimized settings for bucket storage
     const canvas = await html2canvas(mapContainer, {
       useCORS: true,
       backgroundColor: null,
-      scale: 1, // Full resolution
-      width: mapContainer.offsetWidth,
-      height: mapContainer.offsetHeight
+      scale: 0.5, // Reduced scale for smaller file size
+      width: 800,
+      height: 600
     });
     
-    const base64Image = canvas.toDataURL('image/jpeg', 0.8);
-    
-    // Optimize with Sharp via API for final storage
-    try {
-      const response = await fetch('/api/generate-map-screenshot', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          base64Image: base64Image
-        })
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        return result.screenshot;
-      } else {
-        console.warn('Failed to optimize screenshot, using original');
-        return base64Image;
-      }
-    } catch (error) {
-      console.error('Error optimizing screenshot:', error);
-      return base64Image;
-    }
+    return canvas.toDataURL('image/jpeg', 0.7);
   }
 
   // Handle modal close
@@ -351,15 +335,12 @@
     const sessionData = get(sessionStore);
     let filteredImages = allImages;
     
-    console.log(`[FullscreenMap] getFilteredImages: allImages=${allImages?.length || 0}, userFilter=${!!currentFilters.userFilter}, isAuthenticated=${sessionData.isAuthenticated}`);
-    
     // Apply privacy and user filtering
     if (currentFilters.userFilter) {
       // If user filter is active, show all images from that user (including private)
       filteredImages = filteredImages.filter(img => 
         img.profile_id === currentFilters.userFilter!.userId
       );
-      console.log(`[FullscreenMap] After user filter: ${filteredImages.length} images`);
     } else {
       // If no user filter, apply privacy filtering based on login status
       if (sessionData.isAuthenticated && sessionData.userId) {
@@ -367,17 +348,14 @@
         filteredImages = filteredImages.filter(img => 
           img.profile_id === sessionData.userId || img.is_private === false || img.is_private === null
         );
-        console.log(`[FullscreenMap] After privacy filter (authenticated): ${filteredImages.length} images`);
       } else {
         // For anonymous users: only show public images
         filteredImages = filteredImages.filter(img => 
           img.is_private === false || img.is_private === null
         );
-        console.log(`[FullscreenMap] After privacy filter (anonymous): ${filteredImages.length} images`);
       }
     }
     
-    console.log(`[FullscreenMap] Final filtered images: ${filteredImages.length}`);
     return filteredImages;
   }
   
@@ -572,12 +550,7 @@
         imageUrl = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images/${image.path}`;
       }
       
-      console.log(`[FullscreenMap] Loading image for ${image.id}:`, {
-        path_64: image.path_64,
-        path_512: image.path_512,
-        path: image.path,
-        finalUrl: imageUrl
-      });
+      // Load image for marker
       
       if (imageUrl) {
         // Directly set the background image
@@ -586,7 +559,6 @@
         // Add error handling for failed image loads
         const testImg = new Image();
         testImg.onload = () => {
-          console.log(`[FullscreenMap] Image loaded successfully: ${imageUrl}`);
           imageEl.style.backgroundImage = `url(${imageUrl})`;
         };
         testImg.onerror = () => {
@@ -1523,6 +1495,7 @@
     bind:shareUrl={shareMapUrl}
     bind:shareTitle
     bind:shareDescription
+    bind:screenshot={shareScreenshot}
     on:close={handleModalClose}
   />
 </div>

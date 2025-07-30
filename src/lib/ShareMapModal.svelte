@@ -5,6 +5,7 @@
   export let shareUrl = '';
   export let shareTitle = '';
   export let shareDescription = '';
+  export let screenshot: string | null = null;
   
   const dispatch = createEventDispatcher();
   
@@ -52,12 +53,7 @@
     }
   }
   
-  // Screenshot will be generated dynamically when shared
-  onMount(() => {
-    if (showModal) {
-      console.log('Screenshot will be generated dynamically for OpenGraph');
-    }
-  });
+  // Screenshot is passed from parent component
 </script>
 
 {#if showModal}
@@ -69,9 +65,11 @@
       </div>
       
       <div class="share-modal-content">
-        <div class="map-preview">
-          <p>Screenshot wird dynamisch für Social Media generiert</p>
-        </div>
+        {#if screenshot}
+          <div class="map-preview">
+            <img src={screenshot} alt="Kartenausschnitt" />
+          </div>
+        {/if}
         
         <form class="share-form">
           <div class="form-group">

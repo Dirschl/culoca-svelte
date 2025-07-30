@@ -130,9 +130,9 @@ async function generateAndSaveScreenshot(lat: string, lon: string, zoom: string,
     const timestamp = Date.now();
     const filename = `map-share-${timestamp}.jpg`;
     
-    // Upload to bucket-map
+    // Upload to map-share bucket
     const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('bucket-map')
+      .from('map-share')
       .upload(filename, buffer, {
         contentType: 'image/jpeg',
         cacheControl: '3600'
@@ -145,7 +145,7 @@ async function generateAndSaveScreenshot(lat: string, lon: string, zoom: string,
     
     // Get public URL
     const { data: urlData } = supabase.storage
-      .from('bucket-map')
+      .from('map-share')
       .getPublicUrl(filename);
     
     console.log('Screenshot saved to bucket:', urlData.publicUrl);
