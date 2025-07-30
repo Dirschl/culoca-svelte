@@ -15,9 +15,9 @@ const supabase = createClient(VITE_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 export const POST: RequestHandler = async ({ request }) => {
   try {
-    const { title, description, screenshot, params } = await request.json();
+    const { title, description, params } = await request.json();
     
-    console.log('Saving map share:', { title, description, params, hasScreenshot: !!screenshot });
+    console.log('Saving map share:', { title, description, params });
     
     // Validate required fields
     if (!params) {
@@ -29,11 +29,10 @@ export const POST: RequestHandler = async ({ request }) => {
     
     console.log('Auth result:', { user: user?.id, error: authError });
     
-    // Save to database with screenshot
+    // Save to database (without screenshot - will be generated dynamically)
     const insertData = {
       title: title || 'CULOCA - Map View Share',
       description: description || 'Map View Snippet - CULOCA.com',
-      screenshot: screenshot, // Store screenshot temporarily
       params: params,
       created_by: user?.id || null
     };
