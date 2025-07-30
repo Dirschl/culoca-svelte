@@ -5,7 +5,6 @@
   export let shareUrl = '';
   export let shareTitle = '';
   export let shareDescription = '';
-  export let screenshot: string | null = null;
   
   const dispatch = createEventDispatcher();
   
@@ -33,19 +32,18 @@
         body: JSON.stringify({
           title: shareTitle,
           description: shareDescription,
-          screenshot: screenshot,
-          params: new URL(shareUrl).searchParams.toString()
+          params: shareUrl.split('?')[1] // Extract query parameters
         })
       });
-      
+
+      if (!response.ok) {
+        throw new Error('Failed to save share');
+      }
+
       const result = await response.json();
-      
       if (result.success) {
-        // Update the share URL to the OpenGraph URL
         shareUrl = result.shareUrl;
-        console.log('Share saved with ID:', result.shareId);
-      } else {
-        console.error('Failed to save share:', result.error);
+        showModal = false;
       }
     } catch (error) {
       console.error('Error saving share:', error);
@@ -62,11 +60,9 @@
       </div>
       
       <div class="share-modal-content">
-        {#if screenshot}
-          <div class="map-preview">
-            <img src={screenshot} alt="Kartenausschnitt" />
-          </div>
-        {/if}
+        <div class="map-preview">
+          <p>Screenshot wird beim Aufruf des Links generiert</p>
+        </div>
         
         <form class="share-form">
           <div class="form-group">
@@ -163,6 +159,15 @@
     border-radius: 8px;
     overflow: hidden;
     border: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 200px; /* Fixed height for preview */
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+    font-size: 1rem;
+    font-weight: 500;
+    padding: 1rem;
   }
   
   .map-preview img {

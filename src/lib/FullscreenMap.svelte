@@ -55,7 +55,6 @@
   let showShareModal = false;
   let shareTitle = 'CULOCA - Map View Share';
   let shareDescription = 'Map View Snippet - CULOCA.com';
-  let shareScreenshot: string | null = null;
   
   // Previous position for movement tracking
   let previousPosition: { lat: number; lon: number; timestamp: number } | null = null;
@@ -269,33 +268,32 @@
 
   // Share map function
   async function shareMapView() {
-    if (!map) return;
-    
-    const center = map.getCenter();
-    const zoom = map.getZoom();
-    const viewType = isHybridView ? 'hybrid' : 'standard';
-    
-    // Get current filters
-    const currentFilters = get(filterStore);
-    const userFilter = currentFilters.userFilter;
-    
-    // Create shareable URL with map parameters
-    const shareUrl = new URL(window.location.href);
-    shareUrl.pathname = '/map-view';
-    shareUrl.searchParams.set('lat', center.lat.toFixed(6));
-    shareUrl.searchParams.set('lon', center.lng.toFixed(6));
-    shareUrl.searchParams.set('zoom', zoom.toString());
-    shareUrl.searchParams.set('map_type', viewType);
-    if (userFilter) {
-      shareUrl.searchParams.set('user', userFilter);
+    try {
+      // Build share URL with current map parameters
+      const currentFilters = get(filterStore);
+      const params = new URLSearchParams();
+      
+      if (map) {
+        const center = map.getCenter();
+        params.set('lat', center.lat.toString());
+        params.set('lon', center.lng.toString());
+        params.set('zoom', map.getZoom().toString());
+        params.set('map_type', isHybridView ? 'satellite' : 'standard');
+      }
+      
+      // Add user filter if active
+      if (currentFilters.userFilter) {
+        params.set('user', currentFilters.userFilter.accountname);
+      }
+      
+      shareMapUrl = `https://culoca.com/map-view?${params.toString()}`;
+      shareTitle = 'CULOCA - Map View Share';
+      shareDescription = 'Map View Snippet - CULOCA.com';
+      
+      showShareModal = true;
+    } catch (error) {
+      console.error('Error sharing map view:', error);
     }
-    
-    shareMapUrl = shareUrl.toString();
-    
-    // Capture screenshot
-    shareScreenshot = await captureMapScreenshot();
-    
-    showShareModal = true;
   }
 
   // Capture map screenshot
@@ -1497,7 +1495,6 @@
     bind:shareUrl={shareMapUrl}
     bind:shareTitle
     bind:shareDescription
-    bind:screenshot={shareScreenshot}
     on:close={handleModalClose}
   />
 </div>
