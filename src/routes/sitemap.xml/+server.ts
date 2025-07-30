@@ -13,17 +13,11 @@ export const GET: RequestHandler = async () => {
     // Base URL
     const baseUrl = 'https://culoca.com';
 
-    // Static pages
+    // Static pages (nur öffentliche, wichtige Seiten)
     const staticPages = [
       '',
       '/login',
-      '/profile',
-      '/settings',
-      '/upload',
-      '/bulk-upload',
       '/map-view',
-      '/simulation',
-      '/admin',
       '/datenschutz',
       '/impressum'
     ];
@@ -52,7 +46,7 @@ export const GET: RequestHandler = async () => {
       xml += '  <url>\n';
       xml += `    <loc>${baseUrl}${page}</loc>\n`;
       xml += '    <changefreq>weekly</changefreq>\n';
-      xml += '    <priority>0.8</priority>\n';
+      xml += '    <priority>0.7</priority>\n';
       xml += '  </url>\n';
     }
 
@@ -65,7 +59,7 @@ export const GET: RequestHandler = async () => {
           xml += `    <lastmod>${new Date(item.updated_at).toISOString()}</lastmod>\n`;
         }
         xml += '    <changefreq>monthly</changefreq>\n';
-        xml += '    <priority>0.6</priority>\n';
+        xml += '    <priority>0.9</priority>\n';
         xml += '  </url>\n';
       }
     }
@@ -79,7 +73,7 @@ export const GET: RequestHandler = async () => {
       xml += '  <url>\n';
       xml += `    <loc>${baseUrl}/?page=${page}</loc>\n`;
       xml += '    <changefreq>daily</changefreq>\n';
-      xml += '    <priority>0.7</priority>\n';
+      xml += '    <priority>0.5</priority>\n';
       xml += '  </url>\n';
     }
 
