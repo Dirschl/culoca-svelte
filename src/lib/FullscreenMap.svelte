@@ -268,65 +268,72 @@
 
   // Share map function
   async function shareMapView() {
-    console.log('Share button clicked!'); // Debug log
-    try {
-      // Build share URL with current map parameters
-      const currentFilters = get(filterStore);
-      const params = new URLSearchParams();
-      
-      if (map) {
-        const center = map.getCenter();
-        params.set('lat', center.lat.toString());
-        params.set('lon', center.lng.toString());
-        params.set('zoom', map.getZoom().toString());
-        params.set('map_type', isHybridView ? 'satellite' : 'standard');
-      }
-      
-      // Add user filter if active
-      if (currentFilters.userFilter) {
-        params.set('user', currentFilters.userFilter.accountname);
-      }
-      
-      shareMapUrl = `https://culoca.com/map-view?${params.toString()}`;
-      shareTitle = 'CULOCA - Map View Share';
-      shareDescription = 'Map View Snippet - CULOCA.com';
-      
-      // Capture screenshot for preview
-      try {
-        shareScreenshot = await captureMapScreenshot();
-      } catch (error) {
-        console.error('Error capturing screenshot:', error);
-        shareScreenshot = null;
-      }
-      
-      showShareModal = true;
-    } catch (error) {
-      console.error('Error sharing map view:', error);
+    if (!map) return;
+    
+    const center = map.getCenter();
+    const zoom = map.getZoom();
+    const viewType = isHybridView ? 'hybrid' : 'standard';
+    
+    // Get current filters
+    const currentFilters = get(filterStore);
+    const userFilter = currentFilters.userFilter;
+    
+    // Create shareable URL with map parameters
+    const shareUrl = new URL(window.location.href);
+    shareUrl.pathname = '/map-view';
+    shareUrl.searchParams.set('lat', center.lat.toFixed(6));
+    shareUrl.searchParams.set('lon', center.lng.toFixed(6));
+    shareUrl.searchParams.set('zoom', zoom.toString());
+    shareUrl.searchParams.set('map_type', viewType);
+    if (userFilter) {
+      shareUrl.searchParams.set('user', userFilter.accountname);
     }
+    
+    shareMapUrl = shareUrl.toString();
+    
+    // Capture screenshot
+    shareScreenshot = await captureMapScreenshot();
+    
+    showShareModal = true;
   }
 
   // Capture map screenshot
   async function captureMapScreenshot() {
-    const mapContainer = document.getElementById('map');
-    if (!mapContainer) {
-      throw new Error('Map container not found');
+    if (!map) return null;
+    
+    // Wait for all markers to render
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    try {
+      // Use html2canvas on the map container
+      const mapContainer = document.getElementById('map');
+      if (!mapContainer) {
+        throw new Error('Map container not found');
+      }
+      
+      const canvas = await html2canvas(mapContainer, {
+        useCORS: true,
+        backgroundColor: null,
+        scale: 0.8,
+        width: mapContainer.offsetWidth,
+        height: mapContainer.offsetHeight
+      });
+      
+      return canvas.toDataURL('image/jpeg', 0.8);
+    } catch (error) {
+      console.error('Screenshot capture failed:', error);
+      return null;
     }
-    
-    // Capture screenshot with optimized settings for bucket storage
-    const canvas = await html2canvas(mapContainer, {
-      useCORS: true,
-      backgroundColor: null,
-      scale: 0.5, // Reduced scale for smaller file size
-      width: 800,
-      height: 600
-    });
-    
-    return canvas.toDataURL('image/jpeg', 0.7);
   }
 
   // Handle modal close
   function handleModalClose() {
     showShareModal = false;
+  }
+  
+  // Handle share button click
+  function handleShareClick() {
+    shareMapView();
   }
 
   // Filter images based on active filters and privacy
