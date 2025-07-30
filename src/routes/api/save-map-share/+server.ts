@@ -25,7 +25,9 @@ export const POST: RequestHandler = async ({ request }) => {
     }
     
     // Get current user if authenticated
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    console.log('Auth result:', { user: user?.id, error: authError });
     
     // Save to database with screenshot
     const insertData = {

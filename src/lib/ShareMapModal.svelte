@@ -57,21 +57,8 @@
   // Delete screenshot after modal is fully loaded
   onMount(() => {
     if (showModal && screenshot) {
-      // Delete screenshot after a short delay to ensure it's loaded
-      setTimeout(async () => {
-        try {
-          // Extract share ID from URL
-          const shareId = shareUrl.split('/').pop();
-          if (shareId) {
-            await fetch(`/api/delete-screenshot/${shareId}`, {
-              method: 'DELETE'
-            });
-            console.log('Screenshot deleted from database');
-          }
-        } catch (error) {
-          console.error('Error deleting screenshot:', error);
-        }
-      }, 2000); // 2 second delay to ensure screenshot is loaded
+      // Don't delete screenshot - keep it for OpenGraph
+      console.log('Screenshot available for OpenGraph');
     }
   });
 </script>
