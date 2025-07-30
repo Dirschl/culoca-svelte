@@ -44,8 +44,10 @@
 
       const result = await response.json();
       if (result.success) {
+        // Update the share URL with the new permanent URL
         shareUrl = result.shareUrl;
-        showModal = false;
+        console.log('Share saved successfully, new URL:', shareUrl);
+        // Don't close the modal automatically - let user see the updated URL
       }
     } catch (error) {
       console.error('Error saving share:', error);
@@ -118,6 +120,9 @@
               <input readonly value={shareUrl} />
               <button type="button" on:click={copyUrl}>Kopieren</button>
             </div>
+          </div>
+          
+          <div class="share-actions">
             <button type="button" class="save-share-btn" on:click={saveShare}>
               Für Social Media speichern
             </button>
@@ -243,7 +248,7 @@
   }
   
   .share-url-group {
-    margin-top: 1rem;
+    margin-bottom: 0.5rem; /* Reduce space before the button */
   }
   
   .url-input-group {
@@ -288,5 +293,11 @@
   
   .save-share-btn:hover {
     background: var(--accent-hover);
+  }
+  
+  .share-actions {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
   }
 </style> 
