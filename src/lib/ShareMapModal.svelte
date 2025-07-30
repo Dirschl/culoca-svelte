@@ -5,7 +5,6 @@
   export let shareUrl = '';
   export let shareTitle = '';
   export let shareDescription = '';
-  export let screenshot: string | null = null;
   
   const dispatch = createEventDispatcher();
   
@@ -33,7 +32,6 @@
         body: JSON.stringify({
           title: shareTitle,
           description: shareDescription,
-          screenshot: screenshot,
           params: shareUrl.split('?')[1] // Extract query parameters
         })
       });
@@ -54,11 +52,10 @@
     }
   }
   
-  // Delete screenshot after modal is fully loaded
+  // Screenshot will be generated dynamically when shared
   onMount(() => {
-    if (showModal && screenshot) {
-      // Don't delete screenshot - keep it for OpenGraph
-      console.log('Screenshot available for OpenGraph');
+    if (showModal) {
+      console.log('Screenshot will be generated dynamically for OpenGraph');
     }
   });
 </script>
@@ -72,11 +69,9 @@
       </div>
       
       <div class="share-modal-content">
-        {#if screenshot}
-          <div class="map-preview">
-            <img src={screenshot} alt="Kartenausschnitt" />
-          </div>
-        {/if}
+        <div class="map-preview">
+          <p>Screenshot wird dynamisch für Social Media generiert</p>
+        </div>
         
         <form class="share-form">
           <div class="form-group">

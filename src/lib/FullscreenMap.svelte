@@ -55,7 +55,6 @@
   let showShareModal = false;
   let shareTitle = 'CULOCA - Map View Share';
   let shareDescription = 'Map View Snippet - CULOCA.com';
-  let shareScreenshot: string | null = null;
   
   // Previous position for movement tracking
   let previousPosition: { lat: number; lon: number; timestamp: number } | null = null;
@@ -291,9 +290,6 @@
       shareMapUrl = `https://culoca.com/map-view?${params.toString()}`;
       shareTitle = 'CULOCA - Map View Share';
       shareDescription = 'Map View Snippet - CULOCA.com';
-      
-      // Capture and optimize screenshot
-      shareScreenshot = await captureMapScreenshot();
       
       showShareModal = true;
     } catch (error) {
@@ -1527,7 +1523,6 @@
     bind:shareUrl={shareMapUrl}
     bind:shareTitle
     bind:shareDescription
-    bind:screenshot={shareScreenshot}
     on:close={handleModalClose}
   />
 </div>
