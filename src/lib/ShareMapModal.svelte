@@ -40,11 +40,27 @@
         return;
       }
       
+      // Get auth token from localStorage
+      const authToken = localStorage.getItem('sb-caskhmcbvtevdwsolvwk-auth-token');
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+      
+      // Add auth header if token exists
+      if (authToken) {
+        try {
+          const tokenData = JSON.parse(authToken);
+          if (tokenData.access_token) {
+            headers['Authorization'] = `Bearer ${tokenData.access_token}`;
+          }
+        } catch (e) {
+          console.error('Error parsing auth token:', e);
+        }
+      }
+      
       const response = await fetch('/api/save-map-share', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({
           title: shareTitle,
           description: shareDescription,
