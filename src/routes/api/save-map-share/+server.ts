@@ -26,9 +26,34 @@ export const POST: RequestHandler = async ({ request }) => {
     }
     
     // Get current user if authenticated
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    let userId = null;
+    try {
+      // Get auth header from request
+      const authHeader = request.headers.get('authorization');
+      console.log('Auth header:', authHeader);
+      
+      if (authHeader) {
+        // Extract token from Bearer token
+        const token = authHeader.replace('Bearer ', '');
+        console.log('Token extracted:', token ? 'present' : 'missing');
+        
+        // Get user from token
+        const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+        
+        if (user && !authError) {
+          userId = user.id;
+          console.log('User authenticated:', userId);
+        } else {
+          console.log('Auth error:', authError);
+        }
+      } else {
+        console.log('No auth header found');
+      }
+    } catch (authError) {
+      console.error('Error getting user:', authError);
+    }
     
-    console.log('Auth result:', { user: user?.id, error: authError });
+    console.log('Final user ID:', userId);
     
     // Save screenshot to bucket if provided
     let screenshotUrl = null;
@@ -46,7 +71,7 @@ export const POST: RequestHandler = async ({ request }) => {
       description: description || 'Map View Snippet - CULOCA.com',
       screenshot_url: screenshotUrl,
       params: params,
-      created_by: user?.id || null,
+      created_by: userId,
       last_visit: new Date().toISOString()
     };
     
