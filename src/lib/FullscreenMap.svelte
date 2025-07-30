@@ -55,6 +55,7 @@
   let showShareModal = false;
   let shareTitle = 'CULOCA - Map View Share';
   let shareDescription = 'Map View Snippet - CULOCA.com';
+  let shareScreenshot: string | null = null;
   
   // Previous position for movement tracking
   let previousPosition: { lat: number; lon: number; timestamp: number } | null = null;
@@ -290,6 +291,9 @@
       shareTitle = 'CULOCA - Map View Share';
       shareDescription = 'Map View Snippet - CULOCA.com';
       
+      // Capture and optimize screenshot
+      shareScreenshot = await captureMapScreenshot();
+      
       showShareModal = true;
     } catch (error) {
       console.error('Error sharing map view:', error);
@@ -302,6 +306,8 @@
     if (!mapContainer) {
       throw new Error('Map container not found');
     }
+    
+    // Capture screenshot with html2canvas
     const canvas = await html2canvas(mapContainer, {
       useCORS: true,
       backgroundColor: null,
@@ -309,7 +315,32 @@
       width: 800, // Begrenze die Breite
       height: 600 // Begrenze die Höhe
     });
-    return canvas.toDataURL('image/jpeg', 0.7); // Komprimiere als JPEG mit 70% Qualität
+    
+    const base64Image = canvas.toDataURL('image/jpeg', 0.7);
+    
+    // Optimize with Sharp via API
+    try {
+      const response = await fetch('/api/generate-map-screenshot', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          base64Image: base64Image
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        return result.screenshot;
+      } else {
+        console.warn('Failed to optimize screenshot, using original');
+        return base64Image;
+      }
+    } catch (error) {
+      console.error('Error optimizing screenshot:', error);
+      return base64Image;
+    }
   }
 
   // Handle modal close
@@ -1495,6 +1526,7 @@
     bind:shareUrl={shareMapUrl}
     bind:shareTitle
     bind:shareDescription
+    bind:screenshot={shareScreenshot}
     on:close={handleModalClose}
   />
 </div>
