@@ -17,6 +17,9 @@ export let userLon: number | null = null;
 export let getDistanceFromLatLonInMeters: ((lat1: number, lon1: number, lat2: number, lon2: number) => string) | null = null;
 export let displayedImageCount: number = 0;
 
+// NEU: Serverseitige initiale Daten für SEO
+export let initialItems: any[] = [];
+
 let images: NewsFlashImage[] = [];
 let loading = true;
 let loadingMore = false;
@@ -27,10 +30,32 @@ let hasMoreImages = true;
 let currentOffset = 0;
 let refreshInterval: number | null = null;
 let mounted = false;
+let usedInitialItems = false; // NEU: Merker, ob SSR-Items verwendet wurden
 
 // Container references for auto-scroll
 let stripContainer: HTMLElement;
 let gridContainer: HTMLElement;
+
+// NEU: Verwende initialItems wenn verfügbar (für SEO)
+$: if (initialItems && initialItems.length > 0 && images.length === 0 && !usedInitialItems) {
+  console.log('[NewsFlash] Using server-side initial items:', initialItems.length);
+  console.log('[NewsFlash] First item:', initialItems[0]);
+  images = initialItems.map(item => ({
+    id: item.id,
+    slug: item.slug,
+    lat: item.lat,
+    lon: item.lon,
+    path_512: item.path_512,
+    title: item.title,
+    description: item.description,
+    original_name: item.original_name
+  }));
+  loading = false;
+  lastImageId = images[0]?.id || null;
+  usedInitialItems = true;
+  currentOffset = initialItems.length; // NEU: Offset für Nachladen setzen
+  console.log('[NewsFlash] Server-side items loaded:', images.length);
+}
 
 // Direct database query for NewsFlash images (bypasses API limitations)
 async function loadNewsFlashImagesDirectFromDB(): Promise<NewsFlashImage[]> {
@@ -96,9 +121,9 @@ async function fetchImages(isLoadMore: boolean = false) {
   if (isLoadMore) {
     if (loadingMore || !hasMoreImages) return;
     loadingMore = true;
-    currentOffset += limit;
+    currentOffset += limit; // NEU: Offset erhöhen beim Nachladen
   } else {
-    currentOffset = 0;
+    currentOffset = usedInitialItems ? images.length : 0;
     hasMoreImages = true;
   }
 
@@ -108,23 +133,24 @@ async function fetchImages(isLoadMore: boolean = false) {
 
     if (isLoadMore) {
       if (newImages.length > 0) {
-        images = [...images, ...newImages];
-        hasMoreImages = newImages.length === limit;
+        // Nur neue, noch nicht vorhandene Items anhängen
+        const existingIds = new Set(images.map(img => img.id));
+        const uniqueNewImages = newImages.filter(img => !existingIds.has(img.id));
+        images = [...images, ...uniqueNewImages];
+        hasMoreImages = uniqueNewImages.length === limit;
       } else {
         hasMoreImages = false;
       }
       loadingMore = false;
     } else {
       // Check if we have new images (not just a refresh)
-      const hasNewImages = newImages.length > 0 && 
+      const hasNewImages = newImages.length > 0 &&
         (images.length === 0 || newImages[0]?.id !== images[0]?.id);
-      
       images = newImages;
       lastImageId = images[0]?.id || null;
       lastUpdate = new Date();
       loading = false;
       errorMsg = '';
-      
       // Auto-scroll to the right if we have new images
       if (hasNewImages) {
         setTimeout(() => {
@@ -170,7 +196,12 @@ function stopAutoRefresh() {
 
 onMount(() => {
   mounted = true;
-  fetchImages();
+  // Nur nachladen, wenn keine SSR-Items vorhanden sind
+  if (!initialItems || initialItems.length === 0) {
+    fetchImages();
+  } else {
+    currentOffset = initialItems.length; // NEU: Offset für Nachladen setzen
+  }
   startAutoRefresh();
 });
 
@@ -262,6 +293,11 @@ function handleScroll(event: Event) {
           {#if loadingMore}
             <div class="newsflash-loading-more">Lade mehr...</div>
           {/if}
+          {#if hasMoreImages && !loadingMore}
+            <div class="load-more-trigger" on:click={() => fetchImages(true)} style="text-align:center;margin:1rem 0;cursor:pointer;">
+              Lade mehr
+            </div>
+          {/if}
         </div>
       {:else if layout === 'grid'}
         <div class="newsflash-grid" tabindex="0" on:scroll={handleScroll} bind:this={gridContainer}>
@@ -279,11 +315,24 @@ function handleScroll(event: Event) {
           {#if loadingMore}
             <div class="newsflash-loading-more">Lade mehr...</div>
           {/if}
+          {#if hasMoreImages && !loadingMore}
+            <div class="load-more-trigger" on:click={() => fetchImages(true)} style="text-align:center;margin:1rem 0;cursor:pointer;">
+              Lade mehr
+            </div>
+          {/if}
+        </div>
+      {/if}
+      {#if initialItems && initialItems.length === 50}
+        <!-- SEO-Link nur für Bots sichtbar -->
+        <div class="newsflash-next-link-ssr" style="text-align:center;margin:1rem 0;display:none;">
+          <a href="/?page=2" rel="next">Weitere Bilder anzeigen</a>
         </div>
       {/if}
     {/if}
   </div>
 {/if}
+
+
 
 <style>
 .newsflash-bar {

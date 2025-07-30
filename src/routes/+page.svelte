@@ -20,7 +20,17 @@
   <meta name="twitter:image" content="https://culoca.com/culoca-see-you-local-entdecke-deine-umgebung.jpg" />
 </svelte:head>
 <script lang="ts">
+  import type { PageData } from './$types';
   import { onMount } from 'svelte';
+  
+  export let data: PageData;
+  
+  // Debug: Log server data
+  console.log('[Page] Server data received:', {
+    newsFlashItems: data.newsFlashItems?.length || 0,
+    seo: !!data.seo
+  });
+  
   import FilterBar from '$lib/FilterBar.svelte';
   import NewsFlash from '$lib/NewsFlash.svelte';
   import WelcomeSection from '$lib/WelcomeSection.svelte';
@@ -1677,6 +1687,8 @@
       userLon={effectiveLon}
       getDistanceFromLatLonInMeters={getDistanceFromLatLonInMeters}
       displayedImageCount={$galleryStats.loadedCount}
+      initialItems={data.newsFlashItems || []}
+      on:click={() => console.log('[Page] NewsFlash clicked, data:', data.newsFlashItems?.length || 0)}
     />
   {/if}
   <WelcomeSection />
