@@ -19,6 +19,8 @@ export let displayedImageCount: number = 0;
 
 // NEU: Serverseitige initiale Daten für SEO
 export let initialItems: any[] = [];
+export let currentPage: number = 1;
+export let totalPages: number = 1;
 
 let images: NewsFlashImage[] = [];
 let loading = true;
@@ -325,7 +327,9 @@ function handleScroll(event: Event) {
       {#if initialItems && initialItems.length === 50}
         <!-- SEO-Link nur für Bots sichtbar -->
         <div class="newsflash-next-link-ssr" style="text-align:center;margin:1rem 0;display:none;">
-          <a href="/?page=2" rel="next">Weitere Bilder anzeigen</a>
+          {#if currentPage < totalPages}
+            <a href="/?page={currentPage + 1}" rel="next">Weitere Bilder anzeigen</a>
+          {/if}
         </div>
       {/if}
     {/if}

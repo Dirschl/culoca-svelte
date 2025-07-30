@@ -7,6 +7,11 @@ const supabase = createClient(VITE_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
 });
 
 export const load: PageServerLoad = async ({ url }) => {
+  // Get page parameter for pagination
+  const page = parseInt(url.searchParams.get('page') || '1');
+  const itemsPerPage = 50;
+  const offset = (page - 1) * itemsPerPage;
+
   // SEO-Daten serverseitig laden
   const seo = {
     title: 'Culoca - Entdecke die Welt durch Fotos',
@@ -34,9 +39,9 @@ export const load: PageServerLoad = async ({ url }) => {
   // Serverseitig NewsFlash-Daten laden (neueste Bilder) für SEO
   let newsFlashItems = [];
   try {
-    console.log('[Server] Loading NewsFlash items for SEO...');
+    console.log(`[Server] Loading NewsFlash items for SEO (page ${page}, offset ${offset})...`);
 
-    // Verwende die gleiche Logik wie NewsFlash, aber serverseitig
+    // Verwende die gleiche Logik wie NewsFlash, aber serverseitig mit Pagination
     const { data, error } = await supabase
       .from('items')
       .select('id, slug, lat, lon, path_512, path_2048, path_64, title, description, original_name, profile_id, is_private, created_at, width, height, gallery')
@@ -44,12 +49,12 @@ export const load: PageServerLoad = async ({ url }) => {
       .eq('gallery', true) // Nur Galerie-Items
       .or('is_private.eq.false,is_private.is.null') // Nur öffentliche Items für SEO
       .order('created_at', { ascending: false })
-      .limit(50); // Erste 50 neueste Bilder
+      .range(offset, offset + itemsPerPage - 1);
 
     if (error) {
       console.error('[Server] Error loading NewsFlash items:', error);
     } else {
-      console.log('[Server] Successfully loaded NewsFlash items:', data?.length || 0);
+      console.log(`[Server] Successfully loaded NewsFlash items: ${data?.length || 0} (page ${page})`);
       console.log('[Server] First item:', data?.[0]);
       
       // Formatiere Items für NewsFlash
@@ -74,11 +79,15 @@ export const load: PageServerLoad = async ({ url }) => {
 
   console.log('[Server] Returning data:', {
     seo: !!seo,
-    newsFlashItems: newsFlashItems.length
+    newsFlashItems: newsFlashItems.length,
+    page,
+    offset
   });
   
   return {
     seo,
-    newsFlashItems
+    newsFlashItems,
+    page,
+    totalPages: Math.ceil(2200 / itemsPerPage) // Approximate total pages
   };
 };

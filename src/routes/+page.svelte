@@ -1676,20 +1676,22 @@
     onClear={clearSearchAndReloadGallery}
   />
   {#if newsFlashMode !== 'aus'}
-    <NewsFlash 
-      mode={newsFlashMode}
-      userId={null}
-      layout={$useJustifiedLayout ? 'justified' : 'grid'}
-      limit={15}
-      showToggles={false}
-      showDistance={showDistance}
-      userLat={effectiveLat}
-      userLon={effectiveLon}
-      getDistanceFromLatLonInMeters={getDistanceFromLatLonInMeters}
-      displayedImageCount={$galleryStats.loadedCount}
-      initialItems={data.newsFlashItems || []}
-      on:click={() => console.log('[Page] NewsFlash clicked, data:', data.newsFlashItems?.length || 0)}
-    />
+                    <NewsFlash 
+                  mode={newsFlashMode}
+                  userId={null}
+                  layout={$useJustifiedLayout ? 'justified' : 'grid'}
+                  limit={15}
+                  showToggles={false}
+                  showDistance={showDistance}
+                  userLat={effectiveLat}
+                  userLon={effectiveLon}
+                  getDistanceFromLatLonInMeters={getDistanceFromLatLonInMeters}
+                  displayedImageCount={$galleryStats.loadedCount}
+                  initialItems={data.newsFlashItems || []}
+                  currentPage={data.page || 1}
+                  totalPages={data.totalPages || 1}
+                  on:click={() => console.log('[Page] NewsFlash clicked, data:', data.newsFlashItems?.length || 0)}
+                />
   {/if}
   <WelcomeSection />
   
