@@ -13,18 +13,33 @@
     dispatch('close');
   }
   
+  let copyButtonText = 'Kopieren';
+  
   async function copyUrl() {
     try {
       await navigator.clipboard.writeText(shareUrl);
       // Show success feedback
-      console.log('URL copied to clipboard');
+      copyButtonText = 'Kopiert!';
+      setTimeout(() => {
+        copyButtonText = 'Kopieren';
+      }, 2000);
     } catch (error) {
       console.error('Failed to copy URL:', error);
+      copyButtonText = 'Fehler!';
+      setTimeout(() => {
+        copyButtonText = 'Kopieren';
+      }, 2000);
     }
   }
   
   async function saveShare() {
     try {
+      // Check if screenshot is available
+      if (!screenshot) {
+        console.error('No screenshot available');
+        return;
+      }
+      
       const response = await fetch('/api/save-map-share', {
         method: 'POST',
         headers: {
@@ -39,7 +54,9 @@
       });
 
       if (!response.ok) {
-        throw new Error('Failed to save share');
+        const errorText = await response.text();
+        console.error('Server error:', errorText);
+        throw new Error(`Failed to save share: ${response.status}`);
       }
 
       const result = await response.json();
@@ -99,7 +116,7 @@
             <label>Teilbarer Link</label>
             <div class="url-input-group">
               <input readonly value={shareUrl} />
-              <button type="button" on:click={copyUrl}>Kopieren</button>
+              <button type="button" on:click={copyUrl}>{copyButtonText}</button>
             </div>
             <button type="button" class="save-share-btn" on:click={saveShare}>
               Für Social Media speichern
