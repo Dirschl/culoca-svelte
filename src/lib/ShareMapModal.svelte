@@ -61,7 +61,18 @@
       
       <div class="share-modal-content">
         <div class="map-preview">
-          <p>Screenshot wird beim Aufruf des Links generiert</p>
+          <div class="map-preview-container">
+            <div class="map-preview-placeholder">
+              <div class="map-preview-dimensions">
+                <span>1200 × 630</span>
+                <small>Social Media Optimiert</small>
+              </div>
+              <div class="map-preview-info">
+                <p>Kartenvorschau wird beim Aufruf des Links generiert</p>
+                <p>Optimale Abmessungen für Facebook, Twitter & Co.</p>
+              </div>
+            </div>
+          </div>
         </div>
         
         <form class="share-form">
@@ -159,21 +170,49 @@
     border-radius: 8px;
     overflow: hidden;
     border: 1px solid var(--border-color);
+  }
+  
+  .map-preview-container {
+    width: 100%;
+    max-width: 400px;
+    margin: 0 auto;
+    aspect-ratio: 1200/630;
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
     display: flex;
     align-items: center;
     justify-content: center;
-    height: 200px; /* Fixed height for preview */
-    background-color: var(--bg-secondary);
+    position: relative;
+  }
+  
+  .map-preview-placeholder {
+    text-align: center;
     color: var(--text-primary);
-    font-size: 1rem;
-    font-weight: 500;
     padding: 1rem;
   }
   
-  .map-preview img {
-    width: 100%;
-    height: auto;
+  .map-preview-dimensions {
+    margin-bottom: 1rem;
+  }
+  
+  .map-preview-dimensions span {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: var(--text-primary);
     display: block;
+  }
+  
+  .map-preview-dimensions small {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    display: block;
+    margin-top: 0.25rem;
+  }
+  
+  .map-preview-info p {
+    margin: 0.5rem 0;
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    line-height: 1.4;
   }
   
   .share-form {
