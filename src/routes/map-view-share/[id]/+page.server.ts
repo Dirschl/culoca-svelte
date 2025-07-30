@@ -8,14 +8,23 @@ const supabase = createClient(
 
 export const load: PageServerLoad = async ({ params }) => {
   try {
+    console.log('Loading share data for ID:', params.id);
+    
     // Get share data from database
-    const { data: shareData } = await supabase
+    const { data: shareData, error } = await supabase
       .from('map_shares')
       .select('*')
       .eq('id', params.id)
       .single();
     
+    if (error) {
+      console.error('Database error:', error);
+    }
+    
+    console.log('Share data loaded:', shareData);
+    
     if (!shareData) {
+      console.log('No share data found, using defaults');
       return {
         ogTitle: 'CULOCA - Map View Share',
         ogDescription: 'Map View Snippet - CULOCA.com',
