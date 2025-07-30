@@ -86,7 +86,7 @@ async function saveScreenshotToBucket(base64Screenshot: string) {
     // Compress with Sharp to reduce file size
     const compressedBuffer = await sharp(buffer)
       .resize(1200, 630) // Standard OpenGraph size
-      .jpeg({ quality: 50 }) // Reduced quality for smaller file size
+      .jpeg({ quality: 75 }) // Good quality for smaller file size
       .toBuffer();
     
     // Generate unique filename
