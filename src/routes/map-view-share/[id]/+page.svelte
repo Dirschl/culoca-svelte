@@ -5,11 +5,19 @@
   export let data: any;
   
   onMount(() => {
-    // Redirect to actual map view with parameters
-    if (data.ogUrl && data.ogUrl.includes('map-view-share')) {
-      // Extract the actual map URL from the share data
-      const actualMapUrl = data.ogUrl.replace('/map-view-share/', '/map-view?');
-      window.location.href = actualMapUrl;
+    // Clean up Facebook tracking parameters from URL
+    const cleanUrl = window.location.href.split('?')[0];
+    
+    // Build the actual map URL with original parameters
+    if (data.mapParams) {
+      // Use the original parameters from the database
+      const mapUrl = `https://culoca.com/map-view?${data.mapParams}`;
+      console.log('Redirecting to:', mapUrl);
+      window.location.href = mapUrl;
+    } else {
+      // Fallback to default map view
+      console.log('No map parameters found, redirecting to default map view');
+      window.location.href = 'https://culoca.com/map-view';
     }
   });
 </script>
@@ -43,11 +51,13 @@
 
 <div class="loading">
   <p>Weiterleitung zur Kartenansicht...</p>
+  <p style="font-size: 0.8em; color: #999;">Bitte warten...</p>
 </div>
 
 <style>
   .loading {
     display: flex;
+    flex-direction: column;
     justify-content: center;
     align-items: center;
     height: 100vh;
