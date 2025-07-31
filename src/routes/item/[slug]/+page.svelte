@@ -403,9 +403,20 @@
   async function saveKeywords() {
     if (!editingKeywords || !currentUser || !image || image.profile_id !== currentUser.id) return;
     const newKeywords = keywordsEditValue.trim();
-    if (newKeywords.length > 500) return;
+    
+    // Verbesserte Keywords-Verarbeitung
+    const keywordsArray = newKeywords
+      .split(',')
+      .map(k => k.trim())
+      .filter(k => k.length > 0);
+    
+    // Prüfe auf 50 Keywords Limit
+    if (keywordsArray.length > 50) {
+      console.warn('Keywords truncated to 50 items');
+      keywordsArray.splice(50); // Behalte nur die ersten 50
+    }
+    
     try {
-      const keywordsArray = newKeywords.split(',').map(k => k.trim()).filter(k => k.length > 0);
       const res = await authFetch(`/api/item/${image.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -837,7 +848,7 @@
               autocapitalize="sentences"
               placeholder="Keywords durch Kommas getrennt eingeben..."
             ></textarea>
-            <span class="char-count">{keywordsEditValue.split(',').filter(k => k.trim().length > 0).length}/50</span>
+            <span class="char-count" class:limit-reached={keywordsEditValue.split(',').filter(k => k.trim().length > 0).length >= 50}>{keywordsEditValue.split(',').filter(k => k.trim().length > 0).length}/50</span>
           </div>
         {:else}
           {#if image.keywords && image.keywords.length}
