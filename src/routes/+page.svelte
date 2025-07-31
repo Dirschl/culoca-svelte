@@ -1254,6 +1254,13 @@
     const { lat, lon } = event.detail;
     console.log('[Location-Selected] User selected location from map:', { lat, lon });
     
+    // WICHTIG: Stoppe GPS-Watcher um Konflikte zu vermeiden
+    if (gpsWatchId) {
+      navigator.geolocation.clearWatch(gpsWatchId);
+      gpsWatchId = null;
+      console.log('[Location-Selected] Stopped GPS watcher to prevent conflicts');
+    }
+    
     // Set the selected location as "GPS gemerkt"
     userLat = lat;
     userLon = lon;
@@ -1629,12 +1636,26 @@
           📍 Standort verwenden
         </button>
         <button on:click={() => {
+          // WICHTIG: Stoppe GPS-Watcher um Konflikte zu vermeiden
+          if (gpsWatchId) {
+            navigator.geolocation.clearWatch(gpsWatchId);
+            gpsWatchId = null;
+            console.log('[GPS-Modal] Stopped GPS watcher when user chose "Standort auf Karte auswählen"');
+          }
           gpsStatus = 'none';
           showFullscreenMap = true;
         }} style="padding: 0.9rem 2.2rem; font-size: 1.15rem; border-radius: 0.5rem; background: #4CAF50; color: #fff; border: none; cursor: pointer; font-weight:600;">
           🗺️ Standort auf Karte auswählen
         </button>
-        <button on:click={() => gpsStatus = 'none'} style="padding: 0.9rem 2.2rem; font-size: 1.15rem; border-radius: 0.5rem; background: #666; color: #fff; border: none; cursor: pointer; font-weight:600;">
+        <button on:click={() => {
+          // WICHTIG: Stoppe GPS-Watcher um Konflikte zu vermeiden
+          if (gpsWatchId) {
+            navigator.geolocation.clearWatch(gpsWatchId);
+            gpsWatchId = null;
+            console.log('[GPS-Modal] Stopped GPS watcher when user chose "Ohne Standort"');
+          }
+          gpsStatus = 'none';
+        }} style="padding: 0.9rem 2.2rem; font-size: 1.15rem; border-radius: 0.5rem; background: #666; color: #fff; border: none; cursor: pointer; font-weight:600;">
           Ohne Standort fortfahren
         </button>
       </div>
@@ -1801,6 +1822,13 @@
       on:locationSelected={(event) => {
         const { lat, lon } = event.detail;
         console.log('[FullscreenMap] Location selected:', lat, lon);
+        
+        // WICHTIG: Stoppe GPS-Watcher um Konflikte zu vermeiden
+        if (gpsWatchId) {
+          navigator.geolocation.clearWatch(gpsWatchId);
+          gpsWatchId = null;
+          console.log('[FullscreenMap] Stopped GPS watcher to prevent conflicts');
+        }
         
         // Set the selected location as "GPS gemerkt"
         userLat = lat;
