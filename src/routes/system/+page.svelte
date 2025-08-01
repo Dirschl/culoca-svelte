@@ -123,8 +123,10 @@
       <a href="/" class="logo-link">
         <img src="/culoca-logo-512px.png" alt="Culoca" class="logo" />
       </a>
-      <h1 class="page-title">Culoca System</h1>
-      <p class="page-subtitle">Vollständige Übersicht aller Funktionen</p>
+      <h1 class="page-title">Culoca speichert alle Formate</h1>
+      <p class="page-subtitle">
+        Culoca ist darauf optimiert, sowohl hoch als auch querformate optimal darzustellen und diese in einem justified layout oder als grid visuell ansprechend darzustellen. Der User hat die freie Wahl der Galeriedarstellung, Dark-Light Modes (Settings) oder der Zusatzmodule (Audioguide, Welcome, Newsflash...)
+      </p>
     </div>
   </header>
 
