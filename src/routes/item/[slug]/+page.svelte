@@ -15,10 +15,25 @@
     const currentSlug = $page.params.slug;
     console.log('🔍 [Client] Checking slug for redirect:', currentSlug);
     
-    if (currentSlug === 'alte-steinerne-brucke-in-toging-altotting-inn-salzach-johann-dirschl') {
-      const correctSlug = 'alte-steinerne-bruecke-in-toeging-altotting-inn-salzach-johann-dirschl';
-      console.log('🔍 [Client] Redirecting known case:', currentSlug, '->', correctSlug);
-      goto(`/item/${correctSlug}`, { replaceState: true });
+    // Städtenamen-Mappings
+    const cityMappings = {
+      'altotting': 'altoetting',
+      'muhldorf': 'muehldorf', 
+      'toging': 'toeging',
+      'neuotting': 'neuoetting',
+      'wohrsee': 'woehrsee',
+      'badhoring': 'badhöring'
+    };
+
+    // Prüfe, ob der Slug einen der alten Städtenamen enthält
+    for (const [oldCity, newCity] of Object.entries(cityMappings)) {
+      if (currentSlug.includes(oldCity)) {
+        const newSlug = currentSlug.replace(oldCity, newCity);
+        console.log('🔍 [Client] City redirect:', oldCity, '->', newCity);
+        console.log('🔍 [Client] Redirecting:', currentSlug, '->', newSlug);
+        goto(`/item/${newSlug}`, { replaceState: true });
+        break;
+      }
     }
   }
 
