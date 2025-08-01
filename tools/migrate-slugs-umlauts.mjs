@@ -4,7 +4,17 @@ dotenv.config();
 
 const supabase = createClient(
   process.env.VITE_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY // Admin-Key!
+  process.env.SUPABASE_SERVICE_ROLE_KEY, // Admin-Key!
+  {
+    db: {
+      schema: 'public'
+    },
+    global: {
+      headers: {
+        'X-Client-Info': 'supabase-js/2.x'
+      }
+    }
+  }
 );
 
 // Verbesserte Slugify-Funktion für deutsche Umlaute und bessere SEO

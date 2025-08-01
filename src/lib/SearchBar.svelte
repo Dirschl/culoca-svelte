@@ -73,12 +73,14 @@
     </div>
   </div>
 {:else}
-  <img 
-    src="/culoca-logo-512px.png" 
-    alt="Culoca" 
-    class="culoca-logo clickable"
-    on:click|preventDefault={onToggleSearchField}
-  />
+  <a href="/system" class="logo-link">
+    <img 
+      src="/culoca-logo-512px.png" 
+      alt="Culoca" 
+      class="culoca-logo clickable"
+      on:click|preventDefault={onToggleSearchField}
+    />
+  </a>
 {/if}
 
 <style>
@@ -189,6 +191,15 @@
     transition: opacity 0.2s ease;
   }
   .culoca-logo.clickable:hover {
-    opacity: 0.8;
+    transform: scale(1.05);
+  }
+
+  .logo-link {
+    display: inline-block;
+    text-decoration: none;
+  }
+
+  .logo-link:hover {
+    text-decoration: none;
   }
 </style> 
