@@ -699,7 +699,6 @@
   }
 
   .feature-example {
-    background: var(--bg-primary);
     margin: 0;
     padding: 0;
   }
