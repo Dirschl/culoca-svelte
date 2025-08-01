@@ -72,19 +72,6 @@ export const load: PageServerLoad = async ({ params, url }) => {
   console.log('🔍 [DetailPage] Loading item with slug:', slug);
   console.log('🔍 [DetailPage] URL:', url.toString());
   
-  // Test: Throw error to see if function is called
-  if (slug === 'alte-steinerne-brucke-in-toging-altotting-inn-salzach-johann-dirschl') {
-    console.log('🔍 [DetailPage] TEST: Found the problematic slug, throwing error');
-    throw new Error('TEST: Redirect should happen for this slug');
-  }
-  
-  // Direkte Umleitung für bekannte Fälle - VOR allen anderen Checks
-  if (slug === 'alte-steinerne-brucke-in-toging-altotting-inn-salzach-johann-dirschl') {
-    const correctSlug = 'alte-steinerne-bruecke-in-toeging-altotting-inn-salzach-johann-dirschl';
-    console.log('🔍 [DetailPage] Redirecting known case:', slug, '->', correctSlug);
-    throw redirect(301, `/item/${correctSlug}`);
-  }
-  
   try {
     // Erst versuchen, das Item mit dem ursprünglichen Slug zu finden
     let { data: image, error } = await supabase
@@ -96,6 +83,13 @@ export const load: PageServerLoad = async ({ params, url }) => {
     // Wenn nicht gefunden, versuche Umleitung von altem Slug zu neuem
     if (!image || image.length === 0) {
       console.log('🔍 [DetailPage] Item not found with original slug, trying slug variations:', slug);
+      
+      // Direkte Umleitung für bekannte Fälle
+      if (slug === 'alte-steinerne-brucke-in-toging-altotting-inn-salzach-johann-dirschl') {
+        const correctSlug = 'alte-steinerne-bruecke-in-toeging-altotting-inn-salzach-johann-dirschl';
+        console.log('🔍 [DetailPage] Redirecting known case:', slug, '->', correctSlug);
+        throw redirect(301, `/item/${correctSlug}`);
+      }
       
       // Suche nach Item mit verschiedenen Slug-Varianten
       const foundItem = await findItemBySlugVariations(slug);
