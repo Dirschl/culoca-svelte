@@ -37,17 +37,18 @@
           .not('path_512', 'is', null)
           .gte('width', 1000) // Weniger restriktiv
           .gte('height', 500)
-          .order('RANDOM()') // Zufällige Auswahl
-          .limit(1)
-          .maybeSingle();
+          .order('created_at', { ascending: false }) // Neueste zuerst
+          .limit(10); // Mehr Bilder laden für Zufallsauswahl
 
         if (bannerError) {
           console.error('Banner-Fehler:', bannerError);
         }
 
-        if (bannerData) {
-          console.log('Banner-Bild gefunden:', bannerData);
-          bannerImage = bannerData;
+        if (bannerData && bannerData.length > 0) {
+          // Zufällige Auswahl aus den geladenen Bildern
+          const randomIndex = Math.floor(Math.random() * bannerData.length);
+          bannerImage = bannerData[randomIndex];
+          console.log('Banner-Bild gefunden:', bannerImage);
         } else {
           console.log('Kein Banner-Bild gefunden - versuche Fallback');
           // Fallback: Jedes Bild mit path_512
@@ -55,17 +56,18 @@
             .from('items')
             .select('id, title, slug, path_512, width, height')
             .not('path_512', 'is', null)
-            .order('RANDOM()')
-            .limit(1)
-            .maybeSingle();
+            .order('created_at', { ascending: false })
+            .limit(10);
           
           if (fallbackError) {
             console.error('Fallback-Fehler:', fallbackError);
           }
           
-          if (fallbackData) {
-            console.log('Fallback-Bild gefunden:', fallbackData);
-            bannerImage = fallbackData;
+          if (fallbackData && fallbackData.length > 0) {
+            // Zufällige Auswahl aus den Fallback-Bildern
+            const randomIndex = Math.floor(Math.random() * fallbackData.length);
+            bannerImage = fallbackData[randomIndex];
+            console.log('Fallback-Bild gefunden:', bannerImage);
           } else {
             console.log('Kein Fallback-Bild gefunden');
           }
