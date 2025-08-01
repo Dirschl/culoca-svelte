@@ -14,6 +14,9 @@
   let itemsPerPage = 20;
   let selectedUser: any = null;
   let showModal = false;
+  let showEditModal = false;
+  let editingUser: any = null;
+  let authUsers: any[] = [];
 
   onMount(async () => {
     // Wait for authentication to be ready
@@ -46,7 +49,7 @@
       
       let query = supabase
         .from('profiles')
-        .select('id, full_name, accountname, email, created_at, avatar_url', { count: 'exact' });
+        .select('id, full_name, accountname, email, created_at, avatar_url, privacy_mode, save_originals, use_justified_layout, show_welcome', { count: 'exact' });
 
       // Apply search filter
       if (searchTerm) {
@@ -72,12 +75,32 @@
       filteredUsers = users;
       totalPages = Math.ceil((count || 0) / itemsPerPage);
       
+      // Load auth users for email information
+      await loadAuthUsers();
+      
       console.log(`Loaded ${users.length} users, total pages: ${totalPages}`);
     } catch (error) {
       console.error('Error loading users:', error);
       users = [];
       filteredUsers = [];
       totalPages = 0;
+    }
+  }
+
+  async function loadAuthUsers() {
+    try {
+      // This requires admin API - we'll use a server endpoint
+      const response = await fetch('/api/admin/auth-users');
+      if (response.ok) {
+        authUsers = await response.json();
+        console.log(`Loaded ${authUsers.length} auth users`);
+      } else {
+        console.error('Failed to load auth users');
+        authUsers = [];
+      }
+    } catch (error) {
+      console.error('Error loading auth users:', error);
+      authUsers = [];
     }
   }
 
@@ -126,6 +149,54 @@
   function closeModal() {
     showModal = false;
     selectedUser = null;
+  }
+
+  function editUser(user) {
+    // Find auth user data for this profile
+    const authUser = authUsers.find(auth => auth.id === user.id);
+    editingUser = {
+      ...user,
+      auth_email: authUser?.email || 'Keine E-Mail gefunden',
+      email_confirmed: authUser?.email_confirmed_at ? true : false
+    };
+    showEditModal = true;
+  }
+
+  function closeEditModal() {
+    showEditModal = false;
+    editingUser = null;
+  }
+
+  async function updateUser(updates) {
+    try {
+      const response = await fetch('/api/admin/update-user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: editingUser.id,
+          updates
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Update failed');
+      }
+
+      const result = await response.json();
+      console.log('User updated successfully:', result);
+      
+      // Reload users to get updated data
+      await loadUsers();
+      closeEditModal();
+      
+      alert('Benutzer erfolgreich aktualisiert!');
+    } catch (error) {
+      console.error('Error updating user:', error);
+      alert(`Fehler beim Aktualisieren: ${error.message}`);
+    }
   }
 
   function formatDate(dateString) {
@@ -258,6 +329,7 @@
             <thead>
               <tr>
                 <th>Benutzer</th>
+                <th>E-Mail</th>
                 <th>Account Name</th>
                 <th>ID</th>
                 <th>Erstellt</th>
@@ -268,6 +340,7 @@
             </thead>
             <tbody>
               {#each users as user}
+                {@const authUser = authUsers.find(auth => auth.id === user.id)}
                 <tr>
                   <td>
                     <div style="display: flex; align-items: center; gap: 0.75rem;">
@@ -313,7 +386,7 @@
                           {user.full_name || user.accountname || 'Unbekannt'}
                         </div>
                         <div style="font-size: 0.875rem; color: var(--admin-text-secondary);">
-                          {user.email} • ID: {user.id.slice(0, 8)}...
+                          ID: {user.id.slice(0, 8)}...
                         </div>
                         {#if user.avatar_url}
                           <div style="font-size: 0.75rem; color: var(--admin-text-muted); margin-top: 0.25rem;">
@@ -321,6 +394,18 @@
                           </div>
                         {/if}
                       </div>
+                    </div>
+                  </td>
+                  <td>
+                    <div style="font-size: 0.875rem;">
+                      <div style="color: var(--admin-text-primary);">
+                        {authUser?.email || 'Keine E-Mail'}
+                      </div>
+                      {#if authUser}
+                        <div style="font-size: 0.75rem; color: var(--admin-text-light);">
+                          {authUser.email_confirmed_at ? '✅ Bestätigt' : '❌ Nicht bestätigt'}
+                        </div>
+                      {/if}
                     </div>
                   </td>
                   <td>{user.accountname || 'N/A'}</td>
@@ -341,11 +426,11 @@
                   <td>
                     <div style="display: flex; gap: 0.5rem;">
                       <button
-                        on:click={() => showUserDetails(user)}
+                        on:click={() => editUser(user)}
                         class="admin-btn admin-btn-secondary"
                         style="font-size: 0.75rem; padding: 0.25rem 0.5rem;"
                       >
-                        Details
+                        Bearbeiten
                       </button>
                       <button
                         on:click={() => deleteUser(user.id)}
@@ -459,6 +544,154 @@
         >
           Benutzer löschen
         </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Edit User Modal -->
+{#if showEditModal && editingUser}
+  <div class="admin-modal-overlay" on:click={closeEditModal}>
+    <div class="admin-modal" style="max-width: 600px;" on:click|stopPropagation>
+      <div class="admin-modal-header">
+        <h3 class="admin-modal-title">Benutzer bearbeiten</h3>
+        <button class="admin-modal-close" on:click={closeEditModal}>✕</button>
+      </div>
+      <div class="admin-modal-content">
+        <form on:submit|preventDefault={() => {
+          const formData = new FormData(event.target);
+          const updates = {
+            full_name: formData.get('full_name'),
+            accountname: formData.get('accountname'),
+            email: formData.get('email'),
+            privacy_mode: formData.get('privacy_mode'),
+            save_originals: formData.get('save_originals') === 'true',
+            use_justified_layout: formData.get('use_justified_layout') === 'true',
+            show_welcome: formData.get('show_welcome') === 'true'
+          };
+          updateUser(updates);
+        }}>
+          <div style="display: grid; gap: 1.5rem;">
+            
+            <!-- User Info -->
+            <div>
+              <h4 style="margin: 0 0 1rem 0; color: var(--admin-text);">Benutzer-Informationen</h4>
+              <div style="display: grid; gap: 1rem;">
+                <div>
+                  <label for="full_name" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Vollständiger Name</label>
+                  <input
+                    id="full_name"
+                    name="full_name"
+                    type="text"
+                    value={editingUser.full_name || ''}
+                    class="admin-form-input"
+                    placeholder="Vollständiger Name"
+                  />
+                </div>
+                <div>
+                  <label for="accountname" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Account Name</label>
+                  <input
+                    id="accountname"
+                    name="accountname"
+                    type="text"
+                    value={editingUser.accountname || ''}
+                    class="admin-form-input"
+                    placeholder="Account Name"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <!-- Email Section -->
+            <div>
+              <h4 style="margin: 0 0 1rem 0; color: var(--admin-text);">E-Mail-Adresse</h4>
+              <div style="display: grid; gap: 1rem;">
+                <div>
+                  <label for="email" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">E-Mail-Adresse</label>
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    value={editingUser.auth_email || ''}
+                    class="admin-form-input"
+                    placeholder="E-Mail-Adresse"
+                  />
+                  <div style="font-size: 0.875rem; color: var(--admin-text-light); margin-top: 0.25rem;">
+                    {editingUser.email_confirmed ? '✅ E-Mail bestätigt' : '❌ E-Mail nicht bestätigt'}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Privacy Settings -->
+            <div>
+              <h4 style="margin: 0 0 1rem 0; color: var(--admin-text);">Privacy-Einstellungen</h4>
+              <div style="display: grid; gap: 1rem;">
+                <div>
+                  <label for="privacy_mode" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Privacy Mode</label>
+                  <select id="privacy_mode" name="privacy_mode" class="admin-form-input">
+                    <option value="public" selected={editingUser.privacy_mode === 'public'}>Public - Alle können sehen</option>
+                    <option value="closed" selected={editingUser.privacy_mode === 'closed'}>Closed - Nur angemeldete Benutzer</option>
+                    <option value="private" selected={editingUser.privacy_mode === 'private'}>Private - Nur der Benutzer selbst</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- App Settings -->
+            <div>
+              <h4 style="margin: 0 0 1rem 0; color: var(--admin-text);">App-Einstellungen</h4>
+              <div style="display: grid; gap: 1rem;">
+                <div>
+                  <label style="display: flex; align-items: center; gap: 0.5rem;">
+                    <input
+                      type="checkbox"
+                      name="save_originals"
+                      value="true"
+                      checked={editingUser.save_originals}
+                    />
+                    Save Originals
+                  </label>
+                </div>
+                <div>
+                  <label style="display: flex; align-items: center; gap: 0.5rem;">
+                    <input
+                      type="checkbox"
+                      name="use_justified_layout"
+                      value="true"
+                      checked={editingUser.use_justified_layout}
+                    />
+                    Use Justified Layout
+                  </label>
+                </div>
+                <div>
+                  <label style="display: flex; align-items: center; gap: 0.5rem;">
+                    <input
+                      type="checkbox"
+                      name="show_welcome"
+                      value="true"
+                      checked={editingUser.show_welcome}
+                    />
+                    Show Welcome
+                  </label>
+                </div>
+              </div>
+            </div>
+
+          </div>
+          
+          <div class="admin-modal-actions">
+            <button type="button" class="admin-btn admin-btn-secondary" on:click={closeEditModal}>Abbrechen</button>
+            <button type="submit" class="admin-btn admin-btn-primary">Speichern</button>
+            <button
+              type="button"
+              class="admin-btn admin-btn-danger"
+              on:click={() => { deleteUser(editingUser.id); closeEditModal(); }}
+            >
+              Benutzer löschen
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   </div>
