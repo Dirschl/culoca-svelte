@@ -163,126 +163,124 @@
         Galerie-Funktionen
       </h2>
       
-      <div class="feature-grid">
-        <div class="feature-card">
-          <h3>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px;">
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-              <circle cx="8.5" cy="8.5" r="1.5"/>
-              <polyline points="21,15 16,10 5,21"/>
-            </svg>
-            Normale Galerie
-          </h3>
-          <p>
-            Die Standard-Galerie zeigt Fotos in einem responsiven Grid-Layout. 
-            Nutzer können durch Fotos scrollen, nach Standorten filtern und 
-            detaillierte Informationen zu jedem Foto anzeigen.
-          </p>
-          <div class="feature-example">
-            <strong>Features:</strong>
-            <ul>
-              <li>Responsive Grid-Layout</li>
-              <li>Infinite Scroll</li>
-              <li>Standort-basierte Filterung</li>
-              <li>Detaillierte Foto-Informationen</li>
-            </ul>
-          </div>
+      <div class="feature-card">
+        <h3>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px;">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+            <circle cx="8.5" cy="8.5" r="1.5"/>
+            <polyline points="21,15 16,10 5,21"/>
+          </svg>
+          Normale Galerie
+        </h3>
+        <p>
+          Die Standard-Galerie zeigt Fotos in einem responsiven Grid-Layout. 
+          Nutzer können durch Fotos scrollen, nach Standorten filtern und 
+          detaillierte Informationen zu jedem Foto anzeigen.
+        </p>
+        <div class="feature-example">
+          <strong>Features:</strong>
+          <ul>
+            <li>Responsive Grid-Layout</li>
+            <li>Infinite Scroll</li>
+            <li>Standort-basierte Filterung</li>
+            <li>Detaillierte Foto-Informationen</li>
+          </ul>
         </div>
+      </div>
 
-        <div class="feature-card">
-          <h3>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px;">
-              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
-              <line x1="8" y1="21" x2="16" y2="21"/>
-              <line x1="12" y1="17" x2="12" y2="21"/>
-            </svg>
-            Mobile Galerie (3x3)
-          </h3>
-          <p>
-            Speziell für mobile Geräte optimiert - zeigt 9 Fotos gleichzeitig 
-            in einem 3x3 Grid. Perfekt für schnelle Übersicht und Navigation.
-          </p>
-          <div class="feature-example">
-            <strong>Features:</strong>
-            <ul>
-              <li>3x3 Grid-Layout</li>
-              <li>Touch-optimiert</li>
-              <li>Audioguide-Unterstützung</li>
-              <li>Schnelle Navigation</li>
-            </ul>
-          </div>
+      <div class="feature-card">
+        <h3>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px;">
+            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+            <line x1="8" y1="21" x2="16" y2="21"/>
+            <line x1="12" y1="17" x2="12" y2="21"/>
+          </svg>
+          Mobile Galerie (3x3)
+        </h3>
+        <p>
+          Speziell für mobile Geräte optimiert - zeigt 9 Fotos gleichzeitig 
+          in einem 3x3 Grid. Perfekt für schnelle Übersicht und Navigation.
+        </p>
+        <div class="feature-example">
+          <strong>Features:</strong>
+          <ul>
+            <li>3x3 Grid-Layout</li>
+            <li>Touch-optimiert</li>
+            <li>Audioguide-Unterstützung</li>
+            <li>Schnelle Navigation</li>
+          </ul>
         </div>
+      </div>
 
-        <div class="feature-card">
-          <h3>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px;">
-              <circle cx="11" cy="11" r="8"/>
-              <path d="m21 21-4.35-4.35"/>
-            </svg>
-            Item-Ansicht & Nearby
-          </h3>
-          <p>
-            Detaillierte Ansicht einzelner Fotos mit Nearby-Galerie. 
-            Zeigt ähnliche Fotos in der Umgebung und ermöglicht Standort-Filterung.
-          </p>
-          <div class="feature-example">
-            <strong>Features:</strong>
-            <ul>
-              <li>Nearby-Galerie</li>
-              <li>Location Filter</li>
-              <li>User Filter</li>
-              <li>GPS-Koordinaten</li>
-            </ul>
-          </div>
+      <div class="feature-card">
+        <h3>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px;">
+            <circle cx="11" cy="11" r="8"/>
+            <path d="m21 21-4.35-4.35"/>
+          </svg>
+          Item-Ansicht & Nearby
+        </h3>
+        <p>
+          Detaillierte Ansicht einzelner Fotos mit Nearby-Galerie. 
+          Zeigt ähnliche Fotos in der Umgebung und ermöglicht Standort-Filterung.
+        </p>
+        <div class="feature-example">
+          <strong>Features:</strong>
+          <ul>
+            <li>Nearby-Galerie</li>
+            <li>Location Filter</li>
+            <li>User Filter</li>
+            <li>GPS-Koordinaten</li>
+          </ul>
         </div>
+      </div>
 
-        <div class="feature-card">
-          <h3>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px;">
-              <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2"/>
-              <line x1="8" y1="2" x2="8" y2="18"/>
-              <line x1="16" y1="6" x2="16" y2="22"/>
-            </svg>
-            Kartenansicht
-          </h3>
-          <p>
-            Interaktive Kartenansicht mit OpenStreetMap-Integration. 
-            Fotos werden direkt auf der Karte angezeigt und können 
-            per Klick geöffnet werden.
-          </p>
-          <div class="feature-example">
-            <strong>Features:</strong>
-            <ul>
-              <li>OpenStreetMap Integration</li>
-              <li>Foto-Marker auf Karte</li>
-              <li>Zoom & Pan</li>
-              <li>Standort-Auswahl</li>
-            </ul>
-          </div>
+      <div class="feature-card">
+        <h3>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px;">
+            <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2"/>
+            <line x1="8" y1="2" x2="8" y2="18"/>
+            <line x1="16" y1="6" x2="16" y2="22"/>
+          </svg>
+          Kartenansicht
+        </h3>
+        <p>
+          Interaktive Kartenansicht mit OpenStreetMap-Integration. 
+          Fotos werden direkt auf der Karte angezeigt und können 
+          per Klick geöffnet werden.
+        </p>
+        <div class="feature-example">
+          <strong>Features:</strong>
+          <ul>
+            <li>OpenStreetMap Integration</li>
+            <li>Foto-Marker auf Karte</li>
+            <li>Zoom & Pan</li>
+            <li>Standort-Auswahl</li>
+          </ul>
         </div>
+      </div>
 
-        <div class="feature-card">
-          <h3>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px;">
-              <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
-              <polyline points="16,6 12,2 8,6"/>
-              <line x1="12" y1="2" x2="12" y2="15"/>
-            </svg>
-            Bulk Upload
-          </h3>
-          <p>
-            Massen-Upload von Fotos mit automatischer GPS-Extraktion. 
-            Unterstützt Drag & Drop und Batch-Verarbeitung.
-          </p>
-          <div class="feature-example">
-            <strong>Features:</strong>
-            <ul>
-              <li>Drag & Drop Upload</li>
-              <li>Automatische GPS-Extraktion</li>
-              <li>Batch-Verarbeitung</li>
-              <li>Fortschrittsanzeige</li>
-            </ul>
-          </div>
+      <div class="feature-card">
+        <h3>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px;">
+            <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
+            <polyline points="16,6 12,2 8,6"/>
+            <line x1="12" y1="2" x2="12" y2="15"/>
+          </svg>
+          Bulk Upload
+        </h3>
+        <p>
+          Massen-Upload von Fotos mit automatischer GPS-Extraktion. 
+          Unterstützt Drag & Drop und Batch-Verarbeitung.
+        </p>
+        <div class="feature-example">
+          <strong>Features:</strong>
+          <ul>
+            <li>Drag & Drop Upload</li>
+            <li>Automatische GPS-Extraktion</li>
+            <li>Batch-Verarbeitung</li>
+            <li>Fortschrittsanzeige</li>
+          </ul>
         </div>
       </div>
     </section>
@@ -297,8 +295,7 @@
         SEO & Open Graph Integration
       </h2>
       
-      <div class="feature-grid">
-        <div class="feature-card">
+      <div class="feature-card">
           <h3>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px;">
               <circle cx="12" cy="12" r="3"/>
@@ -423,19 +420,17 @@
             </ul>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <!-- Hetzner Integration -->
-    <section class="hetzner-section">
-      <h2>
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px;">
-            <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>
-          </svg>
-          Hetzner Cloud Hosting
-        </h2>
-        
-        <div class="feature-grid">
+      <!-- Hetzner Integration -->
+      <section class="hetzner-section">
+        <h2>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px;">
+              <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>
+            </svg>
+            Hetzner Cloud Hosting
+          </h2>
+          
           <div class="feature-card">
             <h3>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px;">
@@ -480,374 +475,367 @@
               </ul>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <!-- Live-Statistiken -->
-      <section class="stats-section">
-        <h2>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px;">
-            <line x1="18" y1="20" x2="18" y2="10"/>
-            <line x1="12" y1="20" x2="12" y2="4"/>
-            <line x1="6" y1="20" x2="6" y2="14"/>
-          </svg>
-          Live-Statistiken
-        </h2>
-        
-        <div class="stat-card">
-          <h3>Gesamte Fotos</h3>
-          <div class="stat-number">{stats.totalItems.toLocaleString()}</div>
-        </div>
-        
-        <div class="stat-card">
-          <h3>Registrierte Nutzer</h3>
-          <div class="stat-number">{stats.totalUsers.toLocaleString()}</div>
-        </div>
-        
-        {#if stats.topUser}
-        <div class="stat-card">
-          <h3>Top Nutzer</h3>
-          <div class="stat-number">{stats.topUser.full_name || stats.topUser.accountname}</div>
-        </div>
-        {/if}
-
-        {#if stats.latestItems.length > 0}
-        <div class="latest-items">
-          <h3>Neueste Fotos</h3>
-          <div class="items-grid">
-            {#each stats.latestItems as item}
-            <div class="item-card">
-              <img src="https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/{item.path_512}" 
-                   alt={item.title || 'Foto'} class="item-thumbnail" />
-              <div class="item-info">
-                <h4>{item.title || 'Ohne Titel'}</h4>
-                <p>{new Date(item.created_at).toLocaleDateString('de-DE')}</p>
-              </div>
-            </div>
-            {/each}
+        <!-- Live-Statistiken -->
+        <section class="stats-section">
+          <h2>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px;">
+              <line x1="18" y1="20" x2="18" y2="10"/>
+              <line x1="12" y1="20" x2="12" y2="4"/>
+              <line x1="6" y1="20" x2="6" y2="14"/>
+            </svg>
+            Live-Statistiken
+          </h2>
+          
+          <div class="stat-card">
+            <h3>Gesamte Fotos</h3>
+            <div class="stat-number">{stats.totalItems.toLocaleString()}</div>
           </div>
-        </div>
-        {/if}
-      </section>
-  </main>
+          
+          <div class="stat-card">
+            <h3>Registrierte Nutzer</h3>
+            <div class="stat-number">{stats.totalUsers.toLocaleString()}</div>
+          </div>
+          
+          {#if stats.topUser}
+          <div class="stat-card">
+            <h3>Top Nutzer</h3>
+            <div class="stat-number">{stats.topUser.full_name || stats.topUser.accountname}</div>
+          </div>
+          {/if}
 
-  <!-- Floating Action Buttons -->
-  <FloatingActionButtons />
-</div>
+          {#if stats.latestItems.length > 0}
+          <div class="latest-items">
+            <h3>Neueste Fotos</h3>
+            <div class="items-grid">
+              {#each stats.latestItems as item}
+              <div class="item-card">
+                <img src="https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/{item.path_512}" 
+                     alt={item.title || 'Foto'} class="item-thumbnail" />
+                <div class="item-info">
+                  <h4>{item.title || 'Ohne Titel'}</h4>
+                  <p>{new Date(item.created_at).toLocaleDateString('de-DE')}</p>
+                </div>
+              </div>
+              {/each}
+            </div>
+          </div>
+          {/if}
+        </section>
+    </main>
 
-<style>
-  .system-page {
-    min-height: 100vh;
-    background: var(--bg-primary);
-    color: var(--text-primary);
-  }
+    <!-- Floating Action Buttons -->
+    <FloatingActionButtons />
+  </div>
 
-  .header {
-    background: var(--bg-secondary);
-    border-bottom: 1px solid var(--border-color);
-    padding: 1rem 0;
-    position: sticky;
-    top: 0;
-    z-index: 100;
-  }
-
-  .header-content {
-    margin: 0 auto;
-    padding: 0 2rem;
-    display: flex;
-    align-items: center;
-    gap: 2rem;
-  }
-
-  .logo {
-    height: 40px;
-    width: auto;
-  }
-
-  .logo-link {
-    text-decoration: none;
-  }
-
-  .page-title {
-    font-size: 2rem;
-    margin: 0;
-    color: var(--text-primary);
-  }
-
-  .page-subtitle {
-    font-size: 1rem;
-    color: var(--text-secondary);
-    margin: 0;
-  }
-
-  .banner-section {
-    width: 100%;
-    height: 400px;
-    position: relative;
-    overflow: hidden;
-    margin-bottom: 3rem;
-  }
-
-  .banner-image-container {
-    width: 100%;
-    height: 100%;
-    position: relative;
-    cursor: pointer;
-    transition: transform 0.3s ease;
-  }
-
-  .banner-image-container:hover {
-    transform: scale(1.02);
-  }
-
-  .banner-image {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    object-position: center;
-  }
-
-  .banner-overlay {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(to top, rgba(0, 0, 0, 0.7) 0%, transparent 50%);
-    display: flex;
-    align-items: flex-end;
-    padding: 1.5rem;
-  }
-
-  .banner-title {
-    font-size: 1.2rem;
-    font-weight: 500;
-    color: var(--text-primary);
-    background: var(--bg-secondary);
-    padding: 0.5rem 1rem;
-    border-radius: 6px;
-    box-shadow: 0 2px 8px var(--shadow);
-    backdrop-filter: blur(10px);
-    border: 1px solid var(--border-color);
-  }
-
-  .main-content {
-    margin: 0 auto;
-    padding: 2rem;
-  }
-
-  section {
-    margin-bottom: 3rem;
-  }
-
-  section h2 {
-    font-size: 1.8rem;
-    margin: 0 0 1.5rem 0;
-    color: var(--text-primary);
-    border-bottom: 2px solid var(--accent-color);
-    padding-bottom: 0.5rem;
-  }
-
-  .intro-section {
-    text-align: center;
-  }
-
-  .intro-title {
-    font-size: 2rem;
-    margin-bottom: 1rem;
-    color: var(--text-primary);
-  }
-
-  .intro-text {
-    font-size: 1.1rem;
-    line-height: 1.6;
-    color: var(--text-secondary);
-    margin: 0;
-  }
-
-  .feature-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
-    gap: 2rem;
-  }
-
-  .feature-card {
-    margin-bottom: 2rem;
-  }
-
-  .feature-card h3 {
-    font-size: 1.2rem;
-    margin: 0 0 1rem 0;
-    color: var(--text-primary);
-    padding: 0;
-  }
-
-  .feature-card p {
-    font-size: 1rem;
-    line-height: 1.6;
-    color: var(--text-secondary);
-    margin: 0 0 1rem 0;
-    padding: 0;
-  }
-
-  .feature-example {
-    background: var(--bg-primary);
-    margin: 0 0 1rem 0;
-    padding: 1rem;
-  }
-
-  .feature-example strong {
-    color: var(--text-primary);
-    display: block;
-    margin-bottom: 0.5rem;
-  }
-
-  .feature-example ul {
-    margin: 0;
-    padding-left: 1.5rem;
-    color: var(--text-secondary);
-  }
-
-  .feature-example li {
-    margin: 0.25rem 0;
-  }
-
-  .og-examples {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 1.5rem;
-    margin-top: 1rem;
-  }
-
-  .og-example {
-    background: var(--bg-primary);
-    padding: 1rem;
-  }
-
-  .og-example h4 {
-    font-size: 1rem;
-    margin: 0 0 0.5rem 0;
-    color: var(--text-primary);
-  }
-
-  .og-example p {
-    font-size: 0.9rem;
-    margin: 0 0 1rem 0;
-    color: var(--text-secondary);
-  }
-
-  .og-example a {
-    color: var(--accent-color);
-    text-decoration: none;
-  }
-
-  .og-example a:hover {
-    text-decoration: underline;
-  }
-
-  .og-preview {
-    margin-top: 1rem;
-  }
-
-  .og-image {
-    width: 100%;
-    max-width: 400px;
-    height: auto;
-    display: block;
-  }
-
-  .stat-card {
-    background: var(--bg-secondary);
-    padding: 1.5rem;
-    text-align: center;
-    margin-bottom: 1rem;
-  }
-
-  .stat-card h3 {
-    font-size: 1rem;
-    margin: 0 0 0.5rem 0;
-    color: var(--text-secondary);
-  }
-
-  .stat-number {
-    font-size: 2rem;
-    font-weight: bold;
-    color: var(--accent-color);
-  }
-
-  .latest-items {
-    margin-top: 2rem;
-  }
-
-  .latest-items h3 {
-    margin: 0 0 1rem 0;
-    color: var(--text-primary);
-  }
-
-  .items-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1.5rem;
-  }
-
-  .item-card {
-    background: var(--bg-secondary);
-    overflow: hidden;
-  }
-
-  .item-thumbnail {
-    width: 100%;
-    height: 120px;
-    object-fit: cover;
-  }
-
-  .item-info {
-    padding: 0.75rem;
-  }
-
-  .item-info h4 {
-    font-size: 0.9rem;
-    margin: 0 0 0.25rem 0;
-    color: var(--text-primary);
-  }
-
-  .item-info p {
-    font-size: 0.8rem;
-    color: var(--text-secondary);
-    margin: 0;
-  }
-
-  @media (max-width: 768px) {
-    .header-content {
-      flex-direction: column;
-      gap: 1rem;
-      text-align: center;
+  <style>
+    .system-page {
+      min-height: 100vh;
+      background: var(--bg-primary);
+      color: var(--text-primary);
     }
 
-    .main-content {
-      padding: 1rem;
+    .header {
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-color);
+      padding: 1rem 0;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header-content {
+      margin: 0 auto;
+      padding: 0 2rem;
+      display: flex;
+      align-items: center;
+      gap: 2rem;
+    }
+
+    .logo {
+      height: 40px;
+      width: auto;
+    }
+
+    .logo-link {
+      text-decoration: none;
+    }
+
+    .page-title {
+      font-size: 2rem;
+      margin: 0;
+      color: var(--text-primary);
+    }
+
+    .page-subtitle {
+      font-size: 1rem;
+      color: var(--text-secondary);
+      margin: 0;
     }
 
     .banner-section {
-      height: 250px;
-      margin-bottom: 2rem;
+      width: 100%;
+      height: 400px;
+      position: relative;
+      overflow: hidden;
+      margin-bottom: 3rem;
+    }
+
+    .banner-image-container {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      cursor: pointer;
+      transition: transform 0.3s ease;
+    }
+
+    .banner-image-container:hover {
+      transform: scale(1.02);
+    }
+
+    .banner-image {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+    }
+
+    .banner-overlay {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(to top, rgba(0, 0, 0, 0.7) 0%, transparent 50%);
+      display: flex;
+      align-items: flex-end;
+      padding: 1.5rem;
     }
 
     .banner-title {
+      font-size: 1.2rem;
+      font-weight: 500;
+      color: var(--text-primary);
+      background: var(--bg-secondary);
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      box-shadow: 0 2px 8px var(--shadow);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--border-color);
+    }
+
+    .main-content {
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    section {
+      margin-bottom: 3rem;
+    }
+
+    section h2 {
+      font-size: 1.8rem;
+      margin: 0 0 1.5rem 0;
+      color: var(--text-primary);
+      border-bottom: 2px solid var(--accent-color);
+      padding-bottom: 0.5rem;
+    }
+
+    .intro-section {
+      text-align: center;
+    }
+
+    .intro-title {
+      font-size: 2rem;
+      margin-bottom: 1rem;
+      color: var(--text-primary);
+    }
+
+    .intro-text {
+      font-size: 1.1rem;
+      line-height: 1.6;
+      color: var(--text-secondary);
+      margin: 0;
+    }
+
+    .feature-card {
+      margin-bottom: 2rem;
+    }
+
+    .feature-card h3 {
+      font-size: 1.2rem;
+      margin: 0 0 1rem 0;
+      color: var(--text-primary);
+      padding: 0;
+    }
+
+    .feature-card p {
       font-size: 1rem;
-      padding: 0.4rem 0.8rem;
+      line-height: 1.6;
+      color: var(--text-secondary);
+      margin: 0 0 1rem 0;
+      padding: 0;
     }
 
-    .feature-grid {
-      grid-template-columns: 1fr;
+    .feature-example {
+      background: var(--bg-primary);
+      margin: 0 0 1rem 0;
+      padding: 1rem;
     }
 
-    .stats-grid {
-      grid-template-columns: repeat(2, 1fr);
+    .feature-example strong {
+      color: var(--text-primary);
+      display: block;
+      margin-bottom: 0.5rem;
+    }
+
+    .feature-example ul {
+      margin: 0;
+      padding-left: 1.5rem;
+      color: var(--text-secondary);
+    }
+
+    .feature-example li {
+      margin: 0.25rem 0;
+    }
+
+    .og-examples {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.5rem;
+      margin-top: 1rem;
+    }
+
+    .og-example {
+      background: var(--bg-primary);
+      padding: 1rem;
+    }
+
+    .og-example h4 {
+      font-size: 1rem;
+      margin: 0 0 0.5rem 0;
+      color: var(--text-primary);
+    }
+
+    .og-example p {
+      font-size: 0.9rem;
+      margin: 0 0 1rem 0;
+      color: var(--text-secondary);
+    }
+
+    .og-example a {
+      color: var(--accent-color);
+      text-decoration: none;
+    }
+
+    .og-example a:hover {
+      text-decoration: underline;
+    }
+
+    .og-preview {
+      margin-top: 1rem;
+    }
+
+    .og-image {
+      width: 100%;
+      max-width: 400px;
+      height: auto;
+      display: block;
+    }
+
+    .stat-card {
+      background: var(--bg-secondary);
+      padding: 1.5rem;
+      text-align: center;
+      margin-bottom: 1rem;
+    }
+
+    .stat-card h3 {
+      font-size: 1rem;
+      margin: 0 0 0.5rem 0;
+      color: var(--text-secondary);
+    }
+
+    .stat-number {
+      font-size: 2rem;
+      font-weight: bold;
+      color: var(--accent-color);
+    }
+
+    .latest-items {
+      margin-top: 2rem;
+    }
+
+    .latest-items h3 {
+      margin: 0 0 1rem 0;
+      color: var(--text-primary);
     }
 
     .items-grid {
-      grid-template-columns: repeat(2, 1fr);
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1.5rem;
     }
-  }
-</style> 
+
+    .item-card {
+      background: var(--bg-secondary);
+      overflow: hidden;
+    }
+
+    .item-thumbnail {
+      width: 100%;
+      height: 120px;
+      object-fit: cover;
+    }
+
+    .item-info {
+      padding: 0.75rem;
+    }
+
+    .item-info h4 {
+      font-size: 0.9rem;
+      margin: 0 0 0.25rem 0;
+      color: var(--text-primary);
+    }
+
+    .item-info p {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      margin: 0;
+    }
+
+    @media (max-width: 768px) {
+      .header-content {
+        flex-direction: column;
+        gap: 1rem;
+        text-align: center;
+      }
+
+      .main-content {
+        padding: 1rem;
+      }
+
+      .banner-section {
+        height: 250px;
+        margin-bottom: 2rem;
+      }
+
+      .banner-title {
+        font-size: 1rem;
+        padding: 0.4rem 0.8rem;
+      }
+
+      .feature-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .items-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+  </style> 
