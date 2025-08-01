@@ -674,10 +674,6 @@
   }
 
   .feature-card {
-    background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: 12px;
-    padding: 1.5rem;
     transition: transform 0.2s ease, box-shadow 0.2s ease;
   }
 
