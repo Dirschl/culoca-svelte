@@ -1366,9 +1366,11 @@
   function initializeGPS() {
     if (!navigator.geolocation) {
       gpsStatus = "unavailable";
+      console.log('[GPS] Geolocation not available');
       return;
     }
 
+    console.log('[GPS] Starting GPS watch...');
     gpsStatus = "checking";
 
     // Live-Tracking: watchPosition
@@ -1385,25 +1387,29 @@
         filterStore.updateGpsStatus(true, { lat: userLat, lon: userLon });
       },
       (error) => {
+        console.warn("GPS-Fehler:", error.message, "Code:", error.code);
         switch (error.code) {
           case error.PERMISSION_DENIED:
             gpsStatus = "denied";
             if (browser) localStorage.removeItem('gpsAllowed');
             filterStore.updateGpsStatus(false);
+            console.log('[GPS] Permission denied');
             break;
           case error.POSITION_UNAVAILABLE:
             gpsStatus = "unavailable";
             filterStore.updateGpsStatus(false);
+            console.log('[GPS] Position unavailable');
             break;
           case error.TIMEOUT:
             gpsStatus = "unavailable";
             filterStore.updateGpsStatus(false);
+            console.log('[GPS] GPS timeout');
             break;
           default:
             gpsStatus = "unavailable";
             filterStore.updateGpsStatus(false);
+            console.log('[GPS] Unknown GPS error');
         }
-        console.warn("GPS-Fehler:", error.message);
       },
       {
         enableHighAccuracy: true,
@@ -1426,6 +1432,10 @@
       return;
     }
 
+    // NEU: Setze Status auf 'checking' bevor GPS gestartet wird
+    gpsStatus = 'checking';
+    console.log('[GPS-Init] Starting GPS initialization...');
+
     // Prüfe zuerst den aktuellen Berechtigungsstatus
     if ('permissions' in navigator) {
       navigator.permissions.query({ name: 'geolocation' }).then((permissionStatus) => {
@@ -1433,6 +1443,7 @@
         
         if (permissionStatus.state === 'granted') {
           // Berechtigung bereits erteilt - starte GPS
+          console.log('[GPS] Permission granted - starting GPS...');
           initializeGPS();
         } else if (permissionStatus.state === 'denied') {
           // Berechtigung verweigert - zeige Galerie ohne GPS
@@ -1440,14 +1451,17 @@
           console.log('[GPS] Permission denied - showing gallery without GPS');
         } else {
           // Berechtigung noch nicht entschieden - versuche GPS zu starten
+          console.log('[GPS] Permission not decided - trying GPS...');
           initializeGPS();
         }
       }).catch(() => {
         // Fallback: Versuche GPS zu starten
+        console.log('[GPS] Permission check failed - trying GPS as fallback...');
         initializeGPS();
       });
     } else {
       // Fallback für Browser ohne Permissions API
+      console.log('[GPS] No permissions API - trying GPS directly...');
       initializeGPS();
     }
   }
@@ -1751,7 +1765,7 @@
   }
 </script>
 
-{#if gpsStatus === 'denied' || gpsStatus === 'unavailable' || (gpsStatus === 'none' && !userLat && !userLon)}
+{#if (gpsStatus === 'denied' || gpsStatus === 'unavailable') && !userLat && !userLon}
   <div style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(30,30,30,0.92);z-index:10000;display:flex;flex-direction:column;align-items:center;justify-content:center;">
     <div style="background:#222;padding:2rem 2.5rem;border-radius:1rem;box-shadow:0 2px 16px #0008;max-width:90vw;text-align:center;">
       <h2 style="color:#fff;margin-bottom:1rem;">Standort auswählen</h2>
@@ -1802,6 +1816,25 @@
           Standort konnte nicht ermittelt werden.<br>Du kannst die Galerie trotzdem nutzen.
         </div>
       {/if}
+    </div>
+  </div>
+{:else if gpsStatus === 'checking'}
+  <!-- GPS wird geladen - zeige Ladeindikator -->
+  <div style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(30,30,30,0.92);z-index:10000;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+    <div style="background:#222;padding:2rem 2.5rem;border-radius:1rem;box-shadow:0 2px 16px #0008;max-width:90vw;text-align:center;">
+      <h2 style="color:#fff;margin-bottom:1rem;">GPS wird geladen...</h2>
+      <p style="color:#ccc;font-size:1.1rem;margin-bottom:1.5rem;">
+        Bitte warte, während dein Standort ermittelt wird.
+      </p>
+      <div style="display:flex;justify-content:center;margin-top:1rem;">
+        <div style="width:40px;height:40px;border:4px solid #3a7;border-top:4px solid transparent;border-radius:50%;animation:spin 1s linear infinite;"></div>
+      </div>
+      <style>
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      </style>
     </div>
   </div>
 {:else}
