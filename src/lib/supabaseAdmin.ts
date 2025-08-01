@@ -10,8 +10,13 @@ const supabaseUrl = (typeof process !== 'undefined' && process.env?.PUBLIC_SUPAB
 const supabaseServiceKey = (typeof process !== 'undefined' && process.env?.SUPABASE_SERVICE_ROLE_KEY) ||
                           (typeof import.meta !== 'undefined' && import.meta.env?.SUPABASE_SERVICE_ROLE_KEY);
 
-if (!supabaseServiceKey) {
-  throw new Error('SUPABASE_SERVICE_ROLE_KEY is required for admin operations');
+// Create admin client only when service key is available
+let supabaseAdmin = null;
+
+if (supabaseServiceKey) {
+  supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+} else {
+  console.warn('SUPABASE_SERVICE_ROLE_KEY not found - admin operations will not work');
 }
 
-export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey); 
+export { supabaseAdmin }; 
