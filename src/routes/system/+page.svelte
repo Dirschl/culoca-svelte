@@ -123,10 +123,8 @@
       <a href="/" class="logo-link">
         <img src="/culoca-logo-512px.png" alt="Culoca" class="logo" />
       </a>
-      <h1 class="page-title">Culoca speichert alle Formate</h1>
-      <p class="page-subtitle">
-        Culoca ist darauf optimiert, sowohl hoch als auch querformate optimal darzustellen und diese in einem justified layout oder als grid visuell ansprechend darzustellen. Der User hat die freie Wahl der Galeriedarstellung, Dark-Light Modes (Settings) oder der Zusatzmodule (Audioguide, Welcome, Newsflash...)
-      </p>
+      <h1 class="page-title">Culoca System</h1>
+      <p class="page-subtitle">Vollständige Übersicht aller Funktionen</p>
     </div>
   </header>
 
@@ -146,17 +144,15 @@
   </div>
   {/if}
 
-  <main class="main-content">
-    <!-- Einführung -->
-    <section class="intro-section">
-      <h2>🎯 Was ist Culoca?</h2>
-      <p>
-        Culoca ist eine <strong>GPS-basierte Fotogalerie-Plattform</strong>, die es Nutzern ermöglicht, 
-        Fotos mit präzisen Standortdaten zu teilen und zu entdecken. Das System kombiniert moderne 
-        Web-Technologien mit intelligenten Funktionen für eine optimale Nutzererfahrung.
-      </p>
-    </section>
+  <!-- Einführungstext unterhalb des Banners -->
+  <div class="intro-section">
+    <h2 class="intro-title">Culoca speichert alle Formate</h2>
+    <p class="intro-text">
+      Culoca ist darauf optimiert, sowohl hoch als auch querformate optimal darzustellen und diese in einem justified layout oder als grid visuell ansprechend darzustellen. Der User hat die freie Wahl der Galeriedarstellung, Dark-Light Modes (Settings) oder der Zusatzmodule (Audioguide, Welcome, Newsflash...)
+    </p>
+  </div>
 
+  <main class="main-content">
     <!-- Galerie-Funktionen -->
     <section class="gallery-section">
       <h2>📸 Galerie-Funktionen</h2>
@@ -576,7 +572,22 @@
     padding-bottom: 0.5rem;
   }
 
-  .intro-section p {
+  .intro-section {
+    margin-top: 3rem;
+    padding: 2rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    text-align: center;
+  }
+
+  .intro-title {
+    font-size: 2rem;
+    margin-bottom: 1rem;
+    color: var(--text-primary);
+  }
+
+  .intro-text {
     font-size: 1.1rem;
     line-height: 1.6;
     color: var(--text-secondary);
