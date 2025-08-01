@@ -14,13 +14,14 @@
   import { onMount } from 'svelte';
   import { supabase } from '$lib/supabaseClient';
   import { browser } from '$app/environment';
+  import SearchBar from '$lib/SearchBar.svelte';
+  import FloatingActionButtons from '$lib/FloatingActionButtons.svelte';
 
   let stats = {
     totalItems: 0,
     totalUsers: 0,
     topUser: null as any,
-    latestItems: [] as any[],
-    helgolandItems: 0
+    latestItems: [] as any[]
   };
 
   onMount(async () => {
@@ -38,8 +39,7 @@
         // Top User (meiste Items)
         const { data: topUserData } = await supabase
           .from('profiles')
-          .select('id, full_name, accountname, items!inner(count)')
-          .order('items.count', { ascending: false })
+          .select('id, full_name, accountname')
           .limit(1)
           .maybeSingle();
 
@@ -50,21 +50,11 @@
           .order('created_at', { ascending: false })
           .limit(5);
 
-        // Helgoland Items (Beispiel für GPS-Funktion)
-        const { count: helgolandCount } = await supabase
-          .from('items')
-          .select('*', { count: 'exact', head: true })
-          .gte('lat', 54.1)
-          .lte('lat', 54.2)
-          .gte('lon', 7.8)
-          .lte('lon', 8.0);
-
         stats = {
           totalItems: itemsCount || 0,
           totalUsers: usersCount || 0,
           topUser: topUserData,
-          latestItems: latestItems || [],
-          helgolandItems: helgolandCount || 0
+          latestItems: latestItems || []
         };
       } catch (error) {
         console.error('Fehler beim Laden der Statistiken:', error);
@@ -74,13 +64,18 @@
 </script>
 
 <div class="system-page">
-  <header class="system-header">
-    <a href="/" class="back-link">← Zurück zur Galerie</a>
-    <h1>Culoca System</h1>
-    <p class="subtitle">Vollständige Übersicht aller Funktionen und Features</p>
+  <!-- Header mit Logo und Navigation -->
+  <header class="header">
+    <div class="header-content">
+      <a href="/" class="logo-link">
+        <img src="/culoca-logo-512px.png" alt="Culoca" class="logo" />
+      </a>
+      <h1 class="page-title">Culoca System</h1>
+      <p class="page-subtitle">Vollständige Übersicht aller Funktionen</p>
+    </div>
   </header>
 
-  <main class="system-content">
+  <main class="main-content">
     <!-- Einführung -->
     <section class="intro-section">
       <h2>🎯 Was ist Culoca?</h2>
@@ -91,68 +86,154 @@
       </p>
     </section>
 
-    <!-- Kernfunktionen -->
-    <section class="features-section">
-      <h2>🚀 Kernfunktionen</h2>
+    <!-- Galerie-Funktionen -->
+    <section class="gallery-section">
+      <h2>📸 Galerie-Funktionen</h2>
       
       <div class="feature-grid">
         <div class="feature-card">
-          <h3>📸 GPS-basierte Fotogalerie</h3>
+          <h3>🖼️ Normale Galerie</h3>
           <p>
-            Jedes Foto wird automatisch mit GPS-Koordinaten versehen und kann auf einer interaktiven 
-            Karte angezeigt werden. Nutzer können Fotos in ihrer Nähe entdecken oder gezielt nach 
-            Standorten suchen.
+            Die Standard-Galerie zeigt Fotos in einem responsiven Grid-Layout. 
+            Nutzer können durch Fotos scrollen, nach Standorten filtern und 
+            detaillierte Informationen zu jedem Foto anzeigen.
           </p>
           <div class="feature-example">
-            <strong>Beispiel:</strong> Helgoland-Fotos werden automatisch auf der Karte bei den 
-            Koordinaten 54.15°N, 7.88°E angezeigt.
+            <strong>Features:</strong>
+            <ul>
+              <li>Responsive Grid-Layout</li>
+              <li>Infinite Scroll</li>
+              <li>Standort-basierte Filterung</li>
+              <li>Detaillierte Foto-Informationen</li>
+            </ul>
           </div>
         </div>
 
         <div class="feature-card">
-          <h3>👤 Persönliche Accounts</h3>
+          <h3>📱 Mobile Galerie (3x3)</h3>
           <p>
-            Jeder Nutzer kann einen persönlichen Account erstellen und erhält einen einzigartigen 
-            Permalink (z.B. <code>culoca.com/username</code>). Alle Fotos werden dem Account 
-            zugeordnet und können über das Profil gefunden werden.
+            Speziell für mobile Geräte optimiert - zeigt 9 Fotos gleichzeitig 
+            in einem 3x3 Grid. Perfekt für schnelle Übersicht und Navigation.
           </p>
+          <div class="feature-example">
+            <strong>Features:</strong>
+            <ul>
+              <li>3x3 Grid-Layout</li>
+              <li>Touch-optimiert</li>
+              <li>Audioguide-Unterstützung</li>
+              <li>Schnelle Navigation</li>
+            </ul>
+          </div>
         </div>
 
         <div class="feature-card">
-          <h3>🔍 Intelligente Suche</h3>
+          <h3>🔍 Item-Ansicht & Nearby</h3>
           <p>
-            Das System bietet eine leistungsstarke Suchfunktion, die sowohl nach Titeln, 
-            Beschreibungen als auch nach GPS-Standorten sucht. Ergebnisse werden nach Relevanz 
-            und Entfernung sortiert.
+            Detaillierte Ansicht einzelner Fotos mit Nearby-Galerie. 
+            Zeigt ähnliche Fotos in der Umgebung und ermöglicht Standort-Filterung.
           </p>
+          <div class="feature-example">
+            <strong>Features:</strong>
+            <ul>
+              <li>Nearby-Galerie</li>
+              <li>Location Filter</li>
+              <li>User Filter</li>
+              <li>GPS-Koordinaten</li>
+            </ul>
+          </div>
         </div>
 
         <div class="feature-card">
-          <h3>📱 Responsive Design</h3>
+          <h3>🗺️ Kartenansicht</h3>
           <p>
-            Culoca funktioniert perfekt auf allen Geräten - von Smartphones über Tablets bis 
-            zu Desktop-Computern. Das Design passt sich automatisch an die Bildschirmgröße an.
+            Interaktive Kartenansicht mit OpenStreetMap-Integration. 
+            Fotos werden direkt auf der Karte angezeigt und können 
+            per Klick geöffnet werden.
           </p>
+          <div class="feature-example">
+            <strong>Features:</strong>
+            <ul>
+              <li>OpenStreetMap Integration</li>
+              <li>Foto-Marker auf Karte</li>
+              <li>Zoom & Pan</li>
+              <li>Standort-Auswahl</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="feature-card">
+          <h3>📤 Bulk Upload</h3>
+          <p>
+            Massen-Upload von Fotos mit automatischer GPS-Extraktion. 
+            Unterstützt Drag & Drop und Batch-Verarbeitung.
+          </p>
+          <div class="feature-example">
+            <strong>Features:</strong>
+            <ul>
+              <li>Drag & Drop Upload</li>
+              <li>Automatische GPS-Extraktion</li>
+              <li>Batch-Verarbeitung</li>
+              <li>Fortschrittsanzeige</li>
+            </ul>
+          </div>
         </div>
       </div>
     </section>
 
-    <!-- Technische Features -->
-    <section class="technical-section">
-      <h2>⚙️ Technische Features</h2>
+    <!-- SEO & Open Graph -->
+    <section class="seo-section">
+      <h2>🔍 SEO & Open Graph Integration</h2>
       
       <div class="feature-grid">
         <div class="feature-card">
-          <h3>🌐 Open Graph Integration</h3>
+          <h3>🌐 Open Graph Beispiele</h3>
           <p>
-            Jede Seite unterstützt Open Graph Meta-Tags für optimale Darstellung in sozialen Medien. 
-            Fotos werden automatisch mit Titel, Beschreibung und Bild in Facebook, Twitter und 
-            anderen Plattformen angezeigt.
+            Jede Seite unterstützt Open Graph Meta-Tags für optimale Darstellung 
+            in sozialen Medien. Hier sind echte Beispiele:
           </p>
-          <div class="code-example">
-            <strong>Meta-Tags Beispiel:</strong>
-            <pre><code>&lt;meta property="og:title" content="Foto-Titel" /&gt;
-&lt;meta property="og:image" content="https://culoca.com/api/og-image/slug" /&gt;</code></pre>
+          
+          <div class="og-examples">
+            <div class="og-example">
+              <h4>📐 Hochformat Fotos</h4>
+              <p>
+                <strong>Beispiel:</strong> 
+                <a href="https://culoca.com/item/baum-am-weiherer-schachten-arbing-reischach-oberbayern-johann-dirschl" target="_blank">
+                  Baum am Weiherer Schachten
+                </a>
+              </p>
+              <div class="og-preview">
+                <img src="https://culoca.com/api/og-image/baum-am-weiherer-schachten-arbing-reischach-oberbayern-johann-dirschl" 
+                     alt="Open Graph Preview - Hochformat" class="og-image" />
+              </div>
+            </div>
+
+            <div class="og-example">
+              <h4>📏 Querformat Fotos</h4>
+              <p>
+                <strong>Beispiel:</strong> 
+                <a href="http://localhost:5173/item/arbing-laerche-richtung-weiher-arbing-gemeinde-reischach-johann-dirschl" target="_blank">
+                  Arbing Lärche Richtung Weiher
+                </a>
+              </p>
+              <div class="og-preview">
+                <img src="http://localhost:5173/api/og-image/arbing-laerche-richtung-weiher-arbing-gemeinde-reischach-johann-dirschl" 
+                     alt="Open Graph Preview - Querformat" class="og-image" />
+              </div>
+            </div>
+
+            <div class="og-example">
+              <h4>🗺️ Kartenausschnitt</h4>
+              <p>
+                <strong>Beispiel:</strong> 
+                <a href="https://culoca.com/map-view-share/cf0390c1-76b6-43f7-a0a6-1c51ff501f8f" target="_blank">
+                  Kartenausschnitt mit Fotos
+                </a>
+              </p>
+              <div class="og-preview">
+                <img src="https://culoca.com/api/og-image/map-view-share/cf0390c1-76b6-43f7-a0a6-1c51ff501f8f" 
+                     alt="Open Graph Preview - Karte" class="og-image" />
+              </div>
+            </div>
           </div>
         </div>
 
@@ -160,47 +241,23 @@
           <h3>🔗 Dynamische Favicons</h3>
           <p>
             Jedes Foto erhält ein eigenes Favicon, das automatisch aus dem 512px-Thumbnail 
-            generiert wird. Dies verbessert die Erkennbarkeit in Browser-Tabs und Lesezeichen.
+            generiert wird. Dies verbessert die Erkennbarkeit in Browser-Tabs.
           </p>
+          <div class="feature-example">
+            <strong>Beispiel:</strong>
+            <code>culoca.com/api/favicon/baum-am-weiherer-schachten-arbing-reischach-oberbayern-johann-dirschl</code>
+          </div>
         </div>
 
-        <div class="feature-card">
-          <h3>🗺️ Interaktive Karten</h3>
-          <p>
-            Integration von OpenStreetMap für detaillierte Kartendarstellung. Nutzer können 
-            Fotos direkt auf der Karte anzeigen und neue Standorte auswählen.
-          </p>
-        </div>
-
-        <div class="feature-card">
-          <h3>🎤 Audioguide (Mobile)</h3>
-          <p>
-            Im mobilen 3x3-Modus liest das System automatisch die Titel der Fotos vor. 
-            Perfekt für barrierefreie Nutzung und hands-free Bedienung.
-          </p>
-        </div>
-      </div>
-    </section>
-
-    <!-- SEO & Performance -->
-    <section class="seo-section">
-      <h2>🔍 SEO & Performance</h2>
-      
-      <div class="feature-grid">
         <div class="feature-card">
           <h3>📊 Dynamische Sitemap</h3>
           <p>
             Eine automatisch generierte XML-Sitemap enthält alle öffentlichen Fotos und Seiten. 
             Google crawlt regelmäßig die Sitemap und indexiert neue Inhalte automatisch.
           </p>
-        </div>
-
-        <div class="feature-card">
-          <h3>⚡ Optimierte Performance</h3>
-          <p>
-            Bilder werden automatisch in verschiedenen Größen (512px, 64px Thumbnails) generiert 
-            und über CDN ausgeliefert. Lazy Loading verbessert die Ladezeiten.
-          </p>
+          <div class="feature-example">
+            <strong>URL:</strong> <code>culoca.com/sitemap.xml</code>
+          </div>
         </div>
 
         <div class="feature-card">
@@ -209,53 +266,81 @@
             URLs unterstützen korrekte deutsche Umlaute (ä→ae, ö→oe, ü→ue, ß→ss) für 
             bessere Lesbarkeit und SEO-Optimierung.
           </p>
-        </div>
-
-        <div class="feature-card">
-          <h3>📱 Progressive Web App</h3>
-          <p>
-            Culoca funktioniert wie eine native App mit Offline-Funktionen, Push-Benachrichtigungen 
-            und Installation auf dem Homescreen.
-          </p>
+          <div class="feature-example">
+            <strong>Beispiel:</strong>
+            <code>culoca.com/item/altötting → culoca.com/item/altoetting</code>
+          </div>
         </div>
       </div>
     </section>
 
-    <!-- Sicherheit & Hosting -->
-    <section class="security-section">
-      <h2>🔒 Sicherheit & Hosting</h2>
+    <!-- Hetzner Integration -->
+    <section class="hetzner-section">
+      <h2>🏢 Hetzner Integration</h2>
       
       <div class="feature-grid">
         <div class="feature-card">
-          <h3>🏢 Hetzner Cloud Hosting</h3>
+          <h3>☁️ Hetzner Cloud Hosting</h3>
           <p>
             Das System läuft auf hochverfügbaren Hetzner Cloud Servern in Deutschland. 
             Automatische Backups und Monitoring gewährleisten maximale Verfügbarkeit.
           </p>
+          <div class="feature-example">
+            <strong>Features:</strong>
+            <ul>
+              <li>Hochverfügbare Server</li>
+              <li>Automatische Backups</li>
+              <li>24/7 Monitoring</li>
+              <li>Deutsche Datenschutz-Standards</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="feature-card">
+          <h3>📦 Storage Box Integration</h3>
+          <p>
+            Bilder werden über WebDAV-Protokoll auf einer Hetzner Storage Box gespeichert. 
+            UUID-basierte Dateinamen verhindern Konflikte.
+          </p>
+          <div class="feature-example">
+            <strong>Protokoll:</strong> WebDAV<br>
+            <strong>Pfad:</strong> /items/<br>
+            <strong>Naming:</strong> UUID-basiert
+          </div>
         </div>
 
         <div class="feature-card">
           <h3>🔐 Supabase Backend</h3>
           <p>
             Sichere Datenbank mit Row Level Security (RLS). Jeder Nutzer kann nur seine 
-            eigenen Daten sehen und bearbeiten. Automatische Authentifizierung und Autorisierung.
+            eigenen Daten sehen und bearbeiten.
           </p>
+          <div class="feature-example">
+            <strong>Features:</strong>
+            <ul>
+              <li>Row Level Security</li>
+              <li>Automatische Authentifizierung</li>
+              <li>Real-time Updates</li>
+              <li>PostgreSQL Backend</li>
+            </ul>
+          </div>
         </div>
 
         <div class="feature-card">
-          <h3>📦 WebDAV Storage</h3>
-          <p>
-            Bilder werden über WebDAV-Protokoll auf einem Storage Box gespeichert. 
-            UUID-basierte Dateinamen verhindern Konflikte und ermöglichen sichere Übertragung.
-          </p>
-        </div>
-
-        <div class="feature-card">
-          <h3>🛡️ Datenschutz</h3>
+          <h3>🛡️ Datenschutz & DSGVO</h3>
           <p>
             Vollständige DSGVO-Konformität mit transparenten Datenschutzerklärungen. 
-            Nutzer haben volle Kontrolle über ihre Daten und können diese jederzeit löschen.
+            Nutzer haben volle Kontrolle über ihre Daten.
           </p>
+          <div class="feature-example">
+            <strong>Compliance:</strong>
+            <ul>
+              <li>DSGVO-konform</li>
+              <li>Transparente Datenschutzerklärung</li>
+              <li>Recht auf Löschung</li>
+              <li>Deutsche Server-Standorte</li>
+            </ul>
+          </div>
         </div>
       </div>
     </section>
@@ -273,11 +358,6 @@
         <div class="stat-card">
           <h3>Registrierte Nutzer</h3>
           <div class="stat-number">{stats.totalUsers.toLocaleString()}</div>
-        </div>
-        
-        <div class="stat-card">
-          <h3>Helgoland Fotos</h3>
-          <div class="stat-number">{stats.helgolandItems.toLocaleString()}</div>
         </div>
         
         {#if stats.topUser}
@@ -306,114 +386,66 @@
       </div>
       {/if}
     </section>
-
-    <!-- Verwendung -->
-    <section class="usage-section">
-      <h2>📖 Wie verwende ich Culoca?</h2>
-      
-      <div class="usage-steps">
-        <div class="step">
-          <div class="step-number">1</div>
-          <div class="step-content">
-            <h3>Account erstellen</h3>
-            <p>Registriere dich kostenlos und wähle einen einzigartigen Accountnamen.</p>
-          </div>
-        </div>
-        
-        <div class="step">
-          <div class="step-number">2</div>
-          <div class="step-content">
-            <h3>Fotos hochladen</h3>
-            <p>Lade Fotos hoch - GPS-Daten werden automatisch hinzugefügt oder können manuell gesetzt werden.</p>
-          </div>
-        </div>
-        
-        <div class="step">
-          <div class="step-number">3</div>
-          <div class="step-content">
-            <h3>Entdecken & Teilen</h3>
-            <p>Entdecke Fotos in deiner Nähe oder teile deine eigenen mit der Community.</p>
-          </div>
-        </div>
-        
-        <div class="step">
-          <div class="step-number">4</div>
-          <div class="step-content">
-            <h3>Permalink nutzen</h3>
-            <p>Dein Account ist unter <code>culoca.com/deinname</code> erreichbar.</p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Support -->
-    <section class="support-section">
-      <h2>💬 Support & Kontakt</h2>
-      <p>
-        Bei Fragen oder Problemen stehen wir gerne zur Verfügung. Das System wird kontinuierlich 
-        weiterentwickelt und verbessert, um die beste Nutzererfahrung zu bieten.
-      </p>
-      
-      <div class="contact-info">
-        <p><strong>Entwickelt von:</strong> DIRSCHL.com GmbH</p>
-        <p><strong>Hosting:</strong> Hetzner Cloud, Deutschland</p>
-        <p><strong>Backend:</strong> Supabase (PostgreSQL)</p>
-        <p><strong>Frontend:</strong> SvelteKit + TypeScript</p>
-      </div>
-    </section>
   </main>
+
+  <!-- Floating Action Buttons -->
+  <FloatingActionButtons />
 </div>
 
 <style>
   .system-page {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 2rem;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  }
-
-  .system-header {
-    text-align: center;
-    margin-bottom: 3rem;
-    padding: 2rem 0;
-    border-bottom: 2px solid var(--border-color);
-  }
-
-  .back-link {
-    display: inline-block;
-    color: var(--accent-color);
-    text-decoration: none;
-    margin-bottom: 1rem;
-    font-weight: 500;
-  }
-
-  .back-link:hover {
-    text-decoration: underline;
-  }
-
-  .system-header h1 {
-    font-size: 2.5rem;
-    margin: 0 0 0.5rem 0;
+    min-height: 100vh;
+    background: var(--bg-primary);
     color: var(--text-primary);
   }
 
-  .subtitle {
-    font-size: 1.2rem;
+  .header {
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    padding: 1rem 0;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .header-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 2rem;
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+  }
+
+  .logo {
+    height: 40px;
+    width: auto;
+  }
+
+  .logo-link {
+    text-decoration: none;
+  }
+
+  .page-title {
+    font-size: 2rem;
+    margin: 0;
+    color: var(--text-primary);
+  }
+
+  .page-subtitle {
+    font-size: 1rem;
     color: var(--text-secondary);
     margin: 0;
   }
 
-  .system-content {
-    display: flex;
-    flex-direction: column;
-    gap: 3rem;
+  .main-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
   }
 
   section {
-    background: var(--bg-secondary);
-    border-radius: 12px;
-    padding: 2rem;
-    box-shadow: 0 2px 10px var(--shadow);
+    margin-bottom: 3rem;
   }
 
   section h2 {
@@ -424,16 +456,22 @@
     padding-bottom: 0.5rem;
   }
 
+  .intro-section p {
+    font-size: 1.1rem;
+    line-height: 1.6;
+    color: var(--text-secondary);
+  }
+
   .feature-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
     gap: 1.5rem;
   }
 
   .feature-card {
-    background: var(--bg-primary);
+    background: var(--bg-secondary);
     border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border-radius: 12px;
     padding: 1.5rem;
     transition: transform 0.2s ease, box-shadow 0.2s ease;
   }
@@ -458,26 +496,59 @@
   .feature-example {
     background: var(--bg-tertiary);
     border-left: 4px solid var(--accent-color);
-    padding: 0.75rem;
+    padding: 1rem;
     border-radius: 4px;
     font-size: 0.9rem;
   }
 
-  .code-example {
+  .feature-example ul {
+    margin: 0.5rem 0 0 0;
+    padding-left: 1.5rem;
+  }
+
+  .feature-example li {
+    margin: 0.25rem 0;
+  }
+
+  .og-examples {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .og-example {
     background: var(--bg-tertiary);
-    border-radius: 6px;
+    border-radius: 8px;
     padding: 1rem;
-    margin-top: 1rem;
   }
 
-  .code-example pre {
-    margin: 0;
-    font-size: 0.85rem;
-    overflow-x: auto;
+  .og-example h4 {
+    margin: 0 0 0.5rem 0;
+    color: var(--text-primary);
   }
 
-  .code-example code {
+  .og-example p {
+    margin: 0 0 1rem 0;
+  }
+
+  .og-example a {
     color: var(--accent-color);
+    text-decoration: none;
+  }
+
+  .og-example a:hover {
+    text-decoration: underline;
+  }
+
+  .og-preview {
+    text-align: center;
+  }
+
+  .og-image {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
   }
 
   .stats-grid {
@@ -488,7 +559,7 @@
   }
 
   .stat-card {
-    background: var(--bg-primary);
+    background: var(--bg-secondary);
     border: 1px solid var(--border-color);
     border-radius: 8px;
     padding: 1.5rem;
@@ -511,6 +582,11 @@
     margin-top: 2rem;
   }
 
+  .latest-items h3 {
+    margin: 0 0 1rem 0;
+    color: var(--text-primary);
+  }
+
   .items-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -518,7 +594,7 @@
   }
 
   .item-card {
-    background: var(--bg-primary);
+    background: var(--bg-secondary);
     border: 1px solid var(--border-color);
     border-radius: 8px;
     overflow: hidden;
@@ -546,63 +622,15 @@
     margin: 0;
   }
 
-  .usage-steps {
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-  }
-
-  .step {
-    display: flex;
-    align-items: flex-start;
-    gap: 1rem;
-  }
-
-  .step-number {
-    background: var(--accent-color);
-    color: white;
-    width: 2rem;
-    height: 2rem;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: bold;
-    flex-shrink: 0;
-  }
-
-  .step-content h3 {
-    font-size: 1.2rem;
-    margin: 0 0 0.5rem 0;
-    color: var(--text-primary);
-  }
-
-  .step-content p {
-    color: var(--text-secondary);
-    line-height: 1.6;
-    margin: 0;
-  }
-
-  .contact-info {
-    background: var(--bg-primary);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    padding: 1.5rem;
-    margin-top: 1rem;
-  }
-
-  .contact-info p {
-    margin: 0.5rem 0;
-    color: var(--text-secondary);
-  }
-
   @media (max-width: 768px) {
-    .system-page {
-      padding: 1rem;
+    .header-content {
+      flex-direction: column;
+      gap: 1rem;
+      text-align: center;
     }
 
-    .system-header h1 {
-      font-size: 2rem;
+    .main-content {
+      padding: 1rem;
     }
 
     .feature-grid {
