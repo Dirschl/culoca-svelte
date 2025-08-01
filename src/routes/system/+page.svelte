@@ -33,7 +33,7 @@
         // Banner-Bild laden (zufälliges Querformat-Foto mit breitestem Seitenverhältnis)
         const { data: bannerData, error: bannerError } = await supabase
           .from('items')
-          .select('id, title, slug, path_2048, width, height')
+          .select('id, title, slug, path_2048, width, height, profile_id')
           .not('path_2048', 'is', null)
           .not('width', 'is', null)
           .not('height', 'is', null)
@@ -50,6 +50,24 @@
           // Zufällige Auswahl aus den 5 breitesten Bildern
           const randomIndex = Math.floor(Math.random() * bannerData.length);
           bannerImage = bannerData[randomIndex];
+          
+          // Creator-Information laden
+          if (bannerImage.profile_id) {
+            const { data: creatorData } = await supabase
+              .from('profiles')
+              .select('full_name, accountname')
+              .eq('id', bannerImage.profile_id)
+              .maybeSingle();
+            
+            if (creatorData) {
+              bannerImage.creator = creatorData.full_name || creatorData.accountname || 'Unbekannt';
+            } else {
+              bannerImage.creator = 'Unbekannt';
+            }
+          } else {
+            bannerImage.creator = 'Unbekannt';
+          }
+          
           console.log('Banner-Bild gefunden (breitestes Seitenverhältnis):', bannerImage);
           console.log('Seitenverhältnis:', bannerImage.width / bannerImage.height);
         } else {
@@ -57,7 +75,7 @@
           // Fallback: Jedes Bild mit path_2048
           const { data: fallbackData, error: fallbackError } = await supabase
             .from('items')
-            .select('id, title, slug, path_2048, width, height')
+            .select('id, title, slug, path_2048, width, height, profile_id')
             .not('path_2048', 'is', null)
             .order('created_at', { ascending: false })
             .limit(10);
@@ -70,6 +88,24 @@
             // Zufällige Auswahl aus den Fallback-Bildern
             const randomIndex = Math.floor(Math.random() * fallbackData.length);
             bannerImage = fallbackData[randomIndex];
+            
+            // Creator-Information laden
+            if (bannerImage.profile_id) {
+              const { data: creatorData } = await supabase
+                .from('profiles')
+                .select('full_name, accountname')
+                .eq('id', bannerImage.profile_id)
+                .maybeSingle();
+              
+              if (creatorData) {
+                bannerImage.creator = creatorData.full_name || creatorData.accountname || 'Unbekannt';
+              } else {
+                bannerImage.creator = 'Unbekannt';
+              }
+            } else {
+              bannerImage.creator = 'Unbekannt';
+            }
+            
             console.log('Fallback-Bild gefunden:', bannerImage);
           } else {
             console.log('Kein Fallback-Bild gefunden');
@@ -139,6 +175,8 @@
       />
       <div class="banner-overlay">
         <div class="banner-title">{bannerImage.title || 'Ohne Titel'}</div>
+        <p class="banner-creator">von {bannerImage.creator}</p>
+        <p class="banner-resolution">Auflösung: {bannerImage.width}x{bannerImage.height}</p>
       </div>
     </div>
   </div>
@@ -174,17 +212,16 @@
             Normale Galerie
           </h3>
           <p>
-            Die Standard-Galerie zeigt Fotos in einem responsiven Grid-Layout. 
-            Nutzer können durch Fotos scrollen, nach Standorten filtern und 
-            detaillierte Informationen zu jedem Foto anzeigen.
+            Default, 2 GPS Koordinaten untereinander:<br>
+            Die Standard-Galerie zeigt ALLE Fotos nach Entfernung an. 
+            Es ist eine statische Liste in der du endlos scrollen kannst. 
+            Ideal für zu Hause oder im hotel, wenn du eine Umgebung kennenlernenn wilst.
           </p>
           <div class="feature-example">
             <strong>Features:</strong>
             <ul>
-              <li>Responsive Grid-Layout</li>
+              <li>Responsive Layout</li>
               <li>Infinite Scroll</li>
-              <li>Standort-basierte Filterung</li>
-              <li>Detaillierte Foto-Informationen</li>
             </ul>
           </div>
         </div>
@@ -196,19 +233,21 @@
               <line x1="8" y1="21" x2="16" y2="21"/>
               <line x1="12" y1="17" x2="12" y2="21"/>
             </svg>
-            Mobile Galerie (3x3)
+            Mobile Galerie
           </h3>
           <p>
-            Speziell für mobile Geräte optimiert - zeigt 9 Fotos gleichzeitig 
-            in einem 3x3 Grid. Perfekt für schnelle Übersicht und Navigation.
+            Aktivieren duch GPS Klick (eine Koordinate):<br>
+            Deine Position verändert sich, weil du am Wandern, Fahren etc... bist?
+            Hier werden die Items dynamisch nach deiner Position geladen und clientseitig sortiert.
+            So siehst du immer das aktuelle Umfeld.
           </p>
           <div class="feature-example">
             <strong>Features:</strong>
             <ul>
-              <li>3x3 Grid-Layout</li>
-              <li>Touch-optimiert</li>
-              <li>Audioguide-Unterstützung</li>
-              <li>Schnelle Navigation</li>
+              <li>Intelligente Sortierung</li>
+              <li>Lädt Umkreis von ca. 5 km.</li>
+              <li>für Unterwegs optimiert</li>
+              <li>Audioguide-Möglichkeit</li>
             </ul>
           </div>
         </div>
@@ -223,7 +262,9 @@
           </h3>
           <p>
             Detaillierte Ansicht einzelner Fotos mit Nearby-Galerie. 
-            Zeigt ähnliche Fotos in der Umgebung und ermöglicht Standort-Filterung.
+            Zeigt Items in der Umgebung und ermöglicht Standort-Filterung.
+            Standort wird mit dem Culoca Icon in der Buttonleiste aktiviert, so kannst du entfernte Locations Filtern.
+            User Filter: Klicke auf den Avatar des Erstellers um nur seine Items zu sehen.
           </p>
           <div class="feature-example">
             <strong>Features:</strong>
@@ -232,6 +273,8 @@
               <li>Location Filter</li>
               <li>User Filter</li>
               <li>GPS-Koordinaten</li>
+              <li>Live-Editieren für Ersteller</li>
+              <li>Hetzner Download für Ersteller</li>
             </ul>
           </div>
         </div>
@@ -631,6 +674,18 @@
     box-shadow: 0 2px 8px var(--shadow);
     backdrop-filter: blur(10px);
     border: 1px solid var(--border-color);
+  }
+
+  .banner-creator {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-top: 0.5rem;
+  }
+
+  .banner-resolution {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-top: 0.25rem;
   }
 
   .main-content {
