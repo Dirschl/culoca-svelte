@@ -672,7 +672,6 @@
   }
 
   .feature-card {
-    background: var(--bg-secondary);
     margin-bottom: 2rem;
   }
 
@@ -680,7 +679,7 @@
     font-size: 1.2rem;
     margin: 0 0 1rem 0;
     color: var(--text-primary);
-    padding: 1.5rem 1.5rem 0 1.5rem;
+    padding: 0;
   }
 
   .feature-card p {
@@ -688,12 +687,12 @@
     line-height: 1.6;
     color: var(--text-secondary);
     margin: 0 0 1rem 0;
-    padding: 0 1.5rem;
+    padding: 0;
   }
 
   .feature-example {
     background: var(--bg-primary);
-    margin: 0 1.5rem 1.5rem 1.5rem;
+    margin: 0 0 1rem 0;
     padding: 1rem;
   }
 
