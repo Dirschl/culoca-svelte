@@ -93,7 +93,12 @@
   async function loadAuthUsers() {
     try {
       // This requires admin API - we'll use a server endpoint
-      const response = await fetch(`${baseUrl}/api/admin/auth-users`);
+      const response = await fetch(`${baseUrl}/api/admin/auth-users`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
       if (response.ok) {
         authUsers = await response.json();
         console.log(`Loaded ${authUsers.length} auth users`);
