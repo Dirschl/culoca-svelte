@@ -88,17 +88,13 @@
   async function loadInitialGridImages(lat: number, lon: number) {
     loading = true;
     dynamicLoader.setCurrentUserId(get(sessionStore).isAuthenticated ? get(sessionStore).userId : null);
-    await dynamicLoader.loadImagesForPosition(lat, lon);
-    // Warte, bis DynamicLoader keine Ladejobs mehr in der Queue hat
-    let previousCount = -1;
-    for (let i = 0; i < 20; i++) {
-      await new Promise(res => setTimeout(res, 100));
-      const currentCount = dynamicLoader.getImageCount();
-      if (currentCount === previousCount && !dynamicLoader.getDebugInfo().isLoading) break;
-      previousCount = currentCount;
-    }
-    const gridImages = dynamicLoader.getAllImages();
-    const converted = gridImages.map((img: any) => {
+    
+    // Load images like simulation (direct return from loadImagesForPosition)
+    const newImages = await dynamicLoader.loadImagesForPosition(lat, lon);
+    console.log(`[MobileGallery] Initial load returned ${newImages.length} images from dynamic loader`);
+    
+    // Convert images to gallery format (like simulation)
+    const converted = newImages.map((img: any) => {
       let bestSrc = '';
       if (img.path_512) {
         bestSrc = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${img.path_512}`;
@@ -124,7 +120,8 @@
         path_2048: img.path_2048
       };
     }).filter((p: any) => p.src);
-    // Sort by distance (closest first)
+    
+    // Sort by distance (closest first) - like simulation
     if (lat !== null && lon !== null) {
       converted.sort((a: any, b: any) => {
         if (!a.lat || !a.lon || !b.lat || !b.lon) return 0;
@@ -133,6 +130,7 @@
         return da - db;
       });
     }
+    
     gridItems.set(converted);
     displayedImageCount = converted.length;
     
@@ -141,6 +139,7 @@
     updateGalleryStats(displayedImageCount, totalCount);
     
     loading = false;
+    console.log(`[MobileGallery] Initial grid loaded with ${converted.length} images (like simulation)`);
   }
 
   // Start position monitoring for dynamic loading (like in simulation)
@@ -168,22 +167,14 @@
       if (!isInCenter) {
         console.log(`[MobileGallery] Position ${currentPos.lat},${currentPos.lon} is outside center cell - triggering grid update`);
         
-        // Load new images from dynamic loader
+        // Load new images from dynamic loader (like simulation)
         loading = true;
-        await dynamicLoader.loadImagesForPosition(currentPos.lat, currentPos.lon);
+        const newImages = await dynamicLoader.loadImagesForPosition(currentPos.lat, currentPos.lon);
         
-        // Wait for loading to complete
-        let previousCount = -1;
-        for (let i = 0; i < 20; i++) {
-          await new Promise(res => setTimeout(res, 100));
-          const currentCount = dynamicLoader.getImageCount();
-          if (currentCount === previousCount && !dynamicLoader.getDebugInfo().isLoading) break;
-          previousCount = currentCount;
-        }
+        console.log(`[MobileGallery] Dynamic loader returned ${newImages.length} images`);
         
-        // Update gridItems with the new data from dynamic loader
-        const gridImages = dynamicLoader.getAllImages();
-        const converted = gridImages.map((img: any) => {
+        // Convert images to gallery format (like simulation)
+        const converted = newImages.map((img: any) => {
           let bestSrc = '';
           if (img.path_512) {
             bestSrc = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${img.path_512}`;
@@ -210,7 +201,7 @@
           };
         }).filter((p: any) => p.src);
         
-        // Sort by distance (closest first)
+        // Sort by distance (closest first) - like simulation
         if (currentPos.lat !== null && currentPos.lon !== null) {
           converted.sort((a: any, b: any) => {
             if (!a.lat || !a.lon || !b.lat || !b.lon) return 0;
@@ -220,11 +211,12 @@
           });
         }
         
+        // Update gridItems with new data (like simulation updates allImages)
         gridItems.set(converted);
         displayedImageCount = converted.length;
         loading = false;
         
-        console.log(`[MobileGallery] Updated gridItems with ${converted.length} images from dynamic loader`);
+        console.log(`[MobileGallery] Updated gridItems with ${converted.length} images from dynamic loader (like simulation)`);
       }
     }, 2000) as any; // Check every 2 seconds (same as simulation)
   }
