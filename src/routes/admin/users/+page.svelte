@@ -116,39 +116,70 @@
   }
 
   async function deleteUser(userId) {
-    if (!confirm('Sind Sie sicher, dass Sie diesen Benutzer löschen möchten? Alle Items des Benutzers werden ebenfalls gelöscht.')) {
+    if (!confirm('Möchten Sie diesen Benutzer wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.')) {
       return;
     }
 
     try {
-      // Delete user's items first
-      const { error: itemsError } = await supabase
-        .from('items')
-        .delete()
-        .eq('profile_id', userId);
+      const response = await fetch(`${baseUrl}/api/admin/delete-user-permanently`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId })
+      });
 
-      if (itemsError) {
-        console.error('Error deleting user items:', itemsError);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Delete failed:', response.status, errorText);
+        const error = await response.json().catch(() => ({ error: errorText }));
+        throw new Error(error.error || 'Delete failed');
       }
 
-      // Delete user profile
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .delete()
-        .eq('id', userId);
-
-      if (profileError) {
-        console.error('Error deleting user profile:', profileError);
-        alert('Fehler beim Löschen des Benutzers');
-        return;
-      }
-
-      // Note: Auth user deletion requires admin API
-      alert('Benutzer erfolgreich gelöscht (Profil und Items). Auth-User muss manuell über Supabase Admin gelöscht werden.');
+      const result = await response.json();
+      console.log('User permanently deleted:', result);
+      
+      // Reload users to get updated data
       await loadUsers();
+      
+      alert('Benutzer wurde permanent gelöscht!');
     } catch (error) {
       console.error('Error deleting user:', error);
-      alert('Fehler beim Löschen des Benutzers');
+      alert(`Fehler beim Löschen: ${error.message}`);
+    }
+  }
+
+  async function deleteUserProfile(userId) {
+    if (!confirm('Möchten Sie nur das Profil dieses Benutzers löschen? Der Benutzer bleibt in der Auth-Tabelle.')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`${baseUrl}/api/admin/delete-user`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Delete failed:', response.status, errorText);
+        const error = await response.json().catch(() => ({ error: errorText }));
+        throw new Error(error.error || 'Delete failed');
+      }
+
+      const result = await response.json();
+      console.log('User profile deleted:', result);
+      
+      // Reload users to get updated data
+      await loadUsers();
+      
+      alert('Benutzerprofil wurde gelöscht!');
+    } catch (error) {
+      console.error('Error deleting user profile:', error);
+      alert(`Fehler beim Löschen: ${error.message}`);
     }
   }
 
@@ -246,6 +277,90 @@
     } catch (error) {
       console.error('Error updating user:', error);
       alert(`Fehler beim Aktualisieren: ${error.message}`);
+    }
+  }
+
+  async function refreshCache(table = null, userId = null) {
+    try {
+      console.log(`🔄 Refreshing cache for table: ${table || 'all'}, userId: ${userId || 'all'}`);
+      
+      const response = await fetch(`${baseUrl}/api/admin/refresh-cache`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ table, userId })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Cache refresh failed:', response.status, errorText);
+        const error = await response.json().catch(() => ({ error: errorText }));
+        throw new Error(error.error || 'Cache refresh failed');
+      }
+
+      const result = await response.json();
+      console.log('Cache refresh completed:', result);
+      
+      // Reload users to get fresh data
+      await loadUsers();
+      
+      alert('Cache erfolgreich aktualisiert!');
+    } catch (error) {
+      console.error('Error refreshing cache:', error);
+      alert(`Fehler beim Cache-Refresh: ${error.message}`);
+    }
+  }
+
+  async function forceUpdateUser(userId, updates) {
+    try {
+      console.log(`🔄 Force updating user: ${userId}`, updates);
+      
+      const response = await fetch(`${baseUrl}/api/admin/force-update-user`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId,
+          updates
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Force update failed:', response.status, errorText);
+        const error = await response.json().catch(() => ({ error: errorText }));
+        throw new Error(error.error || 'Force update failed');
+      }
+
+      const result = await response.json();
+      console.log('User force updated successfully:', result);
+      
+      // Reload users to get updated data
+      await loadUsers();
+      
+      alert('Benutzer erfolgreich force-updated!');
+    } catch (error) {
+      console.error('Error force updating user:', error);
+      alert(`Fehler beim Force-Update: ${error.message}`);
+    }
+  }
+
+  async function copyToClipboard(text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      console.log('✅ Copied to clipboard:', text);
+      // Optional: Show a brief success message
+    } catch (error) {
+      console.error('❌ Failed to copy to clipboard:', error);
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
     }
   }
 
@@ -372,6 +487,39 @@
       <div class="admin-table-container">
         <div class="admin-table-header">
           <h3 class="admin-table-title">👥 Benutzer ({users.length})</h3>
+          <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+            <button
+              on:click={() => loadUsers()}
+              class="admin-btn admin-btn-primary"
+              style="padding: 0.25rem 0.5rem; font-size: 0.75rem;"
+            >
+              🔄 Aktualisieren
+            </button>
+            <button
+              on:click={() => refreshCache()}
+              class="admin-btn admin-btn-secondary"
+              style="padding: 0.25rem 0.5rem; font-size: 0.75rem;"
+              title="Cache für alle Tabellen aktualisieren"
+            >
+              🗄️ Cache
+            </button>
+            <button
+              on:click={() => refreshCache('profiles')}
+              class="admin-btn admin-btn-secondary"
+              style="padding: 0.25rem 0.5rem; font-size: 0.75rem;"
+              title="Nur Profile-Cache aktualisieren"
+            >
+              👥 Profile
+            </button>
+            <button
+              on:click={() => refreshCache('items')}
+              class="admin-btn admin-btn-secondary"
+              style="padding: 0.25rem 0.5rem; font-size: 0.75rem;"
+              title="Nur Items-Cache aktualisieren"
+            >
+              🖼️ Items
+            </button>
+          </div>
         </div>
         
         {#if users.length > 0}
@@ -381,7 +529,6 @@
                 <th>Benutzer</th>
                 <th>E-Mail</th>
                 <th>Account Name</th>
-                <th>ID</th>
                 <th>Erstellt</th>
                 <th>Privacy</th>
                 <th>Save Originals</th>
@@ -435,9 +582,6 @@
                         <div style="font-weight: 600; color: var(--admin-text-primary);">
                           {user.full_name || user.accountname || 'Unbekannt'}
                         </div>
-                        <div style="font-size: 0.875rem; color: var(--admin-text-secondary);">
-                          ID: {user.id.slice(0, 8)}...
-                        </div>
                         {#if user.avatar_url}
                           <div style="font-size: 0.75rem; color: var(--admin-text-muted); margin-top: 0.25rem;">
                             Avatar: {user.avatar_url.slice(0, 80)}...
@@ -458,9 +602,19 @@
                       {/if}
                     </div>
                   </td>
-                  <td>{user.accountname || 'N/A'}</td>
-                  <td style="font-family: monospace; font-size: 0.875rem;">
-                    {user.id.slice(0, 8)}...
+                  <td>
+                    {#if user.accountname}
+                      <a 
+                        href="/{user.accountname}" 
+                        style="color: #f59e0b; text-decoration: none; font-weight: 500;"
+                        on:mouseenter={(e) => e.target.style.textDecoration = 'underline'}
+                        on:mouseleave={(e) => e.target.style.textDecoration = 'none'}
+                      >
+                        {user.accountname}
+                      </a>
+                    {:else}
+                      N/A
+                    {/if}
                   </td>
                   <td>{formatDate(user.created_at)}</td>
                   <td>
@@ -474,20 +628,13 @@
                     </span>
                   </td>
                   <td>
-                    <div style="display: flex; gap: 0.5rem;">
+                    <div style="display: flex; gap: 0.25rem; flex-direction: column;">
                       <button
                         on:click={() => editUser(user)}
                         class="admin-btn admin-btn-secondary"
                         style="font-size: 0.75rem; padding: 0.25rem 0.5rem;"
                       >
                         Bearbeiten
-                      </button>
-                      <button
-                        on:click={() => deleteUser(user.id)}
-                        class="admin-btn admin-btn-danger"
-                        style="font-size: 0.75rem; padding: 0.25rem 0.5rem;"
-                      >
-                        Löschen
                       </button>
                     </div>
                   </td>
@@ -588,12 +735,6 @@
       </div>
       <div class="admin-modal-actions">
         <button class="admin-btn admin-btn-secondary" on:click={closeModal}>Schließen</button>
-        <button
-          class="admin-btn admin-btn-danger"
-          on:click={() => { deleteUser(selectedUser.id); closeModal(); }}
-        >
-          Benutzer löschen
-        </button>
       </div>
     </div>
   </div>
@@ -601,147 +742,198 @@
 
 <!-- Edit User Modal -->
 {#if showEditModal && editingUser}
-  <div class="admin-modal-overlay" on:click={closeEditModal}>
-    <div class="admin-modal" style="max-width: 600px;" on:click|stopPropagation>
-      <div class="admin-modal-header">
-        <h3 class="admin-modal-title">Benutzer bearbeiten</h3>
-        <button class="admin-modal-close" on:click={closeEditModal}>✕</button>
+  <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.8); display: flex; align-items: center; justify-content: center; z-index: 1000;" on:click={closeEditModal}>
+    <div style="max-width: 600px; width: 90%; background: #1f2937; border: 2px solid #374151; border-radius: 12px; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5); overflow: hidden;" on:click|stopPropagation>
+      
+      <!-- Header -->
+      <div style="padding: 20px 20px 15px 20px; border-bottom: 1px solid #374151; display: flex; justify-content: space-between; align-items: center; background: #111827;">
+        <h3 style="margin: 0; font-size: 18px; color: #f9fafb; font-weight: 600;">Benutzer bearbeiten</h3>
+        <button 
+          on:click={closeEditModal} 
+          style="background: none; border: none; font-size: 20px; color: #9ca3af; cursor: pointer; padding: 5px; border-radius: 4px; transition: background-color 0.2s;"
+          on:mouseenter={(e) => e.target.style.backgroundColor = '#374151'}
+          on:mouseleave={(e) => e.target.style.backgroundColor = 'transparent'}
+        >
+          ✕
+        </button>
       </div>
-      <div class="admin-modal-content">
-        <form on:submit|preventDefault={() => {
-          const formData = new FormData(event.target);
-          const updates = {
-            full_name: formData.get('full_name'),
-            accountname: formData.get('accountname'),
-            email: formData.get('email'),
-            privacy_mode: formData.get('privacy_mode'),
-            save_originals: formData.get('save_originals') === 'true',
-            use_justified_layout: formData.get('use_justified_layout') === 'true',
-            show_welcome: formData.get('show_welcome') === 'true'
-          };
-          updateUser(updates);
-        }}>
-          <div style="display: grid; gap: 1.5rem;">
-            
-            <!-- User Info -->
-            <div>
-              <h4 style="margin: 0 0 1rem 0; color: var(--admin-text);">Benutzer-Informationen</h4>
-              <div style="display: grid; gap: 1rem;">
-                <div>
-                  <label for="full_name" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Vollständiger Name</label>
-                  <input
-                    id="full_name"
-                    name="full_name"
-                    type="text"
-                    value={editingUser.full_name || ''}
-                    class="admin-form-input"
-                    placeholder="Vollständiger Name"
-                  />
-                </div>
-                <div>
-                  <label for="accountname" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Account Name</label>
-                  <input
-                    id="accountname"
-                    name="accountname"
-                    type="text"
-                    value={editingUser.accountname || ''}
-                    class="admin-form-input"
-                    placeholder="Account Name"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <!-- Email Section -->
-            <div>
-              <h4 style="margin: 0 0 1rem 0; color: var(--admin-text);">E-Mail-Adresse</h4>
-              <div style="display: grid; gap: 1rem;">
-                <div>
-                  <label for="email" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">E-Mail-Adresse</label>
-                  <input
-                    id="email"
-                    name="email"
-                    type="email"
-                    value={editingUser.auth_email || ''}
-                    class="admin-form-input"
-                    placeholder="E-Mail-Adresse"
-                  />
-                  <div style="font-size: 0.875rem; color: var(--admin-text-light); margin-top: 0.25rem;">
-                    {editingUser.email_confirmed ? '✅ E-Mail bestätigt' : '❌ E-Mail nicht bestätigt'}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Privacy Settings -->
-            <div>
-              <h4 style="margin: 0 0 1rem 0; color: var(--admin-text);">Privacy-Einstellungen</h4>
-              <div style="display: grid; gap: 1rem;">
-                <div>
-                  <label for="privacy_mode" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Privacy Mode</label>
-                  <select id="privacy_mode" name="privacy_mode" class="admin-form-input">
-                    <option value="public" selected={editingUser.privacy_mode === 'public'}>Public - Alle können sehen</option>
-                    <option value="closed" selected={editingUser.privacy_mode === 'closed'}>Closed - Nur angemeldete Benutzer</option>
-                    <option value="private" selected={editingUser.privacy_mode === 'private'}>Private - Nur der Benutzer selbst</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            <!-- App Settings -->
-            <div>
-              <h4 style="margin: 0 0 1rem 0; color: var(--admin-text);">App-Einstellungen</h4>
-              <div style="display: grid; gap: 1rem;">
-                <div>
-                  <label style="display: flex; align-items: center; gap: 0.5rem;">
-                    <input
-                      type="checkbox"
-                      name="save_originals"
-                      value="true"
-                      checked={editingUser.save_originals}
-                    />
-                    Save Originals
-                  </label>
-                </div>
-                <div>
-                  <label style="display: flex; align-items: center; gap: 0.5rem;">
-                    <input
-                      type="checkbox"
-                      name="use_justified_layout"
-                      value="true"
-                      checked={editingUser.use_justified_layout}
-                    />
-                    Use Justified Layout
-                  </label>
-                </div>
-                <div>
-                  <label style="display: flex; align-items: center; gap: 0.5rem;">
-                    <input
-                      type="checkbox"
-                      name="show_welcome"
-                      value="true"
-                      checked={editingUser.show_welcome}
-                    />
-                    Show Welcome
-                  </label>
-                </div>
-              </div>
-            </div>
-
+      
+      <!-- Content -->
+      <div style="padding: 20px;">
+        <!-- User Info -->
+        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 20px; padding: 15px; background: #374151; border-radius: 8px;">
+          <div class="admin-avatar" style="width: 60px; height: 60px;">
+            {#if editingUser.avatar_url}
+              {#if editingUser.avatar_url.startsWith('https://caskhmcbvtevdwsolvwk.supabase.co')}
+                <img 
+                  src={editingUser.avatar_url}
+                  alt={editingUser.full_name || editingUser.accountname || 'User'}
+                  style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;"
+                />
+              {:else if editingUser.avatar_url.startsWith('http')}
+                <img 
+                  src={getOptimizedAvatarUrl(editingUser.avatar_url)}
+                  alt={editingUser.full_name || editingUser.accountname || 'User'}
+                  style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;"
+                />
+              {:else}
+                <img 
+                  src={`https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/avatars/${editingUser.avatar_url}`}
+                  alt={editingUser.full_name || editingUser.accountname || 'User'}
+                  style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;"
+                />
+              {/if}
+            {:else}
+              {getInitials(editingUser.full_name || editingUser.accountname || 'U')}
+            {/if}
+          </div>
+          <div style="flex: 1;">
+            <h4 style="margin: 0 0 5px 0; font-size: 16px; color: #f9fafb; font-weight: 500;">
+              {editingUser.full_name || editingUser.accountname || 'Unbekannt'}
+            </h4>
+            <p style="margin: 0; color: #d1d5db; font-size: 14px;">
+              ID: <strong>{editingUser.id}</strong>
+            </p>
+          </div>
+        </div>
+        
+        <!-- Form Fields -->
+        <div style="display: grid; gap: 20px;">
+          <!-- Basic Info -->
+          <div>
+            <label for="full_name" style="display: block; margin-bottom: 8px; font-weight: 600; color: #f9fafb; font-size: 14px;">
+              Vollständiger Name:
+            </label>
+            <input
+              id="full_name"
+              name="full_name"
+              type="text"
+              value={editingUser.full_name || ''}
+              placeholder="Vollständiger Name"
+              style="width: 100%; padding: 12px; border: 2px solid #4b5563; border-radius: 8px; background: #374151; color: #f9fafb; font-size: 14px; font-weight: 500; box-sizing: border-box;"
+            />
           </div>
           
-          <div class="admin-modal-actions">
-            <button type="button" class="admin-btn admin-btn-secondary" on:click={closeEditModal}>Abbrechen</button>
-            <button type="submit" class="admin-btn admin-btn-primary">Speichern</button>
-            <button
-              type="button"
-              class="admin-btn admin-btn-danger"
-              on:click={() => { deleteUser(editingUser.id); closeEditModal(); }}
-            >
-              Benutzer löschen
-            </button>
+          <div>
+            <label for="accountname" style="display: block; margin-bottom: 8px; font-weight: 600; color: #f9fafb; font-size: 14px;">
+              Account Name:
+            </label>
+            <input
+              id="accountname"
+              name="accountname"
+              type="text"
+              value={editingUser.accountname || ''}
+              placeholder="Account Name"
+              style="width: 100%; padding: 12px; border: 2px solid #4b5563; border-radius: 8px; background: #374151; color: #f9fafb; font-size: 14px; font-weight: 500; box-sizing: border-box;"
+            />
           </div>
-        </form>
+          
+          <div>
+            <label for="email" style="display: block; margin-bottom: 8px; font-weight: 600; color: #f9fafb; font-size: 14px;">
+              E-Mail-Adresse:
+            </label>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              value={editingUser.auth_email || ''}
+              placeholder="E-Mail-Adresse"
+              style="width: 100%; padding: 12px; border: 2px solid #4b5563; border-radius: 8px; background: #374151; color: #f9fafb; font-size: 14px; font-weight: 500; box-sizing: border-box;"
+            />
+            <div style="margin-top: 8px; font-size: 14px; font-weight: 500; color: #d1d5db;">
+              {editingUser.email_confirmed ? '✅ E-Mail bestätigt' : '❌ E-Mail nicht bestätigt'}
+            </div>
+          </div>
+          
+          <div>
+            <label for="privacy_mode" style="display: block; margin-bottom: 8px; font-weight: 600; color: #f9fafb; font-size: 14px;">
+              Privacy Mode:
+            </label>
+            <select 
+              id="privacy_mode" 
+              name="privacy_mode" 
+              style="width: 100%; padding: 12px; border: 2px solid #4b5563; border-radius: 8px; background: #374151; color: #f9fafb; font-size: 14px; font-weight: 500; box-sizing: border-box;"
+            >
+              <option value="public" selected={editingUser.privacy_mode === 'public'}>Public - Alle können sehen</option>
+              <option value="closed" selected={editingUser.privacy_mode === 'closed'}>Closed - Nur angemeldete Benutzer</option>
+              <option value="private" selected={editingUser.privacy_mode === 'private'}>Private - Nur der Benutzer selbst</option>
+            </select>
+          </div>
+          
+          <div>
+            <label for="save_originals" style="display: block; margin-bottom: 8px; font-weight: 600; color: #f9fafb; font-size: 14px;">
+              Save Originals:
+            </label>
+            <select 
+              id="save_originals" 
+              name="save_originals" 
+              style="width: 100%; padding: 12px; border: 2px solid #4b5563; border-radius: 8px; background: #374151; color: #f9fafb; font-size: 14px; font-weight: 500; box-sizing: border-box;"
+            >
+              <option value="true" selected={editingUser.save_originals === true}>Ja</option>
+              <option value="false" selected={editingUser.save_originals === false}>Nein</option>
+            </select>
+          </div>
+          
+          <div>
+            <label for="use_justified_layout" style="display: block; margin-bottom: 8px; font-weight: 600; color: #f9fafb; font-size: 14px;">
+              Justified Layout:
+            </label>
+            <select 
+              id="use_justified_layout" 
+              name="use_justified_layout" 
+              style="width: 100%; padding: 12px; border: 2px solid #4b5563; border-radius: 8px; background: #374151; color: #f9fafb; font-size: 14px; font-weight: 500; box-sizing: border-box;"
+            >
+              <option value="true" selected={editingUser.use_justified_layout === true}>Ja</option>
+              <option value="false" selected={editingUser.use_justified_layout === false}>Nein</option>
+            </select>
+          </div>
+          
+          <div>
+            <label for="show_welcome" style="display: block; margin-bottom: 8px; font-weight: 600; color: #f9fafb; font-size: 14px;">
+              Show Welcome:
+            </label>
+            <select 
+              id="show_welcome" 
+              name="show_welcome" 
+              style="width: 100%; padding: 12px; border: 2px solid #4b5563; border-radius: 8px; background: #374151; color: #f9fafb; font-size: 14px; font-weight: 500; box-sizing: border-box;"
+            >
+              <option value="true" selected={editingUser.show_welcome === true}>Ja</option>
+              <option value="false" selected={editingUser.show_welcome === false}>Nein</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Buttons -->
+      <div style="padding: 15px 20px 20px 20px; border-top: 1px solid #374151; display: flex; justify-content: flex-end; gap: 12px; background: #111827;">
+        <button 
+          on:click={closeEditModal} 
+          style="padding: 10px 20px; font-size: 14px; font-weight: 500; background: #4b5563; border: 1px solid #6b7280; color: #f9fafb; border-radius: 6px; cursor: pointer; transition: all 0.2s;"
+          on:mouseenter={(e) => e.target.style.backgroundColor = '#6b7280'}
+          on:mouseleave={(e) => e.target.style.backgroundColor = '#4b5563'}
+        >
+          Abbrechen
+        </button>
+        <button
+          on:click={() => {
+            const formData = new FormData(document.querySelector('form'));
+            const updates = {
+              full_name: formData.get('full_name'),
+              accountname: formData.get('accountname'),
+              email: formData.get('email'),
+              privacy_mode: formData.get('privacy_mode'),
+              save_originals: formData.get('save_originals') === 'true',
+              use_justified_layout: formData.get('use_justified_layout') === 'true',
+              show_welcome: formData.get('show_welcome') === 'true'
+            };
+            updateUser(updates);
+          }}
+          style="padding: 10px 20px; font-size: 14px; font-weight: 500; background: #f59e0b; border: 1px solid #d97706; color: white; border-radius: 6px; cursor: pointer; transition: all 0.2s; opacity: 1;"
+          on:mouseenter={(e) => e.target.style.opacity = '0.8'}
+          on:mouseleave={(e) => e.target.style.opacity = '1'}
+        >
+          Speichern
+        </button>
       </div>
     </div>
   </div>

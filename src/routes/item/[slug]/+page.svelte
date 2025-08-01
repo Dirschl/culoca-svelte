@@ -47,6 +47,17 @@
     ? { id: $sessionStore.userId }
     : null;
   $: isCreator = !!currentUser && (currentUser.id === image?.profile_id || currentUser.id === '0ceb2320-0553-463b-971a-a0eef5ecdf09');
+  
+  // Debug: Log creator status
+  $: if (image && currentUser) {
+    console.log('[DetailPage] Creator Debug:', {
+      currentUserId: currentUser.id,
+      imageProfileId: image.profile_id,
+      isCreator: isCreator,
+      isAuthenticated: $sessionStore.isAuthenticated,
+      sessionUserId: $sessionStore.userId
+    });
+  }
 
   let imageSource = '';
   $: imageSource = image ? (() => {

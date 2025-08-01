@@ -144,6 +144,35 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Create a function to get analytics summary
+CREATE OR REPLACE FUNCTION get_analytics_summary()
+RETURNS TABLE(
+    total_views BIGINT,
+    unique_users BIGINT,
+    authenticated_users BIGINT,
+    anonymous_users BIGINT,
+    views_today BIGINT,
+    views_this_week BIGINT,
+    views_this_month BIGINT,
+    avg_distance_meters DOUBLE PRECISION,
+    local_views BIGINT
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        COUNT(*) as total_views,
+        COUNT(DISTINCT visitor_id) FILTER (WHERE visitor_id IS NOT NULL) as unique_users,
+        COUNT(*) FILTER (WHERE visitor_id IS NOT NULL) as authenticated_users,
+        COUNT(*) FILTER (WHERE visitor_id IS NULL) as anonymous_users,
+        COUNT(*) FILTER (WHERE DATE(created_at) = CURRENT_DATE) as views_today,
+        COUNT(*) FILTER (WHERE created_at >= CURRENT_DATE - INTERVAL '7 days') as views_this_week,
+        COUNT(*) FILTER (WHERE created_at >= CURRENT_DATE - INTERVAL '30 days') as views_this_month,
+        AVG(distance_meters) FILTER (WHERE distance_meters IS NOT NULL) as avg_distance_meters,
+        COUNT(*) FILTER (WHERE distance_meters IS NOT NULL AND distance_meters <= 10000) as local_views
+    FROM public.item_views;
+END;
+$$ LANGUAGE plpgsql;
+
 -- Drop the existing function if it exists
 DROP FUNCTION IF EXISTS public.log_item_view(UUID, UUID, TEXT, TEXT, INET, DOUBLE PRECISION, DOUBLE PRECISION);
 DROP FUNCTION IF EXISTS public.log_item_view(UUID, UUID, TEXT, TEXT, INET);
