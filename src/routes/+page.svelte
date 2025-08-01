@@ -417,46 +417,53 @@
     }
   }
   
-  function speakTitle(text: string, imageId?: string) {
-    if (!autoguide || !speechSynthesis) return;
+  function speakTitle(text: string, imageId: string) {
+    if (!speechSynthesis || !audioActivated) {
+      console.log('🎤 Speech synthesis not available or audio not activated');
+      return;
+    }
     
-    // Clean and prepare text for speech synthesis
+    // NUR im mobilen Modus sprechen
+    if (!isManual3x3Mode) {
+      console.log('🎤 Not in mobile mode - skipping speech');
+      return;
+    }
+    
+    // Reset retry count for new speech
+    speechRetryCount = 0;
+    
+    // Clean the text (same as in announceFirstImage)
     let cleanText = text;
-    
-    // Only speak text up to first comma (as requested)
     const commaIndex = cleanText.indexOf(',');
     if (commaIndex !== -1) {
       cleanText = cleanText.substring(0, commaIndex);
     }
     
-    // Replace other problematic characters that might cause speech issues
     cleanText = cleanText
-      .replace(/;/g, ' - ')  // Replace semicolons with dashes
-      .replace(/\s+/g, ' ')  // Replace multiple spaces with single space
-      .trim();               // Remove leading/trailing whitespace
-    
-    console.log('🎤 Original text:', text);
-    console.log('🎤 Cleaned text (up to first comma):', cleanText);
-    
-    // Don't speak the same text twice in a row for the same image
-    if (cleanText === lastSpeechText && imageId === currentImageId) {
-      console.log('🎤 Skipping duplicate speech for same image:', cleanText);
-      return;
-    }
-    
-    lastSpeechText = cleanText;
-    currentImageId = imageId || '';
-    speechRetryCount = 0;
+      .replace(/;/g, ' - ')
+      .replace(/\s+/g, ' ')
+      .trim();
     
     console.log('🎤 Speaking:', cleanText, 'for image:', imageId);
     autoguideText = cleanText; // Show cleaned text in the UI too
     currentImageTitle = cleanText; // Update current image title for display
     
-    // Cancel any ongoing speech, but only if we're not already speaking the same text
-    if (speechSynthesis && lastSpeechText !== cleanText) {
+    // SOFORT alle anderen Ansagen abbrechen - unabhängig vom Text
+    if (speechSynthesis) {
+      console.log('🎤 Canceling all ongoing speech for new image');
       speechSynthesis.cancel();
+      
+      // Kurze Verzögerung um sicherzustellen, dass alle Ansagen gestoppt sind
+      setTimeout(() => {
+        startNewSpeech(cleanText, imageId);
+      }, 50);
+    } else {
+      startNewSpeech(cleanText, imageId);
     }
-    
+  }
+
+  // Separate function to start new speech
+  function startNewSpeech(cleanText: string, imageId: string) {
     const currentSpeech = new SpeechSynthesisUtterance(cleanText);
     currentSpeech.lang = 'de-DE';
     currentSpeech.volume = 1.0;
@@ -474,11 +481,11 @@
     }
     
     currentSpeech.onstart = () => {
-      console.log('🎤 Speech started:', text);
+      console.log('🎤 Speech started:', cleanText);
     };
     
     currentSpeech.onend = () => {
-      console.log('🎤 Speech ended:', text);
+      console.log('🎤 Speech ended:', cleanText);
       // Don't clear the text automatically - it should stay until image changes
     };
     
@@ -488,29 +495,13 @@
         return;
       }
       
-      console.error('🎤 Speech error:', event.error);
-      
       if (event.error === 'not-allowed') {
-        console.log('🎤 Speech not allowed - user interaction required');
-        // Try to enable speech synthesis with user interaction
-        const enableSpeech = () => {
-          console.log('🎤 User interaction detected - retrying speech');
-          try {
-            if (speechSynthesis) {
-              speechSynthesis.resume();
-              speechSynthesis.speak(currentSpeech);
-            }
-          } catch (error) {
-            console.error('🎤 Retry after user interaction failed:', error);
-          }
-          document.removeEventListener('click', enableSpeech);
-          document.removeEventListener('touchstart', enableSpeech);
-        };
-        
-        document.addEventListener('click', enableSpeech, { once: true });
-        document.addEventListener('touchstart', enableSpeech, { once: true });
+        console.log('🎤 Speech not allowed - user interaction required, but text is still displayed');
+        // Don't retry automatically - just log the error
         return;
       }
+      
+      console.error('🎤 Speech error:', event.error);
       
       // For other errors, try to recover with retry logic
       console.log('🎤 Speech error occurred, attempting to recover...');
@@ -528,7 +519,7 @@
       // Retry logic (max 3 attempts)
       if (speechRetryCount < 3) {
         speechRetryCount++;
-        console.log(`🎤 Retrying speech (attempt ${speechRetryCount}/3):`, text);
+        console.log(`🎤 Retrying speech (attempt ${speechRetryCount}/3):`, cleanText);
         
         setTimeout(() => {
           try {
@@ -608,16 +599,26 @@
   function announceFirstImage() {
     console.log('🎤 announceFirstImage called');
     
+    // Im mobilen Modus nur über Events arbeiten, nicht über pics
+    if (isManual3x3Mode) {
+      console.log('🎤 Mobile mode detected - relying on mobile gallery events only');
+      return;
+    }
+    
     // Always update the first image title, even when autoguide is disabled
-    const currentPics = get(pics);
+    let currentPics = get(pics);
+    console.log('🎤 Current pics length:', currentPics.length);
+    
     if (currentPics.length === 0) {
       console.log('🎤 No images available for announcement');
+      currentImageTitle = 'Keine Bilder verfügbar';
       return;
     }
     
     const firstImage = currentPics[0];
     console.log('🎤 First image:', firstImage);
     console.log('🎤 First image title:', firstImage.title);
+    console.log('🎤 First image original_name:', firstImage.original_name);
     
     let displayTitle = '';
     if (firstImage.title) {
@@ -639,13 +640,18 @@
       .trim();               // Remove leading/trailing whitespace
     
     console.log('🎤 Display title (up to first comma):', displayTitle);
+    console.log('🎤 Previous currentImageTitle:', currentImageTitle);
+    console.log('🎤 Previous lastAnnouncedImageId:', lastAnnouncedImageId);
     
     // Update the display title
     currentImageTitle = displayTitle;
     lastAnnouncedImageId = firstImage.id;
     
-    // If autoguide and audio are activated, also speak it
-    if (autoguide && audioActivated) {
+    console.log('🎤 Updated currentImageTitle to:', currentImageTitle);
+    console.log('🎤 Updated lastAnnouncedImageId to:', lastAnnouncedImageId);
+    
+    // NUR im mobilen Modus sprechen - normale Galerie soll nicht sprechen
+    if (autoguide && audioActivated && isManual3x3Mode) {
       speakTitle(firstImage.title || firstImage.original_name || 'Bild ohne Titel', firstImage.id);
     }
   }
@@ -713,16 +719,20 @@
       
       testUtterance.onend = () => {
         console.log('🎤 Audio guide activated successfully');
-        // Announce first image after activation
-        setTimeout(() => {
-          announceFirstImage();
-        }, 500);
+        // Announce first image after activation - nur im mobilen Modus
+        if (isManual3x3Mode) {
+          setTimeout(() => {
+            announceFirstImage();
+          }, 500);
+        }
       };
       
-      // Also announce immediately if audio is activated
-      setTimeout(() => {
-        announceFirstImage();
-      }, 200);
+      // Also announce immediately if audio is activated - nur im mobilen Modus
+      if (isManual3x3Mode) {
+        setTimeout(() => {
+          announceFirstImage();
+        }, 200);
+      }
       
       // Don't log canceled errors as errors - they're expected
       testUtterance.onerror = (event) => {
@@ -916,6 +926,14 @@
     // Initialize filter store from URL parameters
     filterStore.initFromUrl($pageStore.url.searchParams);
     console.log('[onMount] Initialized filterStore from URL parameters');
+    
+    // URL-Parameter für mobilen Modus verarbeiten (nur für Audioguide)
+    const urlParams = new URLSearchParams(window.location.search);
+    const mobileParam = urlParams.get('mobile');
+    if (mobileParam === 'true') {
+      console.log('[onMount] Mobile mode detected via URL parameter');
+      // Nur für Audioguide-Zwecke, nicht für Galerie-Logik
+    }
     
     // WICHTIG: Kurze Verzögerung um sicherzustellen, dass der FilterStore korrekt initialisiert wurde
     setTimeout(() => {
@@ -1622,6 +1640,61 @@
       });
     }
   }
+
+
+
+  // Event-basierte Audioguide-Updates für Simulation
+  function updateAudioguideForSimulation() {
+    if (simulationMode && autoguide && isManual3x3Mode) {
+      console.log('🎤 [Simulation] Manual audioguide update triggered');
+      setTimeout(() => {
+        announceFirstImage();
+      }, 200);
+    }
+  }
+
+  // Funktion um Audioguide mit mobilem Galerie-Bild zu aktualisieren
+  function updateAudioguideWithMobileImage(firstImage: any) {
+    if (autoguide && isManual3x3Mode && firstImage) {
+      console.log('🎤 Updating autoguide with mobile gallery image:', firstImage);
+      
+      // Verhindere doppelte Ansagen für dasselbe Bild
+      if (firstImage.id === lastAnnouncedImageId) {
+        console.log('🎤 Skipping duplicate announcement for same image:', firstImage.id);
+        return;
+      }
+      
+      let displayTitle = '';
+      if (firstImage.title) {
+        displayTitle = firstImage.title;
+      } else {
+        displayTitle = firstImage.original_name || 'Bild ohne Titel';
+      }
+      
+      // Only display text up to first comma
+      const commaIndex = displayTitle.indexOf(',');
+      if (commaIndex !== -1) {
+        displayTitle = displayTitle.substring(0, commaIndex);
+      }
+      
+      // Clean the text
+      displayTitle = displayTitle
+        .replace(/;/g, ' - ')  // Replace semicolons with dashes
+        .replace(/\s+/g, ' ')  // Replace multiple spaces with single space
+        .trim();               // Remove leading/trailing whitespace
+      
+      console.log('🎤 Mobile gallery display title:', displayTitle);
+      
+      // Update the display title
+      currentImageTitle = displayTitle;
+      lastAnnouncedImageId = firstImage.id;
+      
+      // If autoguide and audio are activated, also speak it
+      if (autoguide && audioActivated) {
+        speakTitle(firstImage.title || firstImage.original_name || 'Bild ohne Titel', firstImage.id);
+      }
+    }
+  }
 </script>
 
 {#if gpsStatus === 'denied' || gpsStatus === 'unavailable'}
@@ -1716,12 +1789,16 @@
   {/if}
   <WelcomeSection />
   
-  <!-- Autoguide Bar -->
-  {#if isLoggedIn && autoguide}
+  <!-- Autoguide Bar - nur im mobilen 3x3-Modus -->
+  {#if isLoggedIn && autoguide && isManual3x3Mode}
     <div class="autoguide-bar {audioActivated ? 'audio-active' : 'audio-inactive'}">
       <div class="autoguide-content">
         <div class="autoguide-text">
-          {currentImageTitle || (audioActivated ? 'Bildtitel werden vorgelesen' : 'Audio deaktiviert - Klicke auf den Lautsprecher')}
+          {#if simulationMode}
+            {currentImageTitle || 'Simulation: Erster Bildtitel wird geladen...'}
+          {:else}
+            {currentImageTitle || (audioActivated ? 'Bildtitel werden vorgelesen' : 'Audio deaktiviert - Klicke auf den Lautsprecher')}
+          {/if}
         </div>
         <button class="speaker-btn" on:click={() => {
           console.log('🎤 Speaker button clicked, audioActivated:', audioActivated);
@@ -1758,6 +1835,17 @@
       filterStore={filterStore}
       sessionStore={sessionStore}
       dynamicLoader={dynamicImageLoader}
+      on:firstImageChanged={(event) => {
+        console.log('🎤 Mobile gallery first image changed:', event.detail);
+        if (autoguide && isManual3x3Mode) {
+          // Update the first image title for autoguide
+          const firstImage = event.detail;
+          if (firstImage && firstImage.id !== lastAnnouncedImageId) {
+            console.log('🎤 Updating autoguide for new first image from mobile gallery');
+            updateAudioguideWithMobileImage(firstImage);
+          }
+        }
+      }}
     />
   {:else}
     <NormalGallery

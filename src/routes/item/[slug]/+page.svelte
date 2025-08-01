@@ -703,12 +703,12 @@
   <meta name="author" content="culoca.com">
   <link rel="canonical" href={`https://culoca.com/item/${itemSlug}`}> <!-- Slug statt ID -->
   
-  <!-- Dynamisches Favicon für bessere SEO - nur 512px Variante -->
+  <!-- Dynamisches Favicon für bessere SEO - korrektes API verwenden -->
   {#if image}
-    <link rel="icon" type="image/jpeg" href={`/api/og-image/${itemSlug}?favicon=true`} sizes="512x512">
-    <link rel="apple-touch-icon" href={`/api/og-image/${itemSlug}?favicon=true`}>
+    <link rel="icon" type="image/png" href={`/api/favicon/${itemSlug}`} sizes="32x32 48x48 96x96 192x192 512x512">
+    <link rel="apple-touch-icon" href={`/api/favicon/${itemSlug}`} sizes="180x180">
     <!-- Zusätzliche Meta-Tags für bessere SEO -->
-    <meta name="image" content={`https://culoca.com/api/og-image/${itemSlug}?favicon=true`}>
+    <meta name="image" content={`https://culoca.com/api/favicon/${itemSlug}`}>
     <meta property="og:image:alt" content={image?.title || `Bild ${itemSlug}`}>
     <meta name="twitter:image:alt" content={image?.title || `Bild ${itemSlug}`}>
   {:else}
