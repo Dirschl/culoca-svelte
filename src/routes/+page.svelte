@@ -1063,7 +1063,29 @@
     }
     
     // Intelligente GPS-Initialisierung
-    initializeGPSIntelligently();
+    console.log('[App-Start] Starting GPS initialization...');
+    
+    // NEU: Verzögerte GPS-Initialisierung um sicherzustellen, dass sie ausgeführt wird
+    setTimeout(() => {
+      console.log('[App-Start] Delayed GPS initialization...');
+      if (navigator.geolocation) {
+        console.log('[App-Start] Geolocation available, initializing...');
+        initializeGPSIntelligently();
+        
+        // NEU: Fallback GPS-Initialisierung nach 5 Sekunden falls die erste fehlschlägt
+        setTimeout(() => {
+          if (gpsStatus === 'checking' || gpsStatus === 'none') {
+            console.log('[App-Start] Fallback GPS initialization...');
+            if (navigator.geolocation) {
+              initializeGPSIntelligently();
+            }
+          }
+        }, 5000);
+      } else {
+        console.log('[App-Start] Geolocation not available');
+        gpsStatus = 'unavailable';
+      }
+    }, 100);
     
     // Setze Default-Settings für anonyme User
     setAnonymousUserDefaults();
@@ -1364,6 +1386,8 @@
 
   // GPS-Initialisierung beim App-Start
   function initializeGPS() {
+    console.log('[GPS] initializeGPS called');
+    
     if (!navigator.geolocation) {
       gpsStatus = "unavailable";
       console.log('[GPS] Geolocation not available');
@@ -1373,55 +1397,67 @@
     console.log('[GPS] Starting GPS watch...');
     gpsStatus = "checking";
 
-    // Live-Tracking: watchPosition
-    gpsWatchId = navigator.geolocation.watchPosition(
-      (position) => {
-        userLat = position.coords.latitude;
-        userLon = position.coords.longitude;
-        gpsStatus = "active";
-        lastGPSUpdateTime = Date.now();
-        if (browser) localStorage.setItem('gpsAllowed', 'true');
-        console.log("[GPS] Position geändert:", userLat, userLon);
-        
-        // WICHTIG: GPS-Position in filterStore speichern für getEffectiveGpsPosition()
-        filterStore.updateGpsStatus(true, { lat: userLat, lon: userLon });
-      },
-      (error) => {
-        console.warn("GPS-Fehler:", error.message, "Code:", error.code);
-        switch (error.code) {
-          case error.PERMISSION_DENIED:
-            gpsStatus = "denied";
-            if (browser) localStorage.removeItem('gpsAllowed');
-            filterStore.updateGpsStatus(false);
-            console.log('[GPS] Permission denied');
-            break;
-          case error.POSITION_UNAVAILABLE:
-            gpsStatus = "unavailable";
-            filterStore.updateGpsStatus(false);
-            console.log('[GPS] Position unavailable');
-            break;
-          case error.TIMEOUT:
-            gpsStatus = "unavailable";
-            filterStore.updateGpsStatus(false);
-            console.log('[GPS] GPS timeout');
-            break;
-          default:
-            gpsStatus = "unavailable";
-            filterStore.updateGpsStatus(false);
-            console.log('[GPS] Unknown GPS error');
+    try {
+      // Live-Tracking: watchPosition
+      gpsWatchId = navigator.geolocation.watchPosition(
+        (position) => {
+          console.log('[GPS] Position received:', position);
+          userLat = position.coords.latitude;
+          userLon = position.coords.longitude;
+          gpsStatus = "active";
+          lastGPSUpdateTime = Date.now();
+          if (browser) localStorage.setItem('gpsAllowed', 'true');
+          console.log("[GPS] Position geändert:", userLat, userLon);
+          
+          // WICHTIG: GPS-Position in filterStore speichern für getEffectiveGpsPosition()
+          filterStore.updateGpsStatus(true, { lat: userLat, lon: userLon });
+        },
+        (error) => {
+          console.warn("GPS-Fehler:", error.message, "Code:", error.code);
+          switch (error.code) {
+            case error.PERMISSION_DENIED:
+              gpsStatus = "denied";
+              if (browser) localStorage.removeItem('gpsAllowed');
+              filterStore.updateGpsStatus(false);
+              console.log('[GPS] Permission denied');
+              break;
+            case error.POSITION_UNAVAILABLE:
+              gpsStatus = "unavailable";
+              filterStore.updateGpsStatus(false);
+              console.log('[GPS] Position unavailable');
+              break;
+            case error.TIMEOUT:
+              gpsStatus = "unavailable";
+              filterStore.updateGpsStatus(false);
+              console.log('[GPS] GPS timeout');
+              break;
+            default:
+              gpsStatus = "unavailable";
+              filterStore.updateGpsStatus(false);
+              console.log('[GPS] Unknown GPS error');
+          }
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 60000
         }
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 60000
-      }
-    );
+      );
+      
+      console.log('[GPS] GPS watch started with ID:', gpsWatchId);
+    } catch (error) {
+      console.error('[GPS] Error starting GPS watch:', error);
+      gpsStatus = "unavailable";
+      filterStore.updateGpsStatus(false);
+    }
   }
 
   // Intelligente GPS-Initialisierung, die Berechtigungen berücksichtigt
   function initializeGPSIntelligently() {
+    console.log('[GPS-Init] initializeGPSIntelligently called');
+    
     if (!navigator.geolocation) {
+      console.log('[GPS-Init] Geolocation not available');
       gpsStatus = "unavailable";
       return;
     }
@@ -1436,33 +1472,40 @@
     gpsStatus = 'checking';
     console.log('[GPS-Init] Starting GPS initialization...');
 
-    // Prüfe zuerst den aktuellen Berechtigungsstatus
-    if ('permissions' in navigator) {
-      navigator.permissions.query({ name: 'geolocation' }).then((permissionStatus) => {
-        console.log('[GPS] Permission status:', permissionStatus.state);
-        
-        if (permissionStatus.state === 'granted') {
-          // Berechtigung bereits erteilt - starte GPS
-          console.log('[GPS] Permission granted - starting GPS...');
+    // NEU: Versuche immer GPS zu starten, auch wenn Permissions API nicht verfügbar ist
+    try {
+      // Prüfe zuerst den aktuellen Berechtigungsstatus
+      if ('permissions' in navigator) {
+        navigator.permissions.query({ name: 'geolocation' }).then((permissionStatus) => {
+          console.log('[GPS] Permission status:', permissionStatus.state);
+          
+          if (permissionStatus.state === 'granted') {
+            // Berechtigung bereits erteilt - starte GPS
+            console.log('[GPS] Permission granted - starting GPS...');
+            initializeGPS();
+          } else if (permissionStatus.state === 'denied') {
+            // Berechtigung verweigert - zeige Galerie ohne GPS
+            gpsStatus = "denied";
+            console.log('[GPS] Permission denied - showing gallery without GPS');
+          } else {
+            // Berechtigung noch nicht entschieden - versuche GPS zu starten
+            console.log('[GPS] Permission not decided - trying GPS...');
+            initializeGPS();
+          }
+        }).catch((error) => {
+          // Fallback: Versuche GPS zu starten
+          console.log('[GPS] Permission check failed - trying GPS as fallback:', error);
           initializeGPS();
-        } else if (permissionStatus.state === 'denied') {
-          // Berechtigung verweigert - zeige Galerie ohne GPS
-          gpsStatus = "denied";
-          console.log('[GPS] Permission denied - showing gallery without GPS');
-        } else {
-          // Berechtigung noch nicht entschieden - versuche GPS zu starten
-          console.log('[GPS] Permission not decided - trying GPS...');
-          initializeGPS();
-        }
-      }).catch(() => {
-        // Fallback: Versuche GPS zu starten
-        console.log('[GPS] Permission check failed - trying GPS as fallback...');
+        });
+      } else {
+        // Fallback für Browser ohne Permissions API
+        console.log('[GPS] No permissions API - trying GPS directly...');
         initializeGPS();
-      });
-    } else {
-      // Fallback für Browser ohne Permissions API
-      console.log('[GPS] No permissions API - trying GPS directly...');
-      initializeGPS();
+      }
+    } catch (error) {
+      // NEU: Fehlerbehandlung für GPS-Initialisierung
+      console.error('[GPS-Init] Error during GPS initialization:', error);
+      gpsStatus = 'unavailable';
     }
   }
   
