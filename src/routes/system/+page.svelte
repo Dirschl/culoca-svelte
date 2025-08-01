@@ -30,32 +30,35 @@
   onMount(async () => {
     if (browser) {
       try {
-        // Banner-Bild laden (zufälliges Querformat-Foto)
+        // Banner-Bild laden (zufälliges Querformat-Foto mit breitestem Seitenverhältnis)
         const { data: bannerData, error: bannerError } = await supabase
           .from('items')
-          .select('id, title, slug, path_512, width, height')
-          .not('path_512', 'is', null)
-          .gte('width', 1000) // Weniger restriktiv
-          .gte('height', 500)
-          .order('created_at', { ascending: false }) // Neueste zuerst
-          .limit(10); // Mehr Bilder laden für Zufallsauswahl
+          .select('id, title, slug, path_2048, width, height')
+          .not('path_2048', 'is', null)
+          .not('width', 'is', null)
+          .not('height', 'is', null)
+          .gt('width', 0)
+          .gt('height', 0)
+          .order('width', { ascending: false }) // Breiteste zuerst
+          .limit(5); // Top 5 breiteste Bilder
 
         if (bannerError) {
           console.error('Banner-Fehler:', bannerError);
         }
 
         if (bannerData && bannerData.length > 0) {
-          // Zufällige Auswahl aus den geladenen Bildern
+          // Zufällige Auswahl aus den 5 breitesten Bildern
           const randomIndex = Math.floor(Math.random() * bannerData.length);
           bannerImage = bannerData[randomIndex];
-          console.log('Banner-Bild gefunden:', bannerImage);
+          console.log('Banner-Bild gefunden (breitestes Seitenverhältnis):', bannerImage);
+          console.log('Seitenverhältnis:', bannerImage.width / bannerImage.height);
         } else {
           console.log('Kein Banner-Bild gefunden - versuche Fallback');
-          // Fallback: Jedes Bild mit path_512
+          // Fallback: Jedes Bild mit path_2048
           const { data: fallbackData, error: fallbackError } = await supabase
             .from('items')
-            .select('id, title, slug, path_512, width, height')
-            .not('path_512', 'is', null)
+            .select('id, title, slug, path_2048, width, height')
+            .not('path_2048', 'is', null)
             .order('created_at', { ascending: false })
             .limit(10);
           
@@ -130,7 +133,7 @@
   <div class="banner-section">
     <div class="banner-image-container" on:click={() => goToDetail(bannerImage.slug)}>
       <img 
-        src="https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/{bannerImage.path_512}" 
+        src="https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/{bannerImage.path_2048}" 
         alt={bannerImage.title || 'Banner Bild'} 
         class="banner-image" 
       />
