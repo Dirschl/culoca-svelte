@@ -446,7 +446,7 @@
               </p>
               <div class="og-preview">
                 {#if item.id === 'map-share'}
-                  <img src="https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/map-share/cf0390c1-76b6-43f7-a0a6-1c51ff501f8f.jpg" 
+                  <img src="/api/og-image/map-view-share/cf0390c1-76b6-43f7-a0a6-1c51ff501f8f" 
                        alt="Open Graph Preview - Karte" class="og-image" />
                 {:else}
                   <img src={`/api/og-image/${item.slug}`} 
