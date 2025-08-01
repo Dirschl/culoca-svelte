@@ -28,13 +28,45 @@ function fixEncoding(str: string | null): string | null {
   return str;
 }
 
-// Slugify-Funktion für sprechende URLs
+// Verbesserte Slugify-Funktion für deutsche Umlaute und bessere SEO
 function slugify(text: string): string {
   return text
     .toString()
+    .toLowerCase()
+    // Deutsche Umlaute korrekt ersetzen
+    .replace(/ä/g, 'ae')
+    .replace(/ö/g, 'oe')
+    .replace(/ü/g, 'ue')
+    .replace(/ß/g, 'ss')
+    // Weitere europäische Zeichen
+    .replace(/à/g, 'a')
+    .replace(/á/g, 'a')
+    .replace(/â/g, 'a')
+    .replace(/ã/g, 'a')
+    .replace(/å/g, 'a')
+    .replace(/è/g, 'e')
+    .replace(/é/g, 'e')
+    .replace(/ê/g, 'e')
+    .replace(/ë/g, 'e')
+    .replace(/ì/g, 'i')
+    .replace(/í/g, 'i')
+    .replace(/î/g, 'i')
+    .replace(/ï/g, 'i')
+    .replace(/ò/g, 'o')
+    .replace(/ó/g, 'o')
+    .replace(/ô/g, 'o')
+    .replace(/õ/g, 'o')
+    .replace(/ù/g, 'u')
+    .replace(/ú/g, 'u')
+    .replace(/û/g, 'u')
+    .replace(/ý/g, 'y')
+    .replace(/ÿ/g, 'y')
+    .replace(/ñ/g, 'n')
+    .replace(/ç/g, 'c')
+    // Unicode-Normalisierung für verbleibende Zeichen
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
+    // Nur erlaubte Zeichen behalten
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .replace(/--+/g, '-')

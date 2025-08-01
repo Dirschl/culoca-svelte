@@ -51,47 +51,81 @@ function slugify(text) {
     .replace(/--+/g, '-');
 }
 
-async function migrateSlugs() {
+async function migrateSlugsWithUmlauts() {
+  console.log('🔄 Starte Migration der Slugs mit Umlaut-Behandlung...');
+  
   const { data: items, error } = await supabase
     .from('items')
     .select('id, title, original_name, slug, profile_id')
-    .or('slug.is.null,slug.eq.""');
+    .not('slug', 'is', null);
 
-  if (error) throw error;
+  if (error) {
+    console.error('❌ Fehler beim Laden der Items:', error);
+    return;
+  }
+
+  console.log(`📊 ${items.length} Items gefunden`);
+
+  let updatedCount = 0;
+  let skippedCount = 0;
 
   for (const item of items) {
     // Lade Erstellername
     let creator = 'user';
     if (item.profile_id) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('accountname, full_name')
-          .eq('id', item.profile_id)
-          .maybeSingle();
-        creator = profile?.full_name || profile?.accountname || 'user';
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('accountname, full_name')
+        .eq('id', item.profile_id)
+        .maybeSingle();
+      creator = profile?.full_name || profile?.accountname || 'user';
     }
-    // Slug-Basis auf 95 Zeichen kürzen, damit für -2, -3 etc. Platz bleibt
-    let base = slugify(`${item.title || item.original_name || item.id}-${creator}`).substring(0, 95);
-    let slug = base;
+
+    // Generiere neuen Slug mit Umlaut-Behandlung
+    const title = item.title || item.original_name || item.id;
+    const newSlugBase = slugify(`${title}-${creator}`).substring(0, 95);
+    let newSlug = newSlugBase;
     let counter = 2;
+
     // Prüfe auf Kollisionen
     while (true) {
       const { data: exists } = await supabase
         .from('items')
         .select('id')
-        .eq('slug', slug)
+        .eq('slug', newSlug)
+        .neq('id', item.id) // Ignoriere das aktuelle Item
         .maybeSingle();
       if (!exists) break;
-      slug = `${base}-${counter++}`;
-      if (slug.length > 100) slug = slug.substring(0, 100);
+      newSlug = `${newSlugBase}-${counter++}`;
+      if (newSlug.length > 100) newSlug = newSlug.substring(0, 100);
     }
-    // Update
-    await supabase
-      .from('items')
-      .update({ slug })
-      .eq('id', item.id);
-    console.log(`Set slug for ${item.id}: ${slug}`);
+
+    // Vergleiche alten und neuen Slug
+    if (item.slug !== newSlug) {
+      console.log(`🔄 Update: ${item.id}`);
+      console.log(`   Alt: ${item.slug}`);
+      console.log(`   Neu: ${newSlug}`);
+      
+      // Update
+      const { error: updateError } = await supabase
+        .from('items')
+        .update({ slug: newSlug })
+        .eq('id', item.id);
+      
+      if (updateError) {
+        console.error(`❌ Fehler beim Update von ${item.id}:`, updateError);
+      } else {
+        updatedCount++;
+      }
+    } else {
+      skippedCount++;
+    }
   }
+
+  console.log(`✅ Migration abgeschlossen!`);
+  console.log(`   Aktualisiert: ${updatedCount}`);
+  console.log(`   Übersprungen: ${skippedCount}`);
+  console.log(`   Gesamt: ${items.length}`);
 }
 
-migrateSlugs().then(() => console.log('Migration complete!'));
+migrateSlugsWithUmlauts().catch(console.error); 
