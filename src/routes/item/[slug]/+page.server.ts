@@ -10,48 +10,42 @@ const supabase = createClient(
   }
 );
 
-// Funktion zur Umwandlung alter Slugs mit Umlauten in neue korrigierte Slugs
-function convertOldSlugToNewSlug(oldSlug: string): string {
-  return oldSlug
-    .toLowerCase()
+// Funktion zur Suche nach Items mit verschiedenen Slug-Varianten
+async function findItemBySlugVariations(slug: string): Promise<any> {
+  // Liste von möglichen Slug-Varianten basierend auf verschiedenen Umlaute-Behandlungen
+  const slugVariations = [
+    slug, // Original
     // Alte Umlaute-Behandlung (wie vor der Korrektur)
-    .replace(/ä/g, 'a')  // alt: ä -> a, neu: ä -> ae
-    .replace(/ö/g, 'o')  // alt: ö -> o, neu: ö -> oe  
-    .replace(/ü/g, 'u')  // alt: ü -> u, neu: ü -> ue
-    .replace(/ß/g, '-')  // alt: ß -> -, neu: ß -> ss
-    // Weitere alte Umlaute-Behandlung
-    .replace(/à/g, 'a')
-    .replace(/á/g, 'a')
-    .replace(/â/g, 'a')
-    .replace(/ã/g, 'a')
-    .replace(/å/g, 'a')
-    .replace(/è/g, 'e')
-    .replace(/é/g, 'e')
-    .replace(/ê/g, 'e')
-    .replace(/ë/g, 'e')
-    .replace(/ì/g, 'i')
-    .replace(/í/g, 'i')
-    .replace(/î/g, 'i')
-    .replace(/ï/g, 'i')
-    .replace(/ò/g, 'o')
-    .replace(/ó/g, 'o')
-    .replace(/ô/g, 'o')
-    .replace(/õ/g, 'o')
-    .replace(/ù/g, 'u')
-    .replace(/ú/g, 'u')
-    .replace(/û/g, 'u')
-    .replace(/ý/g, 'y')
-    .replace(/ÿ/g, 'y')
-    .replace(/ñ/g, 'n')
-    .replace(/ç/g, 'c')
-    // Unicode-Normalisierung
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    // Nur erlaubte Zeichen behalten
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .replace(/--+/g, '-')
-    .substring(0, 100);
+    slug.replace(/ae/g, 'a').replace(/oe/g, 'o').replace(/ue/g, 'u').replace(/ss/g, '-'),
+    // Neue Umlaute-Behandlung (aktuelle Korrektur)
+    slug.replace(/a/g, 'ae').replace(/o/g, 'oe').replace(/u/g, 'ue').replace(/ß/g, 'ss'),
+    // Weitere Variationen
+    slug.replace(/ae/g, 'a').replace(/oe/g, 'o').replace(/ue/g, 'u'),
+    slug.replace(/a/g, 'ae').replace(/o/g, 'oe').replace(/u/g, 'ue'),
+    // Spezielle deutsche Umlaute
+    slug.replace(/ae/g, 'a').replace(/oe/g, 'o').replace(/ue/g, 'u').replace(/ss/g, 'ß'),
+    slug.replace(/a/g, 'ae').replace(/o/g, 'oe').replace(/u/g, 'ue').replace(/ß/g, 'ss'),
+  ];
+
+  console.log('🔍 [DetailPage] Trying slug variations:', slugVariations);
+
+  // Versuche jede Variation
+  for (const variation of slugVariations) {
+    if (variation === slug) continue; // Original bereits versucht
+    
+    const { data: image, error } = await supabase
+      .from('items')
+      .select('*')
+      .eq('slug', variation)
+      .or('is_private.eq.false,is_private.is.null');
+    
+    if (image && image.length > 0) {
+      console.log('🔍 [DetailPage] Found item with slug variation:', variation);
+      return image[0];
+    }
+  }
+  
+  return null;
 }
 
 function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -79,27 +73,17 @@ export const load: PageServerLoad = async ({ params, url }) => {
     
     // Wenn nicht gefunden, versuche Umleitung von altem Slug zu neuem
     if (!image || image.length === 0) {
-      console.log('🔍 [DetailPage] Item not found with original slug, trying old slug conversion:', slug);
+      console.log('🔍 [DetailPage] Item not found with original slug, trying slug variations:', slug);
       
-      // Konvertiere alten Slug zu neuem Format
-      const newSlug = convertOldSlugToNewSlug(slug);
-      console.log('🔍 [DetailPage] Converted old slug to new slug:', slug, '->', newSlug);
+      // Suche nach Item mit verschiedenen Slug-Varianten
+      const foundItem = await findItemBySlugVariations(slug);
       
-      if (newSlug !== slug) {
-        // Versuche mit konvertiertem Slug zu finden
-        const { data: convertedImage, error: convertedError } = await supabase
-          .from('items')
-          .select('*')
-          .eq('slug', newSlug)
-          .or('is_private.eq.false,is_private.is.null');
-        
-        if (convertedImage && convertedImage.length > 0) {
-          console.log('🔍 [DetailPage] Found item with converted slug, redirecting:', newSlug);
-          // Umleitung zur neuen URL
-          throw redirect(301, `/item/${newSlug}`);
-        } else {
-          console.log('🔍 [DetailPage] Item not found with converted slug either:', newSlug);
-        }
+      if (foundItem) {
+        console.log('🔍 [DetailPage] Found item with slug variation, redirecting:', foundItem.slug);
+        // Umleitung zur neuen URL
+        throw redirect(301, `/item/${foundItem.slug}`);
+      } else {
+        console.log('🔍 [DetailPage] No item found with any slug variation');
       }
     }
     
