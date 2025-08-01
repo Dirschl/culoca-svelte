@@ -927,6 +927,41 @@
     filterStore.initFromUrl($pageStore.url.searchParams);
     console.log('[onMount] Initialized filterStore from URL parameters');
     
+    // WICHTIG: Stelle GPS-Position aus localStorage wieder her
+    if (browser) {
+      const savedGps = localStorage.getItem('userGps');
+      if (savedGps) {
+        try {
+          const gpsData = JSON.parse(savedGps);
+          const now = Date.now();
+          const age = now - gpsData.timestamp;
+          
+          // Verwende gespeicherte GPS-Daten nur wenn sie nicht zu alt sind (24 Stunden)
+          if (age < 24 * 60 * 60 * 1000) {
+            userLat = gpsData.lat;
+            userLon = gpsData.lon;
+            gpsStatus = 'active';
+            lastGPSUpdateTime = gpsData.timestamp;
+            
+            // WICHTIG: GPS-Position in filterStore speichern für getEffectiveGpsPosition()
+            filterStore.updateGpsStatus(true, { lat: userLat, lon: userLon });
+            
+            console.log('[onMount] Restored GPS position from localStorage:', {
+              lat: userLat,
+              lon: userLon,
+              age: Math.round(age / 1000 / 60) + ' minutes ago'
+            });
+          } else {
+            console.log('[onMount] Saved GPS data too old, clearing localStorage');
+            localStorage.removeItem('userGps');
+          }
+        } catch (error) {
+          console.error('[onMount] Error parsing saved GPS data:', error);
+          localStorage.removeItem('userGps');
+        }
+      }
+    }
+    
     // URL-Parameter für mobilen Modus verarbeiten (nur für Audioguide)
     const urlParams = new URLSearchParams(window.location.search);
     const mobileParam = urlParams.get('mobile');
