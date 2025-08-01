@@ -1028,6 +1028,40 @@
     
     window.addEventListener('message', handleGPSSimulation);
     
+    // NEU: Prüfe gespeicherte GPS-Daten beim App-Start
+    if (browser) {
+      const savedGps = localStorage.getItem('userGps');
+      if (savedGps) {
+        try {
+          const gpsData = JSON.parse(savedGps);
+          const now = Date.now();
+          const gpsAge = now - gpsData.timestamp;
+          
+          // Verwende gespeicherte GPS-Daten nur wenn sie nicht älter als 24 Stunden sind
+          if (gpsData.lat && gpsData.lon && gpsAge < 24 * 60 * 60 * 1000) {
+            console.log('[App-Start] Found saved GPS data:', gpsData);
+            userLat = gpsData.lat;
+            userLon = gpsData.lon;
+            gpsStatus = 'cached';
+            lastGPSUpdateTime = gpsData.timestamp;
+            
+            // Update filterStore with saved GPS data
+            filterStore.updateGpsStatus(true, { lat: userLat, lon: userLon });
+            
+            console.log('[App-Start] Using cached GPS data:', { userLat, userLon, gpsAge: Math.round(gpsAge / 1000 / 60) + ' minutes' });
+          } else {
+            console.log('[App-Start] Saved GPS data too old, clearing:', { gpsAge: Math.round(gpsAge / 1000 / 60) + ' minutes' });
+            localStorage.removeItem('userGps');
+          }
+        } catch (error) {
+          console.warn('[App-Start] Error parsing saved GPS data:', error);
+          localStorage.removeItem('userGps');
+        }
+      } else {
+        console.log('[App-Start] No saved GPS data found');
+      }
+    }
+    
     // Intelligente GPS-Initialisierung
     initializeGPSIntelligently();
     
@@ -1386,6 +1420,12 @@
       return;
     }
 
+    // NEU: Wenn bereits gespeicherte GPS-Daten vorhanden sind, nicht sofort GPS starten
+    if (gpsStatus === 'cached' && userLat && userLon) {
+      console.log('[GPS-Init] Using cached GPS data, not starting live GPS immediately');
+      return;
+    }
+
     // Prüfe zuerst den aktuellen Berechtigungsstatus
     if ('permissions' in navigator) {
       navigator.permissions.query({ name: 'geolocation' }).then((permissionStatus) => {
@@ -1711,12 +1751,18 @@
   }
 </script>
 
-{#if gpsStatus === 'denied' || gpsStatus === 'unavailable'}
+{#if gpsStatus === 'denied' || gpsStatus === 'unavailable' || (gpsStatus === 'none' && !userLat && !userLon)}
   <div style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(30,30,30,0.92);z-index:10000;display:flex;flex-direction:column;align-items:center;justify-content:center;">
     <div style="background:#222;padding:2rem 2.5rem;border-radius:1rem;box-shadow:0 2px 16px #0008;max-width:90vw;text-align:center;">
       <h2 style="color:#fff;margin-bottom:1rem;">Standort auswählen</h2>
       <p style="color:#ccc;font-size:1.1rem;margin-bottom:1.5rem;">
-        GPS ist nicht verfügbar. Wähle deinen Standort auf der Karte aus, um die Galerie nach Entfernung zu sortieren.
+        {#if gpsStatus === 'denied'}
+          GPS ist nicht verfügbar. Wähle deinen Standort auf der Karte aus, um die Galerie nach Entfernung zu sortieren.
+        {:else if gpsStatus === 'unavailable'}
+          GPS ist nicht verfügbar. Wähle deinen Standort auf der Karte aus, um die Galerie nach Entfernung zu sortieren.
+        {:else}
+          Keine GPS-Daten verfügbar. Wähle deinen Standort aus, um die Galerie nach Entfernung zu sortieren.
+        {/if}
       </p>
       <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;">
         <button on:click={tryInitializeGPS} style="padding: 0.9rem 2.2rem; font-size: 1.15rem; border-radius: 0.5rem; background: #3a7; color: #fff; border: none; cursor: pointer; font-weight:600;">
