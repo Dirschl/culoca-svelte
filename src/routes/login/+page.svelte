@@ -41,16 +41,25 @@
   async function loginWithEmail() {
     loginLoading = true;
     loginError = '';
-    const { error: authError } = await supabase.auth.signInWithPassword({ email: loginEmail, password: loginPassword });
+    const { data, error: authError } = await supabase.auth.signInWithPassword({ email: loginEmail, password: loginPassword });
     if (authError) {
       loginError = authError.message;
     } else {
-      // Erfolgreicher Login - Session löschen für direkten Login
-      sessionStore.clearSession();
-      console.log('🔓 Direct login - cleared session data');
+      // Erfolgreicher Login - Session aktualisieren
+      console.log('🔓 Email login successful - updating session');
+      
+      // Session aktualisieren mit User-Daten
+      if (data.user) {
+        sessionStore.setUser(data.user.id, true);
+        console.log('🔓 Session updated with user:', data.user.id);
+      }
       
       loginEmail = '';
       loginPassword = '';
+      
+      // WICHTIG: Weiterleitung zur Startseite nach erfolgreichem Login
+      console.log('🔓 Email login successful - redirecting to home page');
+      goto('/');
     }
     loginLoading = false;
   }
@@ -59,18 +68,33 @@
     loginLoading = true;
     loginError = '';
     loginInfo = '';
-    const { error: authError } = await supabase.auth.signUp({ email: loginEmail, password: loginPassword });
+    const { data, error: authError } = await supabase.auth.signUp({ email: loginEmail, password: loginPassword });
     if (authError) {
       loginError = authError.message;
     } else {
-      // Erfolgreiche Registrierung - Session löschen für direkten Login
-      sessionStore.clearSession();
-      console.log('🔓 Direct signup - cleared session data');
+      // Erfolgreiche Registrierung
+      console.log('🔓 Email signup successful');
       
-      loginInfo = 'Bitte bestätige deine E-Mail-Adresse. Du kannst dich nach der Bestätigung anmelden.';
-      loginEmail = '';
-      loginPassword = '';
-      showRegister = false;
+      if (data.user && data.session) {
+        // Email ist bereits bestätigt (z.B. bei Admin-erstellten Accounts)
+        console.log('🔓 User already confirmed - updating session');
+        sessionStore.setUser(data.user.id, true);
+        loginInfo = 'Registrierung erfolgreich! Du wurdest automatisch angemeldet.';
+        loginEmail = '';
+        loginPassword = '';
+        showRegister = false;
+        
+        // Weiterleitung zur Startseite
+        setTimeout(() => goto('/'), 2000);
+      } else {
+        // Email muss bestätigt werden
+        console.log('🔓 User needs email confirmation');
+        sessionStore.clearSession();
+        loginInfo = 'Registrierung erfolgreich! Bitte bestätige deine E-Mail-Adresse. Du kannst dich nach der Bestätigung anmelden.';
+        loginEmail = '';
+        loginPassword = '';
+        showRegister = false;
+      }
     }
     loginLoading = false;
   }
