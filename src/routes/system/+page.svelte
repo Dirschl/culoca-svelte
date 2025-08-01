@@ -155,11 +155,24 @@
   <main class="main-content">
     <!-- Galerie-Funktionen -->
     <section class="gallery-section">
-      <h2>📸 Galerie-Funktionen</h2>
+      <h2>
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px;">
+          <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/>
+          <circle cx="12" cy="13" r="3"/>
+        </svg>
+        Galerie-Funktionen
+      </h2>
       
       <div class="feature-grid">
         <div class="feature-card">
-          <h3>🖼️ Normale Galerie</h3>
+          <h3>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px;">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+              <circle cx="8.5" cy="8.5" r="1.5"/>
+              <polyline points="21,15 16,10 5,21"/>
+            </svg>
+            Normale Galerie
+          </h3>
           <p>
             Die Standard-Galerie zeigt Fotos in einem responsiven Grid-Layout. 
             Nutzer können durch Fotos scrollen, nach Standorten filtern und 
@@ -177,7 +190,14 @@
         </div>
 
         <div class="feature-card">
-          <h3>📱 Mobile Galerie (3x3)</h3>
+          <h3>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px;">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+              <line x1="8" y1="21" x2="16" y2="21"/>
+              <line x1="12" y1="17" x2="12" y2="21"/>
+            </svg>
+            Mobile Galerie (3x3)
+          </h3>
           <p>
             Speziell für mobile Geräte optimiert - zeigt 9 Fotos gleichzeitig 
             in einem 3x3 Grid. Perfekt für schnelle Übersicht und Navigation.
@@ -194,7 +214,13 @@
         </div>
 
         <div class="feature-card">
-          <h3>🔍 Item-Ansicht & Nearby</h3>
+          <h3>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px;">
+              <circle cx="11" cy="11" r="8"/>
+              <path d="m21 21-4.35-4.35"/>
+            </svg>
+            Item-Ansicht & Nearby
+          </h3>
           <p>
             Detaillierte Ansicht einzelner Fotos mit Nearby-Galerie. 
             Zeigt ähnliche Fotos in der Umgebung und ermöglicht Standort-Filterung.
@@ -211,7 +237,14 @@
         </div>
 
         <div class="feature-card">
-          <h3>🗺️ Kartenansicht</h3>
+          <h3>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px;">
+              <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2"/>
+              <line x1="8" y1="2" x2="8" y2="18"/>
+              <line x1="16" y1="6" x2="16" y2="22"/>
+            </svg>
+            Kartenansicht
+          </h3>
           <p>
             Interaktive Kartenansicht mit OpenStreetMap-Integration. 
             Fotos werden direkt auf der Karte angezeigt und können 
@@ -229,7 +262,14 @@
         </div>
 
         <div class="feature-card">
-          <h3>📤 Bulk Upload</h3>
+          <h3>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px;">
+              <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
+              <polyline points="16,6 12,2 8,6"/>
+              <line x1="12" y1="2" x2="12" y2="15"/>
+            </svg>
+            Bulk Upload
+          </h3>
           <p>
             Massen-Upload von Fotos mit automatischer GPS-Extraktion. 
             Unterstützt Drag & Drop und Batch-Verarbeitung.
@@ -249,11 +289,23 @@
 
     <!-- SEO & Open Graph -->
     <section class="seo-section">
-      <h2>🔍 SEO & Open Graph Integration</h2>
+      <h2>
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px;">
+          <circle cx="11" cy="11" r="8"/>
+          <path d="m21 21-4.35-4.35"/>
+        </svg>
+        SEO & Open Graph Integration
+      </h2>
       
       <div class="feature-grid">
         <div class="feature-card">
-          <h3>🌐 Open Graph Beispiele</h3>
+          <h3>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px;">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+            Open Graph Beispiele
+          </h3>
           <p>
             Jede Seite unterstützt Open Graph Meta-Tags für optimale Darstellung 
             in sozialen Medien. Hier sind echte Beispiele:
@@ -261,7 +313,14 @@
           
           <div class="og-examples">
             <div class="og-example">
-              <h4>📐 Hochformat Fotos</h4>
+              <h4>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px;">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                  <circle cx="8.5" cy="8.5" r="1.5"/>
+                  <polyline points="21,15 16,10 5,21"/>
+                </svg>
+                Hochformat Fotos
+              </h4>
               <p>
                 <strong>Beispiel:</strong> 
                 <a href="https://culoca.com/item/baum-am-weiherer-schachten-arbing-reischach-oberbayern-johann-dirschl" target="_blank">
@@ -275,7 +334,14 @@
             </div>
 
             <div class="og-example">
-              <h4>📏 Querformat Fotos</h4>
+              <h4>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px;">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                  <circle cx="8.5" cy="8.5" r="1.5"/>
+                  <polyline points="21,15 16,10 5,21"/>
+                </svg>
+                Querformat Fotos
+              </h4>
               <p>
                 <strong>Beispiel:</strong> 
                 <a href="http://localhost:5173/item/arbing-laerche-richtung-weiher-arbing-gemeinde-reischach-johann-dirschl" target="_blank">
@@ -289,7 +355,14 @@
             </div>
 
             <div class="og-example">
-              <h4>🗺️ Kartenausschnitt</h4>
+              <h4>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px;">
+                  <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2"/>
+                  <line x1="8" y1="2" x2="8" y2="18"/>
+                  <line x1="16" y1="6" x2="16" y2="22"/>
+                </svg>
+                Kartenausschnitt
+              </h4>
               <p>
                 <strong>Beispiel:</strong> 
                 <a href="https://culoca.com/map-view-share/cf0390c1-76b6-43f7-a0a6-1c51ff501f8f" target="_blank">
@@ -305,37 +378,49 @@
         </div>
 
         <div class="feature-card">
-          <h3>🔗 Dynamische Favicons</h3>
+          <h3>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px;">
+              <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
+              <polyline points="16,6 12,2 8,6"/>
+              <line x1="12" y1="2" x2="12" y2="15"/>
+            </svg>
+            Dynamische Sitemap
+          </h3>
           <p>
-            Jedes Foto erhält ein eigenes Favicon, das automatisch aus dem 512px-Thumbnail 
-            generiert wird. Dies verbessert die Erkennbarkeit in Browser-Tabs.
+            Automatisch generierte XML-Sitemap mit allen öffentlichen Fotos. 
+            Wird von Suchmaschinen automatisch gecrawlt und aktualisiert.
           </p>
           <div class="feature-example">
-            <strong>Beispiel:</strong>
-            <code>culoca.com/api/favicon/baum-am-weiherer-schachten-arbing-reischach-oberbayern-johann-dirschl</code>
+            <strong>Features:</strong>
+            <ul>
+              <li>Automatische Generierung</li>
+              <li>Alle öffentlichen Fotos</li>
+              <li>SEO-optimiert</li>
+              <li>Google-kompatibel</li>
+            </ul>
           </div>
         </div>
 
         <div class="feature-card">
-          <h3>📊 Dynamische Sitemap</h3>
+          <h3>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px;">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+              <circle cx="12" cy="7" r="4"/>
+            </svg>
+            Datenschutz & DSGVO
+          </h3>
           <p>
-            Eine automatisch generierte XML-Sitemap enthält alle öffentlichen Fotos und Seiten. 
-            Google crawlt regelmäßig die Sitemap und indexiert neue Inhalte automatisch.
+            Vollständige DSGVO-Konformität mit transparenten Datenschutzrichtlinien 
+            und Benutzerrechten.
           </p>
           <div class="feature-example">
-            <strong>URL:</strong> <code>culoca.com/sitemap.xml</code>
-          </div>
-        </div>
-
-        <div class="feature-card">
-          <h3>🌍 Deutsche Umlaute</h3>
-          <p>
-            URLs unterstützen korrekte deutsche Umlaute (ä→ae, ö→oe, ü→ue, ß→ss) für 
-            bessere Lesbarkeit und SEO-Optimierung.
-          </p>
-          <div class="feature-example">
-            <strong>Beispiel:</strong>
-            <code>culoca.com/item/altötting → culoca.com/item/altoetting</code>
+            <strong>Features:</strong>
+            <ul>
+              <li>DSGVO-konform</li>
+              <li>Transparente Datenschutzerklärung</li>
+              <li>Benutzerrechte</li>
+              <li>Datenlöschung</li>
+            </ul>
           </div>
         </div>
       </div>
@@ -343,78 +428,71 @@
 
     <!-- Hetzner Integration -->
     <section class="hetzner-section">
-      <h2>🏢 Hetzner Integration</h2>
-      
-      <div class="feature-grid">
-        <div class="feature-card">
-          <h3>☁️ Hetzner Cloud Hosting</h3>
-          <p>
-            Das System läuft auf hochverfügbaren Hetzner Cloud Servern in Deutschland. 
-            Automatische Backups und Monitoring gewährleisten maximale Verfügbarkeit.
-          </p>
-          <div class="feature-example">
-            <strong>Features:</strong>
-            <ul>
-              <li>Hochverfügbare Server</li>
-              <li>Automatische Backups</li>
-              <li>24/7 Monitoring</li>
-              <li>Deutsche Datenschutz-Standards</li>
-            </ul>
+      <h2>
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px;">
+            <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>
+          </svg>
+          Hetzner Cloud Hosting
+        </h2>
+        
+        <div class="feature-grid">
+          <div class="feature-card">
+            <h3>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px;">
+                <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>
+              </svg>
+              Hetzner Cloud Hosting
+            </h3>
+            <p>
+              Professionelles Hosting auf deutschen Servern mit hoher Verfügbarkeit 
+              und DSGVO-konformer Datenverarbeitung.
+            </p>
+            <div class="feature-example">
+              <strong>Features:</strong>
+              <ul>
+                <li>Deutsche Server</li>
+                <li>99.9% Uptime</li>
+                <li>DSGVO-konform</li>
+                <li>Automatische Backups</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="feature-card">
+            <h3>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px;">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+              </svg>
+              Datenschutz & DSGVO
+            </h3>
+            <p>
+              Vollständige DSGVO-Konformität mit transparenten Datenschutzrichtlinien 
+              und Benutzerrechten.
+            </p>
+            <div class="feature-example">
+              <strong>Features:</strong>
+              <ul>
+                <li>DSGVO-konform</li>
+                <li>Transparente Datenschutzerklärung</li>
+                <li>Benutzerrechte</li>
+                <li>Datenlöschung</li>
+              </ul>
+            </div>
           </div>
         </div>
+      </section>
 
-        <div class="feature-card">
-          <h3>📦 Storage Box Integration</h3>
-          <p>
-            Bilder werden über WebDAV-Protokoll auf einer Hetzner Storage Box gespeichert. 
-            UUID-basierte Dateinamen verhindern Konflikte.
-          </p>
-          <div class="feature-example">
-            <strong>Protokoll:</strong> WebDAV<br>
-            <strong>Pfad:</strong> /items/<br>
-            <strong>Naming:</strong> UUID-basiert
-          </div>
-        </div>
-
-        <div class="feature-card">
-          <h3>🔐 Supabase Backend</h3>
-          <p>
-            Sichere Datenbank mit Row Level Security (RLS). Jeder Nutzer kann nur seine 
-            eigenen Daten sehen und bearbeiten.
-          </p>
-          <div class="feature-example">
-            <strong>Features:</strong>
-            <ul>
-              <li>Row Level Security</li>
-              <li>Automatische Authentifizierung</li>
-              <li>Real-time Updates</li>
-              <li>PostgreSQL Backend</li>
-            </ul>
-          </div>
-        </div>
-
-        <div class="feature-card">
-          <h3>🛡️ Datenschutz & DSGVO</h3>
-          <p>
-            Vollständige DSGVO-Konformität mit transparenten Datenschutzerklärungen. 
-            Nutzer haben volle Kontrolle über ihre Daten.
-          </p>
-          <div class="feature-example">
-            <strong>Compliance:</strong>
-            <ul>
-              <li>DSGVO-konform</li>
-              <li>Transparente Datenschutzerklärung</li>
-              <li>Recht auf Löschung</li>
-              <li>Deutsche Server-Standorte</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Live-Statistiken -->
-    <section class="stats-section">
-      <h2>📊 Live-Statistiken</h2>
+      <!-- Live-Statistiken -->
+      <section class="stats-section">
+        <h2>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px;">
+            <line x1="18" y1="20" x2="18" y2="10"/>
+            <line x1="12" y1="20" x2="12" y2="4"/>
+            <line x1="6" y1="20" x2="6" y2="14"/>
+          </svg>
+          Live-Statistiken
+        </h2>
       
       <div class="stats-grid">
         <div class="stat-card">
