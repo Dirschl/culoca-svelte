@@ -109,7 +109,7 @@
           }
         }
 
-        // OG Examples laden - genau 1 Hochformat, 1 Querformat und 1 Map Share
+        // OG Examples laden - genau 1 Hochformat und 1 Querformat
         const { data: allItems, error: itemsError } = await supabase
           .from('items')
           .select('id, title, slug, width, height, profile_id, description')
@@ -143,20 +143,9 @@
             selectedItems.push(randomLandscape);
           }
           
-          // Füge Map Share als drittes Item hinzu
-          selectedItems.push({
-            id: 'map-share',
-            title: 'Kartenausschnitt mit Fotos',
-            slug: 'map-view-share/cf0390c1-76b6-43f7-a0a6-1c51ff501f8f',
-            width: 1200,
-            height: 630,
-            creator: 'Culoca',
-            description: 'Interaktive Kartenansicht mit Fotos aus der Umgebung. Entdecken Sie die Fotografie-Landschaft auf einer interaktiven OpenStreetMap-Karte.'
-          });
-          
           // Creator-Informationen für echte Items laden
           for (const item of selectedItems) {
-            if (item.id !== 'map-share' && item.profile_id) {
+            if (item.profile_id) {
               const { data: creatorData } = await supabase
                 .from('profiles')
                 .select('full_name, accountname')
@@ -422,49 +411,30 @@
             <div class="og-example">
               <h4>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px;">
-                  {#if item.id === 'map-share'}
-                    <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2"/>
-                    <line x1="8" y1="2" x2="8" y2="18"/>
-                    <line x1="16" y1="6" x2="16" y2="22"/>
-                  {:else}
-                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                    <circle cx="8.5" cy="8.5" r="1.5"/>
-                    <polyline points="21,15 16,10 5,21"/>
-                  {/if}
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                  <circle cx="8.5" cy="8.5" r="1.5"/>
+                  <polyline points="21,15 16,10 5,21"/>
                 </svg>
-                {#if item.id === 'map-share'}
-                  Kartenausschnitt
-                {:else}
-                  {item.width > item.height ? 'Querformat Fotos' : 'Hochformat Fotos'}
-                {/if}
+                {item.width > item.height ? 'Querformat Fotos' : 'Hochformat Fotos'}
               </h4>
               <p>
                 <strong>Beispiel:</strong> 
-                <a href={`https://culoca.com/${item.id === 'map-share' ? item.slug : 'item/' + item.slug}`} target="_blank">
+                <a href={`https://culoca.com/item/${item.slug}`} target="_blank">
                   {item.title || 'Ohne Titel'}
                 </a>
               </p>
               <div class="og-preview">
-                {#if item.id === 'map-share'}
-                  <img src="/api/og-image/map-view-share/cf0390c1-76b6-43f7-a0a6-1c51ff501f8f" 
-                       alt="Open Graph Preview - Karte" class="og-image" />
-                {:else}
-                  <img src={`/api/og-image/${item.slug}`} 
-                       alt="Open Graph Preview - {item.width > item.height ? 'Querformat' : 'Hochformat'}" class="og-image" />
-                {/if}
+                <img src={`/api/og-image/${item.slug}`} 
+                     alt="Open Graph Preview - {item.width > item.height ? 'Querformat' : 'Hochformat'}" class="og-image" />
               </div>
               <div class="og-details">
                 <div class="og-favicon">
-                  {#if item.id === 'map-share'}
-                    <img src="/culoca-favicon.svg" alt="Favicon" class="favicon" />
-                  {:else}
-                    <img src={`/api/favicon/${item.slug}`} alt="Favicon" class="favicon" />
-                  {/if}
+                  <img src={`/api/favicon/${item.slug}`} alt="Favicon" class="favicon" />
                 </div>
                 <div class="og-text">
-                  <h5>{item.title || 'Ohne Titel'}{item.id !== 'map-share' ? ', ' + item.creator : ''}</h5>
+                  <h5>{item.title || 'Ohne Titel'}, {item.creator}</h5>
                   <p>{item.description || 'Keine Beschreibung verfügbar.'}</p>
-                  <span class="og-link">https://culoca.com/{item.id === 'map-share' ? item.slug : 'item/' + item.slug}</span>
+                  <span class="og-link">https://culoca.com/item/{item.slug}</span>
                 </div>
               </div>
             </div>
