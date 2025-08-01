@@ -23,17 +23,40 @@ export const POST = async ({ request }) => {
 
     // Update auth user if email is being changed
     if (updates.email) {
-      const { data: authData, error: authError } = await supabaseAdmin.auth.admin.updateUserById(
-        userId,
-        { email: updates.email }
-      );
+      try {
+        // First check if the new email already exists
+        const { data: existingUsers, error: listError } = await supabaseAdmin.auth.admin.listUsers();
+        
+        if (listError) {
+          console.error('Error listing users:', listError);
+          return json({ error: `Failed to check existing emails: ${listError.message}` }, { status: 500 });
+        }
 
-      if (authError) {
-        console.error('Error updating auth user:', authError);
-        return json({ error: `Auth update failed: ${authError.message}` }, { status: 500 });
+        const existingUser = existingUsers.users.find(user => 
+          user.email === updates.email && user.id !== userId
+        );
+
+        if (existingUser) {
+          return json({ error: `E-Mail-Adresse ${updates.email} wird bereits von einem anderen Benutzer verwendet` }, { status: 400 });
+        }
+
+        // Update the user's email
+        const { data: authData, error: authError } = await supabaseAdmin.auth.admin.updateUserById(
+          userId,
+          { email: updates.email }
+        );
+
+        if (authError) {
+          console.error('Error updating auth user:', authError);
+          return json({ error: `Auth update failed: ${authError.message}` }, { status: 500 });
+        }
+
+        results.auth = 'updated';
+        console.log('✅ Auth user email updated successfully');
+      } catch (error) {
+        console.error('Error in auth update:', error);
+        return json({ error: `Auth update failed: ${error.message}` }, { status: 500 });
       }
-
-      results.auth = 'updated';
     }
 
     // Update profile
@@ -57,6 +80,7 @@ export const POST = async ({ request }) => {
       }
 
       results.profile = 'updated';
+      console.log('✅ Profile updated successfully');
     }
 
     console.log(`✅ User ${userId} updated successfully:`, results);

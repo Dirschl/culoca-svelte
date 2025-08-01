@@ -3,6 +3,7 @@
   import { supabase } from '$lib/supabaseClient';
   import { goto } from '$app/navigation';
   import { darkMode } from '$lib/darkMode';
+  import { page } from '$app/stores';
 
   let isLoading = true;
   let isAdmin = false;
@@ -90,7 +91,7 @@
   async function loadAuthUsers() {
     try {
       // This requires admin API - we'll use a server endpoint
-      const response = await fetch('/api/admin/auth-users');
+      const response = await $page.fetch('/api/admin/auth-users');
       if (response.ok) {
         authUsers = await response.json();
         console.log(`Loaded ${authUsers.length} auth users`);
@@ -169,7 +170,7 @@
 
   async function updateUser(updates) {
     try {
-      const response = await fetch('/api/admin/update-user', {
+      const response = await $page.fetch('/api/admin/update-user', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
