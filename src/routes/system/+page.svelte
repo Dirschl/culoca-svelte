@@ -16,6 +16,7 @@
   import { browser } from '$app/environment';
   import SearchBar from '$lib/SearchBar.svelte';
   import FloatingActionButtons from '$lib/FloatingActionButtons.svelte';
+  import { goto } from '$app/navigation';
 
   let stats = {
     totalItems: 0,
@@ -24,9 +25,26 @@
     latestItems: [] as any[]
   };
 
+  let bannerImage = null as any;
+
   onMount(async () => {
     if (browser) {
       try {
+        // Banner-Bild laden (zufälliges Querformat-Foto)
+        const { data: bannerData } = await supabase
+          .from('items')
+          .select('id, title, slug, path_512, width, height')
+          .not('path_512', 'is', null)
+          .gte('width', 2000) // Nur große Bilder
+          .gte('height', 1000)
+          .order('RANDOM()') // Zufällige Auswahl
+          .limit(1)
+          .maybeSingle();
+
+        if (bannerData) {
+          bannerImage = bannerData;
+        }
+
         // Statistiken laden
         const { count: itemsCount } = await supabase
           .from('items')
@@ -57,10 +75,14 @@
           latestItems: latestItems || []
         };
       } catch (error) {
-        console.error('Fehler beim Laden der Statistiken:', error);
+        console.error('Fehler beim Laden der Daten:', error);
       }
     }
   });
+
+  function goToDetail(slug: string) {
+    goto(`/item/${slug}`);
+  }
 </script>
 
 <div class="system-page">
@@ -74,6 +96,22 @@
       <p class="page-subtitle">Vollständige Übersicht aller Funktionen</p>
     </div>
   </header>
+
+  <!-- Banner mit zufälligem Querformat-Foto -->
+  {#if bannerImage}
+  <div class="banner-section">
+    <div class="banner-image-container" on:click={() => goToDetail(bannerImage.slug)}>
+      <img 
+        src="https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/{bannerImage.path_512}" 
+        alt={bannerImage.title || 'Banner Bild'} 
+        class="banner-image" 
+      />
+      <div class="banner-overlay">
+        <div class="banner-title">{bannerImage.title || 'Ohne Titel'}</div>
+      </div>
+    </div>
+  </div>
+  {/if}
 
   <main class="main-content">
     <!-- Einführung -->
@@ -437,6 +475,57 @@
     margin: 0;
   }
 
+  .banner-section {
+    width: 100%;
+    height: 400px;
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 3rem;
+  }
+
+  .banner-image-container {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    cursor: pointer;
+    transition: transform 0.3s ease;
+  }
+
+  .banner-image-container:hover {
+    transform: scale(1.02);
+  }
+
+  .banner-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+  }
+
+  .banner-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.7) 0%, transparent 50%);
+    display: flex;
+    align-items: flex-end;
+    padding: 1.5rem;
+  }
+
+  .banner-title {
+    font-size: 1.2rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    background: var(--bg-secondary);
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    box-shadow: 0 2px 8px var(--shadow);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--border-color);
+  }
+
   .main-content {
     margin: 0 auto;
     padding: 2rem;
@@ -629,6 +718,16 @@
 
     .main-content {
       padding: 1rem;
+    }
+
+    .banner-section {
+      height: 250px;
+      margin-bottom: 2rem;
+    }
+
+    .banner-title {
+      font-size: 1rem;
+      padding: 0.4rem 0.8rem;
     }
 
     .feature-grid {
