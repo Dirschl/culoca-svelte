@@ -18,13 +18,19 @@ async function findItemBySlugVariations(slug: string): Promise<any> {
     // Alte Umlaute-Behandlung (wie vor der Korrektur)
     slug.replace(/ae/g, 'a').replace(/oe/g, 'o').replace(/ue/g, 'u').replace(/ss/g, '-'),
     // Neue Umlaute-Behandlung (aktuelle Korrektur)
-    slug.replace(/a/g, 'ae').replace(/o/g, 'oe').replace(/u/g, 'ue').replace(/ß/g, 'ss'),
+    slug.replace(/a/g, 'ae').replace(/o/g, 'oe').replace(/u/g, 'ue').replace(/-/g, 'ss'),
     // Weitere Variationen
     slug.replace(/ae/g, 'a').replace(/oe/g, 'o').replace(/ue/g, 'u'),
     slug.replace(/a/g, 'ae').replace(/o/g, 'oe').replace(/u/g, 'ue'),
-    // Spezielle deutsche Umlaute
-    slug.replace(/ae/g, 'a').replace(/oe/g, 'o').replace(/ue/g, 'u').replace(/ss/g, 'ß'),
-    slug.replace(/a/g, 'ae').replace(/o/g, 'oe').replace(/u/g, 'ue').replace(/ß/g, 'ss'),
+    // Spezielle deutsche Umlaute - ß wurde zu - konvertiert
+    slug.replace(/ae/g, 'a').replace(/oe/g, 'o').replace(/ue/g, 'u').replace(/-/g, 'ss'),
+    slug.replace(/a/g, 'ae').replace(/o/g, 'oe').replace(/u/g, 'ue').replace(/ss/g, '-'),
+    // Zusätzliche Variationen für ß -> - Fall
+    slug.replace(/ss/g, '-'),
+    slug.replace(/-/g, 'ss'),
+    // Kombinationen für komplexe Fälle
+    slug.replace(/ae/g, 'a').replace(/oe/g, 'o').replace(/ue/g, 'u').replace(/ss/g, '-').replace(/-/g, 'ss'),
+    slug.replace(/a/g, 'ae').replace(/o/g, 'oe').replace(/u/g, 'ue').replace(/-/g, 'ss').replace(/ss/g, '-'),
   ];
 
   console.log('🔍 [DetailPage] Trying slug variations:', slugVariations);
