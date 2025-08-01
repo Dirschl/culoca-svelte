@@ -1,5 +1,6 @@
 import type { PageServerLoad } from './$types';
 import { createClient } from '@supabase/supabase-js';
+import { redirect } from '@sveltejs/kit';
 
 const supabase = createClient(
   (process.env.PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL || import.meta.env.PUBLIC_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL) as string,
@@ -8,6 +9,50 @@ const supabase = createClient(
     auth: { persistSession: false }
   }
 );
+
+// Funktion zur Umwandlung alter Slugs mit Umlauten in neue korrigierte Slugs
+function convertOldSlugToNewSlug(oldSlug: string): string {
+  return oldSlug
+    .toLowerCase()
+    // Alte Umlaute-Behandlung (wie vor der Korrektur)
+    .replace(/ä/g, 'a')  // alt: ä -> a, neu: ä -> ae
+    .replace(/ö/g, 'o')  // alt: ö -> o, neu: ö -> oe  
+    .replace(/ü/g, 'u')  // alt: ü -> u, neu: ü -> ue
+    .replace(/ß/g, '-')  // alt: ß -> -, neu: ß -> ss
+    // Weitere alte Umlaute-Behandlung
+    .replace(/à/g, 'a')
+    .replace(/á/g, 'a')
+    .replace(/â/g, 'a')
+    .replace(/ã/g, 'a')
+    .replace(/å/g, 'a')
+    .replace(/è/g, 'e')
+    .replace(/é/g, 'e')
+    .replace(/ê/g, 'e')
+    .replace(/ë/g, 'e')
+    .replace(/ì/g, 'i')
+    .replace(/í/g, 'i')
+    .replace(/î/g, 'i')
+    .replace(/ï/g, 'i')
+    .replace(/ò/g, 'o')
+    .replace(/ó/g, 'o')
+    .replace(/ô/g, 'o')
+    .replace(/õ/g, 'o')
+    .replace(/ù/g, 'u')
+    .replace(/ú/g, 'u')
+    .replace(/û/g, 'u')
+    .replace(/ý/g, 'y')
+    .replace(/ÿ/g, 'y')
+    .replace(/ñ/g, 'n')
+    .replace(/ç/g, 'c')
+    // Unicode-Normalisierung
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    // Nur erlaubte Zeichen behalten
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .replace(/--+/g, '-')
+    .substring(0, 100);
+}
 
 function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371000;
@@ -25,12 +70,38 @@ export const load: PageServerLoad = async ({ params, url }) => {
   console.log('🔍 [DetailPage] Loading item with slug:', slug);
   
   try {
-    // Fetch image data by slug
-    const { data: image, error } = await supabase
+    // Erst versuchen, das Item mit dem ursprünglichen Slug zu finden
+    let { data: image, error } = await supabase
       .from('items')
       .select('*')
       .eq('slug', slug)
       .or('is_private.eq.false,is_private.is.null');
+    
+    // Wenn nicht gefunden, versuche Umleitung von altem Slug zu neuem
+    if (!image || image.length === 0) {
+      console.log('🔍 [DetailPage] Item not found with original slug, trying old slug conversion:', slug);
+      
+      // Konvertiere alten Slug zu neuem Format
+      const newSlug = convertOldSlugToNewSlug(slug);
+      console.log('🔍 [DetailPage] Converted old slug to new slug:', slug, '->', newSlug);
+      
+      if (newSlug !== slug) {
+        // Versuche mit konvertiertem Slug zu finden
+        const { data: convertedImage, error: convertedError } = await supabase
+          .from('items')
+          .select('*')
+          .eq('slug', newSlug)
+          .or('is_private.eq.false,is_private.is.null');
+        
+        if (convertedImage && convertedImage.length > 0) {
+          console.log('🔍 [DetailPage] Found item with converted slug, redirecting:', newSlug);
+          // Umleitung zur neuen URL
+          throw redirect(301, `/item/${newSlug}`);
+        } else {
+          console.log('🔍 [DetailPage] Item not found with converted slug either:', newSlug);
+        }
+      }
+    }
     
     console.log('🔍 [DetailPage] Supabase query result:', { 
       hasData: !!image, 
