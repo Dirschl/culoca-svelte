@@ -26,6 +26,7 @@
   };
 
   let bannerImage = null as any;
+  let ogExamples = [] as any[];
 
   onMount(async () => {
     if (browser) {
@@ -105,11 +106,78 @@
             } else {
               bannerImage.creator = 'Unbekannt';
             }
-            
-            console.log('Fallback-Bild gefunden:', bannerImage);
-          } else {
-            console.log('Kein Fallback-Bild gefunden');
           }
+        }
+
+        // OG Examples laden - mindestens 1 Hochformat und 1 Querformat
+        const { data: allItems, error: itemsError } = await supabase
+          .from('items')
+          .select('id, title, slug, width, height, profile_id, description')
+          .not('slug', 'is', null)
+          .not('width', 'is', null)
+          .not('height', 'is', null)
+          .gt('width', 0)
+          .gt('height', 0)
+          .order('created_at', { ascending: false })
+          .limit(50);
+
+        if (itemsError) {
+          console.error('OG Examples Fehler:', itemsError);
+        }
+
+        if (allItems && allItems.length > 0) {
+          // Trenne in Hoch- und Querformat
+          const portraitItems = allItems.filter(item => item.height > item.width);
+          const landscapeItems = allItems.filter(item => item.width > item.height);
+          
+          // Wähle mindestens 1 Hochformat und 1 Querformat
+          const selectedItems = [];
+          
+          if (portraitItems.length > 0) {
+            const randomPortrait = portraitItems[Math.floor(Math.random() * portraitItems.length)];
+            selectedItems.push(randomPortrait);
+          }
+          
+          if (landscapeItems.length > 0) {
+            const randomLandscape = landscapeItems[Math.floor(Math.random() * landscapeItems.length)];
+            selectedItems.push(randomLandscape);
+          }
+          
+          // Fülle mit weiteren zufälligen Items auf bis zu 3
+          const remainingItems = allItems.filter(item => 
+            !selectedItems.some(selected => selected.id === item.id)
+          );
+          
+          while (selectedItems.length < 3 && remainingItems.length > 0) {
+            const randomIndex = Math.floor(Math.random() * remainingItems.length);
+            selectedItems.push(remainingItems[randomIndex]);
+            remainingItems.splice(randomIndex, 1);
+          }
+          
+          // Mische die Reihenfolge
+          selectedItems.sort(() => Math.random() - 0.5);
+          
+          // Creator-Informationen laden
+          for (const item of selectedItems) {
+            if (item.profile_id) {
+              const { data: creatorData } = await supabase
+                .from('profiles')
+                .select('full_name, accountname')
+                .eq('id', item.profile_id)
+                .maybeSingle();
+              
+              if (creatorData) {
+                item.creator = creatorData.full_name || creatorData.accountname || 'Unbekannt';
+              } else {
+                item.creator = 'Unbekannt';
+              }
+            } else {
+              item.creator = 'Unbekannt';
+            }
+          }
+          
+          ogExamples = selectedItems;
+          console.log('OG Examples geladen:', ogExamples);
         }
 
         // Statistiken laden
@@ -181,14 +249,6 @@
     </div>
   </div>
   {/if}
-
-  <!-- Einführungstext unterhalb des Banners -->
-  <div class="intro-section">
-    <h2 class="intro-title">Culoca speichert alle Formate</h2>
-    <p class="intro-text">
-      Culoca ist darauf optimiert, sowohl hoch als auch querformate optimal darzustellen und diese in einem justified layout oder als grid visuell ansprechend darzustellen. Der User hat die freie Wahl der Galeriedarstellung, Dark-Light Modes (Settings) oder der Zusatzmodule (Audioguide, Welcome, Newsflash...)
-    </p>
-  </div>
 
   <!-- Einführungstext unterhalb des Banners -->
   <div class="intro-section">
@@ -363,6 +423,7 @@
           </p>
           
           <div class="og-examples">
+            {#each ogExamples as item}
             <div class="og-example">
               <h4>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px;">
@@ -370,93 +431,31 @@
                   <circle cx="8.5" cy="8.5" r="1.5"/>
                   <polyline points="21,15 16,10 5,21"/>
                 </svg>
-                Hochformat Fotos
+                {item.width > item.height ? 'Querformat Fotos' : 'Hochformat Fotos'}
               </h4>
               <p>
                 <strong>Beispiel:</strong> 
-                <a href="https://culoca.com/item/baum-am-weiherer-schachten-arbing-reischach-oberbayern-johann-dirschl" target="_blank">
-                  Baum am Weiherer Schachten
+                <a href={`https://culoca.com/item/${item.slug}`} target="_blank">
+                  {item.title || 'Ohne Titel'}
                 </a>
               </p>
               <div class="og-preview">
-                <img src="https://culoca.com/api/og-image/baum-am-weiherer-schachten-arbing-reischach-oberbayern-johann-dirschl" 
-                     alt="Open Graph Preview - Hochformat" class="og-image" />
+                <img src={`/api/og-image/${item.slug}`} 
+                     alt="Open Graph Preview - {item.width > item.height ? 'Querformat' : 'Hochformat'}" class="og-image" />
               </div>
               <div class="og-details">
                 <div class="og-favicon">
-                  <img src="https://culoca.com/api/favicon/baum-am-weiherer-schachten-arbing-reischach-oberbayern-johann-dirschl" 
+                  <img src={`/api/favicon/${item.slug}`} 
                        alt="Favicon" class="favicon" />
                 </div>
                 <div class="og-text">
-                  <h5>Baum am Weiherer Schachten, Arbing, Reischach, Oberbayern</h5>
-                  <p>Ein majestätischer Baum am Ufer des Weiherer Schachtens in der Gemeinde Arbing, Reischach, Oberbayern. Das Foto zeigt die beeindruckende Naturkulisse mit dem Baum als zentrales Element.</p>
-                  <span class="og-link">culoca.com</span>
+                  <h5>{item.title || 'Ohne Titel'}, {item.creator}</h5>
+                  <p>{item.description || 'Keine Beschreibung verfügbar.'}</p>
+                  <span class="og-link">https://culoca.com/item/{item.slug}</span>
                 </div>
               </div>
             </div>
-
-            <div class="og-example">
-              <h4>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px;">
-                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                  <circle cx="8.5" cy="8.5" r="1.5"/>
-                  <polyline points="21,15 16,10 5,21"/>
-                </svg>
-                Querformat Fotos
-              </h4>
-              <p>
-                <strong>Beispiel:</strong> 
-                <a href="http://localhost:5173/item/arbing-laerche-richtung-weiher-arbing-gemeinde-reischach-johann-dirschl" target="_blank">
-                  Arbing Lärche Richtung Weiher
-                </a>
-              </p>
-              <div class="og-preview">
-                <img src="http://localhost:5173/api/og-image/arbing-laerche-richtung-weiher-arbing-gemeinde-reischach-johann-dirschl" 
-                     alt="Open Graph Preview - Querformat" class="og-image" />
-              </div>
-              <div class="og-details">
-                <div class="og-favicon">
-                  <img src="http://localhost:5173/api/favicon/arbing-laerche-richtung-weiher-arbing-gemeinde-reischach-johann-dirschl" 
-                       alt="Favicon" class="favicon" />
-                </div>
-                <div class="og-text">
-                  <h5>Arbing Lärche Richtung Weiher, Arbing, Gemeinde Reischach</h5>
-                  <p>Panoramablick von der Arbing Lärche in Richtung des malerischen Weihers in der Gemeinde Reischach. Das Querformat-Foto zeigt die weite Landschaft mit dem Weiher als zentrales Element.</p>
-                  <span class="og-link">culoca.com</span>
-                </div>
-              </div>
-            </div>
-
-            <div class="og-example">
-              <h4>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px;">
-                  <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2"/>
-                  <line x1="8" y1="2" x2="8" y2="18"/>
-                  <line x1="16" y1="6" x2="16" y2="22"/>
-                </svg>
-                Kartenausschnitt
-              </h4>
-              <p>
-                <strong>Beispiel:</strong> 
-                <a href="https://culoca.com/map-view-share/cf0390c1-76b6-43f7-a0a6-1c51ff501f8f" target="_blank">
-                  Kartenausschnitt mit Fotos
-                </a>
-              </p>
-              <div class="og-preview">
-                <img src="https://culoca.com/api/og-image/map-view-share/cf0390c1-76b6-43f7-a0a6-1c51ff501f8f" 
-                     alt="Open Graph Preview - Karte" class="og-image" />
-              </div>
-              <div class="og-details">
-                <div class="og-favicon">
-                  <img src="/static/culoca-favicon.svg" alt="Favicon" class="favicon" />
-                </div>
-                <div class="og-text">
-                  <h5>Kartenausschnitt mit Fotos - Culoca</h5>
-                  <p>Interaktive Kartenansicht mit Fotos aus der Umgebung. Entdecken Sie die Fotografie-Landschaft auf einer interaktiven OpenStreetMap-Karte.</p>
-                  <span class="og-link">culoca.com</span>
-                </div>
-              </div>
-            </div>
+            {/each}
           </div>
         </div>
 
@@ -800,8 +799,8 @@
   }
 
   .og-examples {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
     gap: 1.5rem;
   }
 
