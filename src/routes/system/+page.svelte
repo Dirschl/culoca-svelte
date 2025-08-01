@@ -445,8 +445,13 @@
                 </a>
               </p>
               <div class="og-preview">
-                <img src={`/api/og-image/${item.slug}`} 
-                     alt="Open Graph Preview - {item.id === 'map-share' ? 'Karte' : (item.width > item.height ? 'Querformat' : 'Hochformat')}" class="og-image" />
+                {#if item.id === 'map-share'}
+                  <img src="https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/map-share/cf0390c1-76b6-43f7-a0a6-1c51ff501f8f.jpg" 
+                       alt="Open Graph Preview - Karte" class="og-image" />
+                {:else}
+                  <img src={`/api/og-image/${item.slug}`} 
+                       alt="Open Graph Preview - {item.width > item.height ? 'Querformat' : 'Hochformat'}" class="og-image" />
+                {/if}
               </div>
               <div class="og-details">
                 <div class="og-favicon">
