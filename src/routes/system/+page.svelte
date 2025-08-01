@@ -175,12 +175,20 @@
       />
       <div class="banner-overlay">
         <p class="banner-title">{bannerImage.title || 'Ohne Titel'}</p>
-        <p class="banner-creator">von {bannerImage.creator}</p>
-        <p class="banner-resolution">Auflösung: {bannerImage.width}x{bannerImage.height}</p>
+        <p class="banner-creator">{bannerImage.creator}</p>
+        <p class="banner-resolution">{bannerImage.width} x {bannerImage.height} px</p>
       </div>
     </div>
   </div>
   {/if}
+
+  <!-- Einführungstext unterhalb des Banners -->
+  <div class="intro-section">
+    <h2 class="intro-title">Culoca speichert alle Formate</h2>
+    <p class="intro-text">
+      Culoca ist darauf optimiert, sowohl hoch als auch querformate optimal darzustellen und diese in einem justified layout oder als grid visuell ansprechend darzustellen. Der User hat die freie Wahl der Galeriedarstellung, Dark-Light Modes (Settings) oder der Zusatzmodule (Audioguide, Welcome, Newsflash...)
+    </p>
+  </div>
 
   <!-- Einführungstext unterhalb des Banners -->
   <div class="intro-section">
@@ -374,6 +382,17 @@
                 <img src="https://culoca.com/api/og-image/baum-am-weiherer-schachten-arbing-reischach-oberbayern-johann-dirschl" 
                      alt="Open Graph Preview - Hochformat" class="og-image" />
               </div>
+              <div class="og-details">
+                <div class="og-favicon">
+                  <img src="https://culoca.com/api/favicon/baum-am-weiherer-schachten-arbing-reischach-oberbayern-johann-dirschl" 
+                       alt="Favicon" class="favicon" />
+                </div>
+                <div class="og-text">
+                  <h5>Baum am Weiherer Schachten, Arbing, Reischach, Oberbayern</h5>
+                  <p>Ein majestätischer Baum am Ufer des Weiherer Schachtens in der Gemeinde Arbing, Reischach, Oberbayern. Das Foto zeigt die beeindruckende Naturkulisse mit dem Baum als zentrales Element.</p>
+                  <span class="og-link">culoca.com</span>
+                </div>
+              </div>
             </div>
 
             <div class="og-example">
@@ -395,6 +414,17 @@
                 <img src="http://localhost:5173/api/og-image/arbing-laerche-richtung-weiher-arbing-gemeinde-reischach-johann-dirschl" 
                      alt="Open Graph Preview - Querformat" class="og-image" />
               </div>
+              <div class="og-details">
+                <div class="og-favicon">
+                  <img src="http://localhost:5173/api/favicon/arbing-laerche-richtung-weiher-arbing-gemeinde-reischach-johann-dirschl" 
+                       alt="Favicon" class="favicon" />
+                </div>
+                <div class="og-text">
+                  <h5>Arbing Lärche Richtung Weiher, Arbing, Gemeinde Reischach</h5>
+                  <p>Panoramablick von der Arbing Lärche in Richtung des malerischen Weihers in der Gemeinde Reischach. Das Querformat-Foto zeigt die weite Landschaft mit dem Weiher als zentrales Element.</p>
+                  <span class="og-link">culoca.com</span>
+                </div>
+              </div>
             </div>
 
             <div class="og-example">
@@ -415,6 +445,16 @@
               <div class="og-preview">
                 <img src="https://culoca.com/api/og-image/map-view-share/cf0390c1-76b6-43f7-a0a6-1c51ff501f8f" 
                      alt="Open Graph Preview - Karte" class="og-image" />
+              </div>
+              <div class="og-details">
+                <div class="og-favicon">
+                  <img src="/static/culoca-favicon.svg" alt="Favicon" class="favicon" />
+                </div>
+                <div class="og-text">
+                  <h5>Kartenausschnitt mit Fotos - Culoca</h5>
+                  <p>Interaktive Kartenansicht mit Fotos aus der Umgebung. Entdecken Sie die Fotografie-Landschaft auf einer interaktiven OpenStreetMap-Karte.</p>
+                  <span class="og-link">culoca.com</span>
+                </div>
               </div>
             </div>
           </div>
@@ -642,7 +682,7 @@
   }
 
   .banner-image-container:hover {
-    transform: scale(1.02);
+    /*transform: scale(1.02);*/
   }
 
   .banner-image {
@@ -673,14 +713,14 @@
   }
 
   .banner-creator {
-    font-size: 0.9rem;
-    color: var(--text-secondary);
-    margin: 0.25rem 0 0 0;
+    font-size: 1rem;
+    color: var(--text-primary);
+    margin: 0rem 0 0 0;
   }
 
   .banner-resolution {
-    font-size: 0.9rem;
-    color: var(--text-secondary);
+    font-size: 0.8rem;
+    color: var(--text-primary);
     margin: 0.25rem 0 0 0;
   }
 
@@ -798,6 +838,53 @@
     height: auto;
     border-radius: 8px;
     border: 1px solid var(--border-color);
+  }
+
+  .og-details {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin-top: 1rem;
+    padding: 1rem;
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+  }
+
+  .og-favicon {
+    flex-shrink: 0;
+  }
+
+  .favicon {
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;
+  }
+
+  .og-text {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .og-text h5 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin: 0 0 0.25rem 0;
+    color: var(--text-primary);
+    line-height: 1.3;
+  }
+
+  .og-text p {
+    font-size: 0.8rem;
+    margin: 0 0 0.5rem 0;
+    color: var(--text-secondary);
+    line-height: 1.4;
+  }
+
+  .og-link {
+    font-size: 0.75rem;
+    color: var(--text-tertiary);
+    text-transform: lowercase;
   }
 
   .stats-grid {
