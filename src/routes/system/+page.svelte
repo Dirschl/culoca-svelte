@@ -573,11 +573,6 @@
   }
 
   .intro-section {
-    margin-top: 3rem;
-    padding: 2rem;
-    background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: 12px;
     text-align: center;
   }
 
@@ -591,6 +586,7 @@
     font-size: 1.1rem;
     line-height: 1.6;
     color: var(--text-secondary);
+    margin: 0;
   }
 
   .feature-grid {
