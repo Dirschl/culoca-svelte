@@ -51,6 +51,13 @@ export const load: PageServerLoad = async ({ params, url }) => {
   console.log('🔍 [DetailPage] Loading item with slug:', slug);
   console.log('🔍 [DetailPage] URL:', url.toString());
   
+  // Prüfe auf Städtenamen-Umleitung VOR der Datenbank-Abfrage
+  const redirectSlug = getRedirectSlug(slug);
+  if (redirectSlug) {
+    console.log('🔍 [DetailPage] Found city redirect, redirecting:', slug, '->', redirectSlug);
+    throw redirect(301, `/item/${redirectSlug}`);
+  }
+  
   try {
     // Erst versuchen, das Item mit dem ursprünglichen Slug zu finden
     let { data: image, error } = await supabase
@@ -61,17 +68,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
     
     // Wenn nicht gefunden, versuche Umleitung von altem Slug zu neuem
     if (!image || image.length === 0) {
-      console.log('🔍 [DetailPage] Item not found with original slug, checking for city redirect:', slug);
-      
-      // Prüfe auf Städtenamen-Umleitung
-      const redirectSlug = getRedirectSlug(slug);
-      
-      if (redirectSlug) {
-        console.log('🔍 [DetailPage] Found city redirect, redirecting:', slug, '->', redirectSlug);
-        throw redirect(301, `/item/${redirectSlug}`);
-      } else {
-        console.log('🔍 [DetailPage] No city redirect found for slug:', slug);
-      }
+      console.log('🔍 [DetailPage] Item not found with original slug:', slug);
     }
     
     console.log('🔍 [DetailPage] Supabase query result:', { 
