@@ -72,14 +72,14 @@ export const load: PageServerLoad = async ({ params, url }) => {
   console.log('🔍 [DetailPage] Loading item with slug:', slug);
   console.log('🔍 [DetailPage] URL:', url.toString());
   
+  // Direkte Umleitung für bekannte Fälle - VOR allen anderen Checks
+  if (slug === 'alte-steinerne-brucke-in-toging-altotting-inn-salzach-johann-dirschl') {
+    const correctSlug = 'alte-steinerne-bruecke-in-toeging-altotting-inn-salzach-johann-dirschl';
+    console.log('🔍 [DetailPage] Redirecting known case:', slug, '->', correctSlug);
+    throw redirect(301, `/item/${correctSlug}`);
+  }
+  
   try {
-    // Direkte Umleitung für bekannte Fälle
-    if (slug === 'alte-steinerne-brucke-in-toging-altotting-inn-salzach-johann-dirschl') {
-      const correctSlug = 'alte-steinerne-bruecke-in-toeging-altotting-inn-salzach-johann-dirschl';
-      console.log('🔍 [DetailPage] Redirecting known case:', slug, '->', correctSlug);
-      throw redirect(301, `/item/${correctSlug}`);
-    }
-    
     // Erst versuchen, das Item mit dem ursprünglichen Slug zu finden
     let { data: image, error } = await supabase
       .from('items')
