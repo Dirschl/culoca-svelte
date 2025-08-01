@@ -948,6 +948,12 @@
               age: Math.round(age / 1000 / 60) + ' minutes ago'
             });
             
+            // WICHTIG: Galerie sofort mit wiederhergestellter GPS-Position aktualisieren
+            if (galleryInitialized) {
+              console.log('[GPS-Restore] Updating gallery with restored GPS position');
+              resetGallery({ lat: userLat, lon: userLon });
+            }
+            
             return true; // GPS wurde wiederhergestellt
           } else {
             console.log('[GPS-Restore] Saved GPS data too old, clearing localStorage');
@@ -967,7 +973,7 @@
     filterStore.initFromUrl($pageStore.url.searchParams);
     console.log('[onMount] Initialized filterStore from URL parameters');
     
-    // WICHTIG: Stelle GPS-Position aus localStorage wieder her
+    // WICHTIG: Stelle GPS-Position aus localStorage wieder her VOR der Galerie-Initialisierung
     const gpsRestored = restoreGPSPosition();
     
     // URL-Parameter für mobilen Modus verarbeiten (nur für Audioguide)
@@ -1011,14 +1017,13 @@
     const handleVisibilityChange = () => {
       if (!document.hidden) {
         console.log('[Visibility] Page became visible, checking GPS position');
-        const gpsRestored = restoreGPSPosition();
-        if (gpsRestored && galleryInitialized) {
-          console.log('[Visibility] GPS restored, updating gallery');
+        // Rely on filterStore to have restored GPS from localStorage
+        const gps = getEffectiveGpsPosition();
+        if (gps && galleryInitialized) {
+          console.log('[Visibility] GPS restored via filterStore, updating gallery');
           // Kurze Verzögerung um sicherzustellen, dass alles geladen ist
           setTimeout(() => {
-            if (userLat && userLon) {
-              resetGallery({ lat: userLat, lon: userLon });
-            }
+            resetGallery({ lat: gps.lat, lon: gps.lon });
           }, 100);
         }
       }
@@ -1115,24 +1120,43 @@
         const urlParams = new URLSearchParams(window.location.search);
         const searchParam = urlParams.get('search') || urlParams.get('s');
         
-        // NEU: Lade sofort ohne auf GPS zu warten
-        console.log('[Gallery-Init] Loading gallery immediately without waiting for GPS...');
+        // WICHTIG: Prüfe zuerst auf manuell ausgewählte GPS-Position
+        const savedGps = localStorage.getItem('userGps');
+        let initialLat = 0;
+        let initialLon = 0;
+        
+        if (savedGps) {
+          try {
+            const gpsData = JSON.parse(savedGps);
+            const now = Date.now();
+            const age = now - gpsData.timestamp;
+            
+            // Wenn manuell ausgewählte GPS-Daten vorhanden und nicht zu alt sind, verwende diese
+            if (age < 24 * 60 * 60 * 1000) {
+              initialLat = gpsData.lat;
+              initialLon = gpsData.lon;
+              console.log('[Gallery-Init] Using manually selected GPS position:', { initialLat, initialLon });
+            }
+          } catch (error) {
+            console.error('[Gallery-Init] Error parsing saved GPS data:', error);
+          }
+        }
         
         // Setze lastLoaded-Werte um doppelte GPS-Trigger zu vermeiden
-        lastLoadedLat = 0;
-        lastLoadedLon = 0;
-        lastLoadedSource = 'fallback';
+        lastLoadedLat = initialLat;
+        lastLoadedLon = initialLon;
+        lastLoadedSource = initialLat && initialLon ? 'manual' : 'fallback';
         
         // Setze ursprüngliche Galerie-Koordinaten für Normal Mode (nur einmal)
         if (originalGalleryLat === null && originalGalleryLon === null) {
-          originalGalleryLat = 0;
-          originalGalleryLon = 0;
+          originalGalleryLat = initialLat;
+          originalGalleryLon = initialLon;
           console.log('[Gallery-Init] Set original gallery coordinates:', { originalGalleryLat, originalGalleryLon });
         }
         
         const galleryParams: any = {
-          lat: 0,
-          lon: 0
+          lat: initialLat,
+          lon: initialLon
         };
         
         // WICHTIG: User-Filter beibehalten falls gesetzt
@@ -1151,85 +1175,87 @@
           galleryParams.fromItem = true;
         }
         
-        console.log('[Gallery-Init] Loading gallery with fallback coordinates:', galleryParams);
+        console.log('[Gallery-Init] Loading gallery with coordinates:', galleryParams);
         resetGallery(galleryParams);
         
-        // NEU: Versuche GPS-Koordinaten im Hintergrund zu laden
-        setTimeout(async () => {
-          console.log('[Gallery-Init] Attempting to get GPS coordinates in background...');
-          
-          let attempts = 0;
-          const maxAttempts = 10; // 10 Sekunden warten
-          const checkInterval = 1000; // Jede Sekunde prüfen
-          
-          while (attempts < maxAttempts) {
-            const gps = getEffectiveGpsPosition();
-            const effectiveLat = gps?.lat || userLat;
-            const effectiveLon = gps?.lon || userLon;
+        // NEU: Versuche GPS-Koordinaten im Hintergrund zu laden (nur wenn keine manuell ausgewählte Position vorhanden)
+        if (!initialLat && !initialLon) {
+          setTimeout(async () => {
+            console.log('[Gallery-Init] Attempting to get GPS coordinates in background...');
             
-            console.log(`[Gallery-Init] Background GPS attempt ${attempts + 1}/${maxAttempts}:`, {
-              gps,
-              userLat,
-              userLon,
-              effectiveLat,
-              effectiveLon
-            });
+            let attempts = 0;
+            const maxAttempts = 10; // 10 Sekunden warten
+            const checkInterval = 1000; // Jede Sekunde prüfen
             
-            // Wenn GPS-Koordinaten verfügbar sind, lade Galerie neu
-            if (effectiveLat && effectiveLon) {
-              console.log('[Gallery-Init] GPS coordinates available, updating coordinates...');
+            while (attempts < maxAttempts) {
+              const gps = getEffectiveGpsPosition();
+              const effectiveLat = gps?.lat || userLat;
+              const effectiveLon = gps?.lon || userLon;
               
-              // Setze lastLoaded-Werte um doppelte GPS-Trigger zu vermeiden
-              lastLoadedLat = effectiveLat;
-              lastLoadedLon = effectiveLon;
-              lastLoadedSource = gps?.source || 'background';
+              console.log(`[Gallery-Init] Background GPS attempt ${attempts + 1}/${maxAttempts}:`, {
+                gps,
+                userLat,
+                userLon,
+                effectiveLat,
+                effectiveLon
+              });
               
-              // Setze ursprüngliche Galerie-Koordinaten für Normal Mode (nur einmal)
-              if (originalGalleryLat === 0 && originalGalleryLon === 0) {
-                originalGalleryLat = effectiveLat;
-                originalGalleryLon = effectiveLon;
-                console.log('[Gallery-Init] Updated original gallery coordinates:', { originalGalleryLat, originalGalleryLon });
+              // Wenn GPS-Koordinaten verfügbar sind, lade Galerie neu
+              if (effectiveLat && effectiveLon) {
+                console.log('[Gallery-Init] GPS coordinates available, updating coordinates...');
+                
+                // Setze lastLoaded-Werte um doppelte GPS-Trigger zu vermeiden
+                lastLoadedLat = effectiveLat;
+                lastLoadedLon = effectiveLon;
+                lastLoadedSource = gps?.source || 'background';
+                
+                // Setze ursprüngliche Galerie-Koordinaten für Normal Mode (nur einmal)
+                if (originalGalleryLat === 0 && originalGalleryLon === 0) {
+                  originalGalleryLat = effectiveLat;
+                  originalGalleryLon = effectiveLon;
+                  console.log('[Gallery-Init] Updated original gallery coordinates:', { originalGalleryLat, originalGalleryLon });
+                }
+                
+                // Nur für Mobile Mode: Galerie neu laden
+                if (isManual3x3Mode) {
+                  const galleryParams: any = {
+                    lat: effectiveLat,
+                    lon: effectiveLon
+                  };
+                  
+                  // WICHTIG: User-Filter beibehalten falls gesetzt
+                  if ($filterStore.userFilter) {
+                    galleryParams.user_id = $filterStore.userFilter.userId;
+                  }
+                  
+                  // Füge Suchparameter hinzu falls vorhanden
+                  if (searchParam) {
+                    galleryParams.search = searchParam;
+                    setSearchQuery(searchParam);
+                  }
+                  // Setze fromItem, wenn Location-Filter aktiv
+                  if ($filterStore.locationFilter) {
+                    galleryParams.fromItem = true;
+                  }
+                  
+                  console.log('[Gallery-Init] Reloading mobile gallery with GPS coordinates:', galleryParams);
+                  resetGallery(galleryParams);
+                } else {
+                  // Normal Mode: Nur Koordinaten aktualisieren, keine Neuladung
+                  console.log('[Gallery-Init] Normal mode: Updated GPS coordinates without reloading gallery');
+                }
+                
+                return; // Koordinaten aktualisiert, beende Warteschleife
               }
               
-              // Nur für Mobile Mode: Galerie neu laden
-              if (isManual3x3Mode) {
-                const galleryParams: any = {
-                  lat: effectiveLat,
-                  lon: effectiveLon
-                };
-                
-                // WICHTIG: User-Filter beibehalten falls gesetzt
-                if ($filterStore.userFilter) {
-                  galleryParams.user_id = $filterStore.userFilter.userId;
-                }
-                
-                // Füge Suchparameter hinzu falls vorhanden
-                if (searchParam) {
-                  galleryParams.search = searchParam;
-                  setSearchQuery(searchParam);
-                }
-                // Setze fromItem, wenn Location-Filter aktiv
-                if ($filterStore.locationFilter) {
-                  galleryParams.fromItem = true;
-                }
-                
-                console.log('[Gallery-Init] Reloading mobile gallery with GPS coordinates:', galleryParams);
-                resetGallery(galleryParams);
-              } else {
-                // Normal Mode: Nur Koordinaten aktualisieren, keine Neuladung
-                console.log('[Gallery-Init] Normal mode: Updated GPS coordinates without reloading gallery');
-              }
-              
-              return; // Koordinaten aktualisiert, beende Warteschleife
+              // Warte eine Sekunde bevor nächster Versuch
+              await new Promise(resolve => setTimeout(resolve, checkInterval));
+              attempts++;
             }
             
-            // Warte eine Sekunde bevor nächster Versuch
-            await new Promise(resolve => setTimeout(resolve, checkInterval));
-            attempts++;
-          }
-          
-          console.log('[Gallery-Init] No GPS coordinates available in background, keeping fallback gallery');
-        }, 1000); // 1 Sekunde warten bevor GPS-Versuch
+            console.log('[Gallery-Init] No GPS coordinates available in background, keeping fallback gallery');
+          }, 1000); // 1 Sekunde warten bevor GPS-Versuch
+        }
       }
     };
     
@@ -1402,6 +1428,25 @@
     // Live-Tracking: watchPosition
     gpsWatchId = navigator.geolocation.watchPosition(
       (position) => {
+        // WICHTIG: Prüfe ob manuell ausgewählte GPS-Position vorhanden ist
+        const savedGps = localStorage.getItem('userGps');
+        if (savedGps) {
+          try {
+            const gpsData = JSON.parse(savedGps);
+            const now = Date.now();
+            const age = now - gpsData.timestamp;
+            
+            // Wenn manuell ausgewählte GPS-Daten vorhanden und nicht zu alt sind, verwende diese
+            if (age < 24 * 60 * 60 * 1000) {
+              console.log('[GPS] Manually selected GPS found, ignoring browser GPS');
+              return; // Ignoriere Browser-GPS, verwende manuell ausgewählte Position
+            }
+          } catch (error) {
+            console.error('[GPS] Error parsing saved GPS data:', error);
+          }
+        }
+        
+        // Nur verwende Browser-GPS wenn keine manuell ausgewählte Position vorhanden ist
         userLat = position.coords.latitude;
         userLon = position.coords.longitude;
         gpsStatus = "active";
