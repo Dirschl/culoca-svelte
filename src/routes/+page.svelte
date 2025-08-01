@@ -922,6 +922,46 @@
     }
   }
   
+  // Funktion zur Wiederherstellung der GPS-Position aus localStorage
+  function restoreGPSPosition() {
+    if (browser) {
+      const savedGps = localStorage.getItem('userGps');
+      if (savedGps) {
+        try {
+          const gpsData = JSON.parse(savedGps);
+          const now = Date.now();
+          const age = now - gpsData.timestamp;
+          
+          // Verwende gespeicherte GPS-Daten nur wenn sie nicht zu alt sind (24 Stunden)
+          if (age < 24 * 60 * 60 * 1000) {
+            userLat = gpsData.lat;
+            userLon = gpsData.lon;
+            gpsStatus = 'active';
+            lastGPSUpdateTime = gpsData.timestamp;
+            
+            // WICHTIG: GPS-Position in filterStore speichern für getEffectiveGpsPosition()
+            filterStore.updateGpsStatus(true, { lat: userLat, lon: userLon });
+            
+            console.log('[GPS-Restore] Restored GPS position from localStorage:', {
+              lat: userLat,
+              lon: userLon,
+              age: Math.round(age / 1000 / 60) + ' minutes ago'
+            });
+            
+            return true; // GPS wurde wiederhergestellt
+          } else {
+            console.log('[GPS-Restore] Saved GPS data too old, clearing localStorage');
+            localStorage.removeItem('userGps');
+          }
+        } catch (error) {
+          console.error('[GPS-Restore] Error parsing saved GPS data:', error);
+          localStorage.removeItem('userGps');
+        }
+      }
+    }
+    return false; // Keine GPS-Daten wiederhergestellt
+  }
+  
   onMount(() => {
     // Initialize filter store from URL parameters
     filterStore.initFromUrl($pageStore.url.searchParams);
