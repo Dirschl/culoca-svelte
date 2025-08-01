@@ -31,18 +31,44 @@
     if (browser) {
       try {
         // Banner-Bild laden (zufälliges Querformat-Foto)
-        const { data: bannerData } = await supabase
+        const { data: bannerData, error: bannerError } = await supabase
           .from('items')
           .select('id, title, slug, path_512, width, height')
           .not('path_512', 'is', null)
-          .gte('width', 2000) // Nur große Bilder
-          .gte('height', 1000)
+          .gte('width', 1000) // Weniger restriktiv
+          .gte('height', 500)
           .order('RANDOM()') // Zufällige Auswahl
           .limit(1)
           .maybeSingle();
 
+        if (bannerError) {
+          console.error('Banner-Fehler:', bannerError);
+        }
+
         if (bannerData) {
+          console.log('Banner-Bild gefunden:', bannerData);
           bannerImage = bannerData;
+        } else {
+          console.log('Kein Banner-Bild gefunden - versuche Fallback');
+          // Fallback: Jedes Bild mit path_512
+          const { data: fallbackData, error: fallbackError } = await supabase
+            .from('items')
+            .select('id, title, slug, path_512, width, height')
+            .not('path_512', 'is', null)
+            .order('RANDOM()')
+            .limit(1)
+            .maybeSingle();
+          
+          if (fallbackError) {
+            console.error('Fallback-Fehler:', fallbackError);
+          }
+          
+          if (fallbackData) {
+            console.log('Fallback-Bild gefunden:', fallbackData);
+            bannerImage = fallbackData;
+          } else {
+            console.log('Kein Fallback-Bild gefunden');
+          }
         }
 
         // Statistiken laden
