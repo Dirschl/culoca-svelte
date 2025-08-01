@@ -12,32 +12,26 @@ const supabase = createClient(
 
 // Funktion zur Suche nach Items mit verschiedenen Slug-Varianten
 async function findItemBySlugVariations(slug: string): Promise<any> {
-  // Liste von möglichen Slug-Varianten basierend auf verschiedenen Umlaute-Behandlungen
-  const slugVariations = [
-    slug, // Original
-    // Alte Umlaute-Behandlung (wie vor der Korrektur)
-    slug.replace(/ae/g, 'a').replace(/oe/g, 'o').replace(/ue/g, 'u').replace(/ss/g, '-'),
-    // Neue Umlaute-Behandlung (aktuelle Korrektur)
-    slug.replace(/a/g, 'ae').replace(/o/g, 'oe').replace(/u/g, 'ue').replace(/-/g, 'ss'),
-    // Weitere Variationen
+  console.log('🔍 [DetailPage] Starting slug variation search for:', slug);
+  
+  // Spezifische Variationen für den gegebenen Slug
+  const variations = [
+    // Für "alte-steinerne-brucke-in-toging-altotting-inn-salzach-johann-dirschl"
+    'alte-steinerne-bruecke-in-toeging-altotting-inn-salzach-johann-dirschl',
+    // Weitere mögliche Variationen
+    slug.replace(/brucke/g, 'bruecke'),
+    slug.replace(/toging/g, 'toeging'),
+    slug.replace(/brucke/g, 'bruecke').replace(/toging/g, 'toeging'),
+    // Allgemeine Umlaute-Behandlungen
     slug.replace(/ae/g, 'a').replace(/oe/g, 'o').replace(/ue/g, 'u'),
     slug.replace(/a/g, 'ae').replace(/o/g, 'oe').replace(/u/g, 'ue'),
-    // Spezielle deutsche Umlaute - ß wurde zu - konvertiert
-    slug.replace(/ae/g, 'a').replace(/oe/g, 'o').replace(/ue/g, 'u').replace(/-/g, 'ss'),
-    slug.replace(/a/g, 'ae').replace(/o/g, 'oe').replace(/u/g, 'ue').replace(/ss/g, '-'),
-    // Zusätzliche Variationen für ß -> - Fall
-    slug.replace(/ss/g, '-'),
-    slug.replace(/-/g, 'ss'),
-    // Kombinationen für komplexe Fälle
-    slug.replace(/ae/g, 'a').replace(/oe/g, 'o').replace(/ue/g, 'u').replace(/ss/g, '-').replace(/-/g, 'ss'),
-    slug.replace(/a/g, 'ae').replace(/o/g, 'oe').replace(/u/g, 'ue').replace(/-/g, 'ss').replace(/ss/g, '-'),
   ];
 
-  console.log('🔍 [DetailPage] Trying slug variations:', slugVariations);
+  console.log('🔍 [DetailPage] Trying variations:', variations);
 
   // Versuche jede Variation
-  for (const variation of slugVariations) {
-    if (variation === slug) continue; // Original bereits versucht
+  for (const variation of variations) {
+    console.log('🔍 [DetailPage] Trying variation:', variation);
     
     const { data: image, error } = await supabase
       .from('items')
@@ -45,12 +39,19 @@ async function findItemBySlugVariations(slug: string): Promise<any> {
       .eq('slug', variation)
       .or('is_private.eq.false,is_private.is.null');
     
+    console.log('🔍 [DetailPage] Query result for', variation, ':', { 
+      hasData: !!image, 
+      dataLength: Array.isArray(image) ? image.length : (image ? 1 : 0),
+      error: error?.message 
+    });
+    
     if (image && image.length > 0) {
       console.log('🔍 [DetailPage] Found item with slug variation:', variation);
       return image[0];
     }
   }
   
+  console.log('🔍 [DetailPage] No item found with any slug variation');
   return null;
 }
 
