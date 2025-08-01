@@ -39,17 +39,39 @@ export const GET = async ({ params }) => {
 
     const imageBuffer = await response.arrayBuffer();
 
-    // 5. Gib das Bild als Favicon zurück
-    return new Response(imageBuffer, {
-      status: 200,
-      headers: {
-        'Content-Type': 'image/jpeg',
-        'Cache-Control': 'public, max-age=3600, s-maxage=86400', // 1 Stunde Browser, 24 Stunden CDN
-        'Content-Disposition': 'inline',
-        'Access-Control-Allow-Origin': '*',
-        'X-Favicon-Source': `Item: ${item.title || item.original_name || item.id}` // Debug-Header
-      }
-    });
+    // 5. Konvertiere zu PNG für bessere Browser-Kompatibilität
+    const sharp = (await import('sharp')).default;
+    
+    try {
+      const pngBuffer = await sharp(imageBuffer)
+        .resize(512, 512, { fit: 'cover' })
+        .png({ quality: 90 })
+        .toBuffer();
+      
+      return new Response(pngBuffer, {
+        status: 200,
+        headers: {
+          'Content-Type': 'image/png',
+          'Cache-Control': 'public, max-age=3600, s-maxage=86400', // 1 Stunde Browser, 24 Stunden CDN
+          'Content-Disposition': 'inline',
+          'Access-Control-Allow-Origin': '*',
+          'X-Favicon-Source': `Item: ${item.title || item.original_name || item.id}` // Debug-Header
+        }
+      });
+    } catch (sharpError) {
+      console.error('Sharp conversion error:', sharpError);
+      // Fallback: Original JPEG zurückgeben
+      return new Response(imageBuffer, {
+        status: 200,
+        headers: {
+          'Content-Type': 'image/jpeg',
+          'Cache-Control': 'public, max-age=3600, s-maxage=86400',
+          'Content-Disposition': 'inline',
+          'Access-Control-Allow-Origin': '*',
+          'X-Favicon-Source': `Item: ${item.title || item.original_name || item.id}`
+        }
+      });
+    }
 
   } catch (err) {
     console.error('Favicon generation error:', err);

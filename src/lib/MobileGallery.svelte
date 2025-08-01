@@ -4,6 +4,9 @@
   import GalleryLayout from './GalleryLayout.svelte';
   import { updateGalleryStats } from '$lib/galleryStats';
   import { supabase } from '$lib/supabaseClient';
+  import { createEventDispatcher } from 'svelte';
+  
+  const dispatch = createEventDispatcher();
   export let userLat: number | null = null;
   export let userLon: number | null = null;
   export let useJustifiedLayout: boolean = true;
@@ -217,6 +220,12 @@
         loading = false;
         
         console.log(`[MobileGallery] Updated gridItems with ${converted.length} images from dynamic loader (like simulation)`);
+        
+        // Benachrichtige übergeordnete Komponente über erstes Bild für Audioguide
+        if (converted.length > 0) {
+          console.log('[MobileGallery] Initial load - dispatching first image for autoguide:', converted[0]);
+          dispatch('firstImageChanged', converted[0]);
+        }
       }
     }, 2000) as any; // Check every 2 seconds (same as simulation)
   }
@@ -266,6 +275,20 @@
     if (firstItemChanged) {
       console.log('[MobileGallery] Items re-sorted, closest item is now:', sortedItems[0]?.id);
       gridItems.set(sortedItems);
+      
+      // Benachrichtige übergeordnete Komponente über erstes Bild für Audioguide
+      if (sortedItems.length > 0) {
+        console.log('[MobileGallery] Dispatching first image for autoguide:', sortedItems[0]);
+        dispatch('firstImageChanged', sortedItems[0]);
+      }
+    }
+  }
+
+  // Funktion um erstes Bild für Audioguide zu senden
+  function notifyFirstImageChange() {
+    if ($gridItems.length > 0) {
+      console.log('[MobileGallery] Notifying parent of first image:', $gridItems[0]);
+      dispatch('firstImageChanged', $gridItems[0]);
     }
   }
 </script>
