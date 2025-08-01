@@ -3,6 +3,10 @@ import { supabaseAdmin } from '$lib/supabaseAdmin.js';
 
 export const GET = async () => {
   try {
+    if (!supabaseAdmin) {
+      return json({ error: 'Admin operations not available - SUPABASE_SERVICE_ROLE_KEY missing' }, { status: 503 });
+    }
+
     const { data: users, error } = await supabaseAdmin.auth.admin.listUsers();
     
     if (error) {
@@ -29,6 +33,10 @@ export const GET = async () => {
 
 export const POST = async ({ request }) => {
   try {
+    if (!supabaseAdmin) {
+      return json({ error: 'Admin operations not available - SUPABASE_SERVICE_ROLE_KEY missing' }, { status: 503 });
+    }
+
     const { email } = await request.json();
     
     if (!email) {
