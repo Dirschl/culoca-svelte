@@ -1,15 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { createClient } from '@supabase/supabase-js';
-
-// Service role client for admin operations
-const supabaseUrl = (process.env.PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL)!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!supabaseServiceKey) {
-  throw new Error('SUPABASE_SERVICE_ROLE_KEY is required for admin operations');
-}
-
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+import { supabaseAdmin } from '$lib/supabaseAdmin.js';
 
 export const POST = async ({ request }) => {
   try {
