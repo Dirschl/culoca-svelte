@@ -68,7 +68,9 @@ function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: num
 
 export const load: PageServerLoad = async ({ params, url }) => {
   const { slug } = params;
+  console.log('🔍 [DetailPage] ===== LOAD FUNCTION CALLED =====');
   console.log('🔍 [DetailPage] Loading item with slug:', slug);
+  console.log('🔍 [DetailPage] URL:', url.toString());
   
   try {
     // Direkte Umleitung für bekannte Fälle
