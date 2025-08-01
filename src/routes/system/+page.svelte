@@ -675,40 +675,37 @@
 
   .feature-card {
     background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: 12px;
     padding: 1.5rem;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-  }
-
-  .feature-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 20px var(--shadow);
   }
 
   .feature-card h3 {
-    font-size: 1.3rem;
+    font-size: 1.2rem;
     margin: 0 0 1rem 0;
     color: var(--text-primary);
   }
 
   .feature-card p {
-    color: var(--text-secondary);
+    font-size: 1rem;
     line-height: 1.6;
+    color: var(--text-secondary);
     margin: 0 0 1rem 0;
   }
 
   .feature-example {
-    background: var(--bg-tertiary);
-    border-left: 4px solid var(--accent-color);
+    background: var(--bg-primary);
     padding: 1rem;
-    border-radius: 4px;
-    font-size: 0.9rem;
+  }
+
+  .feature-example strong {
+    color: var(--text-primary);
+    display: block;
+    margin-bottom: 0.5rem;
   }
 
   .feature-example ul {
-    margin: 0.5rem 0 0 0;
+    margin: 0;
     padding-left: 1.5rem;
+    color: var(--text-secondary);
   }
 
   .feature-example li {
@@ -716,24 +713,27 @@
   }
 
   .og-examples {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
     gap: 1.5rem;
+    margin-top: 1rem;
   }
 
   .og-example {
-    background: var(--bg-tertiary);
-    border-radius: 8px;
+    background: var(--bg-primary);
     padding: 1rem;
   }
 
   .og-example h4 {
+    font-size: 1rem;
     margin: 0 0 0.5rem 0;
     color: var(--text-primary);
   }
 
   .og-example p {
+    font-size: 0.9rem;
     margin: 0 0 1rem 0;
+    color: var(--text-secondary);
   }
 
   .og-example a {
@@ -746,14 +746,14 @@
   }
 
   .og-preview {
-    text-align: center;
+    margin-top: 1rem;
   }
 
   .og-image {
-    max-width: 100%;
+    width: 100%;
+    max-width: 400px;
     height: auto;
-    border-radius: 8px;
-    border: 1px solid var(--border-color);
+    display: block;
   }
 
   .stats-grid {
@@ -765,8 +765,6 @@
 
   .stat-card {
     background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
     padding: 1.5rem;
     text-align: center;
   }
@@ -800,8 +798,6 @@
 
   .item-card {
     background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
     overflow: hidden;
   }
 
