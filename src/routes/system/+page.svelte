@@ -174,7 +174,7 @@
         class="banner-image" 
       />
       <div class="banner-overlay">
-        <div class="banner-title">{bannerImage.title || 'Ohne Titel'}</div>
+        <p class="banner-title">{bannerImage.title || 'Ohne Titel'}</p>
         <p class="banner-creator">von {bannerImage.creator}</p>
         <p class="banner-resolution">Auflösung: {bannerImage.width}x{bannerImage.height}</p>
       </div>
@@ -660,7 +660,8 @@
     height: 100%;
     background: linear-gradient(to top, rgba(0, 0, 0, 0.7) 0%, transparent 50%);
     display: flex;
-    align-items: flex-end;
+    flex-direction: column;
+    justify-content: flex-end;
     padding: 1.5rem;
   }
 
@@ -668,24 +669,19 @@
     font-size: 1.2rem;
     font-weight: 500;
     color: var(--text-primary);
-    background: var(--bg-secondary);
-    padding: 0.5rem 1rem;
-    border-radius: 6px;
-    box-shadow: 0 2px 8px var(--shadow);
-    backdrop-filter: blur(10px);
-    border: 1px solid var(--border-color);
+    margin: 0;
   }
 
   .banner-creator {
     font-size: 0.9rem;
     color: var(--text-secondary);
-    margin-top: 0.5rem;
+    margin: 0.25rem 0 0 0;
   }
 
   .banner-resolution {
     font-size: 0.9rem;
     color: var(--text-secondary);
-    margin-top: 0.25rem;
+    margin: 0.25rem 0 0 0;
   }
 
   .main-content {
