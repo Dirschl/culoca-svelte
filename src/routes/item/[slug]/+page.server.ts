@@ -72,6 +72,12 @@ export const load: PageServerLoad = async ({ params, url }) => {
   console.log('🔍 [DetailPage] Loading item with slug:', slug);
   console.log('🔍 [DetailPage] URL:', url.toString());
   
+  // Test: Throw error to see if function is called
+  if (slug === 'alte-steinerne-brucke-in-toging-altotting-inn-salzach-johann-dirschl') {
+    console.log('🔍 [DetailPage] TEST: Found the problematic slug, throwing error');
+    throw new Error('TEST: Redirect should happen for this slug');
+  }
+  
   // Direkte Umleitung für bekannte Fälle - VOR allen anderen Checks
   if (slug === 'alte-steinerne-brucke-in-toging-altotting-inn-salzach-johann-dirschl') {
     const correctSlug = 'alte-steinerne-bruecke-in-toeging-altotting-inn-salzach-johann-dirschl';
