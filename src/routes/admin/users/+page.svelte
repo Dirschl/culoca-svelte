@@ -5,7 +5,7 @@
   import { darkMode } from '$lib/darkMode';
 
   // Base URL for API calls
-  const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+  const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5173';
 
   let isLoading = true;
   let isAdmin = false;
@@ -92,6 +92,7 @@
 
   async function loadAuthUsers() {
     try {
+      console.log('Loading auth users from:', `${baseUrl}/api/admin/auth-users`);
       // This requires admin API - we'll use a server endpoint
       const response = await fetch(`${baseUrl}/api/admin/auth-users`, {
         method: 'GET',
@@ -99,11 +100,13 @@
           'Content-Type': 'application/json',
         }
       });
+
       if (response.ok) {
         authUsers = await response.json();
         console.log(`Loaded ${authUsers.length} auth users`);
       } else {
-        console.error('Failed to load auth users');
+        const errorText = await response.text();
+        console.error('Failed to load auth users:', response.status, errorText);
         authUsers = [];
       }
     } catch (error) {
@@ -177,6 +180,7 @@
 
   async function checkEmailExists(email) {
     try {
+      console.log('Checking email from:', `${baseUrl}/api/admin/auth-users`);
       const response = await fetch(`${baseUrl}/api/admin/auth-users`, {
         method: 'POST',
         headers: {
@@ -186,6 +190,8 @@
       });
 
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Failed to check email:', response.status, errorText);
         throw new Error('Failed to check email');
       }
 
@@ -223,7 +229,9 @@
       });
 
       if (!response.ok) {
-        const error = await response.json();
+        const errorText = await response.text();
+        console.error('Update failed:', response.status, errorText);
+        const error = await response.json().catch(() => ({ error: errorText }));
         throw new Error(error.error || 'Update failed');
       }
 
