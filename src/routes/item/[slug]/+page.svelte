@@ -10,6 +10,18 @@
   import { browser } from '$app/environment';
   import { supabase } from '$lib/supabaseClient';
 
+  // Client-seitige Umleitung für bekannte Fälle
+  if (browser) {
+    const currentSlug = $page.params.slug;
+    console.log('🔍 [Client] Checking slug for redirect:', currentSlug);
+    
+    if (currentSlug === 'alte-steinerne-brucke-in-toging-altotting-inn-salzach-johann-dirschl') {
+      const correctSlug = 'alte-steinerne-bruecke-in-toeging-altotting-inn-salzach-johann-dirschl';
+      console.log('🔍 [Client] Redirecting known case:', currentSlug, '->', correctSlug);
+      goto(`/item/${correctSlug}`, { replaceState: true });
+    }
+  }
+
   // Detail-Komponenten
   import ImageDisplay from '$lib/detail/ImageDisplay.svelte';
   import ImageControlsSection from '$lib/detail/ImageControlsSection.svelte';
