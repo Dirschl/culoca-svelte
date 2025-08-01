@@ -1,28 +1,17 @@
 import { json } from '@sveltejs/kit';
-import { createClient } from '@supabase/supabase-js';
-
-// Service role client for admin operations
-const supabaseUrl = (process.env.PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL)!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!supabaseServiceKey) {
-  throw new Error('SUPABASE_SERVICE_ROLE_KEY is required for admin operations');
-}
-
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+import { supabaseAdmin } from '$lib/supabaseAdmin';
 
 export const GET = async () => {
   try {
-    // Get all auth users with basic info
-    const { data: authUsers, error } = await supabaseAdmin.auth.admin.listUsers();
+    const { data: users, error } = await supabaseAdmin.auth.admin.listUsers();
     
     if (error) {
-      console.error('Error loading auth users:', error);
+      console.error('Error listing auth users:', error);
       return json({ error: error.message }, { status: 500 });
     }
 
-    // Return only necessary fields for admin display
-    const users = authUsers.users.map(user => ({
+    // Filter to only return necessary fields
+    const filteredUsers = users.users.map(user => ({
       id: user.id,
       email: user.email,
       email_confirmed_at: user.email_confirmed_at,
@@ -31,9 +20,41 @@ export const GET = async () => {
       user_metadata: user.user_metadata
     }));
 
-    return json(users);
+    return json(filteredUsers);
   } catch (error) {
     console.error('Error in auth-users API:', error);
+    return json({ error: 'Internal server error' }, { status: 500 });
+  }
+};
+
+export const POST = async ({ request }) => {
+  try {
+    const { email } = await request.json();
+    
+    if (!email) {
+      return json({ error: 'Email is required' }, { status: 400 });
+    }
+
+    const { data: users, error } = await supabaseAdmin.auth.admin.listUsers();
+    
+    if (error) {
+      console.error('Error listing auth users:', error);
+      return json({ error: error.message }, { status: 500 });
+    }
+
+    const existingUser = users.users.find(user => user.email === email);
+    
+    return json({
+      exists: !!existingUser,
+      user: existingUser ? {
+        id: existingUser.id,
+        email: existingUser.email,
+        email_confirmed_at: existingUser.email_confirmed_at,
+        created_at: existingUser.created_at
+      } : null
+    });
+  } catch (error) {
+    console.error('Error checking email:', error);
     return json({ error: 'Internal server error' }, { status: 500 });
   }
 }; 
