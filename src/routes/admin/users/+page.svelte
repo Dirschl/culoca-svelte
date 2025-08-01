@@ -170,8 +170,42 @@
     editingUser = null;
   }
 
+  async function checkEmailExists(email) {
+    try {
+      const response = await fetch(`${baseUrl}/api/admin/auth-users`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to check email');
+      }
+
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error('Error checking email:', error);
+      return { exists: false, user: null };
+    }
+  }
+
   async function updateUser(updates) {
     try {
+      // If email is being changed, check if it exists
+      if (updates.email && updates.email !== editingUser.auth_email) {
+        console.log(`🔍 Checking if email ${updates.email} exists...`);
+        const emailCheck = await checkEmailExists(updates.email);
+        
+        if (emailCheck.exists) {
+          alert(`E-Mail-Adresse ${updates.email} wird bereits von Benutzer ${emailCheck.user.id} verwendet.`);
+          return;
+        }
+        console.log('✅ Email is available');
+      }
+
       const response = await fetch(`${baseUrl}/api/admin/update-user`, {
         method: 'POST',
         headers: {
