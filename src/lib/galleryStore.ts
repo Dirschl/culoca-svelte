@@ -54,11 +54,30 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
     // WICHTIG: User-Filter aus dem Store holen und anwenden
     const { filterStore } = await import('./filterStore');
     const filterState = get(filterStore);
+    
+    // NEU: Location Filter hat höchste Priorität
     if (filterState.locationFilter) {
       mergedParams.lat = filterState.locationFilter.lat;
       mergedParams.lon = filterState.locationFilter.lon;
       mergedParams.fromItem = true; // Immer setzen, wenn Location-Filter aktiv
+      console.log('[GalleryStore] Using Location Filter coordinates:', mergedParams.lat, mergedParams.lon);
+    } else {
+      // Nur wenn kein Location Filter gesetzt ist, verwende aktuelle GPS-Position
+      if (!mergedParams.lat || !mergedParams.lon) {
+        // Versuche GPS-Koordinaten aus dem Browser zu holen
+        if (typeof window !== 'undefined') {
+          // Hole GPS-Koordinaten aus dem Hauptspeicher (falls verfügbar)
+          const userLat = (window as any).userLat;
+          const userLon = (window as any).userLon;
+          if (userLat && userLon) {
+            mergedParams.lat = userLat;
+            mergedParams.lon = userLon;
+            console.log('[GalleryStore] Using GPS from window object:', mergedParams.lat, mergedParams.lon);
+          }
+        }
+      }
     }
+    
     // WICHTIG: User-Filter aus dem Store holen und anwenden
     if (filterState.userFilter && filterState.userFilter.userId) {
       mergedParams.user_id = filterState.userFilter.userId;
@@ -71,23 +90,9 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
     // fallback: keine Änderung
   }
   
-  // WICHTIG: GPS-Koordinaten aus dem Hauptspeicher holen, falls nicht verfügbar
-  // Auch bei User-Filtern brauchen wir GPS für die Sortierung
-  if (!mergedParams.lat || !mergedParams.lon) {
-    // Versuche GPS-Koordinaten aus dem Browser zu holen
-    if (typeof window !== 'undefined') {
-      // Hole GPS-Koordinaten aus dem Hauptspeicher (falls verfügbar)
-      const userLat = (window as any).userLat;
-      const userLon = (window as any).userLon;
-      if (userLat && userLon) {
-        mergedParams.lat = userLat;
-        mergedParams.lon = userLon;
-        console.log('[GalleryStore] Using GPS from window object:', mergedParams.lat, mergedParams.lon);
-      }
-    }
-  }
-  
-  // WICHTIG: Bei User-Filtern auch ohne GPS laden (für Sortierung nach Datum)
+  // NEU: Verbesserte GPS-Behandlung
+  // Wenn Location Filter gesetzt ist, immer laden (auch ohne GPS)
+  // Wenn User Filter gesetzt ist, auch ohne GPS laden (Sortierung nach Datum)
   // Nur bei normalen Filtern ohne GPS warten
   if (!mergedParams.lat || !mergedParams.lon) {
     if (mergedParams.user_id) {
@@ -96,7 +101,7 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
       mergedParams.lat = 0;
       mergedParams.lon = 0;
     } else {
-      console.log('[GalleryStore] No GPS coordinates available, waiting for GPS...');
+      console.log('[GalleryStore] No GPS coordinates available and no filters set, waiting for GPS...');
       isGalleryLoading.set(false);
       return; // Beende ohne zu laden
     }
