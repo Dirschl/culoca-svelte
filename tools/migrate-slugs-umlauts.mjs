@@ -54,22 +54,39 @@ function slugify(text) {
 async function migrateSlugsWithUmlauts() {
   console.log('🔄 Starte Migration der Slugs mit Umlaut-Behandlung...');
   
-  const { data: items, error } = await supabase
-    .from('items')
-    .select('id, title, original_name, slug, profile_id')
-    .not('slug', 'is', null);
+  let allItems = [];
+  let offset = 0;
+  const batchSize = 1000;
+  let hasMore = true;
 
-  if (error) {
-    console.error('❌ Fehler beim Laden der Items:', error);
-    return;
+  // Alle Items in Batches laden
+  while (hasMore) {
+    const { data: items, error } = await supabase
+      .from('items')
+      .select('id, title, original_name, slug, profile_id')
+      .not('slug', 'is', null)
+      .range(offset, offset + batchSize - 1);
+
+    if (error) {
+      console.error('❌ Fehler beim Laden der Items:', error);
+      return;
+    }
+
+    if (items && items.length > 0) {
+      allItems = allItems.concat(items);
+      console.log(`📥 Batch geladen: ${items.length} Items (Offset: ${offset})`);
+      offset += batchSize;
+    } else {
+      hasMore = false;
+    }
   }
 
-  console.log(`📊 ${items.length} Items gefunden`);
+  console.log(`📊 Insgesamt ${allItems.length} Items gefunden`);
 
   let updatedCount = 0;
   let skippedCount = 0;
 
-  for (const item of items) {
+  for (const item of allItems) {
     // Lade Erstellername
     let creator = 'user';
     if (item.profile_id) {
@@ -125,7 +142,7 @@ async function migrateSlugsWithUmlauts() {
   console.log(`✅ Migration abgeschlossen!`);
   console.log(`   Aktualisiert: ${updatedCount}`);
   console.log(`   Übersprungen: ${skippedCount}`);
-  console.log(`   Gesamt: ${items.length}`);
+  console.log(`   Gesamt: ${allItems.length}`);
 }
 
 migrateSlugsWithUmlauts().catch(console.error); 
