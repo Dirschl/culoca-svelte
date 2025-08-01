@@ -493,10 +493,9 @@
           </svg>
           Live-Statistiken
         </h2>
-      
-      <div class="stats-grid">
+        
         <div class="stat-card">
-          <h3>Gesamt Fotos</h3>
+          <h3>Gesamte Fotos</h3>
           <div class="stat-number">{stats.totalItems.toLocaleString()}</div>
         </div>
         
@@ -511,26 +510,25 @@
           <div class="stat-number">{stats.topUser.full_name || stats.topUser.accountname}</div>
         </div>
         {/if}
-      </div>
 
-      {#if stats.latestItems.length > 0}
-      <div class="latest-items">
-        <h3>Neueste Fotos</h3>
-        <div class="items-grid">
-          {#each stats.latestItems as item}
-          <div class="item-card">
-            <img src="https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/{item.path_512}" 
-                 alt={item.title || 'Foto'} class="item-thumbnail" />
-            <div class="item-info">
-              <h4>{item.title || 'Ohne Titel'}</h4>
-              <p>{new Date(item.created_at).toLocaleDateString('de-DE')}</p>
+        {#if stats.latestItems.length > 0}
+        <div class="latest-items">
+          <h3>Neueste Fotos</h3>
+          <div class="items-grid">
+            {#each stats.latestItems as item}
+            <div class="item-card">
+              <img src="https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/{item.path_512}" 
+                   alt={item.title || 'Foto'} class="item-thumbnail" />
+              <div class="item-info">
+                <h4>{item.title || 'Ohne Titel'}</h4>
+                <p>{new Date(item.created_at).toLocaleDateString('de-DE')}</p>
+              </div>
             </div>
+            {/each}
           </div>
-          {/each}
         </div>
-      </div>
-      {/if}
-    </section>
+        {/if}
+      </section>
   </main>
 
   <!-- Floating Action Buttons -->
@@ -675,13 +673,14 @@
 
   .feature-card {
     background: var(--bg-secondary);
-    padding: 1.5rem;
+    margin-bottom: 2rem;
   }
 
   .feature-card h3 {
     font-size: 1.2rem;
     margin: 0 0 1rem 0;
     color: var(--text-primary);
+    padding: 1.5rem 1.5rem 0 1.5rem;
   }
 
   .feature-card p {
@@ -689,10 +688,12 @@
     line-height: 1.6;
     color: var(--text-secondary);
     margin: 0 0 1rem 0;
+    padding: 0 1.5rem;
   }
 
   .feature-example {
     background: var(--bg-primary);
+    margin: 0 1.5rem 1.5rem 1.5rem;
     padding: 1rem;
   }
 
@@ -756,17 +757,11 @@
     display: block;
   }
 
-  .stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 1.5rem;
-    margin-bottom: 2rem;
-  }
-
   .stat-card {
     background: var(--bg-secondary);
     padding: 1.5rem;
     text-align: center;
+    margin-bottom: 1rem;
   }
 
   .stat-card h3 {
