@@ -18,6 +18,7 @@
   let localViews = 0;
   let botViews = 0; // Added for bot views
   let searchEngineViews = 0; // Added for search engine visitors
+  let functionAvailable = false; // Track if SQL function is available
 
   onMount(async () => {
     // Wait for authentication to be ready
@@ -45,6 +46,45 @@
     isLoading = false;
   });
 
+  async function loadAllViewsInBatches() {
+    let allViews: any[] = [];
+    let hasMore = true;
+    let offset = 0;
+    const batchSize = 1000;
+    
+    console.log('Loading all views in batches...');
+    
+    while (hasMore) {
+      const { data: batch, error: batchError } = await supabase
+        .from('item_views')
+        .select('created_at, visitor_id, distance_meters, user_agent, referer')
+        .range(offset, offset + batchSize - 1)
+        .order('created_at', { ascending: false });
+      
+      if (batchError) {
+        console.error('Error loading view batch:', batchError);
+        break;
+      }
+      
+      if (batch && batch.length > 0) {
+        allViews = allViews.concat(batch);
+        offset += batchSize;
+        
+        // If we got less than batchSize, we've reached the end
+        if (batch.length < batchSize) {
+          hasMore = false;
+        }
+        
+        console.log(`Loaded batch: ${batch.length} views, total: ${allViews.length}`);
+      } else {
+        hasMore = false;
+      }
+    }
+    
+    console.log(`Total views loaded: ${allViews.length}`);
+    return allViews;
+  }
+
   async function loadAnalytics() {
     try {
       console.log('Loading analytics data...');
@@ -60,13 +100,23 @@
         popularItems = popular || [];
       }
 
-      // Load overall statistics - all data without limits
+      // Try to load data using SQL function first
+      let allViews: any[] = [];
       const { data: stats, error: statsError } = await supabase
-        .from('item_views')
-        .select('created_at, visitor_id, distance_meters, user_agent, referer');
+        .rpc('get_all_item_views');
       
       if (statsError) {
-        console.error('Error loading view statistics:', statsError);
+        console.log('SQL function not available, using batch loading...');
+        functionAvailable = false;
+        allViews = await loadAllViewsInBatches();
+      } else {
+        console.log('SQL function available, using direct query...');
+        functionAvailable = true;
+        allViews = stats || [];
+      }
+      
+      if (allViews.length === 0) {
+        console.log('No views found');
         totalViews = 0;
         todayViews = 0;
         thisWeekViews = 0;
@@ -76,112 +126,112 @@
         totalAnonymousUsers = 0;
         avgDistanceMeters = 0;
         localViews = 0;
-        botViews = 0; // Initialize botViews
-        searchEngineViews = 0; // Initialize searchEngineViews
-      } else {
-        const allViews = stats || [];
-        
-        // Filter out bots
-        const views = allViews.filter(v => {
-          const userAgent = (v.user_agent || '').toLowerCase();
-          return !userAgent.includes('bot') && 
-                 !userAgent.includes('crawler') && 
-                 !userAgent.includes('spider') && 
-                 !userAgent.includes('googlebot') && 
-                 !userAgent.includes('bingbot') && 
-                 !userAgent.includes('yandex') && 
-                 !userAgent.includes('baiduspider') && 
-                 !userAgent.includes('facebookexternalhit') && 
-                 !userAgent.includes('twitterbot') && 
-                 !userAgent.includes('linkedinbot') && 
-                 !userAgent.includes('whatsapp') && 
-                 !userAgent.includes('telegram') && 
-                 !userAgent.includes('slack') && 
-                 !userAgent.includes('discord') && 
-                 !userAgent.includes('curl') && 
-                 !userAgent.includes('wget') && 
-                 !userAgent.includes('python') && 
-                 !userAgent.includes('java') && 
-                 !userAgent.includes('go-http-client') && 
-                 !userAgent.includes('okhttp') && 
-                 !userAgent.includes('apache-httpclient') && 
-                 !userAgent.includes('postman') && 
-                 !userAgent.includes('insomnia') && 
-                 !userAgent.includes('thunder client');
-        });
-        
-        totalViews = views.length;
-        
-        // Calculate bot views (difference between all views and human views)
-        botViews = allViews.length - views.length;
-        
-        // Calculate search engine views
-        searchEngineViews = views.filter(v => {
-          const referer = (v.referer || '').toLowerCase();
-          return referer.includes('google.com') || 
-                 referer.includes('google.de') || 
-                 referer.includes('bing.com') || 
-                 referer.includes('yahoo.com') || 
-                 referer.includes('duckduckgo.com') || 
-                 referer.includes('yandex.com') || 
-                 referer.includes('baidu.com') || 
-                 referer.includes('qwant.com') || 
-                 referer.includes('ecosia.org') || 
-                 referer.includes('startpage.com') || 
-                 referer.includes('searx.me') || 
-                 referer.includes('brave.com') || 
-                 referer.includes('search.brave.com');
-        }).length;
-        
-        // Calculate unique users (only authenticated users, excluding anonymous)
-        const uniqueUserIds = new Set();
-        views.forEach(v => {
-          if (v.visitor_id) {
-            uniqueUserIds.add(v.visitor_id);
-          }
-        });
-        totalUniqueUsers = uniqueUserIds.size;
-        
-        // Calculate authenticated vs anonymous views
-        totalAuthenticatedUsers = views.filter(v => v.visitor_id !== null).length;
-        totalAnonymousUsers = views.filter(v => v.visitor_id === null).length;
-        
-        // Calculate distance statistics
-        const viewsWithDistance = views.filter(v => v.distance_meters !== null);
-        if (viewsWithDistance.length > 0) {
-          const totalDistance = viewsWithDistance.reduce((sum, v) => sum + v.distance_meters, 0);
-          avgDistanceMeters = totalDistance / viewsWithDistance.length;
-          localViews = viewsWithDistance.filter(v => v.distance_meters <= 10000).length;
-        } else {
-          avgDistanceMeters = 0;
-          localViews = 0;
-        }
-        
-        // Calculate time-based views
-        todayViews = views.filter(v => {
-          const viewDate = new Date(v.created_at);
-          const today = new Date();
-          return viewDate.toDateString() === today.toDateString();
-        }).length;
-        
-        thisWeekViews = views.filter(v => {
-          const viewDate = new Date(v.created_at);
-          const weekAgo = new Date();
-          weekAgo.setDate(weekAgo.getDate() - 7);
-          return viewDate >= weekAgo;
-        }).length;
-        
-        thisMonthViews = views.filter(v => {
-          const viewDate = new Date(v.created_at);
-          const monthAgo = new Date();
-          monthAgo.setDate(monthAgo.getDate() - 30);
-          return viewDate >= monthAgo;
-        }).length;
-        
-        console.log(`Analytics: ${allViews.length} total views, ${views.length} human views (${allViews.length - views.length} bots filtered)`);
+        botViews = 0;
+        searchEngineViews = 0;
+        return;
       }
       
-      console.log('Analytics data loaded successfully');
+      console.log(`Processing ${allViews.length} total views...`);
+      
+      // Filter out bots
+      const views = allViews.filter(v => {
+        const userAgent = (v.user_agent || '').toLowerCase();
+        return !userAgent.includes('bot') && 
+               !userAgent.includes('crawler') && 
+               !userAgent.includes('spider') && 
+               !userAgent.includes('googlebot') && 
+               !userAgent.includes('bingbot') && 
+               !userAgent.includes('yandex') && 
+               !userAgent.includes('baiduspider') && 
+               !userAgent.includes('facebookexternalhit') && 
+               !userAgent.includes('twitterbot') && 
+               !userAgent.includes('linkedinbot') && 
+               !userAgent.includes('whatsapp') && 
+               !userAgent.includes('telegram') && 
+               !userAgent.includes('slack') && 
+               !userAgent.includes('discord') && 
+               !userAgent.includes('curl') && 
+               !userAgent.includes('wget') && 
+               !userAgent.includes('python') && 
+               !userAgent.includes('java') && 
+               !userAgent.includes('go-http-client') && 
+               !userAgent.includes('okhttp') && 
+               !userAgent.includes('apache-httpclient') && 
+               !userAgent.includes('postman') && 
+               !userAgent.includes('insomnia') && 
+               !userAgent.includes('thunder client');
+      });
+      
+      totalViews = views.length;
+      
+      // Calculate bot views (difference between all views and human views)
+      botViews = allViews.length - views.length;
+      
+      // Calculate search engine views
+      searchEngineViews = views.filter(v => {
+        const referer = (v.referer || '').toLowerCase();
+        return referer.includes('google.com') || 
+               referer.includes('google.de') || 
+               referer.includes('bing.com') || 
+               referer.includes('yahoo.com') || 
+               referer.includes('duckduckgo.com') || 
+               referer.includes('yandex.com') || 
+               referer.includes('baidu.com') || 
+               referer.includes('qwant.com') || 
+               referer.includes('ecosia.org') || 
+               referer.includes('startpage.com') || 
+               referer.includes('searx.me') || 
+               referer.includes('brave.com') || 
+               referer.includes('search.brave.com');
+      }).length;
+      
+      // Calculate unique users (only authenticated users, excluding anonymous)
+      const uniqueUserIds = new Set();
+      views.forEach(v => {
+        if (v.visitor_id) {
+          uniqueUserIds.add(v.visitor_id);
+        }
+      });
+      totalUniqueUsers = uniqueUserIds.size;
+      
+      // Calculate authenticated vs anonymous views
+      totalAuthenticatedUsers = views.filter(v => v.visitor_id !== null).length;
+      totalAnonymousUsers = views.filter(v => v.visitor_id === null).length;
+      
+      // Calculate distance statistics
+      const viewsWithDistance = views.filter(v => v.distance_meters !== null);
+      if (viewsWithDistance.length > 0) {
+        const totalDistance = viewsWithDistance.reduce((sum, v) => sum + v.distance_meters, 0);
+        avgDistanceMeters = totalDistance / viewsWithDistance.length;
+        localViews = viewsWithDistance.filter(v => v.distance_meters <= 10000).length;
+      } else {
+        avgDistanceMeters = 0;
+        localViews = 0;
+      }
+      
+      // Calculate time-based views
+      todayViews = views.filter(v => {
+        const viewDate = new Date(v.created_at);
+        const today = new Date();
+        return viewDate.toDateString() === today.toDateString();
+      }).length;
+      
+      thisWeekViews = views.filter(v => {
+        const viewDate = new Date(v.created_at);
+        const weekAgo = new Date();
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        return viewDate >= weekAgo;
+      }).length;
+      
+      thisMonthViews = views.filter(v => {
+        const viewDate = new Date(v.created_at);
+        const monthAgo = new Date();
+        monthAgo.setDate(monthAgo.getDate() - 30);
+        return viewDate >= monthAgo;
+      }).length;
+      
+      console.log(`Analytics: ${allViews.length} total views, ${views.length} human views (${allViews.length - views.length} bots filtered)`);
+      console.log(`Function available: ${functionAvailable}`);
     } catch (error) {
       console.error('Error loading analytics data:', error);
       popularItems = [];
@@ -194,7 +244,35 @@
       totalAnonymousUsers = 0;
       avgDistanceMeters = 0;
       localViews = 0;
-      botViews = 0; // Ensure botViews is reset on error
+      botViews = 0;
+      searchEngineViews = 0;
+    }
+  }
+
+  async function installAnalyticsFunction() {
+    try {
+      console.log('Installing analytics function...');
+      
+      const response = await fetch('/api/admin/install-analytics-function', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      const result = await response.json();
+      
+      if (response.ok) {
+        console.log('Function installed successfully');
+        alert('Analytics-Funktion erfolgreich installiert!');
+        await loadAnalytics(); // Reload data
+      } else {
+        console.error('Failed to install function:', result);
+        alert('Fehler beim Installieren der Funktion: ' + (result.error || 'Unbekannter Fehler'));
+      }
+    } catch (error) {
+      console.error('Error installing function:', error);
+      alert('Fehler beim Installieren der Funktion');
     }
   }
 
@@ -245,6 +323,9 @@
           <p class="admin-subtitle">Item-View Statistiken und Popularität</p>
         </div>
         <nav class="admin-nav">
+          <button on:click={installAnalyticsFunction} class="admin-btn admin-btn-warning" style="margin-right: 1rem;">
+            {functionAvailable ? '✅ Funktion verfügbar' : '🔧 Funktion installieren'}
+          </button>
           <a href="/admin" class="admin-btn admin-btn-secondary">← Zurück zum Dashboard</a>
         </nav>
       </div>
