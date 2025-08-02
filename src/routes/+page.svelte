@@ -1806,6 +1806,14 @@
       }
     }
   }
+
+  // NEU: Reaktive Anweisung um GPS-Status korrekt zu setzen
+  $: {
+    if (userLat !== null && userLon !== null && gpsStatus !== 'active' && gpsStatus !== 'cached') {
+      console.log('[GPS-Status] Setting GPS status to active because coordinates are available:', { userLat, userLon, gpsStatus });
+      gpsStatus = 'active';
+    }
+  }
 </script>
 
 {#if (gpsStatus === 'denied' || gpsStatus === 'unavailable') && !userLat && !userLon}
