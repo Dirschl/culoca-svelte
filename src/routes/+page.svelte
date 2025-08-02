@@ -71,6 +71,8 @@
   let isManual3x3Mode = false;
   let userLat: number | null = null;
   let userLon: number | null = null;
+  let cachedLat: number | null = null;
+  let cachedLon: number | null = null;
   let showDistance = true;
   let showCompass = false;
   let isLoggedIn = false;
@@ -1040,16 +1042,19 @@
           // Verwende gespeicherte GPS-Daten nur wenn sie nicht älter als 24 Stunden sind
           if (gpsData.lat && gpsData.lon && gpsAge < 24 * 60 * 60 * 1000) {
             console.log('[App-Start] Found saved GPS data:', gpsData);
-            // NEU: Setze cached GPS-Daten für 3-stufige Logik
+            
+            // WICHTIG: Setze sowohl userLat/userLon als auch cachedLat/cachedLon
+            userLat = gpsData.lat;
+            userLon = gpsData.lon;
             cachedLat = gpsData.lat;
             cachedLon = gpsData.lon;
-            gpsStatus = 'cached';
+            gpsStatus = 'active'; // Setze auf 'active' da wir GPS-Daten haben
             lastGPSUpdateTime = gpsData.timestamp;
             
             // Update filterStore with saved GPS data
-            filterStore.updateGpsStatus(true, { lat: cachedLat, lon: cachedLon });
+            filterStore.updateGpsStatus(true, { lat: userLat, lon: userLon });
             
-            console.log('[App-Start] Using cached GPS data:', { cachedLat, cachedLon, gpsAge: Math.round(gpsAge / 1000 / 60) + ' minutes' });
+            console.log('[App-Start] Using saved GPS data:', { userLat, userLon, cachedLat, cachedLon, gpsAge: Math.round(gpsAge / 1000 / 60) + ' minutes' });
           } else {
             console.log('[App-Start] Saved GPS data too old, clearing:', { gpsAge: Math.round(gpsAge / 1000 / 60) + ' minutes' });
             localStorage.removeItem('userGps');
@@ -1063,30 +1068,21 @@
       }
     }
     
+    // NEU: Lade gespeicherte GPS-Daten zuerst
+    const hasLoadedGPS = loadGPSData();
+    
     // Intelligente GPS-Initialisierung
     console.log('[App-Start] Starting GPS initialization...');
     
-    // NEU: Verzögerte GPS-Initialisierung um sicherzustellen, dass sie ausgeführt wird
-    setTimeout(() => {
-      console.log('[App-Start] Delayed GPS initialization...');
-      if (navigator.geolocation) {
-        console.log('[App-Start] Geolocation available, initializing...');
-        initializeGPSIntelligently();
-        
-        // NEU: Fallback GPS-Initialisierung nach 5 Sekunden falls die erste fehlschlägt
-        setTimeout(() => {
-          if (gpsStatus === 'checking' || gpsStatus === 'none') {
-            console.log('[App-Start] Fallback GPS initialization...');
-            if (navigator.geolocation) {
-              initializeGPSIntelligently();
-            }
-          }
-        }, 5000);
-      } else {
-        console.log('[App-Start] Geolocation not available');
-        gpsStatus = 'unavailable';
-      }
-    }, 100);
+    // EINFACH: GPS-Initialisierung sofort starten (auch wenn gespeicherte Daten vorhanden sind)
+    if (navigator.geolocation) {
+      console.log('[App-Start] Geolocation available, initializing...');
+      gpsStatus = 'checking';
+      initializeGPS();
+    } else {
+      console.log('[App-Start] Geolocation not available');
+      gpsStatus = 'unavailable';
+    }
     
     // Setze Default-Settings für anonyme User
     setAnonymousUserDefaults();
@@ -1347,9 +1343,8 @@
     // Save to localStorage as "GPS gemerkt"
     if (browser) {
       localStorage.setItem('gpsAllowed', 'true');
-      const gpsData = { lat, lon, timestamp: Date.now() };
-      localStorage.setItem('userGps', JSON.stringify(gpsData));
-      console.log('[Location-Selected] Saved selected location as GPS gemerkt:', gpsData);
+      saveGPSData(lat, lon);
+      console.log('[Location-Selected] Saved selected location as GPS gemerkt:', { lat, lon });
     }
     
     // Update filterStore with the selected location
@@ -1399,7 +1394,7 @@
     gpsStatus = "checking";
 
     try {
-      // Live-Tracking: watchPosition
+      // EINFACH: Direkt GPS anfordern - das sollte das Location-Symbol im Browser anzeigen
       gpsWatchId = navigator.geolocation.watchPosition(
         (position) => {
           console.log('[GPS] Position received:', position);
@@ -1412,6 +1407,9 @@
           
           // WICHTIG: GPS-Position in filterStore speichern für getEffectiveGpsPosition()
           filterStore.updateGpsStatus(true, { lat: userLat, lon: userLon });
+          
+          // WICHTIG: GPS-Daten in localStorage speichern für Persistierung
+          saveGPSData(userLat, userLon);
         },
         (error) => {
           console.warn("GPS-Fehler:", error.message, "Code:", error.code);
@@ -1627,6 +1625,53 @@
       console.log('[GPS] Tracking gestoppt');
     }
   }
+  
+  // NEU: Funktion zum Speichern von GPS-Daten
+  function saveGPSData(lat: number, lon: number) {
+    if (browser) {
+      const gpsData = { lat, lon, timestamp: Date.now() };
+      localStorage.setItem('userGps', JSON.stringify(gpsData));
+      console.log('[GPS] Saved GPS data to localStorage:', gpsData);
+    }
+  }
+  
+  // NEU: Funktion zum Laden von GPS-Daten
+  function loadGPSData() {
+    if (browser) {
+      try {
+        const savedGPS = localStorage.getItem('userGps');
+        if (savedGPS) {
+          const gpsData = JSON.parse(savedGPS);
+          const now = Date.now();
+          const gpsAge = now - gpsData.timestamp;
+          
+          // Verwende gespeicherte GPS-Daten nur wenn sie nicht älter als 24 Stunden sind
+          if (gpsData.lat && gpsData.lon && gpsAge < 24 * 60 * 60 * 1000) {
+            console.log('[GPS] Loading saved GPS data:', gpsData);
+            userLat = gpsData.lat;
+            userLon = gpsData.lon;
+            cachedLat = gpsData.lat;
+            cachedLon = gpsData.lon;
+            gpsStatus = 'active';
+            lastGPSUpdateTime = gpsData.timestamp;
+            
+            // Update filterStore with saved GPS data
+            filterStore.updateGpsStatus(true, { lat: userLat, lon: userLon });
+            
+            console.log('[GPS] Loaded GPS data:', { userLat, userLon, cachedLat, cachedLon });
+            return true;
+          } else {
+            console.log('[GPS] Saved GPS data too old, clearing');
+            localStorage.removeItem('userGps');
+          }
+        }
+      } catch (error) {
+        console.warn('[GPS] Error loading saved GPS data:', error);
+        localStorage.removeItem('userGps');
+      }
+    }
+    return false;
+  }
 
   // Umschalt-Logik für Galerie/3x3-Modus
   function toggle3x3Mode() {
@@ -1808,6 +1853,16 @@
     }
   }
 
+  // NEU: Funktion zum manuellen Starten von GPS
+  function startGPS() {
+    console.log('[GPS] User requested GPS start');
+    if (navigator.geolocation) {
+      gpsStatus = 'checking';
+      initializeGPS();
+    } else {
+      gpsStatus = 'unavailable';
+    }
+  }
 
 </script>
 
@@ -1825,7 +1880,7 @@
         {/if}
       </p>
       <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;">
-        <button on:click={tryInitializeGPS} style="padding: 0.9rem 2.2rem; font-size: 1.15rem; border-radius: 0.5rem; background: #3a7; color: #fff; border: none; cursor: pointer; font-weight:600;">
+        <button on:click={startGPS} style="padding: 0.9rem 2.2rem; font-size: 1.15rem; border-radius: 0.5rem; background: #3a7; color: #fff; border: none; cursor: pointer; font-weight:600;">
           📍 Standort verwenden
         </button>
         <button on:click={() => {
@@ -2057,9 +2112,11 @@
           console.log('[FullscreenMap] Stopped GPS watcher to prevent conflicts');
         }
         
-        // Set the selected location as "GPS gemerkt"
+        // Set the selected location as both active and cached GPS
         userLat = lat;
         userLon = lon;
+        cachedLat = lat;
+        cachedLon = lon;
         
         // Update GPS status to active (as if GPS was working)
         gpsStatus = 'active';
@@ -2068,9 +2125,8 @@
         // Save to localStorage as "GPS gemerkt"
         if (browser) {
           localStorage.setItem('gpsAllowed', 'true');
-          const gpsData = { lat, lon, timestamp: Date.now() };
-          localStorage.setItem('userGps', JSON.stringify(gpsData));
-          console.log('[FullscreenMap] Saved selected location as GPS gemerkt:', gpsData);
+          saveGPSData(lat, lon);
+          console.log('[FullscreenMap] Saved selected location as GPS gemerkt:', { lat, lon });
         }
         
         // Update filterStore with the selected location
