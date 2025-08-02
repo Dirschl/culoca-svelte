@@ -1418,24 +1418,36 @@
           switch (error.code) {
             case error.PERMISSION_DENIED:
               gpsStatus = "denied";
+              // NEU: Lösche aktive GPS-Koordinaten wenn GPS verweigert wird
+              userLat = null;
+              userLon = null;
               if (browser) localStorage.removeItem('gpsAllowed');
               filterStore.updateGpsStatus(false);
-              console.log('[GPS] Permission denied');
+              console.log('[GPS] Permission denied - cleared active GPS coordinates');
               break;
             case error.POSITION_UNAVAILABLE:
               gpsStatus = "unavailable";
+              // NEU: Lösche aktive GPS-Koordinaten wenn GPS nicht verfügbar ist
+              userLat = null;
+              userLon = null;
               filterStore.updateGpsStatus(false);
-              console.log('[GPS] Position unavailable');
+              console.log('[GPS] Position unavailable - cleared active GPS coordinates');
               break;
             case error.TIMEOUT:
               gpsStatus = "unavailable";
+              // NEU: Lösche aktive GPS-Koordinaten bei Timeout
+              userLat = null;
+              userLon = null;
               filterStore.updateGpsStatus(false);
-              console.log('[GPS] GPS timeout');
+              console.log('[GPS] GPS timeout - cleared active GPS coordinates');
               break;
             default:
               gpsStatus = "unavailable";
+              // NEU: Lösche aktive GPS-Koordinaten bei unbekanntem Fehler
+              userLat = null;
+              userLon = null;
               filterStore.updateGpsStatus(false);
-              console.log('[GPS] Unknown GPS error');
+              console.log('[GPS] Unknown GPS error - cleared active GPS coordinates');
           }
         },
         {
@@ -1808,6 +1820,28 @@
     }
   }
 
+  // NEU: Funktion um GPS manuell zu stoppen
+  function stopGPS() {
+    console.log('[GPS] Manually stopping GPS...');
+    
+    // Stoppe GPS-Watcher
+    if (gpsWatchId) {
+      navigator.geolocation.clearWatch(gpsWatchId);
+      gpsWatchId = null;
+      console.log('[GPS] GPS watcher stopped');
+    }
+    
+    // Lösche aktive GPS-Koordinaten
+    userLat = null;
+    userLon = null;
+    gpsStatus = 'none';
+    lastGPSUpdateTime = null;
+    
+    // Update filterStore
+    filterStore.updateGpsStatus(false);
+    
+    console.log('[GPS] GPS stopped and coordinates cleared');
+  }
 
 </script>
 
