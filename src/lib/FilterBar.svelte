@@ -287,23 +287,14 @@
 							</div>
 						{/if}
 					</div>
-				{:else if gpsStatus === 'cached' && cachedLat !== null && cachedLon !== null}
-					<div class="gps-status cached">
-						<span class="gps-coords">
-							{formatCoordinates(cachedLat, cachedLon)} (zuletzt)
-						</span>
-						<button class="gps-map-link" on:click={() => window.dispatchEvent(new CustomEvent('openMap'))}>
-							Location
-						</button>
-					</div>
 				{:else if gpsStatus === 'checking'}
 					<div class="gps-status checking">
 						<span class="gps-text">
 							GPS wird ermittelt...
 						</span>
 					</div>
-				{:else if gpsStatus === 'denied' || gpsStatus === 'unavailable' || gpsStatus === 'none'}
-					<div class="gps-status denied">
+				{:else}
+					<div class="gps-status none">
 						<button class="gps-map-link" on:click={() => window.dispatchEvent(new CustomEvent('openMap'))}>
 							Standort auswählen
 						</button>

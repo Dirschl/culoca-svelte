@@ -1258,7 +1258,7 @@
   
   $: if (galleryInitialized && browser) {
     const gps = getEffectiveGpsPosition();
-    // EINFACH: Verwende aktive GPS oder cached GPS
+    // EINFACH: Verwende nur aktive GPS oder Fallback
     let effectiveLat: number | null = null;
     let effectiveLon: number | null = null;
     
@@ -1266,10 +1266,6 @@
       // Aktive GPS verwenden
       effectiveLat = userLat;
       effectiveLon = userLon;
-    } else if (gpsStatus === 'cached' && cachedLat !== null && cachedLon !== null) {
-      // Cached GPS verwenden
-      effectiveLat = cachedLat;
-      effectiveLon = cachedLon;
     } else if (gps?.lat && gps?.lon) {
       // Fallback auf filterStore GPS
       effectiveLat = gps.lat;
@@ -1360,16 +1356,15 @@
     cachedLat = lat;
     cachedLon = lon;
     
-    // Lösche aktive GPS-Koordinaten wenn GPS deaktiviert ist
-    if (gpsStatus === 'denied' || gpsStatus === 'unavailable' || gpsStatus === 'none') {
-      userLat = null;
-      userLon = null;
-      gpsStatus = 'cached';
-    } else {
-      // Wenn GPS aktiv ist, verwende die ausgewählten Koordinaten als aktive GPS
+    // Wenn GPS aktiv ist, verwende die ausgewählten Koordinaten als aktive GPS
+    if (gpsStatus === 'active') {
       userLat = lat;
       userLon = lon;
-      gpsStatus = 'active';
+    } else {
+      // Wenn kein aktives GPS, lösche aktive Koordinaten
+      userLat = null;
+      userLon = null;
+      gpsStatus = 'none';
     }
     
     lastGPSUpdateTime = Date.now();
@@ -1437,6 +1432,11 @@
           userLon = position.coords.longitude;
           gpsStatus = "active";
           lastGPSUpdateTime = Date.now();
+          
+          // EINFACH: Aktualisiere immer die gemerkte GPS wenn aktive GPS verfügbar ist
+          cachedLat = userLat;
+          cachedLon = userLon;
+          
           if (browser) localStorage.setItem('gpsAllowed', 'true');
           console.log("[GPS] Position geändert:", userLat, userLon);
           
@@ -1720,13 +1720,10 @@
     let effectiveLat: number | undefined = undefined;
     let effectiveLon: number | undefined = undefined;
     
-    // EINFACH: Verwende aktive GPS oder cached GPS
+    // EINFACH: Verwende nur aktive GPS oder Fallback
     if (gpsStatus === 'active' && userLat !== null && userLon !== null) {
       effectiveLat = userLat;
       effectiveLon = userLon;
-    } else if (gpsStatus === 'cached' && cachedLat !== null && cachedLon !== null) {
-      effectiveLat = cachedLat;
-      effectiveLon = cachedLon;
     } else if (gps?.lat && gps?.lon) {
       effectiveLat = gps.lat;
       effectiveLon = gps.lon;
@@ -1762,13 +1759,10 @@
     let effectiveLat: number | undefined = undefined;
     let effectiveLon: number | undefined = undefined;
     
-    // EINFACH: Verwende aktive GPS oder cached GPS
+    // EINFACH: Verwende nur aktive GPS oder Fallback
     if (gpsStatus === 'active' && userLat !== null && userLon !== null) {
       effectiveLat = userLat;
       effectiveLon = userLon;
-    } else if (gpsStatus === 'cached' && cachedLat !== null && cachedLon !== null) {
-      effectiveLat = cachedLat;
-      effectiveLon = cachedLon;
     } else if (gps?.lat && gps?.lon) {
       effectiveLat = gps.lat;
       effectiveLon = gps.lon;
@@ -1804,15 +1798,11 @@
   // Berechne effektive GPS-Koordinaten für alle Components
   $: {
     const gps = getEffectiveGpsPosition();
-    // EINFACH: Verwende aktive GPS oder cached GPS
+    // EINFACH: Verwende nur aktive GPS oder Fallback
     if (gpsStatus === 'active' && userLat !== null && userLon !== null) {
       // Aktive GPS verwenden
       effectiveLat = userLat;
       effectiveLon = userLon;
-    } else if (gpsStatus === 'cached' && cachedLat !== null && cachedLon !== null) {
-      // Cached GPS verwenden
-      effectiveLat = cachedLat;
-      effectiveLon = cachedLon;
     } else if (gps?.lat && gps?.lon) {
       // Fallback auf filterStore GPS
       effectiveLat = gps.lat;
