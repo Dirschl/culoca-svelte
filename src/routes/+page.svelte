@@ -1356,16 +1356,10 @@
     cachedLat = lat;
     cachedLon = lon;
     
-    // Wenn GPS aktiv ist, verwende die ausgewählten Koordinaten als aktive GPS
-    if (gpsStatus === 'active') {
-      userLat = lat;
-      userLon = lon;
-    } else {
-      // Wenn kein aktives GPS, lösche aktive Koordinaten
-      userLat = null;
-      userLon = null;
-      gpsStatus = 'none';
-    }
+    // WICHTIG: Lösche immer aktive GPS-Koordinaten bei Standortauswahl
+    userLat = null;
+    userLon = null;
+    gpsStatus = 'none';
     
     lastGPSUpdateTime = Date.now();
     
