@@ -1945,7 +1945,7 @@
     userLon={effectiveLon}
     {showDistance}
     {isLoggedIn}
-    gpsStatus={gpsStatus}
+    gpsStatus={browser && typeof gpsStatus !== 'undefined' ? gpsStatus : 'none'}
     lastGPSUpdateTime={lastGPSUpdateTime}
     isManual3x3Mode={isManual3x3Mode}
     originalGalleryLat={originalGalleryLat}
