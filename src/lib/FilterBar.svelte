@@ -266,7 +266,7 @@
 							{$locationFilter.name}
 						</span>
 					</div>
-				{:else if gpsStatus === 'active' && userLat !== null && userLon !== null}
+				{:else if userLat !== null && userLon !== null}
 					<div class="gps-status active">
 						<button class="gps-coords-clickable" on:click={() => {
 							console.log('🎯 GPS-Koordinaten geklickt!');
@@ -286,12 +286,6 @@
 								{formatCoordinates(originalGalleryLat, originalGalleryLon)}
 							</div>
 						{/if}
-					</div>
-				{:else if gpsStatus === 'checking'}
-					<div class="gps-status checking">
-						<span class="gps-text">
-							GPS wird ermittelt...
-						</span>
 					</div>
 				{:else}
 					<div class="gps-status none">
