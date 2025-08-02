@@ -1352,23 +1352,17 @@
       console.log('[Location-Selected] Stopped GPS watcher to prevent conflicts');
     }
     
-    // EINFACH: Setze ausgewählte Koordinaten als cached GPS
-    cachedLat = lat;
-    cachedLon = lon;
-    
-    // WICHTIG: Lösche immer aktive GPS-Koordinaten bei Standortauswahl
-    userLat = null;
-    userLon = null;
-    gpsStatus = 'none';
+    // EINFACH: Setze ausgewählte Koordinaten als GPS
+    userLat = lat;
+    userLon = lon;
     
     lastGPSUpdateTime = Date.now();
     
-    // Save to localStorage as "GPS gemerkt"
+    // Save to localStorage
     if (browser) {
-      localStorage.setItem('gpsAllowed', 'true');
       const gpsData = { lat, lon, timestamp: Date.now() };
       localStorage.setItem('userGps', JSON.stringify(gpsData));
-      console.log('[Location-Selected] Saved selected location as GPS gemerkt:', gpsData);
+      console.log('[Location-Selected] Saved selected location:', gpsData);
     }
     
     // Update filterStore with the selected location
@@ -1424,64 +1418,20 @@
           console.log('[GPS] Position received:', position);
           userLat = position.coords.latitude;
           userLon = position.coords.longitude;
-          gpsStatus = "active";
           lastGPSUpdateTime = Date.now();
-          
-          // EINFACH: Aktualisiere immer die gemerkte GPS wenn aktive GPS verfügbar ist
-          cachedLat = userLat;
-          cachedLon = userLon;
           
           if (browser) localStorage.setItem('gpsAllowed', 'true');
           console.log("[GPS] Position geändert:", userLat, userLon);
           
-          // WICHTIG: GPS-Position in filterStore speichern für getEffectiveGpsPosition()
+          // WICHTIG: GPS-Position in filterStore speichern
           filterStore.updateGpsStatus(true, { lat: userLat, lon: userLon });
         },
         (error) => {
           console.warn("GPS-Fehler:", error.message, "Code:", error.code);
-          switch (error.code) {
-            case error.PERMISSION_DENIED:
-              // NEU: Lösche aktive GPS-Koordinaten wenn GPS verweigert wird
-              userLat = null;
-              userLon = null;
-              if (browser) localStorage.removeItem('gpsAllowed');
-              filterStore.updateGpsStatus(false);
-              
-              // WICHTIG: Setze immer den korrekten Fehlerstatus
-              gpsStatus = "denied";
-              console.log('[GPS] Permission denied');
-              break;
-            case error.POSITION_UNAVAILABLE:
-              // NEU: Lösche aktive GPS-Koordinaten wenn GPS nicht verfügbar ist
-              userLat = null;
-              userLon = null;
-              filterStore.updateGpsStatus(false);
-              
-              // WICHTIG: Setze immer den korrekten Fehlerstatus
-              gpsStatus = "unavailable";
-              console.log('[GPS] Position unavailable');
-              break;
-            case error.TIMEOUT:
-              // NEU: Lösche aktive GPS-Koordinaten bei Timeout
-              userLat = null;
-              userLon = null;
-              filterStore.updateGpsStatus(false);
-              
-              // WICHTIG: Setze immer den korrekten Fehlerstatus
-              gpsStatus = "unavailable";
-              console.log('[GPS] GPS timeout');
-              break;
-            default:
-              // NEU: Lösche aktive GPS-Koordinaten bei unbekanntem Fehler
-              userLat = null;
-              userLon = null;
-              filterStore.updateGpsStatus(false);
-              
-              // WICHTIG: Setze immer den korrekten Fehlerstatus
-              gpsStatus = "unavailable";
-              console.log('[GPS] Unknown GPS error');
-              break;
-          }
+          // EINFACH: Lösche GPS-Koordinaten bei Fehler
+          userLat = null;
+          userLon = null;
+          filterStore.updateGpsStatus(false);
         },
         {
           enableHighAccuracy: true,
@@ -1986,8 +1936,8 @@
 {:else}
   <!-- Galerie-Komponenten und restliche Seite -->
   <FilterBar
-    userLat={gpsStatus === 'active' ? userLat : null}
-    userLon={gpsStatus === 'active' ? userLon : null}
+    userLat={userLat}
+    userLon={userLon}
     {showDistance}
     {isLoggedIn}
     gpsStatus={gpsStatus}
