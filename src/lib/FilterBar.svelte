@@ -295,15 +295,15 @@
 					</div>
 				{:else if gpsStatus === 'denied'}
 					<div class="gps-status denied">
-						<span class="gps-text">
-							GPS verweigert - nur Karte oder Suche möglich
-						</span>
+						<button class="gps-map-link" on:click={() => window.dispatchEvent(new CustomEvent('openMap'))}>
+							Standort auswählen
+						</button>
 					</div>
 				{:else if gpsStatus === 'unavailable'}
 					<div class="gps-status unavailable">
-						<span class="gps-text">
-							GPS nicht verfügbar - nur Karte oder Suche möglich
-						</span>
+						<button class="gps-map-link" on:click={() => window.dispatchEvent(new CustomEvent('openMap'))}>
+							Standort auswählen
+						</button>
 					</div>
 				{:else if gpsStatus === 'cached' && cachedLat !== null && cachedLon !== null}
 					<div class="gps-status cached">
@@ -314,7 +314,7 @@
 				{:else if isLoggedIn}
 					<div class="gps-status none">
 						<button class="gps-map-link" on:click={() => window.dispatchEvent(new CustomEvent('openMap'))}>
-							Kein GPS - nur Karte oder Suche möglich
+							Standort auswählen
 						</button>
 					</div>
 				{/if}
