@@ -1040,15 +1040,16 @@
           // Verwende gespeicherte GPS-Daten nur wenn sie nicht älter als 24 Stunden sind
           if (gpsData.lat && gpsData.lon && gpsAge < 24 * 60 * 60 * 1000) {
             console.log('[App-Start] Found saved GPS data:', gpsData);
-            userLat = gpsData.lat;
-            userLon = gpsData.lon;
+            // NEU: Setze cached GPS-Daten für 3-stufige Logik
+            cachedLat = gpsData.lat;
+            cachedLon = gpsData.lon;
             gpsStatus = 'cached';
             lastGPSUpdateTime = gpsData.timestamp;
             
             // Update filterStore with saved GPS data
-            filterStore.updateGpsStatus(true, { lat: userLat, lon: userLon });
+            filterStore.updateGpsStatus(true, { lat: cachedLat, lon: cachedLon });
             
-            console.log('[App-Start] Using cached GPS data:', { userLat, userLon, gpsAge: Math.round(gpsAge / 1000 / 60) + ' minutes' });
+            console.log('[App-Start] Using cached GPS data:', { cachedLat, cachedLon, gpsAge: Math.round(gpsAge / 1000 / 60) + ' minutes' });
           } else {
             console.log('[App-Start] Saved GPS data too old, clearing:', { gpsAge: Math.round(gpsAge / 1000 / 60) + ' minutes' });
             localStorage.removeItem('userGps');
@@ -1462,8 +1463,8 @@
       return;
     }
 
-    // NEU: Wenn bereits gespeicherte GPS-Daten vorhanden sind, nicht sofort GPS starten
-    if (gpsStatus === 'cached' && userLat && userLon) {
+    // NEU: Wenn bereits cached GPS-Daten vorhanden sind, nicht sofort live GPS starten
+    if (gpsStatus === 'cached' && cachedLat && cachedLon) {
       console.log('[GPS-Init] Using cached GPS data, not starting live GPS immediately');
       return;
     }
@@ -1807,13 +1808,7 @@
     }
   }
 
-  // NEU: Reaktive Anweisung um GPS-Status korrekt zu setzen
-  $: {
-    if (userLat !== null && userLon !== null && gpsStatus !== 'active' && gpsStatus !== 'cached') {
-      console.log('[GPS-Status] Setting GPS status to active because coordinates are available:', { userLat, userLon, gpsStatus });
-      gpsStatus = 'active';
-    }
-  }
+
 </script>
 
 {#if (gpsStatus === 'denied' || gpsStatus === 'unavailable') && !userLat && !userLon}
