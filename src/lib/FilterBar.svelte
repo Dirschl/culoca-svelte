@@ -14,11 +14,13 @@
 	export let showOnMap = false; // Different styling for map vs gallery
 	export let userLat: number | null = null;
 	export let userLon: number | null = null;
+	export let selectedLat: number | null = null;
+	export let selectedLon: number | null = null;
 	export let isPermalinkMode = false; // Enable clickable filter names for detail navigation
 	export let permalinkImageId: string | null = null;
 	export let showDistance = false; // New prop to show current sorting method
 	export let isLoggedIn = false; // New prop to determine if user is logged in
-	export let gpsStatus: 'active' | 'cached' | 'none' | 'checking' | 'denied' | 'unavailable' = 'none';
+	export let gpsStatus: 'active' | 'cached' | 'none' | 'checking' | 'denied' | 'unavailable' | 'selected' = 'none';
 	export let lastGPSUpdateTime: number | null = null; // Add this prop
 	export let isManual3x3Mode = false;
 	export let originalGalleryLat: number | null = null;
@@ -287,11 +289,29 @@
 							</div>
 						{/if}
 					</div>
+				{:else if gpsStatus === 'selected' && selectedLat !== null && selectedLon !== null}
+					<div class="gps-status selected">
+						<span class="gps-coords">
+							{formatCoordinates(selectedLat, selectedLon)} (ausgewählt)
+						</span>
+						<button class="gps-map-link" on:click={() => window.dispatchEvent(new CustomEvent('openMap'))}>
+							Standort auswählen
+						</button>
+					</div>
 				{:else if gpsStatus === 'checking'}
 					<div class="gps-status checking">
 						<span class="gps-text">
 							GPS wird ermittelt...
 						</span>
+					</div>
+				{:else if gpsStatus === 'cached' && cachedLat !== null && cachedLon !== null}
+					<div class="gps-status cached">
+						<span class="gps-coords">
+							{formatCoordinates(cachedLat, cachedLon)} (zuletzt)
+						</span>
+						<button class="gps-map-link" on:click={() => window.dispatchEvent(new CustomEvent('openMap'))}>
+							Location
+						</button>
 					</div>
 				{:else if gpsStatus === 'denied'}
 					<div class="gps-status denied">
@@ -304,12 +324,6 @@
 						<button class="gps-map-link" on:click={() => window.dispatchEvent(new CustomEvent('openMap'))}>
 							Standort auswählen
 						</button>
-					</div>
-				{:else if gpsStatus === 'cached' && cachedLat !== null && cachedLon !== null}
-					<div class="gps-status cached">
-						<span class="gps-coords">
-							{formatCoordinates(cachedLat, cachedLon)} (zuletzt)
-						</span>
 					</div>
 				{:else if isLoggedIn}
 					<div class="gps-status none">
