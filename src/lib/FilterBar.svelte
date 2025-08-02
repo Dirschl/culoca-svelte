@@ -307,9 +307,26 @@
 					</div>
 				{:else if gpsStatus === 'cached' && cachedLat !== null && cachedLon !== null}
 					<div class="gps-status cached">
-						<span class="gps-coords">
-							{formatCoordinates(cachedLat, cachedLon)} (zuletzt)
-						</span>
+						<button class="gps-coords-clickable" on:click={() => {
+							console.log('🎯 Cached GPS-Koordinaten geklickt!');
+							window.dispatchEvent(new CustomEvent('toggle3x3Mode'));
+						}}>
+							<span class="gps-coords">
+								{formatCoordinates(cachedLat, cachedLon)} (zuletzt)
+							</span>
+						</button>
+					</div>
+				{:else if userLat !== null && userLon !== null}
+					<!-- NEU: GPS-Daten verfügbar aber Status nicht korrekt gesetzt -->
+					<div class="gps-status active">
+						<button class="gps-coords-clickable" on:click={() => {
+							console.log('🎯 GPS-Koordinaten geklickt! (Fallback)');
+							window.dispatchEvent(new CustomEvent('toggle3x3Mode'));
+						}}>
+							<span class="gps-coords">
+								{formatCoordinates(userLat, userLon)}
+							</span>
+						</button>
 					</div>
 				{:else if isLoggedIn}
 					<div class="gps-status none">
