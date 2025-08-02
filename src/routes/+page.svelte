@@ -1447,14 +1447,9 @@
               if (browser) localStorage.removeItem('gpsAllowed');
               filterStore.updateGpsStatus(false);
               
-              // NEU: Prüfe ob cached GPS-Daten verfügbar sind
-              if (cachedLat !== null && cachedLon !== null) {
-                gpsStatus = "cached";
-                console.log('[GPS] Permission denied - using cached GPS data');
-              } else {
-                gpsStatus = "denied";
-                console.log('[GPS] Permission denied - no cached GPS data available');
-              }
+              // WICHTIG: Setze immer den korrekten Fehlerstatus
+              gpsStatus = "denied";
+              console.log('[GPS] Permission denied');
               break;
             case error.POSITION_UNAVAILABLE:
               // NEU: Lösche aktive GPS-Koordinaten wenn GPS nicht verfügbar ist
@@ -1462,14 +1457,9 @@
               userLon = null;
               filterStore.updateGpsStatus(false);
               
-              // NEU: Prüfe ob cached GPS-Daten verfügbar sind
-              if (cachedLat !== null && cachedLon !== null) {
-                gpsStatus = "cached";
-                console.log('[GPS] Position unavailable - using cached GPS data');
-              } else {
-                gpsStatus = "unavailable";
-                console.log('[GPS] Position unavailable - no cached GPS data available');
-              }
+              // WICHTIG: Setze immer den korrekten Fehlerstatus
+              gpsStatus = "unavailable";
+              console.log('[GPS] Position unavailable');
               break;
             case error.TIMEOUT:
               // NEU: Lösche aktive GPS-Koordinaten bei Timeout
@@ -1477,14 +1467,9 @@
               userLon = null;
               filterStore.updateGpsStatus(false);
               
-              // NEU: Prüfe ob cached GPS-Daten verfügbar sind
-              if (cachedLat !== null && cachedLon !== null) {
-                gpsStatus = "cached";
-                console.log('[GPS] GPS timeout - using cached GPS data');
-              } else {
-                gpsStatus = "unavailable";
-                console.log('[GPS] GPS timeout - no cached GPS data available');
-              }
+              // WICHTIG: Setze immer den korrekten Fehlerstatus
+              gpsStatus = "unavailable";
+              console.log('[GPS] GPS timeout');
               break;
             default:
               // NEU: Lösche aktive GPS-Koordinaten bei unbekanntem Fehler
@@ -1492,14 +1477,10 @@
               userLon = null;
               filterStore.updateGpsStatus(false);
               
-              // NEU: Prüfe ob cached GPS-Daten verfügbar sind
-              if (cachedLat !== null && cachedLon !== null) {
-                gpsStatus = "cached";
-                console.log('[GPS] Unknown GPS error - using cached GPS data');
-              } else {
-                gpsStatus = "unavailable";
-                console.log('[GPS] Unknown GPS error - no cached GPS data available');
-              }
+              // WICHTIG: Setze immer den korrekten Fehlerstatus
+              gpsStatus = "unavailable";
+              console.log('[GPS] Unknown GPS error');
+              break;
           }
         },
         {
@@ -1918,14 +1899,9 @@
     userLon = null;
     lastGPSUpdateTime = null;
     
-    // NEU: Prüfe ob cached GPS-Daten verfügbar sind
-    if (cachedLat !== null && cachedLon !== null) {
-      gpsStatus = 'cached';
-      console.log('[GPS] GPS stopped - using cached GPS data');
-    } else {
-      gpsStatus = 'none';
-      console.log('[GPS] GPS stopped - no cached GPS data available');
-    }
+    // WICHTIG: Setze immer auf 'none' wenn GPS manuell gestoppt wird
+    gpsStatus = 'none';
+    console.log('[GPS] GPS stopped - status set to none');
     
     // Update filterStore
     filterStore.updateGpsStatus(false);
