@@ -74,8 +74,8 @@
   let cachedLat: number | null = null;
   let cachedLon: number | null = null;
   // NEU: Separate Variablen für ausgewählte GPS-Koordinaten
-  let selectedLat: number | null = null;
-  let selectedLon: number | null = null;
+  // let selectedLat: number | null = null;
+  // let selectedLon: number | null = null;
   let showDistance = true;
   let showCompass = false;
   let isLoggedIn = false;
@@ -1258,7 +1258,7 @@
   
   $: if (galleryInitialized && browser) {
     const gps = getEffectiveGpsPosition();
-    // NEU: Unterscheide zwischen aktiven GPS und ausgewählten GPS
+    // EINFACH: Verwende aktive GPS oder cached GPS
     let effectiveLat: number | null = null;
     let effectiveLon: number | null = null;
     
@@ -1266,10 +1266,6 @@
       // Aktive GPS verwenden
       effectiveLat = userLat;
       effectiveLon = userLon;
-    } else if (gpsStatus === 'selected' && selectedLat !== null && selectedLon !== null) {
-      // Ausgewählte GPS verwenden (nicht als aktive GPS)
-      effectiveLat = selectedLat;
-      effectiveLon = selectedLon;
     } else if (gpsStatus === 'cached' && cachedLat !== null && cachedLon !== null) {
       // Cached GPS verwenden
       effectiveLat = cachedLat;
@@ -1360,15 +1356,15 @@
       console.log('[Location-Selected] Stopped GPS watcher to prevent conflicts');
     }
     
-    // NEU: Setze ausgewählte GPS-Koordinaten separat von aktiven GPS
-    selectedLat = lat;
-    selectedLon = lon;
+    // EINFACH: Setze ausgewählte Koordinaten als cached GPS
+    cachedLat = lat;
+    cachedLon = lon;
     
     // Lösche aktive GPS-Koordinaten wenn GPS deaktiviert ist
     if (gpsStatus === 'denied' || gpsStatus === 'unavailable' || gpsStatus === 'none') {
       userLat = null;
       userLon = null;
-      gpsStatus = 'selected'; // NEU: Status für ausgewählte GPS
+      gpsStatus = 'cached';
     } else {
       // Wenn GPS aktiv ist, verwende die ausgewählten Koordinaten als aktive GPS
       userLat = lat;
@@ -1724,13 +1720,10 @@
     let effectiveLat: number | undefined = undefined;
     let effectiveLon: number | undefined = undefined;
     
-    // NEU: Verwende die gleiche Logik wie im reaktiven Statement
+    // EINFACH: Verwende aktive GPS oder cached GPS
     if (gpsStatus === 'active' && userLat !== null && userLon !== null) {
       effectiveLat = userLat;
       effectiveLon = userLon;
-    } else if (gpsStatus === 'selected' && selectedLat !== null && selectedLon !== null) {
-      effectiveLat = selectedLat;
-      effectiveLon = selectedLon;
     } else if (gpsStatus === 'cached' && cachedLat !== null && cachedLon !== null) {
       effectiveLat = cachedLat;
       effectiveLon = cachedLon;
@@ -1769,13 +1762,10 @@
     let effectiveLat: number | undefined = undefined;
     let effectiveLon: number | undefined = undefined;
     
-    // NEU: Verwende die gleiche Logik wie im reaktiven Statement
+    // EINFACH: Verwende aktive GPS oder cached GPS
     if (gpsStatus === 'active' && userLat !== null && userLon !== null) {
       effectiveLat = userLat;
       effectiveLon = userLon;
-    } else if (gpsStatus === 'selected' && selectedLat !== null && selectedLon !== null) {
-      effectiveLat = selectedLat;
-      effectiveLon = selectedLon;
     } else if (gpsStatus === 'cached' && cachedLat !== null && cachedLon !== null) {
       effectiveLat = cachedLat;
       effectiveLon = cachedLon;
@@ -1814,15 +1804,11 @@
   // Berechne effektive GPS-Koordinaten für alle Components
   $: {
     const gps = getEffectiveGpsPosition();
-    // NEU: Unterscheide zwischen aktiven GPS und ausgewählten GPS
+    // EINFACH: Verwende aktive GPS oder cached GPS
     if (gpsStatus === 'active' && userLat !== null && userLon !== null) {
       // Aktive GPS verwenden
       effectiveLat = userLat;
       effectiveLon = userLon;
-    } else if (gpsStatus === 'selected' && selectedLat !== null && selectedLon !== null) {
-      // Ausgewählte GPS verwenden (nicht als aktive GPS)
-      effectiveLat = selectedLat;
-      effectiveLon = selectedLon;
     } else if (gpsStatus === 'cached' && cachedLat !== null && cachedLon !== null) {
       // Cached GPS verwenden
       effectiveLat = cachedLat;
@@ -1836,7 +1822,7 @@
       effectiveLon = null;
     }
     
-    // NEU: Bessere Logging für GPS-Priorität
+    // EINFACH: Bessere Logging für GPS-Priorität
     if (browser) {
       console.log('[GPS-Priority] Effective GPS calculation:', {
         gpsStatus,
@@ -2042,8 +2028,6 @@
   <FilterBar
     userLat={gpsStatus === 'active' ? userLat : null}
     userLon={gpsStatus === 'active' ? userLon : null}
-    selectedLat={gpsStatus === 'selected' ? selectedLat : null}
-    selectedLon={gpsStatus === 'selected' ? selectedLon : null}
     {showDistance}
     {isLoggedIn}
     gpsStatus={gpsStatus}
