@@ -36,45 +36,46 @@ export const load: PageServerLoad = async ({ url }) => {
     canonicalUrl: 'https://culoca.com'
   };
 
-  // Serverseitig NewsFlash-Daten laden (neueste Bilder) für SEO
+  // Load NewsFlash items for SEO
+  console.log('[Server] Loading NewsFlash items for SEO (page 1, offset 0)...');
+  
+  // Use dedicated SQL function for NewsFlash with proper sorting
+  const { data: newsFlashData, error: newsFlashError } = await supabase.rpc('newsflash_items_postgis', {
+    page_value: 0, // First page
+    page_size_value: 50, // First 50 items for SEO
+    current_user_id: null, // For SEO only public items
+    mode: 'aus' // Only public items for SEO
+  });
+  
   let newsFlashItems = [];
-  try {
-    console.log(`[Server] Loading NewsFlash items for SEO (page ${page}, offset ${offset})...`);
-
-    // Verwende die gleiche Logik wie NewsFlash, aber serverseitig mit Pagination
-    const { data, error } = await supabase
-      .from('items')
-      .select('id, slug, lat, lon, path_512, path_2048, path_64, title, description, original_name, profile_id, is_private, created_at, width, height, gallery')
-      .not('path_512', 'is', null)
-      .eq('gallery', true) // Nur Galerie-Items
-      .or('is_private.eq.false,is_private.is.null') // Nur öffentliche Items für SEO
-      .order('created_at', { ascending: false })
-      .range(offset, offset + itemsPerPage - 1);
-
-    if (error) {
-      console.error('[Server] Error loading NewsFlash items:', error);
-    } else {
-      console.log(`[Server] Successfully loaded NewsFlash items: ${data?.length || 0} (page ${page})`);
-      console.log('[Server] First item:', data?.[0]);
-      
-      // Formatiere Items für NewsFlash
-      newsFlashItems = (data || []).map(item => ({
-        id: item.id,
-        slug: item.slug,
-        title: item.title,
-        description: item.description,
-        lat: item.lat,
-        lon: item.lon,
-        path_512: item.path_512,
-        original_name: item.original_name,
-        created_at: item.created_at
-      }));
-      
-      console.log('[Server] Formatted items:', newsFlashItems.length);
-      console.log('[Server] First formatted item:', newsFlashItems[0]);
+  if (newsFlashError) {
+    console.error('[Server] Error loading NewsFlash items:', newsFlashError);
+    newsFlashItems = [];
+  } else {
+    console.log('[Server] Successfully loaded NewsFlash items:', newsFlashData?.length || 0, '(page 1)');
+    if (newsFlashData && newsFlashData.length > 0) {
+      console.log('[Server] First item:', newsFlashData[0]);
     }
-  } catch (error) {
-    console.error('[Server] Unexpected error loading NewsFlash items:', error);
+    
+    // Format items for NewsFlash component
+    const formattedItems = (newsFlashData || []).map(item => ({
+      id: item.id,
+      slug: item.slug,
+      title: item.title,
+      description: item.description,
+      lat: item.lat,
+      lon: item.lon,
+      path_512: item.path_512,
+      original_name: item.original_name,
+      created_at: item.created_at
+    }));
+    
+    console.log('[Server] Formatted items:', formattedItems.length);
+    if (formattedItems.length > 0) {
+      console.log('[Server] First formatted item:', formattedItems[0]);
+    }
+    
+    newsFlashItems = formattedItems;
   }
 
   console.log('[Server] Returning data:', {

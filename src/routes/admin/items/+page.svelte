@@ -368,15 +368,58 @@
 {:else}
   <!-- Admin Header -->
   <div style="background: #111827; border-bottom: 1px solid #374151; padding: 1rem 2rem;">
-    <div style="display: flex; justify-content: space-between; align-items: center;">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
       <h1 style="margin: 0; color: #f9fafb; font-size: 1.5rem;">Admin Dashboard</h1>
-      <nav style="display: flex; gap: 1rem;">
+      <nav style="display: flex; gap: 1rem; flex-wrap: wrap;">
         <a href="/admin/items" style="color: #f59e0b; text-decoration: none; font-weight: 500; padding: 0.5rem 1rem; border-radius: 4px; background: #374151;">Items</a>
         <a href="/admin/users" style="color: #9ca3af; text-decoration: none; font-weight: 500; padding: 0.5rem 1rem; border-radius: 4px;">Users</a>
         <a href="/" style="color: #9ca3af; text-decoration: none; font-weight: 500; padding: 0.5rem 1rem; border-radius: 4px;">Galerie</a>
       </nav>
     </div>
   </div>
+
+  <style>
+    /* Responsive Design */
+    @media (max-width: 768px) {
+      .desktop-only {
+        display: none !important;
+      }
+      .mobile-only {
+        display: block !important;
+      }
+    }
+    
+    @media (min-width: 769px) {
+      .desktop-only {
+        display: block !important;
+      }
+      .mobile-only {
+        display: none !important;
+      }
+    }
+    
+    /* Mobile optimizations */
+    @media (max-width: 480px) {
+      .mobile-only {
+        padding: 0 1rem;
+      }
+      
+      .mobile-only > div {
+        margin-bottom: 0.75rem;
+        padding: 0.75rem;
+      }
+      
+      .mobile-only img {
+        width: 60px !important;
+        height: 60px !important;
+      }
+      
+      .mobile-only .grid {
+        grid-template-columns: 1fr !important;
+        gap: 0.5rem !important;
+      }
+    }
+  </style>
 
   <div style="padding: 2rem;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
@@ -402,8 +445,8 @@
 
     </div>
 
-    <!-- Items Table -->
-    <div style="overflow-x: auto;">
+    <!-- Desktop Table View (hidden on mobile) -->
+    <div style="overflow-x: auto; display: none;" class="desktop-only">
       <table style="width: 100%; border-collapse: collapse; background: #1f2937; border-radius: 8px; overflow: hidden;">
         <thead>
           <tr style="background: #111827;">
@@ -514,6 +557,105 @@
           {/each}
         </tbody>
       </table>
+    </div>
+
+    <!-- Mobile Card View (hidden on desktop) -->
+    <div class="mobile-only">
+      {#each items as item}
+        <div style="background: #1f2937; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; border: 1px solid #374151;">
+          <!-- Item Header with Image -->
+          <div style="display: flex; align-items: flex-start; gap: 12px; margin-bottom: 1rem;">
+            {#if item.path_512}
+              <img 
+                src={`https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${item.path_512}`}
+                alt={item.title || 'Bild'}
+                style="width: 80px; height: 80px; object-fit: cover; border-radius: 4px; flex-shrink: 0;"
+              />
+            {:else}
+              <div style="width: 80px; height: 80px; background: #374151; border-radius: 4px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: #9ca3af; font-size: 0.75rem;">
+                Kein Bild
+              </div>
+            {/if}
+            <div style="flex: 1;">
+              <div style="font-weight: 500; color: #f9fafb; margin-bottom: 4px; font-size: 1rem;">
+                {item.title || 'Unbenannt'}
+              </div>
+              <a 
+                href="/item/{item.slug}" 
+                style="color: #f59e0b; text-decoration: none; font-size: 0.875rem;"
+                target="_blank"
+              >
+                {item.slug}
+              </a>
+            </div>
+          </div>
+
+          <!-- Item Details -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;" class="grid">
+            <div>
+              <div style="font-size: 0.875rem; color: #9ca3af; margin-bottom: 4px;">Benutzer</div>
+              <a 
+                href="/?user={item.user_id}" 
+                style="color: #f59e0b; text-decoration: none; font-weight: 500;"
+              >
+                {item.profiles?.accountname || 'Unbekannt'}
+              </a>
+              <div style="font-size: 0.75rem; color: #9ca3af; margin-top: 4px;">
+                {item.width} × {item.height}
+              </div>
+            </div>
+            
+            <div>
+              <div style="font-size: 0.875rem; color: #9ca3af; margin-bottom: 4px;">Erstellt</div>
+              <div style="color: #f9fafb;">
+                {formatDate(item.created_at)}
+              </div>
+              {#if item.lat && item.lon}
+                <button 
+                  on:click={() => openMapForGPS(item)}
+                  style="font-size: 0.75rem; color: #9ca3af; margin-top: 0.25rem; font-family: monospace; background: none; border: none; cursor: pointer; text-decoration: underline; padding: 0;"
+                  title="Auf Karte anzeigen"
+                >
+                  {item.lat.toFixed(2)}, {item.lon.toFixed(2)}
+                </button>
+              {:else}
+                <button 
+                  on:click={() => openGPSModal(item)}
+                  style="font-size: 0.75rem; color: #9ca3af; margin-top: 0.25rem; font-family: monospace; background: none; border: none; cursor: pointer; text-decoration: underline; padding: 0;"
+                  title="GPS-Koordinaten setzen"
+                >
+                  GPS: -
+                </button>
+              {/if}
+            </div>
+          </div>
+
+          <!-- Privacy and Actions -->
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+            <button
+              on:click={() => togglePrivacy(item)}
+              style="padding: 6px 12px; font-size: 0.875rem; border-radius: 4px; border: none; cursor: pointer; background: {item.is_private ? '#dc2626' : '#059669'}; color: white;"
+            >
+              {item.is_private ? 'Privat' : 'Öffentlich'}
+            </button>
+            
+            <div style="display: flex; gap: 0.5rem;">
+              <button
+                on:click={() => openOwnerModal(item)}
+                style="padding: 6px 12px; font-size: 0.875rem; background: #f59e0b; border: none; border-radius: 4px; color: white; cursor: pointer;"
+              >
+                Besitzer
+              </button>
+              <button
+                on:click={() => deleteItem(item)}
+                style="padding: 6px 12px; font-size: 0.875rem; background: #dc2626; border: none; border-radius: 4px; color: white; cursor: pointer;"
+              >
+                Löschen
+              </button>
+            </div>
+          </div>
+        </div>
+      {/each}
     </div>
 
     <!-- Pagination -->
