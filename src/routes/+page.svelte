@@ -71,6 +71,11 @@
   let isManual3x3Mode = false;
   let userLat: number | null = null;
   let userLon: number | null = null;
+  let cachedLat: number | null = null;
+  let cachedLon: number | null = null;
+  // NEU: Separate Variablen für ausgewählte GPS-Koordinaten
+  let selectedLat: number | null = null;
+  let selectedLon: number | null = null;
   let showDistance = true;
   let showCompass = false;
   let isLoggedIn = false;
@@ -1336,12 +1341,22 @@
       console.log('[Location-Selected] Stopped GPS watcher to prevent conflicts');
     }
     
-    // Set the selected location as "GPS gemerkt"
-    userLat = lat;
-    userLon = lon;
+    // NEU: Setze ausgewählte GPS-Koordinaten separat von aktiven GPS
+    selectedLat = lat;
+    selectedLon = lon;
     
-    // Update GPS status to active (as if GPS was working)
-    gpsStatus = 'active';
+    // Lösche aktive GPS-Koordinaten wenn GPS deaktiviert ist
+    if (gpsStatus === 'denied' || gpsStatus === 'unavailable' || gpsStatus === 'none') {
+      userLat = null;
+      userLon = null;
+      gpsStatus = 'selected'; // NEU: Status für ausgewählte GPS
+    } else {
+      // Wenn GPS aktiv ist, verwende die ausgewählten Koordinaten als aktive GPS
+      userLat = lat;
+      userLon = lon;
+      gpsStatus = 'active';
+    }
+    
     lastGPSUpdateTime = Date.now();
     
     // Save to localStorage as "GPS gemerkt"
@@ -1417,37 +1432,65 @@
           console.warn("GPS-Fehler:", error.message, "Code:", error.code);
           switch (error.code) {
             case error.PERMISSION_DENIED:
-              gpsStatus = "denied";
               // NEU: Lösche aktive GPS-Koordinaten wenn GPS verweigert wird
               userLat = null;
               userLon = null;
               if (browser) localStorage.removeItem('gpsAllowed');
               filterStore.updateGpsStatus(false);
-              console.log('[GPS] Permission denied - cleared active GPS coordinates');
+              
+              // NEU: Prüfe ob cached GPS-Daten verfügbar sind
+              if (cachedLat !== null && cachedLon !== null) {
+                gpsStatus = "cached";
+                console.log('[GPS] Permission denied - using cached GPS data');
+              } else {
+                gpsStatus = "denied";
+                console.log('[GPS] Permission denied - no cached GPS data available');
+              }
               break;
             case error.POSITION_UNAVAILABLE:
-              gpsStatus = "unavailable";
               // NEU: Lösche aktive GPS-Koordinaten wenn GPS nicht verfügbar ist
               userLat = null;
               userLon = null;
               filterStore.updateGpsStatus(false);
-              console.log('[GPS] Position unavailable - cleared active GPS coordinates');
+              
+              // NEU: Prüfe ob cached GPS-Daten verfügbar sind
+              if (cachedLat !== null && cachedLon !== null) {
+                gpsStatus = "cached";
+                console.log('[GPS] Position unavailable - using cached GPS data');
+              } else {
+                gpsStatus = "unavailable";
+                console.log('[GPS] Position unavailable - no cached GPS data available');
+              }
               break;
             case error.TIMEOUT:
-              gpsStatus = "unavailable";
               // NEU: Lösche aktive GPS-Koordinaten bei Timeout
               userLat = null;
               userLon = null;
               filterStore.updateGpsStatus(false);
-              console.log('[GPS] GPS timeout - cleared active GPS coordinates');
+              
+              // NEU: Prüfe ob cached GPS-Daten verfügbar sind
+              if (cachedLat !== null && cachedLon !== null) {
+                gpsStatus = "cached";
+                console.log('[GPS] GPS timeout - using cached GPS data');
+              } else {
+                gpsStatus = "unavailable";
+                console.log('[GPS] GPS timeout - no cached GPS data available');
+              }
               break;
             default:
-              gpsStatus = "unavailable";
               // NEU: Lösche aktive GPS-Koordinaten bei unbekanntem Fehler
               userLat = null;
               userLon = null;
               filterStore.updateGpsStatus(false);
-              console.log('[GPS] Unknown GPS error - cleared active GPS coordinates');
+              
+              // NEU: Prüfe ob cached GPS-Daten verfügbar sind
+              if (cachedLat !== null && cachedLon !== null) {
+                gpsStatus = "cached";
+                console.log('[GPS] Unknown GPS error - using cached GPS data');
+              } else {
+                gpsStatus = "unavailable";
+                console.log('[GPS] Unknown GPS error - no cached GPS data available');
+              }
           }
         },
         {
@@ -1834,8 +1877,16 @@
     // Lösche aktive GPS-Koordinaten
     userLat = null;
     userLon = null;
-    gpsStatus = 'none';
     lastGPSUpdateTime = null;
+    
+    // NEU: Prüfe ob cached GPS-Daten verfügbar sind
+    if (cachedLat !== null && cachedLon !== null) {
+      gpsStatus = 'cached';
+      console.log('[GPS] GPS stopped - using cached GPS data');
+    } else {
+      gpsStatus = 'none';
+      console.log('[GPS] GPS stopped - no cached GPS data available');
+    }
     
     // Update filterStore
     filterStore.updateGpsStatus(false);
@@ -1922,6 +1973,8 @@
   <FilterBar
     userLat={effectiveLat}
     userLon={effectiveLon}
+    selectedLat={selectedLat}
+    selectedLon={selectedLon}
     {showDistance}
     {isLoggedIn}
     gpsStatus={gpsStatus}
