@@ -1258,11 +1258,30 @@
   
   $: if (galleryInitialized && browser) {
     const gps = getEffectiveGpsPosition();
-    const effectiveLat = gps?.lat || userLat;
-    const effectiveLon = gps?.lon || userLon;
+    // NEU: Unterscheide zwischen aktiven GPS und ausgewählten GPS
+    let effectiveLat: number | null = null;
+    let effectiveLon: number | null = null;
+    
+    if (gpsStatus === 'active' && userLat !== null && userLon !== null) {
+      // Aktive GPS verwenden
+      effectiveLat = userLat;
+      effectiveLon = userLon;
+    } else if (gpsStatus === 'selected' && selectedLat !== null && selectedLon !== null) {
+      // Ausgewählte GPS verwenden (nicht als aktive GPS)
+      effectiveLat = selectedLat;
+      effectiveLon = selectedLon;
+    } else if (gpsStatus === 'cached' && cachedLat !== null && cachedLon !== null) {
+      // Cached GPS verwenden
+      effectiveLat = cachedLat;
+      effectiveLon = cachedLon;
+    } else if (gps?.lat && gps?.lon) {
+      // Fallback auf filterStore GPS
+      effectiveLat = gps.lat;
+      effectiveLon = gps.lon;
+    }
     
     // Debug-Logging für reaktive Trigger
-    const triggerLog = `GPS-Trigger: lat=${effectiveLat}, lon=${effectiveLon}, source=${gps?.source || 'direct'}, lastLat=${lastLoadedLat}, lastLon=${lastLoadedLon}, lastSource=${lastLoadedSource}`;
+    const triggerLog = `GPS-Trigger: lat=${effectiveLat}, lon=${effectiveLon}, gpsStatus=${gpsStatus}, source=${gps?.source || 'direct'}, lastLat=${lastLoadedLat}, lastLon=${lastLoadedLon}, lastSource=${lastLoadedSource}`;
     
     if (triggerLog !== lastTriggerLog) {
       console.log('[GPS-Trigger-Debug]', triggerLog);
@@ -1702,8 +1721,23 @@
     
     // Dann lade die normale Galerie mit aktuellen GPS-Daten
     const gps = getEffectiveGpsPosition();
-    const effectiveLat = gps?.lat || userLat || undefined;
-    const effectiveLon = gps?.lon || userLon || undefined;
+    let effectiveLat: number | undefined = undefined;
+    let effectiveLon: number | undefined = undefined;
+    
+    // NEU: Verwende die gleiche Logik wie im reaktiven Statement
+    if (gpsStatus === 'active' && userLat !== null && userLon !== null) {
+      effectiveLat = userLat;
+      effectiveLon = userLon;
+    } else if (gpsStatus === 'selected' && selectedLat !== null && selectedLon !== null) {
+      effectiveLat = selectedLat;
+      effectiveLon = selectedLon;
+    } else if (gpsStatus === 'cached' && cachedLat !== null && cachedLon !== null) {
+      effectiveLat = cachedLat;
+      effectiveLon = cachedLon;
+    } else if (gps?.lat && gps?.lon) {
+      effectiveLat = gps.lat;
+      effectiveLon = gps.lon;
+    }
     
     const galleryParams: any = {};
     if (effectiveLat && effectiveLon) {
@@ -1712,7 +1746,7 @@
     }
     
     console.log('[Search-Clear] About to resetGallery with params:', galleryParams);
-    console.log('[Search-Clear] GPS data:', { gps, userLat, userLon, effectiveLat, effectiveLon });
+    console.log('[Search-Clear] GPS data:', { gps, userLat, userLon, effectiveLat, effectiveLon, gpsStatus });
     
     // Kurze Verzögerung um sicherzustellen dass clearSearch abgeschlossen ist
     setTimeout(() => {
@@ -1732,8 +1766,23 @@
     
     // Lade die normale Galerie mit aktuellen GPS-Daten
     const gps = getEffectiveGpsPosition();
-    const effectiveLat = gps?.lat || userLat || undefined;
-    const effectiveLon = gps?.lon || userLon || undefined;
+    let effectiveLat: number | undefined = undefined;
+    let effectiveLon: number | undefined = undefined;
+    
+    // NEU: Verwende die gleiche Logik wie im reaktiven Statement
+    if (gpsStatus === 'active' && userLat !== null && userLon !== null) {
+      effectiveLat = userLat;
+      effectiveLon = userLon;
+    } else if (gpsStatus === 'selected' && selectedLat !== null && selectedLon !== null) {
+      effectiveLat = selectedLat;
+      effectiveLon = selectedLon;
+    } else if (gpsStatus === 'cached' && cachedLat !== null && cachedLon !== null) {
+      effectiveLat = cachedLat;
+      effectiveLon = cachedLon;
+    } else if (gps?.lat && gps?.lon) {
+      effectiveLat = gps.lat;
+      effectiveLon = gps.lon;
+    }
     
     const galleryParams: any = {};
     if (effectiveLat && effectiveLon) {
@@ -1742,7 +1791,7 @@
     }
     
     console.log('[Location-Clear] About to resetGallery with params:', galleryParams);
-    console.log('[Location-Clear] GPS data:', { gps, userLat, userLon, effectiveLat, effectiveLon });
+    console.log('[Location-Clear] GPS data:', { gps, userLat, userLon, effectiveLat, effectiveLon, gpsStatus });
     
     // Kurze Verzögerung um sicherzustellen dass clearLocationFilter abgeschlossen ist
     setTimeout(() => {
@@ -1765,12 +1814,32 @@
   // Berechne effektive GPS-Koordinaten für alle Components
   $: {
     const gps = getEffectiveGpsPosition();
-    effectiveLat = gps?.lat || userLat;
-    effectiveLon = gps?.lon || userLon;
+    // NEU: Unterscheide zwischen aktiven GPS und ausgewählten GPS
+    if (gpsStatus === 'active' && userLat !== null && userLon !== null) {
+      // Aktive GPS verwenden
+      effectiveLat = userLat;
+      effectiveLon = userLon;
+    } else if (gpsStatus === 'selected' && selectedLat !== null && selectedLon !== null) {
+      // Ausgewählte GPS verwenden (nicht als aktive GPS)
+      effectiveLat = selectedLat;
+      effectiveLon = selectedLon;
+    } else if (gpsStatus === 'cached' && cachedLat !== null && cachedLon !== null) {
+      // Cached GPS verwenden
+      effectiveLat = cachedLat;
+      effectiveLon = cachedLon;
+    } else if (gps?.lat && gps?.lon) {
+      // Fallback auf filterStore GPS
+      effectiveLat = gps.lat;
+      effectiveLon = gps.lon;
+    } else {
+      effectiveLat = null;
+      effectiveLon = null;
+    }
     
     // NEU: Bessere Logging für GPS-Priorität
     if (browser) {
       console.log('[GPS-Priority] Effective GPS calculation:', {
+        gpsStatus,
         gpsSource: gps?.source,
         gpsFromItem: gps?.fromItem,
         effectiveLat,
@@ -1971,10 +2040,10 @@
 {:else}
   <!-- Galerie-Komponenten und restliche Seite -->
   <FilterBar
-    userLat={effectiveLat}
-    userLon={effectiveLon}
-    selectedLat={selectedLat}
-    selectedLon={selectedLon}
+    userLat={gpsStatus === 'active' ? userLat : null}
+    userLon={gpsStatus === 'active' ? userLon : null}
+    selectedLat={gpsStatus === 'selected' ? selectedLat : null}
+    selectedLon={gpsStatus === 'selected' ? selectedLon : null}
     {showDistance}
     {isLoggedIn}
     gpsStatus={gpsStatus}
