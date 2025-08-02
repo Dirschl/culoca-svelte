@@ -1,7 +1,11 @@
--- Create gallery_items_search_postgis function
--- Combines normal gallery functionality with built-in search using optimized full-text search
+-- =====================================================
+-- UPDATE SEARCH FUNCTION WITH OPTIMIZED FULL-TEXT SEARCH
+-- =====================================================
 
--- Drop existing function if it exists
+-- This script updates the gallery_items_search_postgis function to use
+-- the optimized full-text search with AND functionality for multiple words
+
+-- 1. Update the search function to use optimized full-text search
 DROP FUNCTION IF EXISTS public.gallery_items_search_postgis(double precision, double precision, integer, integer, uuid, text);
 
 CREATE OR REPLACE FUNCTION public.gallery_items_search_postgis(
@@ -82,4 +86,17 @@ $function$;
 GRANT EXECUTE ON FUNCTION public.gallery_items_search_postgis(double precision, double precision, integer, integer, uuid, text) TO anon, authenticated, service_role;
 
 -- Set ownership
-ALTER FUNCTION public.gallery_items_search_postgis(double precision, double precision, integer, integer, uuid, text) OWNER TO postgres; 
+ALTER FUNCTION public.gallery_items_search_postgis(double precision, double precision, integer, integer, uuid, text) OWNER TO postgres;
+
+-- 2. Test the updated function
+-- Test with single word
+SELECT COUNT(*) as single_word_test FROM gallery_items_search_postgis(0, 0, 0, 50, NULL, 'wasser');
+
+-- Test with multiple words (should find items containing BOTH words)
+SELECT COUNT(*) as multi_word_test FROM gallery_items_search_postgis(0, 0, 0, 50, NULL, 'wasser berg');
+
+-- Test with German umlauts
+SELECT COUNT(*) as umlaut_test FROM gallery_items_search_postgis(0, 0, 0, 50, NULL, 'müller köln');
+
+-- Show sample results
+SELECT title, slug FROM gallery_items_search_postgis(0, 0, 0, 10, NULL, 'wasser berg') LIMIT 5; 
