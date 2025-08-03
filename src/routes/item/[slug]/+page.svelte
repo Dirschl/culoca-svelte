@@ -817,8 +817,12 @@
     {@const dateModified = image.updated_at ? new Date(image.updated_at).toISOString() : 
       (image.created_at ? new Date(image.created_at).toISOString() : null)}
     {@const keywordsCsv = image.keywords ? image.keywords.join(', ') : ''}
-    {@const caption = image.exif_data?.Caption || image.title || itemName}
+    {@const rawCaption = image.exif_data?.Caption || image.title || itemName}
+    {@const caption = image.exif_data?.Caption ? decodeURIComponent(escape(rawCaption)) : (image.title || itemName)}
     {@const sha256 = image.sha256 || undefined}
+    {@const creatorName = image.full_name || 'Culoca User'}
+    {@const createdYear = image.created_at ? new Date(image.created_at).getFullYear() : new Date().getFullYear()}
+    {@const copyrightNotice = `© ${createdYear} ${creatorName} | culoca.com. Alle Rechte vorbehalten.`}
     {@html `<script type="application/ld+json">
     ${JSON.stringify({
       "@context": "https://schema.org",
@@ -833,8 +837,8 @@
       "height": { "@type": "QuantitativeValue", "value": image.height || 0, "unitCode": "PX" },
       "encodingFormat": "image/jpeg",
       "license": "https://culoca.com/license",
-      "creditText": image.full_name || 'Culoca User',
-      "copyrightNotice": `© ${new Date().getFullYear()} ${image.full_name || 'Culoca User'}. Alle Rechte vorbehalten.`,
+      "creditText": creatorName,
+      "copyrightNotice": copyrightNotice,
       "acquireLicensePage": "https://culoca.com/license",
       "caption": caption,
       "keywords": keywordsCsv,
@@ -842,15 +846,15 @@
       ...(sha256 ? { "sha256": sha256 } : {}),
       "creator": {
         "@type": "Person",
-        "name": image.full_name || 'Culoca User'
+        "name": creatorName
       },
       "author": {
         "@type": "Person",
-        "name": image.full_name || 'Culoca User'
+        "name": creatorName
       },
       "copyrightHolder": {
         "@type": "Person",
-        "name": image.full_name || 'Culoca User'
+        "name": creatorName
       },
       "publisher": {
         "@type": "Organization",
