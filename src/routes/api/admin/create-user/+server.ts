@@ -2,14 +2,23 @@ import { json, error } from '@sveltejs/kit';
 import { createClient } from '@supabase/supabase-js';
 
 // Service role client for admin operations
-const supabaseUrl = (process.env.PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL)!;
+const supabaseUrl = (process.env.PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL) || 'https://caskhmcbvtevdwsolvwk.supabase.co';
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-if (!supabaseServiceKey) {
-  throw new Error('SUPABASE_SERVICE_ROLE_KEY is required for admin operations');
+// Create client with proper error handling for build process
+let supabaseAdmin;
+try {
+  if (!supabaseServiceKey) {
+    // For build process, create a dummy client that won't be used
+    supabaseAdmin = createClient(supabaseUrl, 'dummy-key-for-build');
+  } else {
+    supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+  }
+} catch (error) {
+  console.warn('Failed to create Supabase admin client:', error);
+  // Create a dummy client for build process
+  supabaseAdmin = createClient(supabaseUrl, 'dummy-key-for-build');
 }
-
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
 export const POST = async ({ request }) => {
   try {

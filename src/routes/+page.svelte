@@ -731,78 +731,16 @@
         speechSynthesis.resume();
       }
       
-      // Teste die Sprachausgabe mit einem kurzen Text - nur nach direkter Benutzerinteraktion
-      const testUtterance = new SpeechSynthesisUtterance('Audio aktiviert');
-      testUtterance.lang = 'de-DE';
-      testUtterance.volume = 1.0;
-      testUtterance.rate = 0.9; // Slightly slower for better clarity
-      
-      testUtterance.onstart = () => {
-        console.log('🎤 Audio guide activation started');
-        audioActivated = true;
-      };
-      
-      // Set audioActivated immediately for better reactivity
+      // Stille Aktivierung des Audioguides ohne Sprachausgabe
+      console.log('🎤 Audio guide activated silently');
       audioActivated = true;
       
-      testUtterance.onend = () => {
-        console.log('🎤 Audio guide activated successfully');
-        // Announce first image after activation - nur im mobilen Modus
-        if (isManual3x3Mode) {
-          setTimeout(() => {
-            announceFirstImage();
-          }, 500);
-        }
-      };
-      
-      // Also announce immediately if audio is activated - nur im mobilen Modus
+      // Announce first image after activation - nur im mobilen Modus
       if (isManual3x3Mode) {
         setTimeout(() => {
           announceFirstImage();
         }, 200);
       }
-      
-      // Don't log canceled errors as errors - they're expected
-      testUtterance.onerror = (event) => {
-        if (event.error === 'canceled') {
-          console.log('🎤 Speech was canceled (expected behavior)');
-          return;
-        }
-        
-        console.error('🎤 Audio guide activation error:', event.error);
-        
-        if (event.error === 'not-allowed') {
-          console.log('🎤 Speech not allowed - user interaction required');
-          // Wait for user interaction and retry
-          const retryActivation = () => {
-            console.log('🎤 User interaction detected - retrying audio guide activation');
-            try {
-              if (speechSynthesis) {
-                speechSynthesis.resume();
-                speechSynthesis.speak(testUtterance);
-              }
-            } catch (error) {
-              console.error('🎤 Retry activation failed:', error);
-            }
-            document.removeEventListener('click', retryActivation);
-            document.removeEventListener('touchstart', retryActivation);
-          };
-          document.addEventListener('click', retryActivation, { once: true });
-          document.addEventListener('touchstart', retryActivation, { once: true });
-        }
-      };
-      
-      // Chrome fix: Small delay to ensure speech synthesis is ready
-      setTimeout(() => {
-        try {
-          if (speechSynthesis) {
-            speechSynthesis.speak(testUtterance);
-            console.log('🎤 Audio guide activation test spoken');
-          }
-        } catch (error) {
-          console.error('🎤 Audio guide activation error:', error);
-        }
-      }, 100);
     }
   }
 
