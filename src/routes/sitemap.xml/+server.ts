@@ -1,23 +1,5 @@
 import type { RequestHandler } from '@sveltejs/kit';
-import { createClient } from '@supabase/supabase-js';
-
-// Use environment variables with fallbacks for build process
-const supabaseUrl = (typeof process !== 'undefined' && process.env?.PUBLIC_SUPABASE_URL) || 
-                   (typeof process !== 'undefined' && process.env?.VITE_SUPABASE_URL) ||
-                   (typeof import.meta !== 'undefined' && import.meta.env?.PUBLIC_SUPABASE_URL) ||
-                   (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_URL) ||
-                   'https://caskhmcbvtevdwsolvwk.supabase.co';
-
-const supabaseServiceKey = (typeof process !== 'undefined' && process.env?.SUPABASE_SERVICE_ROLE_KEY) ||
-                          (typeof import.meta !== 'undefined' && import.meta.env?.SUPABASE_SERVICE_ROLE_KEY) ||
-                          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNhc2tobWNidnRldmR3c29sdnciLCJyb2xlIjoic2VydmljZV9yb2xlIiwiaWF0IjoxNzM0NTk3MjkwLCJleHAiOjIwNTAxNzMyOTB9.Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8';
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: { persistSession: false },
-  db: {
-    schema: 'public'
-  }
-});
+import { supabase } from '$lib/supabaseClient';
 
 export const GET: RequestHandler = async () => {
   try {
