@@ -112,6 +112,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
 
     // Lade das Profil des Erstellers
     let profile = null;
+    let full_name = 'Culoca User';
     if (img?.profile_id) {
       const { data: profileData } = await supabase
         .from('profiles')
@@ -119,6 +120,9 @@ export const load: PageServerLoad = async ({ params, url }) => {
         .eq('id', img.profile_id)
         .single();
       profile = profileData;
+      if (profileData?.full_name) {
+        full_name = profileData.full_name;
+      }
     }
 
     // Fetch nearby items if image has GPS coordinates
@@ -216,7 +220,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
       }
     }
     return {
-      image: { ...img, profile },
+      image: { ...img, profile, full_name },
       error: null,
       nearby
     };
