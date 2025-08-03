@@ -816,6 +816,9 @@
     {@const uploadDate = image.created_at ? new Date(image.created_at).toISOString() : null}
     {@const dateModified = image.updated_at ? new Date(image.updated_at).toISOString() : 
       (image.created_at ? new Date(image.created_at).toISOString() : null)}
+    {@const keywordsCsv = image.keywords ? image.keywords.join(', ') : ''}
+    {@const caption = image.exif_data?.Caption || image.title || itemName}
+    {@const sha256 = image.sha256 || undefined}
     {@html `<script type="application/ld+json">
     ${JSON.stringify({
       "@context": "https://schema.org",
@@ -826,13 +829,17 @@
       "name": itemName,
       "description": image.description || '',
       "inLanguage": "de",
-      "width": image.width || 0,
-      "height": image.height || 0,
+      "width": { "@type": "QuantitativeValue", "value": image.width || 0, "unitCode": "PX" },
+      "height": { "@type": "QuantitativeValue", "value": image.height || 0, "unitCode": "PX" },
       "encodingFormat": "image/jpeg",
       "license": "https://culoca.com/impressum",
       "creditText": image.full_name || 'Culoca User',
       "copyrightNotice": `© ${new Date().getFullYear()} ${image.full_name || 'Culoca User'}. Alle Rechte vorbehalten.`,
       "acquireLicensePage": "https://culoca.com/impressum",
+      "caption": caption,
+      "keywords": keywordsCsv,
+      "representativeOfPage": true,
+      ...(sha256 ? { "sha256": sha256 } : {}),
       "creator": {
         "@type": "Person",
         "name": image.full_name || 'Culoca User'
@@ -861,7 +868,7 @@
       },
       ...(uploadDate && { "uploadDate": uploadDate }),
       ...(dateModified && { "dateModified": dateModified })
-    })}
+    }, null, 2)}
     </script>`}
   {/if}
 </svelte:head>
