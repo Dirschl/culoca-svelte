@@ -6,6 +6,40 @@
   }
 </script>
 
+<svelte:head>
+  <title>Impressum - Culoca</title>
+  <meta name="description" content="Impressum und rechtliche Informationen von Culoca - DIRSCHL.com GmbH" />
+  
+  <!-- Strukturierte Daten (JSON-LD) für bessere SEO -->
+  <script type="application/ld+json">
+  {JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    "name": "Impressum - Culoca",
+    "description": "Impressum und rechtliche Informationen von Culoca - DIRSCHL.com GmbH",
+    "url": "https://culoca.com/impressum",
+    "inLanguage": "de",
+    "publisher": {
+      "@type": "Organization",
+      "name": "DIRSCHL.com GmbH",
+      "url": "https://culoca.com",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "Waldberg 84",
+        "addressLocality": "Reischach",
+        "postalCode": "84571",
+        "addressCountry": "DE"
+      },
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "telephone": "+49-179-9766666",
+        "email": "johann.dirschl@gmx.de"
+      }
+    }
+  })}
+  </script>
+</svelte:head>
+
 <div class="fullscreen-page">
   <header class="page-header">
     <button class="back-button" on:click={goBackToApp}>
