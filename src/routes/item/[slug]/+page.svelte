@@ -305,6 +305,8 @@
   let keywordsEditValue = '';
   let editingFilename = false;
   let filenameEditValue = '';
+  let editingSlug = false;
+  let slugEditValue = '';
 
   let showFullExif = false;
   let hiddenItems = [];
@@ -504,6 +506,61 @@
   function handleFilenameKeydown(event: KeyboardEvent) {
     if (event.key === 'Enter') { event.preventDefault(); saveFilename(); }
     else if (event.key === 'Escape') { event.preventDefault(); cancelEditFilename(); }
+  }
+  // --- Slug ---
+  function startEditSlug() {
+    if (currentUser && image && image.profile_id === currentUser.id) {
+      editingSlug = true;
+      slugEditValue = image.slug || '';
+      setTimeout(() => {
+        const input = document.getElementById('slug-edit-input') as HTMLInputElement;
+        if (input) {
+          input.focus();
+          input.setSelectionRange(input.value.length, input.value.length);
+          input.click();
+        }
+      }, 100);
+    }
+  }
+  async function saveSlug() {
+    if (!editingSlug || !currentUser || !image || image.profile_id !== currentUser.id) return;
+    const newSlug = slugEditValue.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    if (newSlug.length < 3 || newSlug.length > 100) {
+      console.error('Slug validation failed:', { length: newSlug.length, slug: newSlug });
+      return;
+    }
+    try {
+      console.log('Saving slug:', { oldSlug: image.slug, newSlug });
+      const res = await authFetch(`/api/item/${image.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug: newSlug })
+      });
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error('Failed to save slug:', { status: res.status, error: errorText });
+        
+        // Spezielle Behandlung für Slug-Konflikte
+        if (res.status === 409) {
+          alert('Dieser Slug existiert bereits. Bitte wählen Sie einen anderen Slug.');
+        } else {
+          alert('Fehler beim Speichern des Slugs. Bitte versuchen Sie es erneut.');
+        }
+        return;
+      }
+      image.slug = newSlug;
+      editingSlug = false;
+      // Redirect to new slug URL
+      goto(`/item/${newSlug}`, { replaceState: true });
+    } catch (err) { 
+      console.error('Failed to save slug:', err); 
+      editingSlug = false;
+    }
+  }
+  function cancelEditSlug() { editingSlug = false; slugEditValue = image.slug || ''; }
+  function handleSlugKeydown(event: KeyboardEvent) {
+    if (event.key === 'Enter') { event.preventDefault(); saveSlug(); }
+    else if (event.key === 'Escape') { event.preventDefault(); cancelEditSlug(); }
   }
 
   function getDistanceFromLatLonInMeters(lat1: number, lon1: number, lat2: number, lon2: number): string {
@@ -876,7 +933,7 @@
             <textarea
               id="keywords-edit-input"
               bind:value={keywordsEditValue}
-              maxlength="500"
+              maxlength="800"
               on:keydown={handleKeywordsKeydown}
               on:blur={saveKeywords}
               class="keywords-edit-input"
@@ -926,6 +983,31 @@
           {/if}
         </div>
         <div class="filename">{browser ? window.location.href : ''}</div>
+        {#if image.slug}
+          <div class="filename" class:editable={isCreator} class:editing={editingSlug}>
+            {#if editingSlug}
+              <div class="filename-edit-container">
+                <input
+                  id="slug-edit-input"
+                  type="text"
+                  bind:value={slugEditValue}
+                  maxlength="100"
+                  on:keydown={handleSlugKeydown}
+                  on:blur={saveSlug}
+                  class="filename-edit-input"
+                  placeholder="Slug eingeben..."
+                  autocomplete="off"
+                  autocorrect="off"
+                  autocapitalize="none"
+                  inputmode="text"
+                />
+                <span class="char-count">{slugEditValue.length}/100</span>
+              </div>
+            {:else}
+              <span class="filename-text" tabindex="0" role="button" on:click={startEditSlug} on:keydown={(e) => handleKey(e, startEditSlug)}>Slug: {image.slug}</span>
+            {/if}
+          </div>
+        {/if}
         <div class="filename">ID: {image?.id}</div>
         <div class="filename">64px: {fileSizes.size64 ? formatFileSize(fileSizes.size64) : 'unbekannt'}  |  512px: {fileSizes.size512 ? formatFileSize(fileSizes.size512) : 'unbekannt'}  |  2048px: {fileSizes.size2048 ? formatFileSize(fileSizes.size2048) : 'unbekannt'}</div>
       </div>

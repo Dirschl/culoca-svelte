@@ -7,6 +7,12 @@
   export let saveFilename: () => void;
   export let cancelEditFilename: () => void;
   export let handleFilenameKeydown: (e: KeyboardEvent) => void;
+  export let editingSlug: boolean;
+  export let slugEditValue: string;
+  export let startEditSlug: () => void;
+  export let saveSlug: () => void;
+  export let cancelEditSlug: () => void;
+  export let handleSlugKeydown: (e: KeyboardEvent) => void;
   export let fileSizes: { size64: number|null, size512: number|null, size2048: number|null };
   export let formatFileSize: (bytes: number) => string;
   export let browser: boolean;
@@ -44,8 +50,32 @@
   {browser ? window.location.href : ''}
 </div>
 {#if image.slug}
-  <div class="filename">
-    Slug: {image.slug}
+  <div class="filename" class:editable={isCreator} class:editing={editingSlug}>
+    {#if editingSlug}
+      <div class="filename-edit-container">
+        <input
+          id="slug-edit-input"
+          type="text"
+          bind:value={slugEditValue}
+          maxlength="100"
+          on:keydown={handleSlugKeydown}
+          on:blur={saveSlug}
+          class="filename-edit-input"
+          placeholder="Slug eingeben..."
+          autocomplete="off"
+          autocorrect="off"
+          autocapitalize="none"
+          inputmode="text"
+        />
+        <span class="char-count">
+          {slugEditValue.length}/100
+        </span>
+      </div>
+    {:else}
+      <span class="filename-text" on:click={startEditSlug}>
+        Slug: {image.slug}
+      </span>
+    {/if}
   </div>
 {/if}
 <div class="filename">
