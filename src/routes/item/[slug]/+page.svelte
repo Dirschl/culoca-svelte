@@ -830,6 +830,9 @@
       "height": image.height || 0,
       "encodingFormat": "image/jpeg",
       "license": "https://culoca.com/impressum",
+      "creditText": image.full_name || 'Culoca User',
+      "copyrightNotice": `© ${new Date().getFullYear()} ${image.full_name || 'Culoca User'}. Alle Rechte vorbehalten.`,
+      "acquireLicensePage": "https://culoca.com/impressum",
       "creator": {
         "@type": "Person",
         "name": image.full_name || 'Culoca User'
