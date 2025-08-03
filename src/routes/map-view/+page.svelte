@@ -50,6 +50,14 @@
   <title>CULOCA - Map View</title>
   <meta name="description" content="Interaktive Kartenansicht mit GPS-basierten Fotos" />
   
+  <!-- Open Graph Meta-Tags -->
+  <meta property="og:title" content="CULOCA - Map View" />
+  <meta property="og:description" content="Interaktive Kartenansicht mit GPS-basierten Fotos" />
+  <meta property="og:url" content="https://culoca.com/map-view" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Culoca" />
+  <meta property="og:locale" content="de_DE" />
+  
   <!-- Strukturierte Daten (JSON-LD) für bessere SEO -->
   <script type="application/ld+json">
   {JSON.stringify({
