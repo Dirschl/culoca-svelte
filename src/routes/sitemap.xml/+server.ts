@@ -93,17 +93,17 @@ export const GET: RequestHandler = async () => {
       xml += `    <loc>${baseUrl}/item/${item.slug}</loc>\n`;
       
       // Add lastmod using created_at as fallback if updated_at is not available
-      // Round to seconds (remove milliseconds) as per Google guidelines
+      // Use date only (no time) to avoid micro-updates as per Google guidelines
       let lastmod = null;
       if (item.updated_at && item.updated_at !== null) {
         try {
-          lastmod = new Date(item.updated_at).toISOString().split('.')[0] + 'Z';
+          lastmod = new Date(item.updated_at).toISOString().split('T')[0];
         } catch (error) {
           console.log('[Sitemap] Invalid updated_at for item:', item.slug, item.updated_at);
         }
       } else if (item.created_at && item.created_at !== null) {
         try {
-          lastmod = new Date(item.created_at).toISOString().split('.')[0] + 'Z';
+          lastmod = new Date(item.created_at).toISOString().split('T')[0];
         } catch (error) {
           console.log('[Sitemap] Invalid created_at for item:', item.slug, item.created_at);
         }
