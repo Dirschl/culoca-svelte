@@ -80,7 +80,7 @@ export const PATCH = async ({ params, request, locals }) => {
   }
 
   // Erlaubte Felder
-  const allowedFields = ['title', 'description', 'keywords', 'original_name', 'gallery', 'lat', 'lon', 'slug'];
+  const allowedFields = ['title', 'description', 'caption', 'keywords', 'original_name', 'gallery', 'lat', 'lon', 'slug'];
   const updateData = {};
   for (const key of allowedFields) {
     if (body[key] !== undefined) {
