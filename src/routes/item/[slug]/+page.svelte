@@ -299,6 +299,8 @@
 
   let editingTitle = false;
   let titleEditValue = '';
+  let editingCaption = false;
+  let captionEditValue = '';
   let editingDescription = false;
   let descriptionEditValue = '';
   let editingKeywords = false;
@@ -424,6 +426,47 @@
   function handleDescriptionKeydown(event: KeyboardEvent) {
     if (event.key === 'Enter') { event.preventDefault(); saveDescription(); }
     else if (event.key === 'Escape') { event.preventDefault(); cancelEditDescription(); }
+  }
+  // --- Caption ---
+  function startEditCaption() {
+    if (currentUser && image && image.profile_id === currentUser.id) {
+      editingCaption = true;
+      captionEditValue = image.caption || '';
+      setTimeout(() => {
+        const input = document.getElementById('caption-edit-input') as HTMLTextAreaElement;
+        if (input) {
+          input.focus();
+          input.setSelectionRange(input.value.length, input.value.length);
+          input.click();
+        }
+      }, 100);
+    }
+  }
+  async function saveCaption() {
+    if (!editingCaption || !currentUser || !image || image.profile_id !== currentUser.id) return;
+    const newCaption = captionEditValue.trim();
+    if (newCaption.length > 300) return;
+    try {
+      const res = await authFetch(`/api/item/${image.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ caption: newCaption })
+      });
+      if (!res.ok) return;
+      image.caption = newCaption;
+      editingCaption = false;
+    } catch (err) { console.error('Failed to save caption:', err); }
+  }
+  function cancelEditCaption() { editingCaption = false; captionEditValue = image.caption || ''; }
+  function handleCaptionKeydown(event: KeyboardEvent) {
+    if (event.key === 'Enter' && !event.shiftKey) { 
+      event.preventDefault(); 
+      saveCaption(); 
+    }
+    else if (event.key === 'Escape') { 
+      event.preventDefault(); 
+      cancelEditCaption(); 
+    }
   }
   // --- Keywords ---
   function startEditKeywords() {
@@ -818,7 +861,8 @@
       (image.created_at ? new Date(image.created_at).toISOString() : null)}
     {@const keywordsCsv = image.keywords ? image.keywords.join(', ') : ''}
     {@const rawCaption = image.exif_data?.Caption || image.title || itemName}
-    {@const caption = image.exif_data?.Caption ? decodeURIComponent(escape(rawCaption)) : (image.title || itemName)}
+    {@const exifCaption = image.exif_data?.Caption ? decodeURIComponent(escape(rawCaption)) : (image.title || itemName)}
+    {@const caption = image.caption || exifCaption}
     {@const sha256 = image.sha256 || undefined}
     {@const creatorName = image.full_name || 'Culoca User'}
     {@const createdYear = image.created_at ? new Date(image.created_at).getFullYear() : new Date().getFullYear()}
@@ -923,6 +967,46 @@
             </span>
           {/if}
         </h1>
+        {#if isCreator}
+          <p class="caption" class:editable={isCreator} class:editing={editingCaption}>
+            {#if editingCaption}
+              <div class="caption-edit-container">
+                <textarea
+                  id="caption-edit-input"
+                  bind:value={captionEditValue}
+                  maxlength="300"
+                  on:keydown={handleCaptionKeydown}
+                  on:blur={saveCaption}
+                  class="caption-edit-input"
+                  class:valid={captionEditValue.length >= 80 && captionEditValue.length <= 120}
+                  placeholder="Emotionale Beschreibung eingeben (80-120 Zeichen ideal)..."
+                  rows="2"
+                  autocomplete="off"
+                  autocorrect="off"
+                  autocapitalize="sentences"
+                  inputmode="text"
+                ></textarea>
+                <span class="char-count" class:valid={captionEditValue.length >= 80 && captionEditValue.length <= 120}>
+                  {captionEditValue.length}/300
+                </span>
+              </div>
+            {:else}
+              <span class="caption-text" tabindex="0" role="button" on:click={startEditCaption} on:keydown={(e) => handleKey(e, startEditCaption)}>
+                {#if image.caption}
+                  <em>{image.caption}</em>
+                {:else}
+                  <em class="placeholder">Klicke hier um eine emotionale Beschreibung hinzuzufügen</em>
+                {/if}
+              </span>
+            {/if}
+          </p>
+        {:else if image.caption}
+          <p class="caption">
+            <span class="caption-text">
+              <em>{image.caption}</em>
+            </span>
+          </p>
+        {/if}
         <p class="description" class:editable={isCreator} class:editing={editingDescription}>
           {#if editingDescription}
             <div class="description-edit-container">
@@ -945,16 +1029,16 @@
                 {descriptionEditValue.length}/160
               </span>
             </div>
-          {:else}
-            <span class="description-text" tabindex="0" role="button" on:click={startEditDescription} on:keydown={(e) => handleKey(e, startEditDescription)}>
-              {#if image.description}
-                {image.description}
-              {:else}
-                <span class="placeholder">Keine Beschreibung verfügbar</span>
-              {/if}
-            </span>
-          {/if}
-        </p>
+                      {:else}
+              <span class="description-text" tabindex="0" role="button" on:click={startEditDescription} on:keydown={(e) => handleKey(e, startEditDescription)}>
+                {#if image.description}
+                  {image.description}
+                {:else}
+                  <span class="placeholder">Keine Beschreibung verfügbar</span>
+                {/if}
+              </span>
+            {/if}
+
       </div>
     </div>
     <ImageControlsSection
@@ -1800,6 +1884,54 @@
     cursor: pointer;
     transition: color 0.2s;
     background: transparent;
+  }
+  .caption {
+    font-style: italic;
+    color: var(--text-secondary);
+    font-size: 1rem;
+    line-height: 1.4;
+    margin: 0.5rem 0;
+    background: transparent;
+  }
+  .caption.editable {
+    cursor: pointer;
+    transition: color 0.2s;
+  }
+  .caption.editable:hover {
+    color: var(--culoca-orange);
+  }
+  .caption-text {
+    display: block;
+    background: transparent;
+  }
+  .caption-edit-container {
+    position: relative;
+    width: 100%;
+  }
+  .caption-edit-input {
+    width: 100%;
+    padding: 0.5rem;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 1rem;
+    line-height: 1.4;
+    resize: vertical;
+    min-height: 60px;
+    transition: border-color 0.2s;
+  }
+  .caption-edit-input:focus {
+    outline: none;
+    border-color: var(--culoca-orange);
+  }
+  .caption-edit-input.valid {
+    border-color: var(--success-color);
+  }
+  .caption.placeholder {
+    color: var(--text-tertiary);
+    font-style: italic;
   }
   .keywords-title.editable:hover {
     color: var(--culoca-orange);
