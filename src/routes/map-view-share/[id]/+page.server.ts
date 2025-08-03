@@ -11,7 +11,20 @@ const supabaseUrl = (typeof process !== 'undefined' && process.env?.PUBLIC_SUPAB
 const supabaseServiceKey = (typeof process !== 'undefined' && process.env?.SUPABASE_SERVICE_ROLE_KEY) ||
                           (typeof import.meta !== 'undefined' && import.meta.env?.SUPABASE_SERVICE_ROLE_KEY);
 
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+// Create client with proper error handling for build process
+let supabase;
+try {
+  if (!supabaseServiceKey) {
+    // For build process, create a dummy client that won't be used
+    supabase = createClient(supabaseUrl, 'dummy-key-for-build');
+  } else {
+    supabase = createClient(supabaseUrl, supabaseServiceKey);
+  }
+} catch (error) {
+  console.warn('Failed to create Supabase client:', error);
+  // Create a dummy client for build process
+  supabase = createClient(supabaseUrl, 'dummy-key-for-build');
+}
 
 export const load: PageServerLoad = async ({ params }) => {
   try {

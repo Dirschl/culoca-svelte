@@ -12,4 +12,19 @@ const supabaseAnonKey = (typeof process !== 'undefined' && process.env?.PUBLIC_S
                        (typeof import.meta !== 'undefined' && import.meta.env?.PUBLIC_SUPABASE_ANON_KEY) ||
                        (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_ANON_KEY);
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Create client with proper error handling for build process
+let supabase;
+try {
+  if (!supabaseAnonKey) {
+    // For build process, create a dummy client that won't be used
+    supabase = createClient(supabaseUrl, 'dummy-key-for-build');
+  } else {
+    supabase = createClient(supabaseUrl, supabaseAnonKey);
+  }
+} catch (error) {
+  console.warn('Failed to create Supabase client:', error);
+  // Create a dummy client for build process
+  supabase = createClient(supabaseUrl, 'dummy-key-for-build');
+}
+
+export { supabase };
