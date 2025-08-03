@@ -321,12 +321,19 @@ export const POST = async ({ request }) => {
         const formTitle = form.get('title') as string;
         const formDescription = form.get('description') as string;
         const formKeywords = form.get('keywords') as string;
+        const formTypeId = form.get('type_id') as string;
         const formLat = form.get('lat') as string;
         const formLon = form.get('lon') as string;
 
         if (formTitle) title = formTitle;
         if (formDescription) description = formDescription;
         if (formKeywords) keywords = formKeywords;
+        if (formTypeId) {
+          const typeId = parseInt(formTypeId);
+          if (typeId >= 1 && typeId <= 6) {
+            // type_id wird später in der Datenbank gespeichert
+          }
+        }
         if (formLat && formLon) {
           lat = parseFloat(formLat);
           lon = parseFloat(formLon);
@@ -688,6 +695,7 @@ export const POST = async ({ request }) => {
           image_format: qualitySettings.format512, // Use actual format from settings
           original_url: originalUrl, // Include original_url in main record
           is_private: privacyMode === 'private', // Set is_private based on user's privacy mode
+          type_id: formTypeId ? parseInt(formTypeId) : 1, // Default: 1 = Foto
           ...(keywordsArray ? { keywords: keywordsArray } : {}),
           exif_data: Object.keys(exifToStore).length ? exifToStore : null,
           slug // <--- Slug speichern
@@ -744,6 +752,7 @@ export const POST = async ({ request }) => {
             image_format: qualitySettings.format512,
             original_url: originalUrl, // Include original_url in fallback record
             is_private: privacyMode === 'private', // Set is_private based on user's privacy mode
+            type_id: formTypeId ? parseInt(formTypeId) : 1, // Default: 1 = Foto
             ...(keywordsArray ? { keywords: keywordsArray } : {}),
             exif_data: Object.keys(exifToStore).length ? exifToStore : null
           };

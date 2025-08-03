@@ -805,6 +805,71 @@
     <meta property="twitter:title" content="Item {itemSlug} - culoca.com">
   {/if}
   <meta name="debug-test" content="true">
+  
+  <!-- Strukturierte Daten (JSON-LD) für bessere SEO - Optimiert nach Google-Richtlinien -->
+  {#if image}
+    <script type="application/ld+json">
+    {JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "ImageObject",
+      "url": `https://culoca.com/item/${image.slug}`,
+      "contentUrl": imageSource,
+      "thumbnailUrl": `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${image.path_512 || image.path_2048}`,
+      "name": (image.title || image.original_name || `Bild ${image.id}`).length > 110 ? 
+        (image.title || image.original_name || `Bild ${image.id}`).substring(0, 107) + '...' : 
+        (image.title || image.original_name || `Bild ${image.id}`),
+      "caption": image.description ? image.description.substring(0, 200) : '',
+      "description": image.description || '',
+      "keywords": image.keywords ? image.keywords.trim() : '',
+      "inLanguage": "de",
+      "width": {
+        "@type": "QuantitativeValue",
+        "value": image.width || 0,
+        "unitCode": "PX"
+      },
+      "height": {
+        "@type": "QuantitativeValue",
+        "value": image.height || 0,
+        "unitCode": "PX"
+      },
+      "encodingFormat": "image/jpeg",
+      "license": "https://culoca.com/impressum",
+      "acquireLicensePage": "https://culoca.com/impressum",
+      "creditText": `© 2025 ${image.full_name || 'Culoca User'}`,
+      "copyrightNotice": `© 2025 ${image.full_name || 'Culoca User'} – culoca.com`,
+      "creator": {
+        "@type": "Person",
+        "name": image.full_name || 'Culoca User'
+      },
+      "author": {
+        "@type": "Person",
+        "name": image.full_name || 'Culoca User'
+      },
+      "copyrightHolder": {
+        "@type": "Person",
+        "name": image.full_name || 'Culoca User'
+      },
+      "publisher": {
+        "@type": "Organization",
+        "name": "Culoca",
+        "url": "https://culoca.com"
+      },
+      "contentLocation": {
+        "@type": "Place",
+        "name": image.title || 'Unbekannter Ort',
+        "geo": {
+          "@type": "GeoCoordinates",
+          "latitude": image.lat || 0,
+          "longitude": image.lon || 0
+        }
+      },
+      "uploadDate": image.created_at ? new Date(image.created_at).toISOString().split('.')[0] + 'Z' : '',
+      "dateModified": image.updated_at ? new Date(image.updated_at).toISOString().split('.')[0] + 'Z' : 
+        (image.created_at ? new Date(image.created_at).toISOString().split('.')[0] + 'Z' : ''),
+      "representativeOfPage": true
+    })}
+    </script>
+  {/if}
 </svelte:head>
 
 <div class="page">
