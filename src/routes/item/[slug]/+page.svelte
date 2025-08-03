@@ -808,16 +808,22 @@
   
   <!-- Strukturierte Daten (JSON-LD) für bessere SEO - Optimiert nach Google-Richtlinien -->
   {#if image}
+    {@const itemName = (image.title || image.original_name || `Bild ${image.id}`).length > 110 ? 
+      (image.title || image.original_name || `Bild ${image.id}`).substring(0, 107) + '...' : 
+      (image.title || image.original_name || `Bild ${image.id}`)}
+    {@const itemUrl = `https://culoca.com/item/${image.slug}`}
+    {@const thumbnailUrl = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${image.path_512 || image.path_2048}`}
+    {@const uploadDate = image.created_at ? new Date(image.created_at).toISOString() : null}
+    {@const dateModified = image.updated_at ? new Date(image.updated_at).toISOString() : 
+      (image.created_at ? new Date(image.created_at).toISOString() : null)}
     <script type="application/ld+json">
     {JSON.stringify({
       "@context": "https://schema.org",
       "@type": "ImageObject",
-      "url": `https://culoca.com/item/${image.slug}`,
+      "url": itemUrl,
       "contentUrl": imageSource,
-      "thumbnailUrl": `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${image.path_512 || image.path_2048}`,
-      "name": (image.title || image.original_name || `Bild ${image.id}`).length > 110 ? 
-        (image.title || image.original_name || `Bild ${image.id}`).substring(0, 107) + '...' : 
-        (image.title || image.original_name || `Bild ${image.id}`),
+      "thumbnailUrl": thumbnailUrl,
+      "name": itemName,
       "description": image.description || '',
       "inLanguage": "de",
       "width": image.width || 0,
@@ -850,10 +856,9 @@
           "longitude": image.lon || 0
         }
       },
-      "uploadDate": image.created_at ? new Date(image.created_at).toISOString() : undefined,
-      "dateModified": image.updated_at ? new Date(image.updated_at).toISOString() : 
-        (image.created_at ? new Date(image.created_at).toISOString() : undefined)
-    }, null, 2)}
+      ...(uploadDate && { "uploadDate": uploadDate }),
+      ...(dateModified && { "dateModified": dateModified })
+    })}
     </script>
   {/if}
 </svelte:head>
