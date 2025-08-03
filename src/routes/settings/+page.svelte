@@ -317,6 +317,23 @@
 
 <svelte:head>
   <title>Einstellungen - Culoca</title>
+  
+  <!-- Strukturierte Daten (JSON-LD) für bessere SEO -->
+  <script type="application/ld+json">
+  {JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    "name": "Einstellungen - Culoca",
+    "description": "Passe deine Culoca-Erfahrung an - Theme, Galerie-Einstellungen und mehr",
+    "url": "https://culoca.com/settings",
+    "inLanguage": "de",
+    "publisher": {
+      "@type": "Organization",
+      "name": "Culoca",
+      "url": "https://culoca.com"
+    }
+  })}
+  </script>
 </svelte:head>
 
 <div class="settings-page">

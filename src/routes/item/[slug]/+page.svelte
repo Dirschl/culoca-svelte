@@ -818,25 +818,12 @@
       "name": (image.title || image.original_name || `Bild ${image.id}`).length > 110 ? 
         (image.title || image.original_name || `Bild ${image.id}`).substring(0, 107) + '...' : 
         (image.title || image.original_name || `Bild ${image.id}`),
-      "caption": image.description ? image.description.substring(0, 200) : '',
       "description": image.description || '',
-      "keywords": image.keywords ? image.keywords.trim() : '',
       "inLanguage": "de",
-      "width": {
-        "@type": "QuantitativeValue",
-        "value": image.width || 0,
-        "unitCode": "PX"
-      },
-      "height": {
-        "@type": "QuantitativeValue",
-        "value": image.height || 0,
-        "unitCode": "PX"
-      },
+      "width": image.width || 0,
+      "height": image.height || 0,
       "encodingFormat": "image/jpeg",
       "license": "https://culoca.com/impressum",
-      "acquireLicensePage": "https://culoca.com/impressum",
-      "creditText": `© 2025 ${image.full_name || 'Culoca User'}`,
-      "copyrightNotice": `© 2025 ${image.full_name || 'Culoca User'} – culoca.com`,
       "creator": {
         "@type": "Person",
         "name": image.full_name || 'Culoca User'
@@ -863,11 +850,10 @@
           "longitude": image.lon || 0
         }
       },
-      "uploadDate": image.created_at ? new Date(image.created_at).toISOString().split('.')[0] + 'Z' : '',
-      "dateModified": image.updated_at ? new Date(image.updated_at).toISOString().split('.')[0] + 'Z' : 
-        (image.created_at ? new Date(image.created_at).toISOString().split('.')[0] + 'Z' : ''),
-      "representativeOfPage": true
-    })}
+      "uploadDate": image.created_at ? new Date(image.created_at).toISOString() : undefined,
+      "dateModified": image.updated_at ? new Date(image.updated_at).toISOString() : 
+        (image.created_at ? new Date(image.created_at).toISOString() : undefined)
+    }, null, 2)}
     </script>
   {/if}
 </svelte:head>

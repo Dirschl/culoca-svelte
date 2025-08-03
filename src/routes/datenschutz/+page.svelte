@@ -6,6 +6,28 @@
   }
 </script>
 
+<svelte:head>
+  <title>Datenschutzerklärung - Culoca</title>
+  <meta name="description" content="Datenschutzerklärung von Culoca - Informationen zum Umgang mit personenbezogenen Daten" />
+  
+  <!-- Strukturierte Daten (JSON-LD) für bessere SEO -->
+  <script type="application/ld+json">
+  {JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    "name": "Datenschutzerklärung - Culoca",
+    "description": "Datenschutzerklärung von Culoca - Informationen zum Umgang mit personenbezogenen Daten",
+    "url": "https://culoca.com/datenschutz",
+    "inLanguage": "de",
+    "publisher": {
+      "@type": "Organization",
+      "name": "DIRSCHL.com GmbH",
+      "url": "https://culoca.com"
+    }
+  })}
+  </script>
+</svelte:head>
+
 <div class="fullscreen-page">
   <header class="page-header">
     <button class="back-button" on:click={goBackToApp}>

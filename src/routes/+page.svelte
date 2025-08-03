@@ -18,6 +18,32 @@
   <meta name="twitter:title" content="Culoca – See You Local | Entdecke deine Umgebung" />
   <meta name="twitter:description" content="Fotos, Firmen, Events & Anzeigen mit GPS-Daten – jetzt lokal entdecken." />
   <meta name="twitter:image" content="https://culoca.com/culoca-see-you-local-entdecke-deine-umgebung.jpg" />
+  
+  <!-- Strukturierte Daten (JSON-LD) für bessere SEO -->
+  <script type="application/ld+json">
+  {JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "Culoca",
+    "alternateName": "See You Local",
+    "url": "https://culoca.com",
+    "description": "Entdecke und teile Fotos, Firmen, Events und Anzeigen – alles mit präzisen GPS-Daten. Starte deine kostenlose Galerie auf Culoca.",
+    "inLanguage": "de",
+    "publisher": {
+      "@type": "Organization",
+      "name": "DIRSCHL.com GmbH",
+      "url": "https://culoca.com"
+    },
+    "potentialAction": {
+      "@type": "SearchAction",
+      "target": {
+        "@type": "EntryPoint",
+        "urlTemplate": "https://culoca.com/?search={search_term_string}"
+      },
+      "query-input": "required name=search_term_string"
+    }
+  })}
+  </script>
 </svelte:head>
 <script lang="ts">
   import type { PageData } from './$types';

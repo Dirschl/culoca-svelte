@@ -49,6 +49,23 @@
 <svelte:head>
   <title>CULOCA - Map View</title>
   <meta name="description" content="Interaktive Kartenansicht mit GPS-basierten Fotos" />
+  
+  <!-- Strukturierte Daten (JSON-LD) für bessere SEO -->
+  <script type="application/ld+json">
+  {JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    "name": "CULOCA - Map View",
+    "description": "Interaktive Kartenansicht mit GPS-basierten Fotos",
+    "url": "https://culoca.com/map-view",
+    "inLanguage": "de",
+    "publisher": {
+      "@type": "Organization",
+      "name": "Culoca",
+      "url": "https://culoca.com"
+    }
+  })}
+  </script>
 </svelte:head>
 
 <div class="map-view-container">

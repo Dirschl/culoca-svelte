@@ -1070,6 +1070,23 @@
 
 <svelte:head>
   <title>Massen-Upload - Culoca</title>
+  
+  <!-- Strukturierte Daten (JSON-LD) für bessere SEO -->
+  <script type="application/ld+json">
+  {JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    "name": "Massen-Upload - Culoca",
+    "description": "Lade mehrere Bilder gleichzeitig hoch - Unterstützt JPEG, PNG, WebP (max. 50MB pro Datei)",
+    "url": "https://culoca.com/bulk-upload",
+    "inLanguage": "de",
+    "publisher": {
+      "@type": "Organization",
+      "name": "Culoca",
+      "url": "https://culoca.com"
+    }
+  })}
+  </script>
 </svelte:head>
 
 <div class="bulk-upload-container">
