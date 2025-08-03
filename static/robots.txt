@@ -1,7 +1,13 @@
 User-agent: *
 Allow: /
 
-# Sitemap
+# Disallow login and admin pages
+Disallow: /login
+Disallow: /admin/
+Disallow: /api/
+Disallow: /auth/
+
+# Sitemap location
 Sitemap: https://culoca.com/sitemap.xml
 
 # Crawl-delay for polite crawling
