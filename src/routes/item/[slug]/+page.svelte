@@ -816,8 +816,8 @@
     {@const uploadDate = image.created_at ? new Date(image.created_at).toISOString() : null}
     {@const dateModified = image.updated_at ? new Date(image.updated_at).toISOString() : 
       (image.created_at ? new Date(image.created_at).toISOString() : null)}
-    <script type="application/ld+json">
-    {JSON.stringify({
+    {@html `<script type="application/ld+json">
+    ${JSON.stringify({
       "@context": "https://schema.org",
       "@type": "ImageObject",
       "url": itemUrl,
@@ -859,7 +859,7 @@
       ...(uploadDate && { "uploadDate": uploadDate }),
       ...(dateModified && { "dateModified": dateModified })
     })}
-    </script>
+    </script>`}
   {/if}
 </svelte:head>
 
