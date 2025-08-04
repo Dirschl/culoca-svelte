@@ -93,7 +93,7 @@
   }
 
   .footer-section a:hover {
-    color: var(--accent-color);
+    color: #ee7221;
   }
 
   .footer-bottom {
