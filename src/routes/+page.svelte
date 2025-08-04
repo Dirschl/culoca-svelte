@@ -68,7 +68,7 @@
   import LoginOverlay from '$lib/LoginOverlay.svelte';
   import FullscreenMap from '$lib/FullscreenMap.svelte';
   import { searchQuery, isSearching, useSearchResults, performSearch, clearSearch, setSearchQuery } from '$lib/searchStore';
-  import { sessionStore } from '$lib/sessionStore';
+  import { sessionStore, hasPublicContentPermission } from '$lib/sessionStore';
   import { filterStore, locationFilter, userFilter } from '$lib/filterStore';
   import { page as pageStore } from '$app/stores';
   import { galleryStats } from '$lib/galleryStats';
@@ -88,6 +88,9 @@
 
   // Check if location filter is active
   $: hasLocationFilter = !!$locationFilter;
+
+  // Permission states - now using sessionStore
+  $: hasPublicContentPermissionValue = $hasPublicContentPermission;
 
 
 
@@ -2024,7 +2027,6 @@
   {#if !isInIframe}
     <FloatingActionButtons
       {showScrollToTop}
-      showTestMode={true}
       showMapButton={true}
       isLoggedIn={isLoggedIn}
       {simulationMode}
@@ -2107,8 +2109,8 @@
       }}
     />
   {/if}
-  <a class="impressum-link" href="/impressum" target="_blank" rel="noopener">Impressum</a>
-  <a class="datenschutz-link" href="/datenschutz" target="_blank" rel="noopener">Datenschutz</a>
+  <a class="impressum-link" href="/web/impressum" target="_blank" rel="noopener">Impressum</a>
+  <a class="datenschutz-link" href="/web/datenschutz" target="_blank" rel="noopener">Datenschutz</a>
 {/if}
 
 <style>

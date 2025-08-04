@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { supabase } from '$lib/supabaseClient.ts';
+  import InfoPageLayout from '$lib/InfoPageLayout.svelte';
   
   let user: any = null;
   let hasAdminPermission = false;
@@ -91,34 +92,19 @@
     <a href="/" class="btn">Zurück zur Startseite</a>
   </div>
 {:else}
-  <div class="admin-layout">
-    <!-- Admin Navigation -->
-    <nav class="admin-nav">
-      <div class="nav-header">
-        <h1>Admin-Bereich</h1>
-      </div>
-      <ul class="nav-links">
-        <li><a href="/admin" class="nav-link">Dashboard</a></li>
-        <li><a href="/admin/roles" class="nav-link active">Rollen</a></li>
-        <li><a href="/admin/users" class="nav-link">Benutzer</a></li>
-        <li><a href="/admin/items" class="nav-link">Items</a></li>
-        <li><a href="/admin/analytics" class="nav-link">Analytics</a></li>
-      </ul>
-    </nav>
-
-    <!-- Main Content -->
-    <main class="admin-content">
-      <div class="content-header">
-        <h2>Rollen-Management</h2>
-        <p>Verwalte Rollen und deren Berechtigungen</p>
-      </div>
-      
+  <InfoPageLayout 
+    currentPage="admin"
+    title="Rollen-Management"
+    description="Verwalte Rollen und deren Berechtigungen"
+  >
+    <div class="admin-content">
       {#if error}
         <div class="error-message">{error}</div>
       {/if}
       
       <!-- Roles Management -->
       <section class="roles-section">
+        <h2>Rollen und Berechtigungen</h2>
         <div class="roles-grid">
           {#each roles as role}
             <div class="role-card">
@@ -151,8 +137,8 @@
           {/each}
         </div>
       </section>
-    </main>
-  </div>
+    </div>
+  </InfoPageLayout>
 {/if}
 
 <style>
@@ -166,67 +152,9 @@
     color: var(--error-color);
   }
   
-  .admin-layout {
-    display: flex;
-    min-height: 100vh;
-  }
-  
-  .admin-nav {
-    width: 250px;
-    background: var(--bg-secondary);
-    border-right: 1px solid var(--border-color);
-    padding: 1rem;
-  }
-  
-  .nav-header h1 {
-    margin: 0 0 2rem 0;
-    font-size: 1.5rem;
-    color: var(--text-primary);
-  }
-  
-  .nav-links {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-  }
-  
-  .nav-link {
-    display: block;
-    padding: 0.75rem 1rem;
-    color: var(--text-secondary);
-    text-decoration: none;
-    border-radius: 6px;
-    margin-bottom: 0.5rem;
-    transition: all 0.2s;
-  }
-  
-  .nav-link:hover {
-    background: var(--bg-tertiary);
-    color: var(--text-primary);
-  }
-  
-  .nav-link.active {
-    background: var(--primary-color);
-    color: white;
-  }
-  
   .admin-content {
-    flex: 1;
+    width: 100%;
     padding: 2rem;
-  }
-  
-  .content-header {
-    margin-bottom: 2rem;
-  }
-  
-  .content-header h2 {
-    margin: 0 0 0.5rem 0;
-    color: var(--text-primary);
-  }
-  
-  .content-header p {
-    color: var(--text-secondary);
-    margin: 0;
   }
   
   .error-message {

@@ -3,6 +3,7 @@
   import { supabase } from '$lib/supabaseClient';
   import { goto } from '$app/navigation';
   import { darkMode } from '$lib/darkMode';
+  import InfoPageLayout from '$lib/InfoPageLayout.svelte';
 
   let isLoading = true;
   let isAdmin = false;
@@ -314,38 +315,20 @@
     </div>
   </div>
 {:else}
-  <div class="admin-container">
-    <!-- Header -->
-    <header class="admin-header">
-      <div class="admin-header-content">
+  <InfoPageLayout title="Admin Analytics">
+    <div style="width: 100%;">
+      <!-- Header -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
         <div>
-          <h1 class="admin-title">Analytics</h1>
-          <p class="admin-subtitle">Item-View Statistiken und Popularität</p>
+          <h2 style="margin: 0; color: var(--text-primary);">Analytics</h2>
+          <p style="margin: 0.5rem 0 0 0; color: var(--text-secondary);">Item-View Statistiken und Popularität</p>
         </div>
-        <nav class="admin-nav">
-          <button on:click={installAnalyticsFunction} class="admin-btn admin-btn-warning" style="margin-right: 1rem;">
+        <div>
+          <button on:click={installAnalyticsFunction} style="padding: 0.5rem 1rem; background: #f59e0b; border: none; border-radius: 6px; color: white; font-size: 0.875rem; margin-right: 1rem; cursor: pointer;">
             {functionAvailable ? '✅ Funktion verfügbar' : '🔧 Funktion installieren'}
           </button>
-          <a href="/admin" class="admin-btn admin-btn-secondary">← Zurück zum Dashboard</a>
-        </nav>
-      </div>
-    </header>
-
-    <!-- Navigation -->
-    <nav class="admin-navbar">
-      <div class="admin-navbar-content">
-        <div class="admin-navbar-links">
-          <a href="/admin" class="admin-nav-link">Dashboard</a>
-          <a href="/admin/users" class="admin-nav-link">Benutzer</a>
-          <a href="/admin/items" class="admin-nav-link">Items</a>
-          <a href="/admin/analytics" class="admin-nav-link active">Analytics</a>
-          <a href="/admin/create-user" class="admin-nav-link">Benutzer erstellen</a>
         </div>
       </div>
-    </nav>
-
-    <!-- Main Content -->
-    <main class="admin-main">
       <!-- Statistics Cards -->
       <div class="admin-stats-grid">
         <div class="admin-stat-card">
@@ -532,6 +515,176 @@
           </div>
         {/if}
       </div>
-    </main>
-  </div>
+    </div>
+  </InfoPageLayout>
 {/if} 
+
+<style>
+  /* Admin Analytics Styles */
+  .admin-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+  
+  .admin-stat-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1.5rem;
+    transition: all 0.2s;
+  }
+  
+  .admin-stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+  
+  .admin-stat-content {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  
+  .admin-stat-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    background: var(--bg-tertiary);
+  }
+  
+  .admin-stat-info h3 {
+    margin: 0 0 0.5rem 0;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+  }
+  
+  .admin-stat-info p {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+  
+  .admin-table-container {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  
+  .admin-table-header {
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+  }
+  
+  .admin-table-title {
+    margin: 0;
+    color: var(--text-primary);
+    font-size: 1.125rem;
+    font-weight: 600;
+  }
+  
+  .admin-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  
+  .admin-table th,
+  .admin-table td {
+    padding: 0.75rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+  }
+  
+  .admin-table th {
+    background: var(--bg-tertiary);
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.875rem;
+  }
+  
+  .admin-table td {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+  }
+  
+  .admin-item-link {
+    color: var(--primary-color);
+    text-decoration: none;
+    font-weight: 500;
+  }
+  
+  .admin-item-link:hover {
+    text-decoration: underline;
+  }
+  
+  .admin-action-btn {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border: none;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .admin-action-btn-primary {
+    background: var(--primary-color);
+    color: white;
+  }
+  
+  .admin-action-btn-primary:hover {
+    background: var(--primary-hover);
+  }
+  
+  .admin-empty {
+    text-align: center;
+    padding: 3rem 1rem;
+  }
+  
+  .admin-empty-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+  }
+  
+  .admin-empty-title {
+    margin: 0 0 0.5rem 0;
+    color: var(--text-primary);
+    font-size: 1.25rem;
+    font-weight: 600;
+  }
+  
+  .admin-empty-description {
+    margin: 0;
+    color: var(--text-secondary);
+  }
+  
+  /* Loading styles */
+  .admin-loading {
+    text-align: center;
+    padding: 3rem 1rem;
+  }
+  
+  .admin-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--border-color);
+    border-top: 3px solid var(--primary-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1rem;
+  }
+  
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+</style> 

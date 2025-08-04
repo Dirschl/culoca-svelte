@@ -31,7 +31,8 @@
       create_items: false,
       manage_users: false,
       view_analytics: false,
-      system_settings: false
+      system_settings: false,
+      public_content: false
     }
   };
   
@@ -84,9 +85,10 @@
           full_name,
           email,
           role_id,
+          created_at,
           roles!inner(id, name, display_name)
         `)
-        .order('full_name');
+        .order('created_at', { ascending: false });
       
       if (usersError) throw usersError;
       users = usersData || [];
@@ -154,64 +156,49 @@
     <a href="/" class="btn">Zurück zur Startseite</a>
   </div>
 {:else}
-  <div class="admin-layout">
-    <!-- Admin Navigation -->
-    <nav class="admin-nav">
-      <div class="nav-header">
-        <h1>Admin-Bereich</h1>
-      </div>
-      <ul class="nav-links">
-        <li><a href="/admin" class="nav-link active">Dashboard</a></li>
-        <li><a href="/admin/roles" class="nav-link">Rollen</a></li>
-        <li><a href="/admin/users" class="nav-link">Benutzer</a></li>
-        <li><a href="/admin/items" class="nav-link">Items</a></li>
-        <li><a href="/admin/analytics" class="nav-link">Analytics</a></li>
-      </ul>
-    </nav>
-
-    <!-- Main Content -->
-    <main class="admin-content">
-      <div class="content-header">
-        <h2>Dashboard</h2>
-        <p>Übersicht über das System</p>
-      </div>
-      
+  <InfoPageLayout 
+    currentPage="admin"
+    title="Admin Dashboard"
+    description="Übersicht über das System"
+  >
+    <div class="admin-content">
       {#if error}
         <div class="error-message">{error}</div>
       {/if}
       
       <!-- Quick Stats -->
       <section class="stats-section">
+        <h2>System-Statistiken</h2>
         <div class="stats-grid">
           <div class="stat-card">
             <h3>Rollen</h3>
             <div class="stat-number">{roles.length}</div>
-            <a href="/admin/roles" class="stat-link">Verwalten →</a>
+            <p>Verfügbare Rollen</p>
           </div>
           
           <div class="stat-card">
             <h3>Benutzer</h3>
             <div class="stat-number">{users.length}</div>
-            <a href="/admin/users" class="stat-link">Verwalten →</a>
+            <p>Registrierte Benutzer</p>
           </div>
           
           <div class="stat-card">
             <h3>Admins</h3>
             <div class="stat-number">{users.filter(u => u.role_id === 3).length}</div>
-            <a href="/admin/users" class="stat-link">Anzeigen →</a>
+            <p>Administratoren</p>
           </div>
           
           <div class="stat-card">
-            <h3>Items</h3>
-            <div class="stat-number">-</div>
-            <a href="/admin/items" class="stat-link">Verwalten →</a>
+            <h3>Normale Benutzer</h3>
+            <div class="stat-number">{users.filter(u => u.role_id === 2).length}</div>
+            <p>Standard-Benutzer</p>
           </div>
         </div>
       </section>
       
       <!-- Recent Users -->
       <section class="recent-section">
-        <h3>Neueste Benutzer</h3>
+        <h2>Neueste Benutzer</h2>
         <div class="users-table">
           <table>
             <thead>
@@ -219,7 +206,6 @@
                 <th>Name</th>
                 <th>Email</th>
                 <th>Rolle</th>
-                <th>Erstellt</th>
               </tr>
             </thead>
             <tbody>
@@ -234,24 +220,20 @@
                       {/if}
                     {/each}
                   </td>
-                  <td>{new Date(user.created_at).toLocaleDateString()}</td>
                 </tr>
               {/each}
             </tbody>
           </table>
         </div>
-        <div class="section-footer">
-          <a href="/admin/users" class="btn">Alle Benutzer anzeigen</a>
-        </div>
       </section>
       
       <!-- System Info -->
       <section class="system-info">
-        <h3>System-Informationen</h3>
+        <h2>System-Informationen</h2>
         
         <div class="info-grid">
           <div class="info-card">
-            <h4>Rollen-Übersicht</h4>
+            <h3>Rollen-Übersicht</h3>
             <ul>
               {#each roles as role}
                 <li>
@@ -263,7 +245,7 @@
           </div>
           
           <div class="info-card">
-            <h4>Berechtigungen</h4>
+            <h3>Berechtigungen</h3>
             <ul>
               {#each roles as role}
                 <li>
@@ -275,8 +257,8 @@
           </div>
         </div>
       </section>
-    </main>
-  </div>
+    </div>
+  </InfoPageLayout>
 {/if}
 
 <style>
@@ -290,67 +272,9 @@
     color: var(--error-color);
   }
   
-  .admin-layout {
-    display: flex;
-    min-height: 100vh;
-  }
-  
-  .admin-nav {
-    width: 250px;
-    background: var(--bg-secondary);
-    border-right: 1px solid var(--border-color);
-    padding: 1rem;
-  }
-  
-  .nav-header h1 {
-    margin: 0 0 2rem 0;
-    font-size: 1.5rem;
-    color: var(--text-primary);
-  }
-  
-  .nav-links {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-  }
-  
-  .nav-link {
-    display: block;
-    padding: 0.75rem 1rem;
-    color: var(--text-secondary);
-    text-decoration: none;
-    border-radius: 6px;
-    margin-bottom: 0.5rem;
-    transition: all 0.2s;
-  }
-  
-  .nav-link:hover {
-    background: var(--bg-tertiary);
-    color: var(--text-primary);
-  }
-  
-  .nav-link.active {
-    background: var(--primary-color);
-    color: white;
-  }
-  
   .admin-content {
-    flex: 1;
+    width: 100%;
     padding: 2rem;
-  }
-  
-  .content-header {
-    margin-bottom: 2rem;
-  }
-  
-  .content-header h2 {
-    margin: 0 0 0.5rem 0;
-    color: var(--text-primary);
-  }
-  
-  .content-header p {
-    color: var(--text-secondary);
-    margin: 0;
   }
   
   .error-message {
@@ -394,42 +318,13 @@
     margin-bottom: 1rem;
   }
   
-  .stat-link {
-    color: var(--primary-color);
-    text-decoration: none;
-    font-size: 0.9rem;
-  }
-  
-  .stat-link:hover {
-    text-decoration: underline;
-  }
-  
   .recent-section {
     margin-bottom: 3rem;
   }
   
-  .recent-section h3 {
+  .recent-section h2 {
     margin-bottom: 1rem;
     color: var(--text-primary);
-  }
-  
-  .section-footer {
-    margin-top: 1rem;
-    text-align: center;
-  }
-  
-  .section-footer .btn {
-    display: inline-block;
-    padding: 0.5rem 1rem;
-    background: var(--primary-color);
-    color: white;
-    text-decoration: none;
-    border-radius: 6px;
-    font-size: 0.9rem;
-  }
-  
-  .section-footer .btn:hover {
-    background: var(--primary-hover);
   }
   
   .admin-content h1 {
@@ -454,55 +349,7 @@
     color: var(--text-primary);
   }
   
-  .roles-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 1.5rem;
-  }
-  
-  .role-card {
-    background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    padding: 1.5rem;
-  }
-  
-  .role-card h3 {
-    margin: 0 0 0.5rem 0;
-    color: var(--text-primary);
-  }
-  
-  .role-description {
-    color: var(--text-secondary);
-    margin-bottom: 1rem;
-    font-size: 0.9rem;
-  }
-  
-  .permissions h4 {
-    margin: 0 0 0.5rem 0;
-    font-size: 0.9rem;
-    color: var(--text-secondary);
-  }
-  
-  .permission-item {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 0.25rem;
-    font-size: 0.85rem;
-  }
-  
-  .permission-item input[type="checkbox"] {
-    margin: 0;
-  }
-  
-  .role-stats {
-    margin-top: 1rem;
-    padding-top: 1rem;
-    border-top: 1px solid var(--border-color);
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-  }
+
   
   .users-table {
     overflow-x: auto;
@@ -532,27 +379,7 @@
     color: var(--text-secondary);
   }
   
-  select {
-    padding: 0.25rem 0.5rem;
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    background: var(--bg-primary);
-    color: var(--text-primary);
-  }
-  
-  .btn-small {
-    padding: 0.25rem 0.5rem;
-    background: var(--accent-color);
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 0.8rem;
-  }
-  
-  .btn-small:hover {
-    opacity: 0.9;
-  }
+
   
   .info-grid {
     display: grid;
@@ -585,10 +412,6 @@
   @media (max-width: 768px) {
     .admin-content {
       padding: 1rem;
-    }
-    
-    .roles-grid {
-      grid-template-columns: 1fr;
     }
     
     .info-grid {

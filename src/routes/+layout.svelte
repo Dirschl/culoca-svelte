@@ -61,12 +61,18 @@
         if (session?.user) {
           sessionStore.setUser(session.user.id, true);
           console.log('🔐 User authenticated:', session.user.id);
+          // Load user permissions
+          sessionStore.loadPermissions(session.user.id);
         } else {
           sessionStore.setUser(null, false);
-          console.log('🔓 User logged out');
+          console.log('🔓 User logged out - loading anonymous permissions');
+          sessionStore.loadPermissions(null);
         }
       } catch (error) {
         console.error('❌ Failed to update session store:', error);
+        // Set anonymous permissions on error
+        sessionStore.setUser(null, false);
+        sessionStore.loadPermissions(null);
       }
     });
 
@@ -78,11 +84,19 @@
         if (session?.user) {
           sessionStore.setUser(session.user.id, true);
           console.log('✅ Session found and set:', session.user.id);
+          
+          // Load user permissions
+          sessionStore.loadPermissions(session.user.id);
         } else {
-          console.log('ℹ️ No active session found');
+          console.log('ℹ️ No active session found - loading anonymous permissions');
+          sessionStore.setUser(null, false);
+          sessionStore.loadPermissions(null);
         }
       }).catch((error) => {
         console.error('❌ Failed to check session:', error);
+        // Set anonymous permissions on error
+        sessionStore.setUser(null, false);
+        sessionStore.loadPermissions(null);
       });
     }, 500);
 

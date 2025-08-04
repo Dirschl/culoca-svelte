@@ -67,10 +67,58 @@ export const POST = async ({ request }) => {
       }
     }
 
+    // Check for accountname conflicts if accountname is being changed
+    if (updates.accountname && updates.accountname.trim() !== '') {
+      try {
+        // Get current user to see if accountname is actually changing
+        const { data: currentProfile, error: currentProfileError } = await supabaseAdmin
+          .from('profiles')
+          .select('accountname')
+          .eq('id', userId)
+          .single();
+        
+        if (currentProfileError) {
+          console.error('Error getting current profile:', currentProfileError);
+          return json({ error: `Failed to get current profile: ${currentProfileError.message}` }, { status: 500 });
+        }
+
+        // If accountname is the same, no need to check for conflicts
+        if (currentProfile.accountname === updates.accountname) {
+          console.log('✅ Accountname unchanged, skipping conflict check');
+        } else {
+          // Check if the new accountname already exists
+          const { data: existingProfiles, error: listError } = await supabaseAdmin
+            .from('profiles')
+            .select('id, accountname')
+            .eq('accountname', updates.accountname);
+          
+          if (listError) {
+            console.error('Error checking existing accountnames:', listError);
+            return json({ error: `Failed to check existing accountnames: ${listError.message}` }, { status: 500 });
+          }
+
+          const existingProfile = existingProfiles.find(profile => profile.id !== userId);
+
+          if (existingProfile) {
+            return json({ error: `Accountname "${updates.accountname}" wird bereits von Benutzer ${existingProfile.id} verwendet` }, { status: 400 });
+          }
+        }
+      } catch (error) {
+        console.error('Error in accountname conflict check:', error);
+        return json({ error: `Accountname conflict check failed: ${error.message}` }, { status: 500 });
+      }
+    }
+
     // Update profile
     const profileUpdates = {};
     if (updates.full_name !== undefined) profileUpdates.full_name = updates.full_name;
-    if (updates.accountname !== undefined) profileUpdates.accountname = updates.accountname;
+    if (updates.accountname !== undefined && updates.accountname.trim() !== '') {
+      profileUpdates.accountname = updates.accountname.trim();
+    } else if (updates.accountname !== undefined && updates.accountname.trim() === '') {
+      // Set accountname to null if it's empty
+      profileUpdates.accountname = null;
+    }
+    if (updates.role_id !== undefined) profileUpdates.role_id = updates.role_id;
     if (updates.privacy_mode !== undefined) profileUpdates.privacy_mode = updates.privacy_mode;
     if (updates.save_originals !== undefined) profileUpdates.save_originals = updates.save_originals;
     if (updates.use_justified_layout !== undefined) profileUpdates.use_justified_layout = updates.use_justified_layout;

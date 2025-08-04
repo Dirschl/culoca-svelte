@@ -1,22 +1,35 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { supabase } from './supabaseClient.ts';
+  import { hasAdminPermission } from './sessionStore';
   
   export let currentPage: 'system' | 'license' | 'impressum' | 'datenschutz' | 'admin' = 'system';
   
-  let hasAdminPermission = false;
   let user: any = null;
+  let openDropdown: string | null = null;
   
-  const pages = [
+  $: pages = [
     { id: 'system', title: 'System', url: '/web' },
     { id: 'license', title: 'Lizenz', url: '/web/license' },
     { id: 'impressum', title: 'Impressum', url: '/web/impressum' },
     { id: 'datenschutz', title: 'Datenschutz', url: '/web/datenschutz' },
-    // Admin link - only shown if user has admin permission
-    ...(hasAdminPermission ? [{ id: 'admin', title: 'Admin', url: '/admin' }] : [])
+    // Admin dropdown - only shown if user has admin permission
+    ...($hasAdminPermission ? [{ 
+      id: 'admin', 
+      title: 'Admin', 
+      url: '/admin',
+      hasSubmenu: true,
+      submenu: [
+        { id: 'admin-dashboard', title: 'Dashboard', url: '/admin' },
+        { id: 'admin-roles', title: 'Rollen', url: '/admin/roles' },
+        { id: 'admin-users', title: 'Benutzer', url: '/admin/users' },
+        { id: 'admin-items', title: 'Items', url: '/admin/items' },
+        { id: 'admin-analytics', title: 'Analytics', url: '/admin/analytics' }
+      ]
+    }] : [])
   ];
   
-  // Check admin permission
+  // Check admin permission - now using sessionStore
   async function checkAdminPermission() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -25,19 +38,7 @@
       console.log('🔍 [InfoPageHeader] Checking admin permission for user:', user?.id);
       
       if (user) {
-        const { data: hasPermission, error } = await supabase.rpc('has_permission', {
-          user_id: user.id,
-          permission_name: 'admin'
-        });
-        
-        console.log('🔍 [InfoPageHeader] has_permission result:', { hasPermission, error });
-        
-        if (!error && hasPermission) {
-          hasAdminPermission = true;
-          console.log('✅ [InfoPageHeader] Admin permission granted');
-        } else {
-          console.log('❌ [InfoPageHeader] Admin permission denied:', error);
-        }
+        console.log('✅ [InfoPageHeader] User session found:', user.id);
       } else {
         console.log('❌ [InfoPageHeader] No user session found');
       }
@@ -46,8 +47,23 @@
     }
   }
   
+  function toggleDropdown(dropdownId: string) {
+    openDropdown = openDropdown === dropdownId ? null : dropdownId;
+  }
+  
+  function closeDropdown() {
+    openDropdown = null;
+  }
+  
   onMount(() => {
     checkAdminPermission();
+    
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.dropdown')) {
+        closeDropdown();
+      }
+    });
   });
 </script>
 
@@ -76,13 +92,41 @@
     
     <nav class="nav-menu">
       {#each pages as page}
-        <a 
-          href={page.url} 
-          class="nav-link" 
-          class:active={currentPage === page.id}
-        >
-          {page.title}
-        </a>
+        {#if page.hasSubmenu}
+          <div class="dropdown">
+            <button 
+              class="nav-link dropdown-toggle" 
+              class:active={currentPage === page.id}
+              on:click={() => toggleDropdown(page.id)}
+            >
+              {page.title}
+              <svg class="dropdown-arrow" width="12" height="12" viewBox="0 0 12 12">
+                <path d="M2 4l4 4 4-4" stroke="currentColor" stroke-width="2" fill="none"/>
+              </svg>
+            </button>
+            {#if openDropdown === page.id}
+              <div class="dropdown-menu">
+                {#each page.submenu as subItem}
+                  <a 
+                    href={subItem.url} 
+                    class="dropdown-item"
+                    class:active={currentPage === subItem.id}
+                  >
+                    {subItem.title}
+                  </a>
+                {/each}
+              </div>
+            {/if}
+          </div>
+        {:else}
+          <a 
+            href={page.url} 
+            class="nav-link" 
+            class:active={currentPage === page.id}
+          >
+            {page.title}
+          </a>
+        {/if}
       {/each}
     </nav>
   </div>
@@ -141,6 +185,66 @@
     color: var(--accent-color);
     background: var(--bg-tertiary);
     border: 1px solid var(--accent-color);
+  }
+  
+  /* Dropdown Styles */
+  .dropdown {
+    position: relative;
+  }
+  
+  .dropdown-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: inherit;
+  }
+  
+  .dropdown-arrow {
+    transition: transform 0.2s ease;
+  }
+  
+  .dropdown.active .dropdown-arrow {
+    transform: rotate(180deg);
+  }
+  
+  .dropdown-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    min-width: 150px;
+    z-index: 1000;
+    margin-top: 0.25rem;
+  }
+  
+  .dropdown-item {
+    display: block;
+    padding: 0.75rem 1rem;
+    text-decoration: none;
+    color: var(--text-secondary);
+    transition: all 0.2s ease;
+    border-bottom: 1px solid var(--border-color);
+  }
+  
+  .dropdown-item:last-child {
+    border-bottom: none;
+  }
+  
+  .dropdown-item:hover {
+    color: var(--text-primary);
+    background: var(--bg-tertiary);
+  }
+  
+  .dropdown-item.active {
+    color: var(--accent-color);
+    background: var(--bg-tertiary);
   }
 
   @media (max-width: 768px) {

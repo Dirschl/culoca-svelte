@@ -21,6 +21,7 @@ export interface UserPermissions {
   manage_users?: boolean;
   view_analytics?: boolean;
   system_settings?: boolean;
+  public_content?: boolean;
 }
 
 export interface UserRole {
@@ -42,7 +43,8 @@ export const ANONYMOUS_PERMISSIONS: UserPermissions = {
   admin: false,
   delete_items: false,
   edit_items: false,
-  create_items: false
+  create_items: false,
+  public_content: false
 };
 
 // Permission checking functions
