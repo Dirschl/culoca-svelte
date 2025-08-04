@@ -80,7 +80,7 @@ export const GET = async ({ params }) => {
     return new Response(null, {
       status: 302,
       headers: {
-        'Location': '/favicon.svg'
+        'Location': '/culoca-icon.png'
       }
     });
   }
