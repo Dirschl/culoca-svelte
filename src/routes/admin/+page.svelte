@@ -1,410 +1,465 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { supabase } from '$lib/supabaseClient';
-  import { goto } from '$app/navigation';
-  import { darkMode } from '$lib/darkMode';
-
-  let isLoading = true;
-  let isAdmin = false;
-  let totalUsers = 0;
-  let totalItems = 0;
-  let recentUsers: any[] = [];
-  let recentItems: any[] = [];
-  let storageUsed = '0 MB';
-
-  onMount(async () => {
-    // Wait for authentication to be ready
-    const { data: { session } } = await supabase.auth.getSession();
-    
-    if (!session) {
-      console.log('No session found, redirecting to login');
-      goto('/login');
-      return;
+  import InfoPageLayout from '$lib/InfoPageLayout.svelte';
+  
+  let user: any = null;
+  let hasAdminPermission = false;
+  let roles: any[] = [];
+  let users: any[] = [];
+  let loading = true;
+  let error = '';
+  
+  // Role management
+  let selectedRole = null;
+  let editingRole = null;
+  let newRole = {
+    name: '',
+    display_name: '',
+    description: '',
+    permissions: {
+      view_gallery: true,
+      view_items: true,
+      view_maps: true,
+      search: true,
+      joystick: false,
+      bulk_upload: false,
+      settings: false,
+      admin: false,
+      delete_items: false,
+      edit_items: false,
+      create_items: false,
+      manage_users: false,
+      view_analytics: false,
+      system_settings: false
     }
-
-    const { data: { user } } = await supabase.auth.getUser();
-    console.log('Current user email:', user?.email);
-    console.log('Current user ID:', user?.id);
-    
-    // Check for admin access (johann.dirschl@gmx.de or specific user ID)
-    if (user?.email === 'johann.dirschl@gmx.de' || user?.id === '0ceb2320-0553-463b-971a-a0eef5ecdf09') {
-      console.log('Admin access granted');
-      isAdmin = true;
-      await loadDashboardData();
-    } else {
-      console.log('Access denied for:', user?.email, 'ID:', user?.id);
-      // Don't redirect immediately, show access denied message
-      isAdmin = false;
-    }
-    isLoading = false;
-  });
-
-  async function loadDashboardData() {
+  };
+  
+  // Check admin permission
+  async function checkAdminPermission() {
     try {
-      console.log('Loading dashboard data...');
+      const { data: { session } } = await supabase.auth.getSession();
+      user = session?.user;
       
-      // Load total users
-      const { count: usersCount, error: usersError } = await supabase
+      if (user) {
+        const { data: hasPermission, error } = await supabase.rpc('has_permission', {
+          user_id: user.id,
+          permission_name: 'admin'
+        });
+        
+        if (!error && hasPermission) {
+          hasAdminPermission = true;
+          await loadData();
+        } else {
+          error = 'Keine Admin-Berechtigung';
+        }
+      } else {
+        error = 'Nicht eingeloggt';
+      }
+    } catch (err) {
+      error = 'Fehler beim Prüfen der Berechtigung';
+      console.error(err);
+    } finally {
+      loading = false;
+    }
+  }
+  
+  // Load roles and users
+  async function loadData() {
+    try {
+      // Load roles
+      const { data: rolesData, error: rolesError } = await supabase
+        .from('roles')
+        .select('*')
+        .order('id');
+      
+      if (rolesError) throw rolesError;
+      roles = rolesData || [];
+      
+      // Load users with role info
+      const { data: usersData, error: usersError } = await supabase
         .from('profiles')
-        .select('*', { count: 'exact', head: true });
+        .select(`
+          id,
+          full_name,
+          email,
+          role_id,
+          roles!inner(id, name, display_name)
+        `)
+        .order('full_name');
       
-      if (usersError) {
-        console.error('Error loading users count:', usersError);
-        totalUsers = 0;
-      } else {
-        totalUsers = usersCount || 0;
-      }
-
-      // Load total items
-      const { count: itemsCount, error: itemsError } = await supabase
-        .from('items')
-        .select('*', { count: 'exact', head: true });
+      if (usersError) throw usersError;
+      users = usersData || [];
       
-      if (itemsError) {
-        console.error('Error loading items count:', itemsError);
-        totalItems = 0;
-      } else {
-        totalItems = itemsCount || 0;
-      }
-
-      // Load recent users
-      const { data: users, error: recentUsersError } = await supabase
+    } catch (err) {
+      error = 'Fehler beim Laden der Daten';
+      console.error(err);
+    }
+  }
+  
+  // Update role permissions
+  async function updateRolePermissions(roleId: number, permissions: any) {
+    try {
+      const { error } = await supabase
+        .from('roles')
+        .update({ permissions })
+        .eq('id', roleId);
+      
+      if (error) throw error;
+      
+      // Reload data
+      await loadData();
+      
+    } catch (err) {
+      error = 'Fehler beim Aktualisieren der Rolle';
+      console.error(err);
+    }
+  }
+  
+  // Update user role
+  async function updateUserRole(userId: string, roleId: number) {
+    try {
+      const { error } = await supabase
         .from('profiles')
-        .select('id, full_name, accountname, created_at, avatar_url')
-        .order('created_at', { ascending: false })
-        .limit(5);
+        .update({ role_id: roleId })
+        .eq('id', userId);
       
-      if (recentUsersError) {
-        console.error('Error loading recent users:', recentUsersError);
-        recentUsers = [];
-      } else {
-        recentUsers = users || [];
-      }
-
-      // Load recent items
-      const { data: items, error: recentItemsError } = await supabase
-        .from('items')
-        .select('id, title, original_name, created_at, profile_id, path_64, slug')
-        .order('created_at', { ascending: false })
-        .limit(5);
+      if (error) throw error;
       
-      if (recentItemsError) {
-        console.error('Error loading recent items:', recentItemsError);
-        recentItems = [];
-      } else {
-        recentItems = items || [];
-      }
-
-      // TODO: Calculate storage usage
-      storageUsed = '0 MB';
+      // Reload data
+      await loadData();
       
-      console.log('Dashboard data loaded successfully');
-    } catch (error) {
-      console.error('Error loading dashboard data:', error);
-      // Set defaults to prevent UI errors
-      totalUsers = 0;
-      totalItems = 0;
-      recentUsers = [];
-      recentItems = [];
-      storageUsed = '0 MB';
+    } catch (err) {
+      error = 'Fehler beim Aktualisieren des Benutzers';
+      console.error(err);
     }
   }
-
-  function formatDate(dateString) {
-    return new Date(dateString).toLocaleDateString('de-DE', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  }
-
-  function getOptimizedAvatarUrl(avatarUrl) {
-    console.log('🔍 Optimizing avatar URL:', avatarUrl);
-    
-    // Handle Google OAuth avatars - optimize size and remove problematic parameters
-    if (avatarUrl.includes('lh3.googleusercontent.com')) {
-      // Remove size parameters and add optimal size
-      const baseUrl = avatarUrl.split('=')[0];
-      const optimizedUrl = `${baseUrl}=s128-c`;
-      console.log('🔧 Google OAuth avatar optimized:', optimizedUrl);
-      return optimizedUrl;
-    }
-    // Handle Facebook OAuth avatars
-    if (avatarUrl.includes('graph.facebook.com') || avatarUrl.includes('platform-lookaside.fbsbx.com')) {
-      // Add size parameter for Facebook avatars
-      const separator = avatarUrl.includes('?') ? '&' : '?';
-      const optimizedUrl = `${avatarUrl}${separator}width=128&height=128`;
-      console.log('🔧 Facebook OAuth avatar optimized:', optimizedUrl);
-      return optimizedUrl;
-    }
-    console.log('🔧 Using original avatar URL:', avatarUrl);
-    return avatarUrl;
-  }
-
-  function getInitials(name) {
-    return name
-      .split(' ')
-      .map(word => word.charAt(0))
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
-  }
+  
+  onMount(() => {
+    checkAdminPermission();
+  });
 </script>
 
-{#if isLoading}
-  <div class="admin-container">
-    <div class="admin-loading">
-      <div class="admin-spinner"></div>
-    </div>
-  </div>
-{:else if !isAdmin}
-  <div class="admin-container">
-    <div class="admin-main">
-      <div class="admin-empty">
-        <div class="admin-empty-icon">🚫</div>
-        <h2 class="admin-empty-title">Zugriff verweigert</h2>
-        <p class="admin-empty-description">Sie haben keine Berechtigung, auf das Admin-Dashboard zuzugreifen.</p>
-        <a href="/" class="admin-btn admin-btn-primary">Zurück zur Galerie</a>
-      </div>
-    </div>
+<svelte:head>
+  <title>Admin - Rollen-Management</title>
+  <meta name="description" content="Admin-Bereich für Rollen- und Benutzer-Management" />
+</svelte:head>
+
+{#if loading}
+  <div class="loading">Lade Admin-Bereich...</div>
+{:else if !hasAdminPermission}
+  <div class="error">
+    <h1>Zugriff verweigert</h1>
+    <p>{error}</p>
+    <a href="/" class="btn">Zurück zur Startseite</a>
   </div>
 {:else}
-  <div class="admin-container">
-    <!-- Header -->
-    <header class="admin-header">
-      <div class="admin-header-content">
-        <div>
-          <h1 class="admin-title">Admin Dashboard</h1>
-          <p class="admin-subtitle">Systemverwaltung und Übersicht</p>
-        </div>
-        <nav class="admin-nav">
-          <a href="/" class="admin-btn admin-btn-secondary">← Zurück zur Galerie</a>
-        </nav>
-      </div>
-    </header>
-
-    <!-- Navigation -->
-    <nav class="admin-navbar">
-      <div class="admin-navbar-content">
-        <div class="admin-navbar-links">
-          <a href="/admin" class="admin-nav-link active">Dashboard</a>
-          <a href="/admin/users" class="admin-nav-link">Benutzer</a>
-          <a href="/admin/items" class="admin-nav-link">Items</a>
-          <a href="/admin/analytics" class="admin-nav-link">Analytics</a>
-          <a href="/admin/create-user" class="admin-nav-link">Benutzer erstellen</a>
-        </div>
-      </div>
-    </nav>
-
-    <!-- Main Content -->
-    <main class="admin-main">
-      <!-- Statistics Cards -->
-      <div class="admin-stats-grid">
-        <div class="admin-stat-card">
-          <div class="admin-stat-content">
-            <div class="admin-stat-icon">
-              👥
-            </div>
-            <div class="admin-stat-info">
-              <h3>Gesamte Benutzer</h3>
-              <p>{totalUsers}</p>
-            </div>
-          </div>
-        </div>
-
-        <div class="admin-stat-card green">
-          <div class="admin-stat-content">
-            <div class="admin-stat-icon green">
-              🖼️
-            </div>
-            <div class="admin-stat-info">
-              <h3>Gesamte Items</h3>
-              <p>{totalItems}</p>
-            </div>
-          </div>
-        </div>
-
-        <div class="admin-stat-card purple">
-          <div class="admin-stat-content">
-            <div class="admin-stat-icon purple">
-              💾
-            </div>
-            <div class="admin-stat-info">
-              <h3>Speicherplatz</h3>
-              <p>{storageUsed}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Activity Grid -->
-      <div class="admin-activity-grid">
-        <!-- Recent Users -->
-        <div class="admin-activity-section">
-          <h3 class="admin-activity-title">👥 Neueste Benutzer</h3>
-          <div class="admin-activity-list">
-            {#each recentUsers as user}
-              <div class="admin-activity-item">
-                <div class="admin-activity-content">
-                  <div class="admin-avatar">
-                    {#if user.avatar_url}
-                      {#if user.avatar_url.startsWith('https://caskhmcbvtevdwsolvwk.supabase.co')}
-                        <img 
-                          src={user.avatar_url}
-                          alt={user.full_name || user.accountname || 'User'}
-                          style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;"
-                        />
-                      {:else if user.avatar_url.startsWith('http')}
-                        <img 
-                          src={getOptimizedAvatarUrl(user.avatar_url)}
-                          alt={user.full_name || user.accountname || 'User'}
-                          style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;"
-                          on:error={(e) => {
-                            console.error('❌ External avatar failed to load:', user.avatar_url);
-                            console.error('❌ Error details:', e);
-                            // Hide the broken image and show initials instead
-                            e.target.style.display = 'none';
-                            if (e.target.nextElementSibling) {
-                              e.target.nextElementSibling.style.display = 'flex';
-                            }
-                          }}
-                        />
-                        <div style="display: none; width: 100%; height: 100%; align-items: center; justify-content: center; background: var(--admin-primary); color: white; border-radius: 50%; font-weight: bold;">
-                          {getInitials(user.full_name || user.accountname || 'U')}
-                        </div>
-                      {:else}
-                        <img 
-                          src={`https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/avatars/${user.avatar_url}`}
-                          alt={user.full_name || user.accountname || 'User'}
-                          style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;"
-                        />
-                      {/if}
-                    {:else}
-                      {getInitials(user.full_name || user.accountname || 'U')}
-                    {/if}
-                  </div>
-                  <div class="admin-activity-info">
-                    <div class="admin-activity-name">{user.full_name || user.accountname || 'Unbekannt'}</div>
-                    <div class="admin-activity-details">
-                      <span>ID: {user.id.slice(0, 8)}...</span>
-                      <span>Account: {user.accountname || 'N/A'}</span>
-                    </div>
-                    <div class="admin-activity-time">
-                      {formatDate(user.created_at)}
-                    </div>
-                  </div>
-                </div>
+  <InfoPageLayout 
+    currentPage="admin"
+    title="Admin - Rollen-Management"
+    description="Verwalte Rollen und Benutzer-Berechtigungen"
+  >
+    <div class="admin-content">
+      <h1>Admin-Bereich</h1>
+      
+      {#if error}
+        <div class="error-message">{error}</div>
+      {/if}
+      
+      <!-- Roles Management -->
+      <section class="roles-section">
+        <h2>Rollen-Management</h2>
+        
+        <div class="roles-grid">
+          {#each roles as role}
+            <div class="role-card">
+              <h3>{role.display_name}</h3>
+              <p class="role-description">{role.description}</p>
+              
+              <div class="permissions">
+                <h4>Berechtigungen:</h4>
+                {#each Object.entries(role.permissions) as [permission, value]}
+                  <label class="permission-item">
+                    <input 
+                      type="checkbox" 
+                      checked={value}
+                      on:change={(e) => {
+                        const newPermissions = { ...role.permissions };
+                        newPermissions[permission] = e.target.checked;
+                        updateRolePermissions(role.id, newPermissions);
+                      }}
+                    />
+                    <span>{permission}</span>
+                  </label>
+                {/each}
               </div>
-            {/each}
-            {#if recentUsers.length === 0}
-              <div class="admin-activity-item">
-                <div class="admin-activity-content">
-                  <div class="admin-activity-info">
-                    <div class="admin-activity-name">Keine Benutzer gefunden</div>
-                  </div>
-                </div>
+              
+              <div class="role-stats">
+                <p>Benutzer mit dieser Rolle: {users.filter(u => u.role_id === role.id).length}</p>
               </div>
-            {/if}
+            </div>
+          {/each}
+        </div>
+      </section>
+      
+      <!-- Users Management -->
+      <section class="users-section">
+        <h2>Benutzer-Management</h2>
+        
+        <div class="users-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Rolle</th>
+                <th>Aktionen</th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each users as user}
+                <tr>
+                  <td>{user.full_name || 'Unbekannt'}</td>
+                  <td>{user.email}</td>
+                  <td>
+                    <select 
+                      value={user.role_id || 1}
+                      on:change={(e) => updateUserRole(user.id, parseInt(e.target.value))}
+                    >
+                      {#each roles as role}
+                        <option value={role.id}>{role.display_name}</option>
+                      {/each}
+                    </select>
+                  </td>
+                  <td>
+                    <button 
+                      class="btn-small"
+                      on:click={() => {
+                        // Show user details
+                        console.log('User details:', user);
+                      }}
+                    >
+                      Details
+                    </button>
+                  </td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+      </section>
+      
+      <!-- System Info -->
+      <section class="system-info">
+        <h2>System-Informationen</h2>
+        
+        <div class="info-grid">
+          <div class="info-card">
+            <h3>Statistiken</h3>
+            <ul>
+              <li>Rollen: {roles.length}</li>
+              <li>Benutzer: {users.length}</li>
+              <li>Admins: {users.filter(u => u.role_id === 3).length}</li>
+              <li>Normale Benutzer: {users.filter(u => u.role_id === 2).length}</li>
+              <li>Anonyme: {users.filter(u => u.role_id === 1 || !u.role_id).length}</li>
+            </ul>
+          </div>
+          
+          <div class="info-card">
+            <h3>Berechtigungen</h3>
+            <ul>
+              {#each roles as role}
+                <li>
+                  <strong>{role.display_name}:</strong>
+                  {Object.entries(role.permissions).filter(([_, value]) => value).length} aktiv
+                </li>
+              {/each}
+            </ul>
           </div>
         </div>
+      </section>
+    </div>
+  </InfoPageLayout>
+{/if}
 
-        <!-- Recent Items -->
-        <div class="admin-activity-section">
-          <h3 class="admin-activity-title">🖼️ Neueste Items</h3>
-          <div class="admin-activity-list">
-            {#each recentItems as item}
-              <div class="admin-activity-item">
-                <div class="admin-activity-content">
-                  <div class="admin-avatar">
-                    {#if item.path_64}
-                      <img 
-                        src={`https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/${item.path_64}`}
-                        alt={item.title || 'Item'}
-                        style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;"
-                      />
-                    {:else}
-                      📷
-                    {/if}
-                  </div>
-                  <div class="admin-activity-info">
-                    <div class="admin-activity-name">
-                      <a href={`/item/${item.slug}`} class="admin-item-link" target="_blank">
-                        {item.title || item.original_name || 'Unbenannt'}
-                      </a>
-                    </div>
-                    <div class="admin-activity-details">
-                      <span>ID: {item.id.slice(0, 8)}...</span>
-                      <span>User: {item.profile_id?.slice(0, 8) || 'N/A'}...</span>
-                    </div>
-                    <div class="admin-activity-time">
-                      {formatDate(item.created_at)}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            {/each}
-            {#if recentItems.length === 0}
-              <div class="admin-activity-item">
-                <div class="admin-activity-content">
-                  <div class="admin-activity-info">
-                    <div class="admin-activity-name">Keine Items gefunden</div>
-                  </div>
-                </div>
-              </div>
-            {/if}
-          </div>
-        </div>
-      </div>
-
-      <!-- Quick Actions -->
-      <div class="admin-quick-actions">
-        <div class="admin-quick-actions-header">
-          <h3 class="admin-quick-actions-title">Schnellzugriff</h3>
-        </div>
-        <div class="admin-quick-actions-grid">
-          <a href="/admin/users" class="admin-quick-action">
-            <div class="admin-quick-action-icon blue">
-              👥
-            </div>
-            <div class="admin-quick-action-info">
-              <h4>Benutzer verwalten</h4>
-              <p>Alle Benutzer anzeigen, suchen und verwalten</p>
-            </div>
-          </a>
-
-          <a href="/admin/items" class="admin-quick-action">
-            <div class="admin-quick-action-icon green">
-              🖼️
-            </div>
-            <div class="admin-quick-action-info">
-              <h4>Items verwalten</h4>
-              <p>Alle Bilder anzeigen, filtern und verwalten</p>
-            </div>
-          </a>
-
-          <a href="/admin/create-user" class="admin-quick-action">
-            <div class="admin-quick-action-icon purple">
-              ➕
-            </div>
-            <div class="admin-quick-action-info">
-              <h4>Benutzer erstellen</h4>
-              <p>Neue Benutzerkonten manuell anlegen</p>
-            </div>
-          </a>
-
-          <a href="/" class="admin-quick-action">
-            <div class="admin-quick-action-icon blue">
-              🏠
-            </div>
-            <div class="admin-quick-action-info">
-              <h4>Zur Galerie</h4>
-              <p>Zurück zur Hauptgalerie</p>
-            </div>
-          </a>
-        </div>
-      </div>
-    </main>
-  </div>
-{/if} 
+<style>
+  .loading, .error {
+    text-align: center;
+    padding: 2rem;
+    font-size: 1.2rem;
+  }
+  
+  .error {
+    color: var(--error-color);
+  }
+  
+  .admin-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+  }
+  
+  .admin-content h1 {
+    margin-bottom: 2rem;
+    color: var(--text-primary);
+  }
+  
+  .error-message {
+    background: var(--error-bg);
+    color: var(--error-color);
+    padding: 1rem;
+    border-radius: 6px;
+    margin-bottom: 2rem;
+  }
+  
+  section {
+    margin-bottom: 3rem;
+  }
+  
+  section h2 {
+    margin-bottom: 1.5rem;
+    color: var(--text-primary);
+  }
+  
+  .roles-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+  }
+  
+  .role-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1.5rem;
+  }
+  
+  .role-card h3 {
+    margin: 0 0 0.5rem 0;
+    color: var(--text-primary);
+  }
+  
+  .role-description {
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+  }
+  
+  .permissions h4 {
+    margin: 0 0 0.5rem 0;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+  }
+  
+  .permission-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+    font-size: 0.85rem;
+  }
+  
+  .permission-item input[type="checkbox"] {
+    margin: 0;
+  }
+  
+  .role-stats {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+  }
+  
+  .users-table {
+    overflow-x: auto;
+  }
+  
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  
+  th, td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+  }
+  
+  th {
+    background: var(--bg-tertiary);
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+  
+  td {
+    color: var(--text-secondary);
+  }
+  
+  select {
+    padding: 0.25rem 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+  }
+  
+  .btn-small {
+    padding: 0.25rem 0.5rem;
+    background: var(--accent-color);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8rem;
+  }
+  
+  .btn-small:hover {
+    opacity: 0.9;
+  }
+  
+  .info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+  }
+  
+  .info-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1.5rem;
+  }
+  
+  .info-card h3 {
+    margin: 0 0 1rem 0;
+    color: var(--text-primary);
+  }
+  
+  .info-card ul {
+    margin: 0;
+    padding-left: 1.5rem;
+  }
+  
+  .info-card li {
+    margin-bottom: 0.5rem;
+    color: var(--text-secondary);
+  }
+  
+  @media (max-width: 768px) {
+    .admin-content {
+      padding: 1rem;
+    }
+    
+    .roles-grid {
+      grid-template-columns: 1fr;
+    }
+    
+    .info-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style> 

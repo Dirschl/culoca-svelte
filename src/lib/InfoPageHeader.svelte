@@ -1,12 +1,54 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
+  import { supabase } from './supabaseClient';
+  
   export let currentPage: 'system' | 'license' | 'impressum' | 'datenschutz' = 'system';
+  
+  let hasAdminPermission = false;
+  let user: any = null;
   
   const pages = [
     { id: 'system', title: 'System', url: '/see-you-local-system-faq' },
     { id: 'license', title: 'Lizenz', url: '/license' },
     { id: 'impressum', title: 'Impressum', url: '/impressum' },
-    { id: 'datenschutz', title: 'Datenschutz', url: '/datenschutz' }
+    { id: 'datenschutz', title: 'Datenschutz', url: '/datenschutz' },
+    // Admin link - only shown if user has admin permission
+    ...(hasAdminPermission ? [{ id: 'admin', title: 'Admin', url: '/admin' }] : [])
   ];
+  
+  // Check admin permission
+  async function checkAdminPermission() {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      user = session?.user;
+      
+      console.log('🔍 [InfoPageHeader] Checking admin permission for user:', user?.id);
+      
+      if (user) {
+        const { data: hasPermission, error } = await supabase.rpc('has_permission', {
+          user_id: user.id,
+          permission_name: 'admin'
+        });
+        
+        console.log('🔍 [InfoPageHeader] has_permission result:', { hasPermission, error });
+        
+        if (!error && hasPermission) {
+          hasAdminPermission = true;
+          console.log('✅ [InfoPageHeader] Admin permission granted');
+        } else {
+          console.log('❌ [InfoPageHeader] Admin permission denied:', error);
+        }
+      } else {
+        console.log('❌ [InfoPageHeader] No user session found');
+      }
+    } catch (error) {
+      console.error('❌ [InfoPageHeader] Error checking admin permission:', error);
+    }
+  }
+  
+  onMount(() => {
+    checkAdminPermission();
+  });
 </script>
 
 <header class="info-header">

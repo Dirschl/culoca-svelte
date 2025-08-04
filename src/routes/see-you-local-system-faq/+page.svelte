@@ -46,7 +46,7 @@
   import { supabase } from '$lib/supabaseClient';
   import { browser } from '$app/environment';
   import SearchBar from '$lib/SearchBar.svelte';
-  import FloatingActionButtons from '$lib/FloatingActionButtons.svelte';
+  //import FloatingActionButtons from '$lib/FloatingActionButtons.svelte';
   import { goto } from '$app/navigation';
   import InfoPageLayout from '$lib/InfoPageLayout.svelte';
 
@@ -537,7 +537,7 @@
         <div class="og-details">
           <div class="og-favicon">
             {#if item.id === 'map-share'}
-              <img src="/culoca-favicon.svg" alt="Favicon" class="favicon" />
+              <img src="/culoca-icon.png" alt="Favicon" class="favicon" />
             {:else}
               <img src={`/api/favicon/${item.slug}`} alt="Favicon" class="favicon" />
             {/if}
@@ -699,9 +699,6 @@
     </p>
   </section>
 </InfoPageLayout>
-
-<!-- Floating Action Buttons -->
-<FloatingActionButtons />
 
 <style>
   .banner-section-fullwidth {
