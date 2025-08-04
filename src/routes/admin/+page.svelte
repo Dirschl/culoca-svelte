@@ -42,12 +42,12 @@
       user = session?.user;
       
       if (user) {
-        const { data: hasPermission, error } = await supabase.rpc('has_permission', {
+        const { data: hasPermission, error: rpcError } = await supabase.rpc('has_permission', {
           user_id: user.id,
           permission_name: 'admin'
         });
         
-        if (!error && hasPermission) {
+        if (!rpcError && hasPermission) {
           hasAdminPermission = true;
           await loadData();
         } else {
