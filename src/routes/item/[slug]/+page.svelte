@@ -993,7 +993,7 @@
             {:else}
               <span class="caption-text" tabindex="0" role="button" on:click={startEditCaption} on:keydown={(e) => handleKey(e, startEditCaption)}>
                 {#if image.caption}
-                  <em>{image.caption}</em>
+                  <em>{@html image.caption.replace(/\\n/g, '<br>').replace(/\n/g, '<br>')}</em>
                 {:else}
                   <em class="placeholder">Klicke hier um eine emotionale Beschreibung hinzuzufügen</em>
                 {/if}
