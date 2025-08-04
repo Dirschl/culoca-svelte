@@ -1,198 +1,70 @@
 <script>
-  import { goto } from '$app/navigation';
-  
-  function goBackToApp() {
-    goto('/');
-  }
+  import InfoPageLayout from '$lib/InfoPageLayout.svelte';
 </script>
 
-<svelte:head>
-  <title>Impressum - Culoca</title>
-  <meta name="description" content="Impressum und rechtliche Informationen von Culoca - DIRSCHL.com GmbH" />
+<InfoPageLayout 
+  currentPage="impressum"
+  title="Impressum - DIRSCHL.com GmbH"
+  description="Impressum und rechtliche Informationen der DIRSCHL.com GmbH - Angaben gemäß § 5 TMG"
+>
+  <h1>Impressum</h1>
   
-  <!-- Strukturierte Daten (JSON-LD) für bessere SEO -->
-  <script type="application/ld+json">
-  {JSON.stringify({
-    "@context": "https://schema.org",
-    "@type": "WebPage",
-    "name": "Impressum - Culoca",
-    "description": "Impressum und rechtliche Informationen von Culoca - DIRSCHL.com GmbH",
-    "url": "https://culoca.com/impressum",
-    "inLanguage": "de",
-    "publisher": {
-      "@type": "Organization",
-      "name": "DIRSCHL.com GmbH",
-      "url": "https://culoca.com",
-      "address": {
-        "@type": "PostalAddress",
-        "streetAddress": "Waldberg 84",
-        "addressLocality": "Reischach",
-        "postalCode": "84571",
-        "addressCountry": "DE"
-      },
-      "contactPoint": {
-        "@type": "ContactPoint",
-        "telephone": "+49-179-9766666",
-        "email": "johann.dirschl@gmx.de"
-      }
-    }
-  })}
-  </script>
-</svelte:head>
-
-<div class="fullscreen-page">
-  <header class="page-header">
-    <button class="back-button" on:click={goBackToApp}>
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.42-1.41L7.83 13H20v-2z"/>
-      </svg>
-      Zurück zur App
-    </button>
-  </header>
-
-  <main class="content">
-<section id="impressum">
-  <h2>Impressum</h2>
-  <p><strong>Autor, Herausgeber, Design und technische Umsetzung</strong><br>
-  DIRSCHL.com GmbH<br>
-  Waldberg 84<br>
-  84571 Reischach<br>
-  Deutschland</p>
-  <p><strong>Geschäftsführer:</strong><br>
-  Johann Dirschl</p>
-  <p><strong>Kontakt:</strong><br>
-  Mobil: 0179 9766666<br>
-  Festnetz: 08670 5590127<br>
-  E-Mail: <a href="mailto:johann.dirschl@gmx.de">johann.dirschl@gmx.de</a></p>
-  <p><strong>Handelsregister:</strong><br>
-  Amtsgericht Traunstein, HRB 18130</p>
-  <p><strong>USt-IdNr.:</strong><br>
-  DE258218256</p>
-  <p><strong>Steuernummer:</strong><br>
-  141/124/50220</p>
-  <p><strong>Verantwortlich für den Inhalt gemäß § 55 Abs. 2 RStV:</strong><br>
-  Johann Dirschl<br>
-  Waldberg 84<br>
-  84571 Reischach</p>
-  <p><strong>Social Media:</strong><br>
-  <a href="https://www.facebook.com/johann.dirschl" target="_blank" rel="noopener noreferrer">Facebook – DIRSCHL.com GmbH</a></p>
-  <h3>Haftungsausschluss</h3>
-  <p>Die Inhalte dieser Website wurden mit größter Sorgfalt erstellt. Für die Richtigkeit, Vollständigkeit und Aktualität der Inhalte übernehmen wir jedoch keine Gewähr. Als Diensteanbieter sind wir gemäß § 7 Abs. 1 TMG für eigene Inhalte verantwortlich. Für Links auf externe Webseiten übernehmen wir keine Haftung – für deren Inhalte sind ausschließlich deren Betreiber verantwortlich.</p>
-  <h3>Datenschutzerklärung</h3>
-  <p>Bitte beachten Sie unsere <a href="/datenschutz">Datenschutzerklärung</a>.</p>
-  <h3>Allgemeine Geschäftsbedingungen (AGB)</h3>
-  <p>Unsere vollständigen AGB finden Sie <a href="/agb">hier</a>.</p>
-</section>
-  </main>
-</div>
-
-<style>
-  .fullscreen-page {
-    display: flex;
-    flex-direction: column;
-    min-height: 100vh;
-    background: var(--bg-primary);
-    color: var(--text-primary);
-  }
-
-  .page-header {
-    display: flex;
-    justify-content: flex-start;
-    align-items: center;
-    padding: 1rem 2rem;
-    background: var(--bg-secondary);
-    box-shadow: 0 2px 8px var(--shadow);
-  }
+  <h2>Angaben gemäß § 5 TMG</h2>
   
-  .back-button {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    background: var(--culoca-orange);
-    color: white;
-    padding: 0.75rem 1.25rem;
-    border-radius: 8px;
-    font-weight: 500;
-    font-size: 0.9rem;
-    transition: background 0.2s;
-    border: none;
-    cursor: pointer;
-  }
+  <div class="contact-info">
+    <h4>Verantwortlich für den Inhalt</h4>
+    <ul>
+      <li><strong>Firma:</strong> DIRSCHL.com GmbH</li>
+      <li><strong>Geschäftsführer:</strong> Johann Dirschl</li>
+      <li><strong>Adresse:</strong> Waldberg 84, 84571 Reischach</li>
+      <li><strong>Telefon:</strong> <a href="tel:+49-179-9766666">+49-179-9766666</a></li>
+      <li><strong>E-Mail:</strong> <a href="mailto:johann.dirschl@gmx.de">johann.dirschl@gmx.de</a></li>
+    </ul>
+  </div>
   
-  .back-button:hover {
-    background: var(--accent-color);
-  }
-
-  .content {
-    flex-grow: 1;
-    padding: 2rem;
-    max-width: 1200px;
-    margin: 0 auto;
-    width: 100%;
-  }
+  <h2>Rechtliche Hinweise</h2>
   
-  section#impressum {
-    background: var(--bg-primary);
-    color: var(--text-primary);
-    font-size: 1rem;
-    line-height: 1.7;
-  }
-
-  section#impressum h2 {
-    margin: 0 0 2rem 0;
-    font-size: 2.5rem;
-    color: var(--text-primary);
-  }
-
-  section#impressum h3 {
-    margin: 2.5rem 0 1rem 0;
-    font-size: 1.5rem;
-    color: var(--text-primary);
-  }
-
-  section#impressum p {
-    color: var(--text-secondary);
-    margin-bottom: 1rem;
-    font-size: 1.1rem;
-  }
-
-  section#impressum ul {
-    margin-left: 1.5rem;
-    margin-bottom: 1.5rem;
-  }
-
-  section#impressum a {
-    color: var(--culoca-orange);
-    text-decoration: none;
-  }
-
-  section#impressum a:hover {
-    color: var(--accent-color);
-    text-decoration: underline;
-  }
-
-  @media (max-width: 768px) {
-    .page-header {
-      padding: 1rem;
-    }
-
-    .content {
-      padding: 1.5rem 1rem;
-    }
-
-    section#impressum h2 {
-      font-size: 2rem;
-      margin-bottom: 1.5rem;
-    }
-
-    section#impressum h3 {
-      font-size: 1.3rem;
-      margin: 2rem 0 0.8rem 0;
-    }
-
-    .back-button {
-      padding: 0.6rem 1rem;
-      font-size: 0.85rem;
-    }
-  }
-</style> 
+  <h3>Handelsregister</h3>
+  <p>
+    <strong>Registergericht:</strong> Amtsgericht Traunstein<br>
+    <strong>Registernummer:</strong> HRB 18130
+  </p>
+  
+  <h3>Steuerliche Angaben</h3>
+  <p>
+    <strong>Steuernummer:</strong> 141/124/50220<br>
+    <strong>USt-Identifikationsnummer:</strong> DE258218256
+  </p>
+  
+  <h3>Haftung für Inhalte</h3>
+  <p>
+    Als Diensteanbieter sind wir gemäß § 7 Abs.1 TMG für eigene Inhalte auf diesen Seiten nach den 
+    allgemeinen Gesetzen verantwortlich. Nach §§ 8 bis 10 TMG sind wir als Diensteanbieter jedoch nicht 
+    unter der Verpflichtung, übermittelte oder gespeicherte fremde Informationen zu überwachen oder nach 
+    Umständen zu forschen, die auf eine rechtswidrige Tätigkeit hinweisen.
+  </p>
+  
+  <h3>Urheberrecht</h3>
+  <p>
+    Die durch die Seitenbetreiber erstellten Inhalte und Werke auf diesen Seiten unterliegen dem deutschen 
+    Urheberrecht. Die Vervielfältigung, Bearbeitung, Verbreitung und jede Art der Verwertung außerhalb der 
+    Grenzen des Urheberrechtes bedürfen der schriftlichen Zustimmung des jeweiligen Autors bzw. Erstellers.
+  </p>
+  
+  <h3>Datenschutz</h3>
+  <p>
+    Die Nutzung unserer Webseite ist in der Regel ohne Angabe personenbezogener Daten möglich. 
+    Soweit auf unseren Seiten personenbezogene Daten (beispielsweise Name, Anschrift oder E-Mail-Adressen) 
+    erhoben werden, erfolgt dies, soweit möglich, stets auf freiwilliger Basis.
+  </p>
+  
+  <div class="highlight-box">
+    <h4>Wichtiger Hinweis</h4>
+    <p>
+      Die Nutzung der im Impressum veröffentlichten Kontaktdaten durch Dritte zur Übersendung von 
+      nicht ausdrücklich angeforderter Werbung und Informationsmaterialien wird hiermit ausdrücklich 
+      untersagt. Die Betreiber der Seiten behalten sich ausdrücklich rechtliche Schritte im Falle der 
+      unverlangten Zusendung von Werbeinformationen, etwa durch Spam-E-Mails, vor.
+    </p>
+  </div>
+</InfoPageLayout> 

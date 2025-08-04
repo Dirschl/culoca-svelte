@@ -291,14 +291,14 @@ function handleScroll(event: Event) {
         <div class="newsflash-strip" tabindex="0" on:scroll={handleScroll} bind:this={stripContainer}>
           <div class="newsflash-time">{lastUpdate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} {displayedImageCount}/{$galleryStats.totalCount}</div>
           {#each images as img (img.id)}
-            <div class="newsflash-thumb" on:click={() => handleImageClick(img)} tabindex="0" role="button" aria-label={img.title || img.original_name || 'Bild'}>
+            <a href={`/item/${img.slug}`} class="newsflash-thumb" tabindex="0" role="button" aria-label={img.title || img.original_name || 'Bild'}>
               <img src={"https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/" + img.path_512} alt={img.title || img.original_name || 'Bild'} />
               {#if showDistance && userLat !== null && userLon !== null && img.lat && img.lon && getDistanceFromLatLonInMeters}
                 <div class="gallery-distance">
                   {getDistanceFromLatLonInMeters(userLat, userLon, img.lat, img.lon)}
                 </div>
               {/if}
-            </div>
+            </a>
           {/each}
           {#if loadingMore}
             <div class="newsflash-loading-more">Lade mehr...</div>
@@ -313,14 +313,14 @@ function handleScroll(event: Event) {
         <div class="newsflash-grid" tabindex="0" on:scroll={handleScroll} bind:this={gridContainer}>
           <div class="newsflash-time">{lastUpdate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} {displayedImageCount}/{$galleryStats.totalCount}</div>
           {#each images as img (img.id)}
-            <div class="newsflash-thumb" on:click={() => handleImageClick(img)} tabindex="0" role="button" aria-label={img.title || img.original_name || 'Bild'}>
+            <a href={`/item/${img.slug}`} class="newsflash-thumb" tabindex="0" role="button" aria-label={img.title || img.original_name || 'Bild'}>
               <img src={"https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/" + img.path_512} alt={img.title || img.original_name || 'Bild'} />
               {#if showDistance && userLat !== null && userLon !== null && img.lat && img.lon && getDistanceFromLatLonInMeters}
                 <div class="gallery-distance">
                   {getDistanceFromLatLonInMeters(userLat, userLon, img.lat, img.lon)}
                 </div>
               {/if}
-            </div>
+            </a>
           {/each}
           {#if loadingMore}
             <div class="newsflash-loading-more">Lade mehr...</div>
@@ -333,10 +333,14 @@ function handleScroll(event: Event) {
         </div>
       {/if}
       {#if initialItems && initialItems.length === 50}
-        <!-- SEO-Link nur für Bots sichtbar -->
-        <div class="newsflash-next-link-ssr" style="text-align:center;margin:1rem 0;display:none;">
+        <!-- SEO-Paginierung für Bots - versteckt für normale Benutzer -->
+        <div class="newsflash-pagination-ssr" style="display: none;">
+          {#if currentPage > 1}
+            <a href="/?page={currentPage - 1}" rel="prev" class="pagination-link">← Vorherige Seite</a>
+          {/if}
+          <span class="pagination-info">Seite {currentPage} von {totalPages}</span>
           {#if currentPage < totalPages}
-            <a href="/?page={currentPage + 1}" rel="next">Weitere Bilder anzeigen</a>
+            <a href="/?page={currentPage + 1}" rel="next" class="pagination-link">Weitere Bilder →</a>
           {/if}
         </div>
       {/if}
@@ -487,6 +491,8 @@ function handleScroll(event: Event) {
   padding: 0;
   overflow: hidden;
   position: relative;
+  text-decoration: none;
+  color: inherit;
 }
 .newsflash-thumb:focus, .newsflash-thumb:hover {
   outline: none !important;
@@ -538,5 +544,33 @@ function handleScroll(event: Event) {
   flex-shrink: 0;
 }
 
+.newsflash-pagination-ssr {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  margin: 1rem 0;
+  padding: 0.5rem;
+  background: var(--bg-secondary);
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.pagination-link {
+  color: var(--accent-color);
+  text-decoration: none;
+  padding: 0.25rem 0.5rem;
+  border-radius: 3px;
+  transition: background 0.2s;
+}
+
+.pagination-link:hover {
+  background: var(--border-color);
+}
+
+.pagination-info {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
 
 </style> 
