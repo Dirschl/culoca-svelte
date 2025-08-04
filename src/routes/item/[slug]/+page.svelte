@@ -1344,6 +1344,22 @@
     <div class="error">❌ Bild nicht gefunden</div>
   {/if}
   
+  <!-- Zur Galerie zurückkehren FAB -->
+  <button 
+    class="gallery-back-fab"
+    on:click={() => goto('/')}
+    title="Zur Galerie zurückkehren"
+    aria-label="Zur Galerie zurückkehren"
+  >
+    <!-- Gallery Grid Icon for back to gallery -->
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="3" width="6" height="6"/>
+      <rect x="15" y="3" width="6" height="6"/>
+      <rect x="3" y="15" width="6" height="6"/>
+      <rect x="15" y="15" width="6" height="6"/>
+    </svg>
+  </button>
+
   <!-- Floating Action Buttons - nur Scroll-to-Top und Vollbild -->
   <FloatingActionButtons
     {showScrollToTop}
@@ -2068,6 +2084,58 @@
     }
     .creator-socials {
       justify-content: center;
+    }
+  }
+
+  /* Zur Galerie zurückkehren FAB */
+  .gallery-back-fab {
+    position: fixed;
+    bottom: 7rem; /* Über dem Vollbild-FAB */
+    right: 2rem;
+    width: 4rem;
+    height: 4rem;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px var(--shadow);
+    backdrop-filter: blur(10px);
+    background: transparent;
+    overflow: hidden;
+    pointer-events: auto;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    z-index: 1001;
+  }
+  
+  .gallery-back-fab:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 20px var(--shadow);
+    background: rgba(255, 255, 255, 0.1);
+  }
+  
+  .gallery-back-fab:active {
+    transform: scale(0.95);
+  }
+  
+  /* Mobile responsive */
+  @media (max-width: 768px) {
+    .gallery-back-fab {
+      bottom: 6rem;
+      right: 1rem;
+      width: 3.5rem;
+      height: 3.5rem;
+    }
+    
+    .gallery-back-fab svg {
+      width: 36px;
+      height: 36px;
     }
   }
 </style> 

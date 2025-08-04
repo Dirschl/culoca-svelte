@@ -360,6 +360,9 @@
           <ul>
             <li>Responsive Layout</li>
             <li>Infinite Scroll</li>
+            <li>Suche nach Titel, Beschreibung, Caption, Keywords</li>
+            <li>Filter nach Ersteller, Kategorie, Tags</li>
+            <li>Galerietyp Justified & Grid</li>
           </ul>
         </div>
       </div>
@@ -373,7 +376,7 @@
           Mobile Galerie
         </h3>
         <p>
-          Aktivieren duch GPS Klick (eine Koordinate):<br>
+          Wechseln mit GPS Klick (weisse Koordinate):<br>
           Deine Position verändert sich, weil du am Wandern, Fahren etc... bist?
           Hier werden die Items dynamisch nach deiner Position geladen und clientseitig sortiert.
           So siehst du immer das aktuelle Umfeld.
@@ -385,6 +388,7 @@
             <li>Lädt Umkreis von ca. 5 km.</li>
             <li>für Unterwegs optimiert</li>
             <li>Audioguide-Möglichkeit</li>
+            <li>Galerietyp Justified & Grid</li>
           </ul>
         </div>
       </div>
@@ -399,7 +403,7 @@
           Kartenansicht
         </h3>
         <p>
-          Interaktive Kartenansicht mit OpenStreetMap-Integration. 
+          Interaktive Karten oder Satellitenansicht. 
           Fotos werden direkt auf der Karte angezeigt und können 
           per Klick geöffnet werden.
         </p>
@@ -409,10 +413,11 @@
         <div class="feature-example">
           <strong>Features:</strong>
           <ul>
-            <li>OpenStreetMap Integration</li>
+            <li>2 Kartentypen</li>
             <li>Foto-Marker auf Karte</li>
             <li>Zoom & Pan</li>
             <li>Standort-Auswahl</li>
+            <li>Wegpunkte Aufzeichnung (Beta)</li>
           </ul>
         </div>
       </div>
@@ -673,7 +678,26 @@
     Culoca braucht also keine große Fanbase, sondern Content in einem bestimmten Umkreis und ist damit insb. für den Tourismus interessant.
   </p>
 
-</section>
+  </section>
+
+  <!-- Profile Sektion -->
+  <section class="profile-section">
+    <h2>
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px;">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+        <circle cx="12" cy="7" r="4"/>
+      </svg>
+      Mach mit, melde dich jetzt an
+    </h2>
+    
+    <p>
+      Rechts sehen sie schon unsere FABs (Floatable Access Buttons). Klicke auf das Profil-Icon und nutzte oAuth von Googe, Facebook oder alternativ auch deine Email. Damit könnt ihr dann auch schon eure eigneen, ersten Bilder hochladen und die Anwendung unter Settings für euch individualisieren.
+    </p>
+    
+    <p>
+      Angemeldete User können ihren eigenen Accountnamen, Usernamen, Avar, Kontaktdaten und Sozial-Media Links eintragen und auf Wunsch bei ihren eigenen Items anzeigen. So haben andere Benutzer die Möglichkeit euch zu kontaktieren oder zu folgen.
+    </p>
+  </section>
 </InfoPageLayout>
 
 <!-- Floating Action Buttons -->
@@ -687,6 +711,19 @@
     overflow: hidden;
     margin: 0;
     background: var(--bg-primary);
+  }
+
+  .feature-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    padding: 1rem;
+    border-radius: 7px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+  }
+
+  .feature-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   }
 
   .banner-image-container {
