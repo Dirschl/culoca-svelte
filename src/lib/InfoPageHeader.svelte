@@ -8,10 +8,10 @@
   let user: any = null;
   
   const pages = [
-    { id: 'system', title: 'System', url: '/see-you-local-system-faq' },
-    { id: 'license', title: 'Lizenz', url: '/license' },
-    { id: 'impressum', title: 'Impressum', url: '/impressum' },
-    { id: 'datenschutz', title: 'Datenschutz', url: '/datenschutz' },
+    { id: 'system', title: 'System', url: '/web' },
+    { id: 'license', title: 'Lizenz', url: '/web/license' },
+    { id: 'impressum', title: 'Impressum', url: '/web/impressum' },
+    { id: 'datenschutz', title: 'Datenschutz', url: '/web/datenschutz' },
     // Admin link - only shown if user has admin permission
     ...(hasAdminPermission ? [{ id: 'admin', title: 'Admin', url: '/admin' }] : [])
   ];
