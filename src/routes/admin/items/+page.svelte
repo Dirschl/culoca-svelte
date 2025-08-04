@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { supabase } from '$lib/supabaseClient';
+  import InfoPageLayout from '$lib/InfoPageLayout.svelte';
 
   let isLoading = true;
   let isAdmin = false;
@@ -366,131 +367,180 @@
     <a href="/" style="color: #f59e0b;">Zurück zur Galerie</a>
   </div>
 {:else}
-  <!-- Admin Header -->
-  <div style="background: #111827; border-bottom: 1px solid #374151; padding: 1rem 2rem;">
-    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
-      <h1 style="margin: 0; color: #f9fafb; font-size: 1.5rem;">Admin Dashboard</h1>
-      <nav style="display: flex; gap: 1rem; flex-wrap: wrap;">
-        <a href="/admin/items" style="color: #f59e0b; text-decoration: none; font-weight: 500; padding: 0.5rem 1rem; border-radius: 4px; background: #374151;">Items</a>
-        <a href="/admin/users" style="color: #9ca3af; text-decoration: none; font-weight: 500; padding: 0.5rem 1rem; border-radius: 4px;">Users</a>
-        <a href="/" style="color: #9ca3af; text-decoration: none; font-weight: 500; padding: 0.5rem 1rem; border-radius: 4px;">Galerie</a>
-      </nav>
-    </div>
-  </div>
-
-  <style>
-    /* Responsive Design */
-    @media (max-width: 768px) {
-      .desktop-only {
-        display: none !important;
-      }
-      .mobile-only {
-        display: block !important;
-      }
-    }
-    
-    @media (min-width: 769px) {
-      .desktop-only {
-        display: block !important;
-      }
-      .mobile-only {
-        display: none !important;
-      }
-    }
-    
-    /* Mobile optimizations */
-    @media (max-width: 480px) {
-      .mobile-only {
-        padding: 0 1rem;
-      }
+  <InfoPageLayout title="Admin Dashboard">
+    <div style="width: 100%;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h2 style="margin: 0; color: #f9fafb;">Admin Items</h2>
+        {#if searchTerm}
+          <div style="color: #9ca3af; font-size: 0.875rem;">
+            {items.length} Treffer gefunden
+          </div>
+        {/if}
+      </div>
       
-      .mobile-only > div {
-        margin-bottom: 0.75rem;
-        padding: 0.75rem;
-      }
-      
-      .mobile-only img {
-        width: 60px !important;
-        height: 60px !important;
-      }
-      
-      .mobile-only .grid {
-        grid-template-columns: 1fr !important;
-        gap: 0.5rem !important;
-      }
-    }
-  </style>
-
-  <div style="padding: 2rem;">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-      <h2 style="margin: 0; color: #f9fafb;">Admin Items</h2>
-      {#if searchTerm}
-        <div style="color: #9ca3af; font-size: 0.875rem;">
-          {items.length} Treffer gefunden
+      <!-- Search -->
+      <div style="margin-bottom: 2rem;">
+        <div style="display: flex; gap: 1rem;">
+          <input
+            type="text"
+            placeholder="Suche nach Titel, Slug oder Benutzer... (mehrere Begriffe mit Leerzeichen trennen)"
+            bind:value={searchTerm}
+            on:keydown={handleSearchKeydown}
+            style="flex: 1; padding: 12px; border: 2px solid #374151; border-radius: 8px; background: #1f2937; color: #f9fafb; font-size: 14px;"
+          />
         </div>
-      {/if}
-    </div>
-    
-    <!-- Search -->
-    <div style="margin-bottom: 2rem;">
-      <div style="display: flex; gap: 1rem;">
-        <input
-          type="text"
-          placeholder="Suche nach Titel, Slug oder Benutzer... (mehrere Begriffe mit Leerzeichen trennen)"
-          bind:value={searchTerm}
-          on:keydown={handleSearchKeydown}
-          style="flex: 1; padding: 12px; border: 2px solid #374151; border-radius: 8px; background: #1f2937; color: #f9fafb; font-size: 14px;"
-        />
+
       </div>
 
-    </div>
-
-    <!-- Desktop Table View (hidden on mobile) -->
-    <div style="overflow-x: auto; display: none;" class="desktop-only">
-      <table style="width: 100%; border-collapse: collapse; background: #1f2937; border-radius: 8px; overflow: hidden;">
-        <thead>
-          <tr style="background: #111827;">
-            <th style="padding: 12px; text-align: left; color: #f9fafb; font-weight: 600; border-bottom: 1px solid #374151;">Treffer</th>
-            <th style="padding: 12px; text-align: left; color: #f9fafb; font-weight: 600; border-bottom: 1px solid #374151;">Benutzer</th>
-            <th style="padding: 12px; text-align: left; color: #f9fafb; font-weight: 600; border-bottom: 1px solid #374151;">Erstellt</th>
-            <th style="padding: 12px; text-align: left; color: #f9fafb; font-weight: 600; border-bottom: 1px solid #374151;">Privacy</th>
-            <th style="padding: 12px; text-align: left; color: #f9fafb; font-weight: 600; border-bottom: 1px solid #374151;">Aktionen</th>
-          </tr>
-        </thead>
-        <tbody>
-          {#each items as item}
-            <tr style="border-bottom: 1px solid #374151;">
-              <!-- Item Column -->
-              <td style="padding: 12px; vertical-align: top;">
-                <div style="display: flex; align-items: flex-start; gap: 12px;">
-                  {#if item.path_512}
-                    <img 
-                      src={`https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${item.path_512}`}
-                      alt={item.title || 'Bild'}
-                      style="width: 60px; height: 60px; object-fit: cover; border-radius: 4px; flex-shrink: 0;"
-                    />
-                  {:else}
-                    <div style="width: 60px; height: 60px; background: #374151; border-radius: 4px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: #9ca3af; font-size: 0.75rem;">
-                      Kein Bild
+      <!-- Desktop Table View (hidden on mobile) -->
+      <div style="overflow-x: auto; display: none;" class="desktop-only">
+        <table style="width: 100%; border-collapse: collapse; background: #1f2937; border-radius: 8px; overflow: hidden;">
+          <thead>
+            <tr style="background: #111827;">
+              <th style="padding: 12px; text-align: left; color: #f9fafb; font-weight: 600; border-bottom: 1px solid #374151;">Treffer</th>
+              <th style="padding: 12px; text-align: left; color: #f9fafb; font-weight: 600; border-bottom: 1px solid #374151;">Benutzer</th>
+              <th style="padding: 12px; text-align: left; color: #f9fafb; font-weight: 600; border-bottom: 1px solid #374151;">Erstellt</th>
+              <th style="padding: 12px; text-align: left; color: #f9fafb; font-weight: 600; border-bottom: 1px solid #374151;">Privacy</th>
+              <th style="padding: 12px; text-align: left; color: #f9fafb; font-weight: 600; border-bottom: 1px solid #374151;">Aktionen</th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each items as item}
+              <tr style="border-bottom: 1px solid #374151;">
+                <!-- Item Column -->
+                <td style="padding: 12px; vertical-align: top;">
+                  <div style="display: flex; align-items: flex-start; gap: 12px;">
+                    {#if item.path_512}
+                      <img 
+                        src={`https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${item.path_512}`}
+                        alt={item.title || 'Bild'}
+                        style="width: 60px; height: 60px; object-fit: cover; border-radius: 4px; flex-shrink: 0;"
+                      />
+                    {:else}
+                      <div style="width: 60px; height: 60px; background: #374151; border-radius: 4px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: #9ca3af; font-size: 0.75rem;">
+                        Kein Bild
+                      </div>
+                    {/if}
+                    <div style="flex: 1;">
+                      <div style="font-weight: 500; color: #f9fafb; margin-bottom: 4px;">
+                        {item.title || 'Unbenannt'}
+                      </div>
+                      <a 
+                        href="/item/{item.slug}" 
+                        style="color: #f59e0b; text-decoration: none; font-size: 0.875rem;"
+                        target="_blank"
+                      >
+                        {item.slug}
+                      </a>
                     </div>
-                  {/if}
-                  <div style="flex: 1;">
-                    <div style="font-weight: 500; color: #f9fafb; margin-bottom: 4px;">
-                      {item.title || 'Unbenannt'}
-                    </div>
-                    <a 
-                      href="/item/{item.slug}" 
-                      style="color: #f59e0b; text-decoration: none; font-size: 0.875rem;"
-                      target="_blank"
-                    >
-                      {item.slug}
-                    </a>
                   </div>
-                </div>
-              </td>
+                </td>
 
-              <!-- User Column -->
-              <td style="padding: 12px; vertical-align: top;">
+                <!-- User Column -->
+                <td style="padding: 12px; vertical-align: top;">
+                  <a 
+                    href="/?user={item.user_id}" 
+                    style="color: #f59e0b; text-decoration: none; font-weight: 500;"
+                  >
+                    {item.profiles?.accountname || 'Unbekannt'}
+                  </a>
+                  <div style="font-size: 0.75rem; color: #9ca3af; margin-top: 4px;">
+                    {item.width} × {item.height}
+                  </div>
+                </td>
+
+                <!-- Created Column -->
+                <td style="padding: 12px; vertical-align: top;">
+                  <div style="color: #f9fafb;">
+                    {formatDate(item.created_at)}
+                  </div>
+                  {#if item.lat && item.lon}
+                    <button 
+                      on:click={() => openMapForGPS(item)}
+                      style="font-size: 0.75rem; color: #9ca3af; margin-top: 0.25rem; font-family: monospace; background: none; border: none; cursor: pointer; text-decoration: underline; padding: 0;"
+                      title="Auf Karte anzeigen"
+                    >
+                      {item.lat.toFixed(2)}, {item.lon.toFixed(2)}
+                    </button>
+                  {:else}
+                    <button 
+                      on:click={() => openGPSModal(item)}
+                      style="font-size: 0.75rem; color: #9ca3af; margin-top: 0.25rem; font-family: monospace; background: none; border: none; cursor: pointer; text-decoration: underline; padding: 0;"
+                      title="GPS-Koordinaten setzen"
+                    >
+                      GPS: -
+                    </button>
+                  {/if}
+                </td>
+
+                <!-- Privacy Column -->
+                <td style="padding: 12px; vertical-align: top;">
+                  <button
+                    on:click={() => togglePrivacy(item)}
+                    style="padding: 4px 8px; font-size: 0.75rem; border-radius: 4px; border: none; cursor: pointer; background: {item.is_private ? '#dc2626' : '#059669'}; color: white;"
+                  >
+                    {item.is_private ? 'Privat' : 'Öffentlich'}
+                  </button>
+                </td>
+
+                <!-- Actions Column -->
+                <td style="padding: 12px; vertical-align: top;">
+                  <div style="display: flex; gap: 8px;">
+                    <button
+                      on:click={() => openOwnerModal(item)}
+                      style="padding: 6px 12px; font-size: 0.75rem; background: #f59e0b; border: none; border-radius: 4px; color: white; cursor: pointer;"
+                    >
+                      Besitzer
+                    </button>
+                    <button
+                      on:click={() => deleteItem(item)}
+                      style="padding: 6px 12px; font-size: 0.75rem; background: #dc2626; border: none; border-radius: 4px; color: white; cursor: pointer;"
+                    >
+                      Löschen
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Mobile Card View (hidden on desktop) -->
+      <div class="mobile-only">
+        {#each items as item}
+          <div style="background: #1f2937; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; border: 1px solid #374151;">
+            <!-- Item Header with Image -->
+            <div style="display: flex; align-items: flex-start; gap: 12px; margin-bottom: 1rem;">
+              {#if item.path_512}
+                <img 
+                  src={`https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${item.path_512}`}
+                  alt={item.title || 'Bild'}
+                  style="width: 80px; height: 80px; object-fit: cover; border-radius: 4px; flex-shrink: 0;"
+                />
+              {:else}
+                <div style="width: 80px; height: 80px; background: #374151; border-radius: 4px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: #9ca3af; font-size: 0.75rem;">
+                  Kein Bild
+                </div>
+              {/if}
+              <div style="flex: 1;">
+                <div style="font-weight: 500; color: #f9fafb; margin-bottom: 4px; font-size: 1rem;">
+                  {item.title || 'Unbenannt'}
+                </div>
+                <a 
+                  href="/item/{item.slug}" 
+                  style="color: #f59e0b; text-decoration: none; font-size: 0.875rem;"
+                  target="_blank"
+                >
+                  {item.slug}
+                </a>
+              </div>
+            </div>
+
+            <!-- Item Details -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;" class="grid">
+              <div>
+                <div style="font-size: 0.875rem; color: #9ca3af; margin-bottom: 4px;">Benutzer</div>
                 <a 
                   href="/?user={item.user_id}" 
                   style="color: #f59e0b; text-decoration: none; font-weight: 500;"
@@ -500,10 +550,10 @@
                 <div style="font-size: 0.75rem; color: #9ca3af; margin-top: 4px;">
                   {item.width} × {item.height}
                 </div>
-              </td>
-
-              <!-- Created Column -->
-              <td style="padding: 12px; vertical-align: top;">
+              </div>
+              
+              <div>
+                <div style="font-size: 0.875rem; color: #9ca3af; margin-bottom: 4px;">Erstellt</div>
                 <div style="color: #f9fafb;">
                   {formatDate(item.created_at)}
                 </div>
@@ -524,186 +574,84 @@
                     GPS: -
                   </button>
                 {/if}
-              </td>
+              </div>
+            </div>
 
-              <!-- Privacy Column -->
-              <td style="padding: 12px; vertical-align: top;">
+            <!-- Privacy and Actions -->
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+              <button
+                on:click={() => togglePrivacy(item)}
+                style="padding: 6px 12px; font-size: 0.875rem; border-radius: 4px; border: none; cursor: pointer; background: {item.is_private ? '#dc2626' : '#059669'}; color: white;"
+              >
+                {item.is_private ? 'Privat' : 'Öffentlich'}
+              </button>
+              
+              <div style="display: flex; gap: 0.5rem;">
                 <button
-                  on:click={() => togglePrivacy(item)}
-                  style="padding: 4px 8px; font-size: 0.75rem; border-radius: 4px; border: none; cursor: pointer; background: {item.is_private ? '#dc2626' : '#059669'}; color: white;"
+                  on:click={() => openOwnerModal(item)}
+                  style="padding: 6px 12px; font-size: 0.875rem; background: #f59e0b; border: none; border-radius: 4px; color: white; cursor: pointer;"
                 >
-                  {item.is_private ? 'Privat' : 'Öffentlich'}
+                  Besitzer
                 </button>
-              </td>
-
-              <!-- Actions Column -->
-              <td style="padding: 12px; vertical-align: top;">
-                <div style="display: flex; gap: 8px;">
-                  <button
-                    on:click={() => openOwnerModal(item)}
-                    style="padding: 6px 12px; font-size: 0.75rem; background: #f59e0b; border: none; border-radius: 4px; color: white; cursor: pointer;"
-                  >
-                    Besitzer
-                  </button>
-                  <button
-                    on:click={() => deleteItem(item)}
-                    style="padding: 6px 12px; font-size: 0.75rem; background: #dc2626; border: none; border-radius: 4px; color: white; cursor: pointer;"
-                  >
-                    Löschen
-                  </button>
-                </div>
-              </td>
-            </tr>
-          {/each}
-        </tbody>
-      </table>
-    </div>
-
-    <!-- Mobile Card View (hidden on desktop) -->
-    <div class="mobile-only">
-      {#each items as item}
-        <div style="background: #1f2937; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; border: 1px solid #374151;">
-          <!-- Item Header with Image -->
-          <div style="display: flex; align-items: flex-start; gap: 12px; margin-bottom: 1rem;">
-            {#if item.path_512}
-              <img 
-                src={`https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${item.path_512}`}
-                alt={item.title || 'Bild'}
-                style="width: 80px; height: 80px; object-fit: cover; border-radius: 4px; flex-shrink: 0;"
-              />
-            {:else}
-              <div style="width: 80px; height: 80px; background: #374151; border-radius: 4px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: #9ca3af; font-size: 0.75rem;">
-                Kein Bild
+                <button
+                  on:click={() => deleteItem(item)}
+                  style="padding: 6px 12px; font-size: 0.875rem; background: #dc2626; border: none; border-radius: 4px; color: white; cursor: pointer;"
+                >
+                  Löschen
+                </button>
               </div>
-            {/if}
-            <div style="flex: 1;">
-              <div style="font-weight: 500; color: #f9fafb; margin-bottom: 4px; font-size: 1rem;">
-                {item.title || 'Unbenannt'}
-              </div>
-              <a 
-                href="/item/{item.slug}" 
-                style="color: #f59e0b; text-decoration: none; font-size: 0.875rem;"
-                target="_blank"
-              >
-                {item.slug}
-              </a>
             </div>
           </div>
-
-          <!-- Item Details -->
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;" class="grid">
-            <div>
-              <div style="font-size: 0.875rem; color: #9ca3af; margin-bottom: 4px;">Benutzer</div>
-              <a 
-                href="/?user={item.user_id}" 
-                style="color: #f59e0b; text-decoration: none; font-weight: 500;"
-              >
-                {item.profiles?.accountname || 'Unbekannt'}
-              </a>
-              <div style="font-size: 0.75rem; color: #9ca3af; margin-top: 4px;">
-                {item.width} × {item.height}
-              </div>
-            </div>
-            
-            <div>
-              <div style="font-size: 0.875rem; color: #9ca3af; margin-bottom: 4px;">Erstellt</div>
-              <div style="color: #f9fafb;">
-                {formatDate(item.created_at)}
-              </div>
-              {#if item.lat && item.lon}
-                <button 
-                  on:click={() => openMapForGPS(item)}
-                  style="font-size: 0.75rem; color: #9ca3af; margin-top: 0.25rem; font-family: monospace; background: none; border: none; cursor: pointer; text-decoration: underline; padding: 0;"
-                  title="Auf Karte anzeigen"
-                >
-                  {item.lat.toFixed(2)}, {item.lon.toFixed(2)}
-                </button>
-              {:else}
-                <button 
-                  on:click={() => openGPSModal(item)}
-                  style="font-size: 0.75rem; color: #9ca3af; margin-top: 0.25rem; font-family: monospace; background: none; border: none; cursor: pointer; text-decoration: underline; padding: 0;"
-                  title="GPS-Koordinaten setzen"
-                >
-                  GPS: -
-                </button>
-              {/if}
-            </div>
-          </div>
-
-          <!-- Privacy and Actions -->
-          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
-            <button
-              on:click={() => togglePrivacy(item)}
-              style="padding: 6px 12px; font-size: 0.875rem; border-radius: 4px; border: none; cursor: pointer; background: {item.is_private ? '#dc2626' : '#059669'}; color: white;"
-            >
-              {item.is_private ? 'Privat' : 'Öffentlich'}
-            </button>
-            
-            <div style="display: flex; gap: 0.5rem;">
-              <button
-                on:click={() => openOwnerModal(item)}
-                style="padding: 6px 12px; font-size: 0.875rem; background: #f59e0b; border: none; border-radius: 4px; color: white; cursor: pointer;"
-              >
-                Besitzer
-              </button>
-              <button
-                on:click={() => deleteItem(item)}
-                style="padding: 6px 12px; font-size: 0.875rem; background: #dc2626; border: none; border-radius: 4px; color: white; cursor: pointer;"
-              >
-                Löschen
-              </button>
-            </div>
-          </div>
-        </div>
-      {/each}
-    </div>
-
-    <!-- Pagination -->
-    {#if totalPages > 1}
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2rem; padding: 1rem; background: #1f2937; border-radius: 8px;">
-        <div style="color: #9ca3af; font-size: 0.875rem;">
-          Seite {currentPage + 1} von {totalPages} ({totalItems} Items insgesamt)
-        </div>
-        <div style="display: flex; gap: 0.5rem;">
-          <button 
-            on:click={() => goToPage(0)}
-            disabled={currentPage === 0}
-            style="padding: 0.5rem 1rem; background: #374151; color: #f9fafb; border: none; border-radius: 4px; cursor: pointer; font-size: 0.875rem; opacity: 1;"
-            on:disabled={(e) => e.target.style.opacity = '0.5'}
-          >
-            ⏮️ Erste
-          </button>
-          <button 
-            on:click={() => goToPage(currentPage - 1)}
-            disabled={currentPage === 0}
-            style="padding: 0.5rem 1rem; background: #374151; color: #f9fafb; border: none; border-radius: 4px; cursor: pointer; font-size: 0.875rem; opacity: 1;"
-            on:disabled={(e) => e.target.style.opacity = '0.5'}
-          >
-            ⏪ Zurück
-          </button>
-          <span style="padding: 0.5rem 1rem; background: #f59e0b; color: #1f2937; border-radius: 4px; font-size: 0.875rem; font-weight: 500;">
-            {currentPage + 1}
-          </span>
-          <button 
-            on:click={() => goToPage(currentPage + 1)}
-            disabled={currentPage >= totalPages - 1}
-            style="padding: 0.5rem 1rem; background: #374151; color: #f9fafb; border: none; border-radius: 4px; cursor: pointer; font-size: 0.875rem; opacity: 1;"
-            on:disabled={(e) => e.target.style.opacity = '0.5'}
-          >
-            Weiter ⏩
-          </button>
-          <button 
-            on:click={() => goToPage(totalPages - 1)}
-            disabled={currentPage >= totalPages - 1}
-            style="padding: 0.5rem 1rem; background: #374151; color: #f9fafb; border: none; border-radius: 4px; cursor: pointer; font-size: 0.875rem; opacity: 1;"
-            on:disabled={(e) => e.target.style.opacity = '0.5'}
-          >
-            Letzte ⏭️
-          </button>
-        </div>
+        {/each}
       </div>
-    {/if}
-  </div>
+
+      <!-- Pagination -->
+      {#if totalPages > 1}
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2rem; padding: 1rem; background: #1f2937; border-radius: 8px;">
+          <div style="color: #9ca3af; font-size: 0.875rem;">
+            Seite {currentPage + 1} von {totalPages} ({totalItems} Items insgesamt)
+          </div>
+          <div style="display: flex; gap: 0.5rem;">
+            <button 
+              on:click={() => goToPage(0)}
+              disabled={currentPage === 0}
+              style="padding: 0.5rem 1rem; background: #374151; color: #f9fafb; border: none; border-radius: 4px; cursor: pointer; font-size: 0.875rem; opacity: 1;"
+              on:disabled={(e) => e.target.style.opacity = '0.5'}
+            >
+              ⏮️ Erste
+            </button>
+            <button 
+              on:click={() => goToPage(currentPage - 1)}
+              disabled={currentPage === 0}
+              style="padding: 0.5rem 1rem; background: #374151; color: #f9fafb; border: none; border-radius: 4px; cursor: pointer; font-size: 0.875rem; opacity: 1;"
+              on:disabled={(e) => e.target.style.opacity = '0.5'}
+            >
+              ⏪ Zurück
+            </button>
+            <span style="padding: 0.5rem 1rem; background: #f59e0b; color: #1f2937; border-radius: 4px; font-size: 0.875rem; font-weight: 500;">
+              {currentPage + 1}
+            </span>
+            <button 
+              on:click={() => goToPage(currentPage + 1)}
+              disabled={currentPage >= totalPages - 1}
+              style="padding: 0.5rem 1rem; background: #374151; color: #f9fafb; border: none; border-radius: 4px; cursor: pointer; font-size: 0.875rem; opacity: 1;"
+              on:disabled={(e) => e.target.style.opacity = '0.5'}
+            >
+              Weiter ⏩
+            </button>
+            <button 
+              on:click={() => goToPage(totalPages - 1)}
+              disabled={currentPage >= totalPages - 1}
+              style="padding: 0.5rem 1rem; background: #374151; color: #f9fafb; border: none; border-radius: 4px; cursor: pointer; font-size: 0.875rem; opacity: 1;"
+              on:disabled={(e) => e.target.style.opacity = '0.5'}
+            >
+              Letzte ⏭️
+            </button>
+          </div>
+        </div>
+      {/if}
+    </div>
+  </InfoPageLayout>
 {/if}
 
 <!-- Owner Change Modal -->
@@ -890,3 +838,46 @@
     </div>
   </div>
 {/if} 
+
+<style>
+  /* Responsive Design */
+  @media (max-width: 768px) {
+    .desktop-only {
+      display: none !important;
+    }
+    .mobile-only {
+      display: block !important;
+    }
+  }
+  
+  @media (min-width: 769px) {
+    .desktop-only {
+      display: block !important;
+    }
+    .mobile-only {
+      display: none !important;
+    }
+  }
+  
+  /* Mobile optimizations */
+  @media (max-width: 480px) {
+    .mobile-only {
+      padding: 0 1rem;
+    }
+    
+    .mobile-only > div {
+      margin-bottom: 0.75rem;
+      padding: 0.75rem;
+    }
+    
+    .mobile-only img {
+      width: 60px !important;
+      height: 60px !important;
+    }
+    
+    .mobile-only .grid {
+      grid-template-columns: 1fr !important;
+      gap: 0.5rem !important;
+    }
+  }
+</style> 

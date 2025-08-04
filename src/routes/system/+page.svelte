@@ -10,4 +10,4 @@
 <!-- Temporary content while redirecting -->
 <div style="text-align: center; padding: 2rem;">
   <p>Weiterleitung...</p>
-</div> 
+</div>

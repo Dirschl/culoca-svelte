@@ -3,6 +3,7 @@
   import { supabase } from '$lib/supabaseClient';
   import { goto } from '$app/navigation';
   import { darkMode } from '$lib/darkMode';
+  import InfoPageLayout from '$lib/InfoPageLayout.svelte';
 
   // Base URL for API calls
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5173';
@@ -34,15 +35,24 @@
 
     const { data: { user } } = await supabase.auth.getUser();
     
-    // Check for admin access (johann.dirschl@gmx.de or specific user ID)
-    if (user?.email === 'johann.dirschl@gmx.de' || user?.id === '0ceb2320-0553-463b-971a-a0eef5ecdf09') {
-      console.log('Admin access granted');
-      isAdmin = true;
-      await loadUsers();
-      await loadRoles();
+    if (user) {
+      // Check for admin permission using RPC
+      const { data: hasPermission, error } = await supabase.rpc('has_permission', {
+        user_id: user.id,
+        permission_name: 'admin'
+      });
+      
+      if (!error && hasPermission) {
+        console.log('Admin access granted');
+        isAdmin = true;
+        await loadUsers();
+        await loadRoles();
+      } else {
+        console.log('Access denied for:', user?.email, 'ID:', user?.id);
+        isAdmin = false;
+      }
     } else {
-      console.log('Access denied for:', user?.email, 'ID:', user?.id);
-      // Don't redirect immediately, show access denied message
+      console.log('No user found');
       isAdmin = false;
     }
     isLoading = false;
@@ -442,52 +452,20 @@
 </script>
 
 {#if isLoading}
-  <div class="admin-container">
-    <div class="admin-loading">
-      <div class="admin-spinner"></div>
-    </div>
-  </div>
+  <div class="loading">Lade Benutzer-Management...</div>
 {:else if !isAdmin}
-  <div class="admin-container">
-    <div class="admin-main">
-      <div class="admin-empty">
-        <div class="admin-empty-icon">🚫</div>
-        <h2 class="admin-empty-title">Zugriff verweigert</h2>
-        <p class="admin-empty-description">Sie haben keine Berechtigung, auf das Admin-Dashboard zuzugreifen.</p>
-        <a href="/" class="admin-btn admin-btn-primary">Zurück zur Galerie</a>
-      </div>
-    </div>
+  <div class="error">
+    <h1>Zugriff verweigert</h1>
+    <p>Sie haben keine Berechtigung, auf das Admin-Dashboard zuzugreifen.</p>
+    <a href="/" class="btn">Zurück zur Galerie</a>
   </div>
 {:else}
-  <div class="admin-container">
-    <!-- Header -->
-    <header class="admin-header">
-      <div class="admin-header-content">
-        <div>
-          <h1 class="admin-title">Benutzer verwalten</h1>
-          <p class="admin-subtitle">Alle Benutzer anzeigen und verwalten</p>
-        </div>
-        <nav class="admin-nav">
-          <a href="/admin" class="admin-btn admin-btn-secondary">← Zurück zum Dashboard</a>
-        </nav>
-      </div>
-    </header>
-
-    <!-- Navigation -->
-    <nav class="admin-navbar">
-      <div class="admin-navbar-content">
-        <div class="admin-navbar-links">
-          <a href="/admin" class="admin-nav-link">Dashboard</a>
-          <a href="/admin/users" class="admin-nav-link active">Benutzer</a>
-          <a href="/admin/items" class="admin-nav-link">Items</a>
-          <a href="/admin/analytics" class="admin-nav-link">Analytics</a>
-          <a href="/admin/create-user" class="admin-nav-link">Benutzer erstellen</a>
-        </div>
-      </div>
-    </nav>
-
-    <!-- Main Content -->
-    <main class="admin-main">
+  <InfoPageLayout 
+    currentPage="admin"
+    title="Benutzer-Management"
+    description="Alle Benutzer anzeigen und verwalten"
+  >
+    <div class="admin-content">
       <!-- Search -->
       <div class="admin-search-container">
         <div class="admin-search-header">
@@ -703,14 +681,14 @@
           </div>
         </div>
       {/if}
-    </main>
-  </div>
+    </div>
+  </InfoPageLayout>
 {/if}
 
 <!-- User Details Modal -->
 {#if showModal && selectedUser}
-  <div class="admin-modal-overlay" on:click={closeModal}>
-    <div class="admin-modal" on:click|stopPropagation>
+  <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.8); display: flex; align-items: center; justify-content: center; z-index: 9999; overflow-y: auto; padding: 20px;" on:click={closeModal}>
+    <div style="max-width: 500px; width: 90%; max-height: 90vh; background: #1f2937; border: 2px solid #374151; border-radius: 12px; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5); overflow-y: auto;" on:click|stopPropagation>
       <div class="admin-modal-header">
         <h3 class="admin-modal-title">Benutzer Details</h3>
         <button class="admin-modal-close" on:click={closeModal}>✕</button>
@@ -757,8 +735,8 @@
           </div>
         </div>
       </div>
-      <div class="admin-modal-actions">
-        <button class="admin-btn admin-btn-secondary" on:click={closeModal}>Schließen</button>
+      <div style="padding: 15px 20px 20px 20px; border-top: 1px solid #374151; display: flex; justify-content: flex-end; background: #111827;">
+        <button style="padding: 10px 20px; font-size: 14px; font-weight: 500; background: #4b5563; border: 1px solid #6b7280; color: #f9fafb; border-radius: 6px; cursor: pointer; transition: all 0.2s;" on:click={closeModal}>Schließen</button>
       </div>
     </div>
   </div>
@@ -766,8 +744,8 @@
 
 <!-- Edit User Modal -->
 {#if showEditModal && editingUser}
-  <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.8); display: flex; align-items: center; justify-content: center; z-index: 1000;" on:click={closeEditModal}>
-    <div style="max-width: 600px; width: 90%; background: #1f2937; border: 2px solid #374151; border-radius: 12px; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5); overflow: hidden;" on:click|stopPropagation>
+  <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.8); display: flex; align-items: center; justify-content: center; z-index: 9999; overflow-y: auto; padding: 20px;" on:click={closeEditModal}>
+    <div style="max-width: 600px; width: 90%; max-height: 90vh; background: #1f2937; border: 2px solid #374151; border-radius: 12px; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5); overflow-y: auto;" on:click|stopPropagation>
       
       <!-- Header -->
       <div style="padding: 20px 20px 15px 20px; border-bottom: 1px solid #374151; display: flex; justify-content: space-between; align-items: center; background: #111827;">
@@ -783,7 +761,7 @@
       </div>
       
       <!-- Content -->
-      <div style="padding: 20px;">
+      <form style="padding: 20px;">
         <!-- User Info -->
         <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 20px; padding: 15px; background: #374151; border-radius: 8px;">
           <div class="admin-avatar" style="width: 60px; height: 60px;">
@@ -946,7 +924,7 @@
             </select>
           </div>
         </div>
-      </div>
+      </form>
       
       <!-- Buttons -->
       <div style="padding: 15px 20px 20px 20px; border-top: 1px solid #374151; display: flex; justify-content: flex-end; gap: 12px; background: #111827;">
@@ -959,8 +937,14 @@
           Abbrechen
         </button>
         <button
+          type="button"
           on:click={() => {
-            const formData = new FormData(document.querySelector('form'));
+            const form = document.querySelector('form');
+            if (!form) {
+              console.error('Form not found');
+              return;
+            }
+            const formData = new FormData(form);
             const updates = {
               full_name: formData.get('full_name'),
               accountname: formData.get('accountname'),
@@ -971,6 +955,7 @@
               use_justified_layout: formData.get('use_justified_layout') === 'true',
               show_welcome: formData.get('show_welcome') === 'true'
             };
+            console.log('Updating user with:', updates);
             updateUser(updates);
           }}
           style="padding: 10px 20px; font-size: 14px; font-weight: 500; background: #f59e0b; border: 1px solid #d97706; color: white; border-radius: 6px; cursor: pointer; transition: all 0.2s; opacity: 1;"
@@ -982,4 +967,174 @@
       </div>
     </div>
   </div>
-{/if} 
+{/if}
+
+<style>
+  .loading, .error {
+    text-align: center;
+    padding: 2rem;
+    font-size: 1.2rem;
+  }
+  
+  .error {
+    color: var(--error-color);
+  }
+  
+  .admin-content {
+    width: 100%;
+    /* padding: 2rem; */
+  }
+  
+  .admin-search-container {
+    margin-bottom: 2rem;
+  }
+  
+  .admin-search-header {
+    margin-bottom: 1rem;
+  }
+  
+  .admin-search-title {
+    color: var(--text-primary);
+    margin: 0;
+  }
+  
+  .admin-search-grid {
+    display: grid;
+    gap: 1rem;
+  }
+  
+  .admin-form-group {
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .admin-form-label {
+    margin-bottom: 0.5rem;
+    color: var(--text-primary);
+    font-weight: 600;
+  }
+  
+  .admin-form-input {
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-size: 1rem;
+  }
+  
+  .admin-table-container {
+    margin-bottom: 2rem;
+  }
+  
+  .admin-table-header {
+    margin-bottom: 1rem;
+  }
+  
+  .admin-table-title {
+    color: var(--text-primary);
+    margin: 0 0 0.5rem 0;
+  }
+  
+  .admin-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  
+  .admin-table th,
+  .admin-table td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+  }
+  
+  .admin-table th {
+    background: var(--bg-tertiary);
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+  
+  .admin-table td {
+    color: var(--text-secondary);
+  }
+  
+  .admin-btn {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .admin-btn-primary {
+    background: var(--primary-color);
+    color: white;
+  }
+  
+  .admin-btn-primary:hover {
+    background: var(--primary-hover);
+  }
+  
+  .admin-btn-secondary {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+  }
+  
+  .admin-btn-secondary:hover {
+    background: var(--bg-secondary);
+  }
+  
+  .pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 2rem;
+  }
+  
+  .pagination button {
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  
+  .pagination button:hover {
+    background: var(--bg-tertiary);
+  }
+  
+  .pagination button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  
+  .pagination .current {
+    background: var(--primary-color);
+    color: white;
+  }
+  
+  @media (max-width: 768px) {
+    .admin-content {
+      padding: 1rem;
+    }
+    
+    .admin-table {
+      font-size: 0.9rem;
+    }
+    
+    .admin-table th,
+    .admin-table td {
+      padding: 0.5rem;
+    }
+  }
+</style> 
