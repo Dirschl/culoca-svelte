@@ -2,7 +2,7 @@
   import InfoPageHeader from './InfoPageHeader.svelte';
   import InfoPageFooter from './InfoPageFooter.svelte';
   
-  export let currentPage: 'system' | 'license' | 'impressum' | 'datenschutz' = 'system';
+  export let currentPage: 'system' | 'license' | 'impressum' | 'datenschutz' | 'admin' = 'system';
   export let title: string = '';
   export let description: string = '';
 </script>
