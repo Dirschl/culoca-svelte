@@ -154,58 +154,64 @@
     <a href="/" class="btn">Zurück zur Startseite</a>
   </div>
 {:else}
-  <InfoPageLayout 
-    currentPage="admin"
-    title="Admin - Rollen-Management"
-    description="Verwalte Rollen und Benutzer-Berechtigungen"
-  >
-    <div class="admin-content">
-      <h1>Admin-Bereich</h1>
+  <div class="admin-layout">
+    <!-- Admin Navigation -->
+    <nav class="admin-nav">
+      <div class="nav-header">
+        <h1>Admin-Bereich</h1>
+      </div>
+      <ul class="nav-links">
+        <li><a href="/admin" class="nav-link active">Dashboard</a></li>
+        <li><a href="/admin/roles" class="nav-link">Rollen</a></li>
+        <li><a href="/admin/users" class="nav-link">Benutzer</a></li>
+        <li><a href="/admin/items" class="nav-link">Items</a></li>
+        <li><a href="/admin/analytics" class="nav-link">Analytics</a></li>
+      </ul>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="admin-content">
+      <div class="content-header">
+        <h2>Dashboard</h2>
+        <p>Übersicht über das System</p>
+      </div>
       
       {#if error}
         <div class="error-message">{error}</div>
       {/if}
       
-      <!-- Roles Management -->
-      <section class="roles-section">
-        <h2>Rollen-Management</h2>
-        
-        <div class="roles-grid">
-          {#each roles as role}
-            <div class="role-card">
-              <h3>{role.display_name}</h3>
-              <p class="role-description">{role.description}</p>
-              
-              <div class="permissions">
-                <h4>Berechtigungen:</h4>
-                {#each Object.entries(role.permissions) as [permission, value]}
-                  <label class="permission-item">
-                    <input 
-                      type="checkbox" 
-                      checked={value}
-                      on:change={(e) => {
-                        const newPermissions = { ...role.permissions };
-                        newPermissions[permission] = e.target.checked;
-                        updateRolePermissions(role.id, newPermissions);
-                      }}
-                    />
-                    <span>{permission}</span>
-                  </label>
-                {/each}
-              </div>
-              
-              <div class="role-stats">
-                <p>Benutzer mit dieser Rolle: {users.filter(u => u.role_id === role.id).length}</p>
-              </div>
-            </div>
-          {/each}
+      <!-- Quick Stats -->
+      <section class="stats-section">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <h3>Rollen</h3>
+            <div class="stat-number">{roles.length}</div>
+            <a href="/admin/roles" class="stat-link">Verwalten →</a>
+          </div>
+          
+          <div class="stat-card">
+            <h3>Benutzer</h3>
+            <div class="stat-number">{users.length}</div>
+            <a href="/admin/users" class="stat-link">Verwalten →</a>
+          </div>
+          
+          <div class="stat-card">
+            <h3>Admins</h3>
+            <div class="stat-number">{users.filter(u => u.role_id === 3).length}</div>
+            <a href="/admin/users" class="stat-link">Anzeigen →</a>
+          </div>
+          
+          <div class="stat-card">
+            <h3>Items</h3>
+            <div class="stat-number">-</div>
+            <a href="/admin/items" class="stat-link">Verwalten →</a>
+          </div>
         </div>
       </section>
       
-      <!-- Users Management -->
-      <section class="users-section">
-        <h2>Benutzer-Management</h2>
-        
+      <!-- Recent Users -->
+      <section class="recent-section">
+        <h3>Neueste Benutzer</h3>
         <div class="users-table">
           <table>
             <thead>
@@ -213,60 +219,51 @@
                 <th>Name</th>
                 <th>Email</th>
                 <th>Rolle</th>
-                <th>Aktionen</th>
+                <th>Erstellt</th>
               </tr>
             </thead>
             <tbody>
-              {#each users as user}
+              {#each users.slice(0, 5) as user}
                 <tr>
                   <td>{user.full_name || 'Unbekannt'}</td>
                   <td>{user.email}</td>
                   <td>
-                    <select 
-                      value={user.role_id || 1}
-                      on:change={(e) => updateUserRole(user.id, parseInt(e.target.value))}
-                    >
-                      {#each roles as role}
-                        <option value={role.id}>{role.display_name}</option>
-                      {/each}
-                    </select>
+                    {#each roles as role}
+                      {#if role.id === user.role_id}
+                        {role.display_name}
+                      {/if}
+                    {/each}
                   </td>
-                  <td>
-                    <button 
-                      class="btn-small"
-                      on:click={() => {
-                        // Show user details
-                        console.log('User details:', user);
-                      }}
-                    >
-                      Details
-                    </button>
-                  </td>
+                  <td>{new Date(user.created_at).toLocaleDateString()}</td>
                 </tr>
               {/each}
             </tbody>
           </table>
         </div>
+        <div class="section-footer">
+          <a href="/admin/users" class="btn">Alle Benutzer anzeigen</a>
+        </div>
       </section>
       
       <!-- System Info -->
       <section class="system-info">
-        <h2>System-Informationen</h2>
+        <h3>System-Informationen</h3>
         
         <div class="info-grid">
           <div class="info-card">
-            <h3>Statistiken</h3>
+            <h4>Rollen-Übersicht</h4>
             <ul>
-              <li>Rollen: {roles.length}</li>
-              <li>Benutzer: {users.length}</li>
-              <li>Admins: {users.filter(u => u.role_id === 3).length}</li>
-              <li>Normale Benutzer: {users.filter(u => u.role_id === 2).length}</li>
-              <li>Anonyme: {users.filter(u => u.role_id === 1 || !u.role_id).length}</li>
+              {#each roles as role}
+                <li>
+                  <strong>{role.display_name}:</strong>
+                  {users.filter(u => u.role_id === role.id).length} Benutzer
+                </li>
+              {/each}
             </ul>
           </div>
           
           <div class="info-card">
-            <h3>Berechtigungen</h3>
+            <h4>Berechtigungen</h4>
             <ul>
               {#each roles as role}
                 <li>
@@ -278,8 +275,8 @@
           </div>
         </div>
       </section>
-    </div>
-  </InfoPageLayout>
+    </main>
+  </div>
 {/if}
 
 <style>
@@ -293,10 +290,146 @@
     color: var(--error-color);
   }
   
+  .admin-layout {
+    display: flex;
+    min-height: 100vh;
+  }
+  
+  .admin-nav {
+    width: 250px;
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--border-color);
+    padding: 1rem;
+  }
+  
+  .nav-header h1 {
+    margin: 0 0 2rem 0;
+    font-size: 1.5rem;
+    color: var(--text-primary);
+  }
+  
+  .nav-links {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  
+  .nav-link {
+    display: block;
+    padding: 0.75rem 1rem;
+    color: var(--text-secondary);
+    text-decoration: none;
+    border-radius: 6px;
+    margin-bottom: 0.5rem;
+    transition: all 0.2s;
+  }
+  
+  .nav-link:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+  }
+  
+  .nav-link.active {
+    background: var(--primary-color);
+    color: white;
+  }
+  
   .admin-content {
-    max-width: 1200px;
-    margin: 0 auto;
+    flex: 1;
     padding: 2rem;
+  }
+  
+  .content-header {
+    margin-bottom: 2rem;
+  }
+  
+  .content-header h2 {
+    margin: 0 0 0.5rem 0;
+    color: var(--text-primary);
+  }
+  
+  .content-header p {
+    color: var(--text-secondary);
+    margin: 0;
+  }
+  
+  .error-message {
+    background: var(--error-bg);
+    color: var(--error-color);
+    padding: 1rem;
+    border-radius: 6px;
+    margin-bottom: 2rem;
+  }
+  
+  .stats-section {
+    margin-bottom: 3rem;
+  }
+  
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+  }
+  
+  .stat-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1.5rem;
+    text-align: center;
+  }
+  
+  .stat-card h3 {
+    margin: 0 0 0.5rem 0;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  
+  .stat-number {
+    font-size: 2.5rem;
+    font-weight: bold;
+    color: var(--text-primary);
+    margin-bottom: 1rem;
+  }
+  
+  .stat-link {
+    color: var(--primary-color);
+    text-decoration: none;
+    font-size: 0.9rem;
+  }
+  
+  .stat-link:hover {
+    text-decoration: underline;
+  }
+  
+  .recent-section {
+    margin-bottom: 3rem;
+  }
+  
+  .recent-section h3 {
+    margin-bottom: 1rem;
+    color: var(--text-primary);
+  }
+  
+  .section-footer {
+    margin-top: 1rem;
+    text-align: center;
+  }
+  
+  .section-footer .btn {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    background: var(--primary-color);
+    color: white;
+    text-decoration: none;
+    border-radius: 6px;
+    font-size: 0.9rem;
+  }
+  
+  .section-footer .btn:hover {
+    background: var(--primary-hover);
   }
   
   .admin-content h1 {

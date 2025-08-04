@@ -20,6 +20,7 @@
   let showEditModal = false;
   let editingUser: any = null;
   let authUsers: any[] = [];
+  let roles: any[] = [];
 
   onMount(async () => {
     // Wait for authentication to be ready
@@ -38,6 +39,7 @@
       console.log('Admin access granted');
       isAdmin = true;
       await loadUsers();
+      await loadRoles();
     } else {
       console.log('Access denied for:', user?.email, 'ID:', user?.id);
       // Don't redirect immediately, show access denied message
@@ -87,6 +89,28 @@
       users = [];
       filteredUsers = [];
       totalPages = 0;
+    }
+  }
+
+  async function loadRoles() {
+    try {
+      console.log('Loading roles...');
+      const { data, error } = await supabase
+        .from('roles')
+        .select('*')
+        .order('id');
+      
+      if (error) {
+        console.error('Error loading roles:', error);
+        roles = [];
+        return;
+      }
+      
+      roles = data || [];
+      console.log(`Loaded ${roles.length} roles`);
+    } catch (error) {
+      console.error('Error loading roles:', error);
+      roles = [];
     }
   }
 
@@ -845,6 +869,26 @@
             </div>
           </div>
           
+          <!-- Role Selection -->
+          <div>
+            <label for="role_id" style="display: block; margin-bottom: 8px; font-weight: 600; color: #f9fafb; font-size: 14px;">
+              Rolle:
+            </label>
+            <select
+              id="role_id"
+              name="role_id"
+              value={editingUser.role_id || 1}
+              style="width: 100%; padding: 12px; border: 2px solid #4b5563; border-radius: 8px; background: #374151; color: #f9fafb; font-size: 14px; font-weight: 500; box-sizing: border-box;"
+            >
+              {#each roles as role}
+                <option value={role.id}>{role.display_name} - {role.description}</option>
+              {/each}
+            </select>
+            <div style="margin-top: 8px; font-size: 14px; font-weight: 500; color: #d1d5db;">
+              Aktuelle Rolle: {roles.find(r => r.id === editingUser.role_id)?.display_name || 'Unbekannt'}
+            </div>
+          </div>
+          
           <div>
             <label for="privacy_mode" style="display: block; margin-bottom: 8px; font-weight: 600; color: #f9fafb; font-size: 14px;">
               Privacy Mode:
@@ -921,6 +965,7 @@
               full_name: formData.get('full_name'),
               accountname: formData.get('accountname'),
               email: formData.get('email'),
+              role_id: parseInt(formData.get('role_id')),
               privacy_mode: formData.get('privacy_mode'),
               save_originals: formData.get('save_originals') === 'true',
               use_justified_layout: formData.get('use_justified_layout') === 'true',
