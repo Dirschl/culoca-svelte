@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { supabase } from './supabaseClient.ts';
   
-  export let currentPage: 'system' | 'license' | 'impressum' | 'datenschutz' = 'system';
+  export let currentPage: 'system' | 'license' | 'impressum' | 'datenschutz' | 'admin' = 'system';
   
   let hasAdminPermission = false;
   let user: any = null;
