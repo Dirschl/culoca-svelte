@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { supabase } from './supabaseClient';
+  import { supabase } from './supabaseClient.ts';
   
   export let currentPage: 'system' | 'license' | 'impressum' | 'datenschutz' = 'system';
   
