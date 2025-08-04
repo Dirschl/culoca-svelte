@@ -498,6 +498,14 @@ export const hasViewAnalyticsPermission = derived(sessionStore, $sessionStore =>
 	$sessionStore.permissions?.view_analytics || false
 );
 
+export const hasViewMapsPermission = derived(sessionStore, $sessionStore => 
+	$sessionStore.permissions?.view_maps || false
+);
+
+export const hasGpsTrackingPermission = derived(sessionStore, $sessionStore => 
+	$sessionStore.permissions?.gps_tracking || false
+);
+
 export const hasSystemSettingsPermission = derived(sessionStore, $sessionStore => 
 	$sessionStore.permissions?.system_settings || false
 ); 

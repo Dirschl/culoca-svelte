@@ -117,14 +117,14 @@
     position: static;
     background: #4b5563;
     color: white;
-    padding: 1.5rem 1rem;
+    padding: 1.5rem 2rem;
     box-shadow: 0 4px 20px var(--shadow);
     animation: slideDown 0.5s ease-out;
     border-bottom: 2px solid var(--bg-primary);
   }
 
   .welcome-content {
-    max-width: 1200px;
+    max-width: 100%;
     margin: 0 auto;
     position: relative;
   }
@@ -176,7 +176,7 @@
   }
 
   .welcome-column {
-    text-align: center;
+    /* text-align: center; */
   }
 
   .welcome-column h3 {
