@@ -22,6 +22,7 @@ export interface UserPermissions {
   view_analytics?: boolean;
   system_settings?: boolean;
   public_content?: boolean;
+  gps_tracking?: boolean;
 }
 
 export interface UserRole {
@@ -37,14 +38,15 @@ export const ANONYMOUS_PERMISSIONS: UserPermissions = {
   view_items: true,
   view_maps: true,
   search: true,
-  joystick: false,
-  bulk_upload: false,
-  settings: false,
+  joystick: false,  // Deaktiviert für anonyme User
+  bulk_upload: true,  // Aktiviert für anonyme User
+  settings: false,  // Deaktiviert für anonyme User
   admin: false,
   delete_items: false,
   edit_items: false,
   create_items: false,
-  public_content: false
+  public_content: false,
+  gps_tracking: false  // Deaktiviert für anonyme User
 };
 
 // Permission checking functions

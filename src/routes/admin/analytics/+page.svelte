@@ -250,32 +250,7 @@
     }
   }
 
-  async function installAnalyticsFunction() {
-    try {
-      console.log('Installing analytics function...');
-      
-      const response = await fetch('/api/admin/install-analytics-function', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      const result = await response.json();
-      
-      if (response.ok) {
-        console.log('Function installed successfully');
-        alert('Analytics-Funktion erfolgreich installiert!');
-        await loadAnalytics(); // Reload data
-      } else {
-        console.error('Failed to install function:', result);
-        alert('Fehler beim Installieren der Funktion: ' + (result.error || 'Unbekannter Fehler'));
-      }
-    } catch (error) {
-      console.error('Error installing function:', error);
-      alert('Fehler beim Installieren der Funktion');
-    }
-  }
+
 
   function formatNumber(num: number): string {
     return num.toLocaleString('de-DE');
@@ -324,9 +299,7 @@
           <p style="margin: 0.5rem 0 0 0; color: var(--text-secondary);">Item-View Statistiken und Popularität</p>
         </div>
         <div>
-          <button on:click={installAnalyticsFunction} style="padding: 0.5rem 1rem; background: #f59e0b; border: none; border-radius: 6px; color: white; font-size: 0.875rem; margin-right: 1rem; cursor: pointer;">
-            {functionAvailable ? '✅ Funktion verfügbar' : '🔧 Funktion installieren'}
-          </button>
+          <!-- Button entfernt - Analytics funktioniert weiterhin -->
         </div>
       </div>
       <!-- Statistics Cards -->

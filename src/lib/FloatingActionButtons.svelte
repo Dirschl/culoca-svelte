@@ -6,7 +6,9 @@
     hasJoystickPermission, 
     hasBulkUploadPermission, 
     hasSettingsPermission, 
-    hasPublicContentPermission 
+    hasPublicContentPermission,
+    hasViewMapsPermission,
+    hasGpsTrackingPermission
   } from './sessionStore';
   
   export let showScrollToTop = false;
@@ -160,7 +162,7 @@
 
 <div class="fab-container">
   <!-- Track Start/Stop FAB -->
-  {#if showTrackButtons}
+  {#if $hasGpsTrackingPermission && showTrackButtons}
     <button
       class="fab-button track {isRecording ? 'recording' : ''}"
       aria-label={isRecording ? 'Track beenden' : 'Track starten'}
@@ -200,7 +202,7 @@
   {/if}
   
   <!-- Simulation/Test mode button - nur einer sichtbar: Joystick ODER Haus -->
-  {#if $hasJoystickPermission && isLoggedIn}
+  {#if $hasJoystickPermission}
     {#if simulationMode}
       <button 
         class="fab-button test-mode"
@@ -232,7 +234,7 @@
   {/if}
   
   <!-- Map button -->
-  {#if showMapButton}
+  {#if $hasViewMapsPermission}
     <button 
       class="fab-button map"
       on:click={handleMap}
@@ -296,28 +298,26 @@
     </button>
   {/if}
   
-  <!-- Profile button -->
-  {#if isLoggedIn}
-    <button 
-      class="fab-button profile"
-      on:click={handleProfile}
-      aria-label="Profil"
-      title="Profil"
-    >
-      {#if profileAvatar}
-        <img 
-          src={profileAvatar} 
-          alt="Profilbild" 
-          class="profile-avatar"
-        />
-      {:else}
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-          <circle cx="12" cy="7" r="4"/>
-        </svg>
-      {/if}
-    </button>
-  {/if}
+  <!-- Profile button - always visible for login/logout -->
+  <button 
+    class="fab-button profile"
+    on:click={handleProfile}
+    aria-label={isLoggedIn ? "Profil" : "Anmelden"}
+    title={isLoggedIn ? "Profil" : "Anmelden"}
+  >
+    {#if isLoggedIn && profileAvatar}
+      <img 
+        src={profileAvatar} 
+        alt="Profilbild" 
+        class="profile-avatar"
+      />
+    {:else}
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+        <circle cx="12" cy="7" r="4"/>
+      </svg>
+    {/if}
+  </button>
   
   <!-- Settings button -->
   {#if $hasSettingsPermission}

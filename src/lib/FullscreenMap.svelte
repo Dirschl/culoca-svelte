@@ -10,6 +10,7 @@
   import FloatingActionButtons from './FloatingActionButtons.svelte';
   import TrackModal from './TrackModal.svelte';
   import ShareMapModal from './ShareMapModal.svelte';
+  import { hasGpsTrackingPermission } from './sessionStore';
   import html2canvas from 'html2canvas';
   
   export let images: any[] = [];
@@ -1343,44 +1344,46 @@
   <!-- FAB-Leiste -->
   <div class="fab-container">
     <!-- GPS-Track-FABs (oben, exakt wie die anderen FABs) -->
-    <button
-      class="fab-button track {$trackStore.isRecording ? 'recording' : ''}"
-      aria-label={$trackStore.isRecording ? 'Track beenden' : 'Track starten'}
-      title={$trackStore.isRecording ? 'Track beenden' : 'Track starten'}
-      on:click={$trackStore.isRecording ? trackStore.stopTrack : () => {
-        const trackName = prompt('Name für die Tour eingeben:', `Tour ${new Date().toLocaleDateString()}`);
-        if (trackName) trackStore.startTrack(trackName);
-      }}
-    >
-      {#if $trackStore.isRecording}
-        <!-- Flaggen-Icon (Stop) -->
+    {#if $hasGpsTrackingPermission}
+      <button
+        class="fab-button track {$trackStore.isRecording ? 'recording' : ''}"
+        aria-label={$trackStore.isRecording ? 'Track beenden' : 'Track starten'}
+        title={$trackStore.isRecording ? 'Track beenden' : 'Track starten'}
+        on:click={$trackStore.isRecording ? trackStore.stopTrack : () => {
+          const trackName = prompt('Name für die Tour eingeben:', `Tour ${new Date().toLocaleDateString()}`);
+          if (trackName) trackStore.startTrack(trackName);
+        }}
+      >
+        {#if $trackStore.isRecording}
+          <!-- Flaggen-Icon (Stop) -->
+          <svg class="track-icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 22V2"/>
+            <path d="M4 4h16l-2 5 2 5H4"/>
+          </svg>
+        {:else}
+          <!-- Raketen-Icon (Start) -->
+          <svg class="track-icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4.5 16.5L3 21l4.5-1.5"/>
+            <path d="M21 3s-6.5 0-13 6.5A8.38 8.38 0 0 0 3 13l8 8a8.38 8.38 0 0 0 6.5-5.5C21 9.5 21 3 21 3z"/>
+            <path d="M15 9l-6 6"/>
+          </svg>
+        {/if}
+      </button>
+      <button
+        class="fab-button track-list"
+        aria-label="Track-Übersicht"
+        title="Track-Übersicht"
+        on:click={() => showTrackModal = true}
+      >
+        <!-- Clipboard/List-Icon -->
         <svg class="track-icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M4 22V2"/>
-          <path d="M4 4h16l-2 5 2 5H4"/>
+          <rect x="9" y="2" width="6" height="4" rx="1"/>
+          <path d="M4 7h16v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7z"/>
+          <line x1="9" y1="12" x2="15" y2="12"/>
+          <line x1="9" y1="16" x2="15" y2="16"/>
         </svg>
-      {:else}
-        <!-- Raketen-Icon (Start) -->
-        <svg class="track-icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M4.5 16.5L3 21l4.5-1.5"/>
-          <path d="M21 3s-6.5 0-13 6.5A8.38 8.38 0 0 0 3 13l8 8a8.38 8.38 0 0 0 6.5-5.5C21 9.5 21 3 21 3z"/>
-          <path d="M15 9l-6 6"/>
-        </svg>
-      {/if}
-    </button>
-    <button
-      class="fab-button track-list"
-      aria-label="Track-Übersicht"
-      title="Track-Übersicht"
-      on:click={() => showTrackModal = true}
-    >
-      <!-- Clipboard/List-Icon -->
-      <svg class="track-icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="9" y="2" width="6" height="4" rx="1"/>
-        <path d="M4 7h16v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7z"/>
-        <line x1="9" y1="12" x2="15" y2="12"/>
-        <line x1="9" y1="16" x2="15" y2="16"/>
-      </svg>
-    </button>
+      </button>
+    {/if}
     <!-- Bestehende Karten-FABs -->
     <!-- View Toggle FAB -->
     <button 
