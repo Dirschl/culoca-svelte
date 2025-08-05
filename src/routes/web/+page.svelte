@@ -60,6 +60,124 @@
   let bannerImage = null as any;
   let ogExamples = [] as any[];
 
+  // JSON-LD Test Feature
+  let testUrl = '';
+  let jsonLdData = '';
+  let isLoading = false;
+  let error = '';
+
+  // HTML Head Test Feature
+  let headData = null;
+  let isHeadLoading = false;
+  let headError = '';
+          let activeTab = 'images';
+
+  function clearInput() {
+    testUrl = '';
+    headData = null;
+    jsonLdData = '';
+    error = '';
+    isLoading = false;
+  }
+
+  function handleUrlSubmit(event: KeyboardEvent) {
+    if (event.key === 'Enter') {
+      fetchHeadData();
+    }
+  }
+
+  async function fetchHeadData() {
+    if (!testUrl.trim()) {
+      error = 'Bitte gib eine URL ein';
+      return;
+    }
+
+    // Remove URL validation - allow any URL for testing
+    // if (!testUrl.includes('culoca.com')) {
+    //   error = 'Fehler: Bitte gib eine gültige Culoca Item URL ein (z.B. https://culoca.com/item/...)';
+    //   return;
+    // }
+
+    isLoading = true;
+    error = '';
+    headError = '';
+    headData = null;
+    jsonLdData = '';
+
+    try {
+      // Use our server-side API to avoid CORS issues
+      const response = await fetch(`/api/test-head?url=${encodeURIComponent(testUrl)}`);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP ${response.status}`);
+      }
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        headData = result;
+        // Also fetch JSON-LD data
+        await fetchJsonLd();
+      } else {
+        throw new Error(result.error || 'Unbekannter Fehler');
+      }
+      
+    } catch (err: any) {
+      headError = err.message || 'Fehler beim Laden der HTML Head Daten';
+    } finally {
+      isHeadLoading = false;
+    }
+  }
+
+  async function fetchJsonLd() {
+    if (!testUrl.trim()) {
+      error = 'Bitte gib eine URL ein';
+      return;
+    }
+
+    // Validate URL format
+            // URL validation removed - allow any URL for testing
+        // if (!testUrl.includes('culoca.com/item/')) {
+        //   error = 'Bitte gib eine gültige Culoca Item URL ein (z.B. https://culoca.com/item/...)';
+        //   return;
+        // }
+
+    isLoading = true;
+    error = '';
+    jsonLdData = '';
+
+    try {
+      // Use our server-side API to avoid CORS issues
+      const response = await fetch(`/api/test-jsonld?url=${encodeURIComponent(testUrl)}`);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP ${response.status}`);
+      }
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        jsonLdData = result.formatted;
+      } else {
+        throw new Error(result.error || 'Unbekannter Fehler');
+      }
+      
+    } catch (err: any) {
+      error = err.message || 'Fehler beim Laden der JSON-LD Daten';
+    } finally {
+      isLoading = false;
+    }
+  }
+
+  // Auto-execute first example on page load
+  onMount(async () => {
+    // Set the example URL and execute it automatically
+    testUrl = 'https://culoca.com/item/nachts-in-mitterskirchen-herbstbild-rottal-inn-johann-dirschl';
+    await fetchHeadData();
+  });
+
   onMount(async () => {
     if (browser) {
       try {
@@ -574,74 +692,437 @@
       Google stellt zum testen der Schemas ein eigenes Werkzeug zur Verfügung. Hier könnt ihr eure Daten auf perfektion trimmen: <a href="https://search.google.com/test/rich-results" target="_blank" rel="noopener">https://search.google.com/test/rich-results</a>
     </p>
     
-          <div class="jsonld-example">
-        <h3>Live JSON-LD von: <a href="https://culoca.com/item/nachts-in-mitterskirchen-herbstbild-rottal-inn-johann-dirschl" target="_blank" rel="noopener">Nachts in Mitterskirchen</a></h3>
-        <pre><code>{`{
-  "@context": "https://schema.org",
-  "@type": "ImageObject",
-  "name": "Nachts in Mitterskirchen, Herbstbild, Rottal-Inn",
-  "description": "Herbstliche Nachtaufnahme von Mitterskirchen in Niederbayern, Deutschland. Ruhige Abendstimmung mit beleuchteten Häusern und Kirche. Idyllische Landschaft.",
-  "contentUrl": "https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/ed0e9820-4206-4da0-beb5-925e6440a835.jpg",
-  "thumbnailUrl": "https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/ed0e9820-4206-4da0-beb5-925e6440a835.jpg",
-  "width": 9504,
-  "height": 6336,
-  "encodingFormat": "image/jpeg",
-  "uploadDate": "2025-07-15T00:00:00Z",
-  "dateCreated": "2023-11-06T00:00:00Z",
-  "creator": {
-    "@type": "Person",
-    "name": "Johann Dirschl",
-    "url": "https://www.dirschl.com",
-    "email": "johann.dirschl@gmx.de",
-    "telephone": "+49-179-9766666",
-    "address": {
-      "@type": "PostalAddress",
-      "streetAddress": "Waldberg 84",
-      "addressLocality": "Reischach",
-      "postalCode": "84571",
-      "addressCountry": "DE"
-    }
-  },
-  "copyrightHolder": {
-    "@type": "Organization",
-    "name": "DIRSCHL.com GmbH",
-    "url": "https://www.dirschl.com"
-  },
-  "copyrightNotice": "© 2025 DIRSCHL.com GmbH - Alle Rechte vorbehalten",
-  "contentLocation": {
-    "@type": "Place",
-    "name": "Mitterskirchen, Rottal-Inn, Niederbayern",
-    "geo": {
-      "@type": "GeoCoordinates",
-      "latitude": 48.34104,
-      "longitude": 12.72582
-    },
-    "address": {
-      "@type": "PostalAddress",
-      "addressLocality": "Mitterskirchen",
-      "addressRegion": "Niederbayern",
-      "addressCountry": "DE"
-    }
-  },
-  "keywords": "AbendAtmosphäre,Baum,Bayern,Deutschland,Dorf,Fotografie,Friedlich,Gemeinde,Gemütlich,Herbst,Häuser,Kirche,Landschaft,Mitterskirchen,Nacht,Nachtaufnahme,Natur,Niederbayern,Ortsansicht,Panorama,Region,Reise,Sternenhimmel,Tourismus,beleuchtet,dunkel,idyllisch,ländlich,ruhig",
-  "camera": {
-    "@type": "Product",
-    "name": "SONY ILCE-7RM5",
-    "brand": "Sony"
-  },
-  "lens": {
-    "@type": "Product", 
-    "name": "Sony FE 135mm F1.8 GM",
-    "brand": "Sony"
-  },
-  "exifData": {
-    "focalLength": "135 mm",
-    "iso": 100,
-    "aperture": "ƒ/1.8",
-    "exposureTime": "30 s"
-  }
-}`}</code></pre>
+    <div class="jsonld-test-section">
+      <h3>SEO & Meta-Daten Analyse</h3>
+      <p>
+        Teste die SEO & Meta-Daten von beliebigen Webseiten. Gib eine URL ein und analysiere JSON-LD, Meta-Tags, Favicons und mehr.
+      </p>
+      
+      <div class="url-input-section">
+        <input 
+          type="text" 
+          bind:value={testUrl}
+          placeholder="https://example.com oder https://culoca.com/item/..."
+          on:click={clearInput}
+          on:keydown={handleUrlSubmit}
+          class="url-input"
+        />
+        <button on:click={fetchHeadData} class="analyze-btn" disabled={isLoading}>
+          {isLoading ? 'Analysiere...' : 'Analysieren'}
+        </button>
       </div>
+      
+      {#if isHeadLoading}
+        <div class="loading">Lade HTML Head Daten...</div>
+      {/if}
+      
+      {#if headData}
+        <div class="analysis-example">
+          <h4>HTML Head von: <a href={testUrl} target="_blank" rel="noopener">{testUrl}</a></h4>
+          <div class="head-tabs">
+                    <button class="tab-button" class:active={activeTab === 'images'} on:click={() => activeTab = 'images'}>Bilder & Icons</button>
+        <button class="tab-button" class:active={activeTab === 'jsonld'} on:click={() => activeTab = 'jsonld'}>JSON-LD</button>
+        <button class="tab-button" class:active={activeTab === 'formatted'} on:click={() => activeTab = 'formatted'}>Formatiert</button>
+        <button class="tab-button" class:active={activeTab === 'meta'} on:click={() => activeTab = 'meta'}>Meta-Tags</button>
+        <button class="tab-button" class:active={activeTab === 'raw'} on:click={() => activeTab = 'raw'}>Raw HTML</button>
+          </div>
+          
+          {#if activeTab === 'images'}
+            <div class="images-analysis">
+              <h5>Bilder & Icons Analyse:</h5>
+              
+              <!-- Main Image Section -->
+              {#if headData.mainImage}
+                <div class="image-section">
+                  <h6>📸 Hauptbild:</h6>
+                  <div class="image-info">
+                    <p><strong>Typ:</strong> {headData.mainImage.type}</p>
+                    <p><strong>Quelle:</strong> {headData.mainImage.source}</p>
+                    <p><strong>URL:</strong> <a href={headData.mainImage.url} target="_blank" rel="noopener">{headData.mainImage.url}</a></p>
+                    <div class="image-preview">
+                      <img src={headData.mainImage.url} alt="Hauptbild Vorschau" on:error={(e) => e.target.style.display = 'none'} />
+                    </div>
+                  </div>
+                </div>
+              {:else}
+                <div class="image-section">
+                  <h6>📸 Hauptbild:</h6>
+                  <p class="no-data">Kein Hauptbild gefunden</p>
+                </div>
+              {/if}
+              
+              <!-- Favicon Section -->
+              <div class="favicon-section">
+                <h6>🎨 Favicons ({headData.faviconInfo.count} gefunden):</h6>
+                {#if headData.faviconInfo.favicons.length > 0}
+                  <div class="favicon-list">
+                    {#each headData.faviconInfo.favicons as favicon}
+                      <div class="favicon-item">
+                        <div class="favicon-info">
+                          <p><strong>URL:</strong> <a href={favicon.url} target="_blank" rel="noopener">{favicon.url}</a></p>
+                          {#if favicon.sizes}<p><strong>Größen:</strong> {favicon.sizes}</p>{/if}
+                          {#if favicon.type}<p><strong>Typ:</strong> {favicon.type}</p>{/if}
+                          {#if favicon.rel}<p><strong>Rel:</strong> {favicon.rel}</p>{/if}
+                        </div>
+                        <div class="favicon-preview">
+                          <img 
+                            src={favicon.url} 
+                            alt="Favicon Vorschau" 
+                            on:error={(e) => {
+                              e.target.style.display = 'none';
+                              e.target.nextElementSibling.style.display = 'block';
+                            }} 
+                          />
+                          <svg 
+                            class="culoca-fallback" 
+                            style="display: none; width: 64px; height: 64px;" 
+                            viewBox="0 0 24 24" 
+                            fill="currentColor"
+                          >
+                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                          </svg>
+                        </div>
+                      </div>
+                    {/each}
+                  </div>
+                  
+                  <!-- Actual Size Favicon Display -->
+                  <div class="favicon-sizes-display">
+                    <h6>📏 Favicon-Größen in echter Größe:</h6>
+                    <div class="favicon-sizes-grid">
+                      {#each headData.faviconInfo.favicons as favicon}
+                        {#if favicon.sizes}
+                          {#each favicon.sizes.split(' ').filter(size => size.includes('x')) as size}
+                            {@const [width, height] = size.split('x').map(Number)}
+                            {#if width && height && width <= 512 && height <= 512}
+                              <div class="favicon-size-item">
+                                <div class="favicon-size-label">{size}</div>
+                                <div class="favicon-size-display" style="width: {width}px; height: {height}px;">
+                                  <img 
+                                    src={favicon.url} 
+                                    alt="Favicon {size}" 
+                                    style="width: 100%; height: 100%; object-fit: contain;"
+                                    on:error={(e) => {
+                                      e.target.style.display = 'none';
+                                      e.target.nextElementSibling.style.display = 'block';
+                                    }} 
+                                  />
+                                  <svg 
+                                    class="culoca-fallback-size" 
+                                    style="display: none; width: 100%; height: 100%;" 
+                                    viewBox="0 0 24 24" 
+                                    fill="currentColor"
+                                  >
+                                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                                  </svg>
+                                </div>
+                              </div>
+                            {/if}
+                          {/each}
+                        {/if}
+                      {/each}
+                    </div>
+                  </div>
+                  
+                  <div class="favicon-stats">
+                    <p><strong>Mehrere Größen:</strong> {headData.faviconInfo.hasMultipleSizes ? '✅ Ja' : '❌ Nein'}</p>
+                    <p><strong>Apple Touch Icon:</strong> {headData.faviconInfo.hasAppleTouchIcon ? '✅ Ja' : '❌ Nein'}</p>
+                  </div>
+                {:else}
+                  <p class="no-data">Keine Favicons gefunden</p>
+                  <!-- Show Culoca Fallback when no favicons are found -->
+                  <div class="favicon-fallback-display">
+                    <h6>🛡️ Culoca Fallback-Icon (wenn keine Favicons gefunden):</h6>
+                    <div class="favicon-sizes-grid">
+                      <div class="favicon-size-item">
+                        <div class="favicon-size-label">32x32</div>
+                        <div class="favicon-size-display" style="width: 32px; height: 32px;">
+                          <svg 
+                            class="culoca-fallback-size" 
+                            style="width: 100%; height: 100%;" 
+                            viewBox="0 0 24 24" 
+                            fill="currentColor"
+                          >
+                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                          </svg>
+                        </div>
+                      </div>
+                      <div class="favicon-size-item">
+                        <div class="favicon-size-label">48x48</div>
+                        <div class="favicon-size-display" style="width: 48px; height: 48px;">
+                          <svg 
+                            class="culoca-fallback-size" 
+                            style="width: 100%; height: 100%;" 
+                            viewBox="0 0 24 24" 
+                            fill="currentColor"
+                          >
+                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                          </svg>
+                        </div>
+                      </div>
+                      <div class="favicon-size-item">
+                        <div class="favicon-size-label">96x96</div>
+                        <div class="favicon-size-display" style="width: 96px; height: 96px;">
+                          <svg 
+                            class="culoca-fallback-size" 
+                            style="width: 100%; height: 100%;" 
+                            viewBox="0 0 24 24" 
+                            fill="currentColor"
+                          >
+                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                {/if}
+              </div>
+              
+              <!-- Culoca Logo Fallback Section -->
+              <div class="culoca-fallback-section">
+                <h6>🛡️ Culoca Logo Fallback (Wenn kein Icon möglich):</h6>
+                {#if headData.culocaLogoFallback}
+                  <div class="culoca-fallback-info">
+                    <p><strong>Culoca Logo Referenz:</strong> {headData.culocaLogoFallback.hasCulocaLogoReference ? '✅ Ja' : '❌ Nein'}</p>
+                    <p><strong>Fallback Referenz:</strong> {headData.culocaLogoFallback.hasFallbackReference ? '✅ Ja' : '❌ Nein'}</p>
+                    {#if headData.culocaLogoFallback.culocaLogoReferences.length > 0}
+                      <p><strong>Culoca Logo Referenzen:</strong></p>
+                      <ul>
+                        {#each headData.culocaLogoFallback.culocaLogoReferences as ref}
+                          <li>{ref}</li>
+                        {/each}
+                      </ul>
+                    {/if}
+                    {#if headData.culocaLogoFallback.fallbackReferences.length > 0}
+                      <p><strong>Fallback Referenzen:</strong></p>
+                      <ul>
+                        {#each headData.culocaLogoFallback.fallbackReferences as ref}
+                          <li>{ref}</li>
+                        {/each}
+                      </ul>
+                    {/if}
+                  </div>
+                {:else}
+                  <p class="no-data">Keine Culoca Logo Fallback-Information verfügbar</p>
+                {/if}
+              </div>
+            </div>
+          {:else if activeTab === 'jsonld'}
+            {#if jsonLdData}
+              <pre><code>{jsonLdData}</code></pre>
+            {:else}
+              <div class="loading">Lade JSON-LD Daten...</div>
+            {/if}
+          {:else if activeTab === 'formatted'}
+            <pre><code>{headData.headContent}</code></pre>
+          {:else if activeTab === 'meta'}
+            <div class="meta-analysis">
+              <h5>Meta-Tags Analyse:</h5>
+              <div class="meta-stats">
+                <span>Meta-Tags: {headData.metaTags.length}</span>
+                <span>Title-Tags: {headData.titleTags.length}</span>
+                <span>Link-Tags: {headData.linkTags.length}</span>
+                <span>Script-Tags: {headData.scriptTags.length}</span>
+              </div>
+              <div class="meta-list">
+                {#each headData.metaTags as tag}
+                  <div class="meta-item">{tag}</div>
+                {/each}
+              </div>
+            </div>
+            <div class="images-analysis">
+              <h5>Bilder & Icons Analyse:</h5>
+              
+              <!-- Main Image Section -->
+              {#if headData.mainImage}
+                <div class="image-section">
+                  <h6>📸 Hauptbild:</h6>
+                  <div class="image-info">
+                    <p><strong>Typ:</strong> {headData.mainImage.type}</p>
+                    <p><strong>Quelle:</strong> {headData.mainImage.source}</p>
+                    <p><strong>URL:</strong> <a href={headData.mainImage.url} target="_blank" rel="noopener">{headData.mainImage.url}</a></p>
+                    <div class="image-preview">
+                      <img src={headData.mainImage.url} alt="Hauptbild Vorschau" on:error={(e) => e.target.style.display = 'none'} />
+                    </div>
+                  </div>
+                </div>
+              {:else}
+                <div class="image-section">
+                  <h6>📸 Hauptbild:</h6>
+                  <p class="no-data">Kein Hauptbild gefunden</p>
+                </div>
+              {/if}
+              
+              <!-- Favicon Section -->
+              <div class="favicon-section">
+                <h6>🎨 Favicons ({headData.faviconInfo.count} gefunden):</h6>
+                {#if headData.faviconInfo.favicons.length > 0}
+                  <div class="favicon-list">
+                    {#each headData.faviconInfo.favicons as favicon}
+                      <div class="favicon-item">
+                        <div class="favicon-info">
+                          <p><strong>URL:</strong> <a href={favicon.url} target="_blank" rel="noopener">{favicon.url}</a></p>
+                          {#if favicon.sizes}<p><strong>Größen:</strong> {favicon.sizes}</p>{/if}
+                          {#if favicon.type}<p><strong>Typ:</strong> {favicon.type}</p>{/if}
+                          {#if favicon.rel}<p><strong>Rel:</strong> {favicon.rel}</p>{/if}
+                        </div>
+                        <div class="favicon-preview">
+                          <img 
+                            src={favicon.url} 
+                            alt="Favicon Vorschau" 
+                            on:error={(e) => {
+                              e.target.style.display = 'none';
+                              e.target.nextElementSibling.style.display = 'block';
+                            }} 
+                          />
+                          <svg 
+                            class="culoca-fallback" 
+                            style="display: none; width: 64px; height: 64px;" 
+                            viewBox="0 0 24 24" 
+                            fill="currentColor"
+                          >
+                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                          </svg>
+                        </div>
+                      </div>
+                    {/each}
+                  </div>
+                  
+                  <!-- Actual Size Favicon Display -->
+                  <div class="favicon-sizes-display">
+                    <h6>📏 Favicon-Größen in echter Größe:</h6>
+                    <div class="favicon-sizes-grid">
+                      {#each headData.faviconInfo.favicons as favicon}
+                        {#if favicon.sizes}
+                          {#each favicon.sizes.split(' ').filter(size => size.includes('x')) as size}
+                            {@const [width, height] = size.split('x').map(Number)}
+                            {#if width && height && width <= 512 && height <= 512}
+                              <div class="favicon-size-item">
+                                <div class="favicon-size-label">{size}</div>
+                                <div class="favicon-size-display" style="width: {width}px; height: {height}px;">
+                                  <img 
+                                    src={favicon.url} 
+                                    alt="Favicon {size}" 
+                                    style="width: 100%; height: 100%; object-fit: contain;"
+                                    on:error={(e) => {
+                                      e.target.style.display = 'none';
+                                      e.target.nextElementSibling.style.display = 'block';
+                                    }} 
+                                  />
+                                  <svg 
+                                    class="culoca-fallback-size" 
+                                    style="display: none; width: 100%; height: 100%;" 
+                                    viewBox="0 0 24 24" 
+                                    fill="currentColor"
+                                  >
+                                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                                  </svg>
+                                </div>
+                              </div>
+                            {/if}
+                          {/each}
+                        {/if}
+                      {/each}
+                    </div>
+                  </div>
+                  
+                  <div class="favicon-stats">
+                    <p><strong>Mehrere Größen:</strong> {headData.faviconInfo.hasMultipleSizes ? '✅ Ja' : '❌ Nein'}</p>
+                    <p><strong>Apple Touch Icon:</strong> {headData.faviconInfo.hasAppleTouchIcon ? '✅ Ja' : '❌ Nein'}</p>
+                  </div>
+                {:else}
+                  <p class="no-data">Keine Favicons gefunden</p>
+                  <!-- Show Culoca Fallback when no favicons are found -->
+                  <div class="favicon-fallback-display">
+                    <h6>🛡️ Culoca Fallback-Icon (wenn keine Favicons gefunden):</h6>
+                    <div class="favicon-sizes-grid">
+                      <div class="favicon-size-item">
+                        <div class="favicon-size-label">32x32</div>
+                        <div class="favicon-size-display" style="width: 32px; height: 32px;">
+                          <svg 
+                            class="culoca-fallback-size" 
+                            style="width: 100%; height: 100%;" 
+                            viewBox="0 0 24 24" 
+                            fill="currentColor"
+                          >
+                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                          </svg>
+                        </div>
+                      </div>
+                      <div class="favicon-size-item">
+                        <div class="favicon-size-label">48x48</div>
+                        <div class="favicon-size-display" style="width: 48px; height: 48px;">
+                          <svg 
+                            class="culoca-fallback-size" 
+                            style="width: 100%; height: 100%;" 
+                            viewBox="0 0 24 24" 
+                            fill="currentColor"
+                          >
+                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                          </svg>
+                        </div>
+                      </div>
+                      <div class="favicon-size-item">
+                        <div class="favicon-size-label">96x96</div>
+                        <div class="favicon-size-display" style="width: 96px; height: 96px;">
+                          <svg 
+                            class="culoca-fallback-size" 
+                            style="width: 100%; height: 100%;" 
+                            viewBox="0 0 24 24" 
+                            fill="currentColor"
+                          >
+                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                {/if}
+              </div>
+              
+              <!-- Culoca Logo Fallback Section -->
+              <div class="culoca-fallback-section">
+                <h6>🛡️ Culoca Logo Fallback (Wenn kein Icon möglich):</h6>
+                {#if headData.culocaLogoFallback}
+                  <div class="culoca-fallback-info">
+                    <p><strong>Culoca Logo Referenz:</strong> {headData.culocaLogoFallback.hasCulocaLogoReference ? '✅ Ja' : '❌ Nein'}</p>
+                    <p><strong>Fallback Referenz:</strong> {headData.culocaLogoFallback.hasFallbackReference ? '✅ Ja' : '❌ Nein'}</p>
+                    {#if headData.culocaLogoFallback.culocaLogoReferences.length > 0}
+                      <p><strong>Culoca Logo Referenzen:</strong></p>
+                      <ul>
+                        {#each headData.culocaLogoFallback.culocaLogoReferences as ref}
+                          <li>{ref}</li>
+                        {/each}
+                      </ul>
+                    {/if}
+                    {#if headData.culocaLogoFallback.fallbackReferences.length > 0}
+                      <p><strong>Fallback Referenzen:</strong></p>
+                      <ul>
+                        {#each headData.culocaLogoFallback.fallbackReferences as ref}
+                          <li>{ref}</li>
+                        {/each}
+                      </ul>
+                    {/if}
+                  </div>
+                {:else}
+                  <p class="no-data">Keine Culoca Logo Fallback-Information verfügbar</p>
+                {/if}
+              </div>
+            </div>
+          {:else if activeTab === 'raw'}
+            <pre><code>{headData.rawHead}</code></pre>
+          {/if}
+        </div>
+      {/if}
+      
+      {#if error}
+        <div class="error">Fehler: {error}</div>
+      {/if}
+      
+      {#if headError}
+        <div class="error">Fehler: {headError}</div>
+      {/if}
+    </div>
   </section>
 
   <!-- Live-Statistiken -->
@@ -916,31 +1397,113 @@
     margin: 3rem 0;
   }
 
-  .jsonld-example {
+  .jsonld-test-section {
     margin-top: 2rem;
+  }
+
+  .url-input-container {
+    display: flex;
+    gap: 1rem;
+    margin: 1rem 0;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .url-input-section {
+    display: flex;
+    gap: 1rem;
+    margin: 1rem 0;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .url-input {
+    flex: 1;
+    min-width: 300px;
+    padding: 0.75rem 1rem;
+    border: 2px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    transition: border-color 0.2s ease;
+  }
+
+  .url-input:focus {
+    outline: none;
+    border-color: var(--accent-color);
+  }
+
+  .url-input::placeholder {
+    color: var(--text-tertiary);
+  }
+
+  .analyze-btn {
+    padding: 0.75rem 1.5rem;
+    background: var(--accent-color);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    white-space: nowrap;
+  }
+
+  .analyze-btn:hover {
+    background: var(--accent-hover);
+  }
+
+  .analyze-btn:disabled {
+    background: var(--text-tertiary);
+    cursor: not-allowed;
+  }
+
+  .loading {
+    margin: 1rem 0;
+    padding: 1rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-secondary);
+    text-align: center;
+  }
+
+  .error {
+    margin: 1rem 0;
+    padding: 1rem;
+    background: #fee;
+    border: 1px solid #fcc;
+    border-radius: 6px;
+    color: #c33;
+  }
+
+  .analysis-example {
     background: var(--bg-tertiary);
     border: 1px solid var(--border-color);
     border-radius: 8px;
     padding: 1.5rem;
     overflow-x: auto;
+    margin-top: 1rem;
   }
 
-  .jsonld-example h3 {
+  .analysis-example h4 {
     margin: 0 0 1rem 0;
     color: var(--text-primary);
-    font-size: 1.1rem;
+    font-size: 1rem;
   }
 
-  .jsonld-example h3 a {
+  .analysis-example h4 a {
     color: var(--accent-color);
     text-decoration: none;
   }
 
-  .jsonld-example h3 a:hover {
+  .analysis-example h4 a:hover {
     text-decoration: underline;
   }
 
-  .jsonld-example pre {
+  .analysis-example pre {
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
     border-radius: 6px;
@@ -952,9 +1515,316 @@
     margin: 0;
   }
 
-  .jsonld-example code {
+  .analysis-example code {
     font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
     color: var(--text-primary);
+  }
+
+  .head-tabs {
+    display: flex;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .tab-button {
+    padding: 0.5rem 1rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-bottom: none;
+    border-radius: 8px 8px 0 0;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  .tab-button:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+  }
+
+  .tab-button.active {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border-bottom: 1px solid var(--bg-tertiary);
+  }
+
+  .meta-analysis {
+    margin-top: 1rem;
+  }
+
+  .meta-stats {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+  }
+
+  .meta-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+  }
+
+  .meta-item {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 0.25rem 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
+
+  .meta-item svg {
+    width: 12px;
+    height: 12px;
+    color: var(--accent-color);
+  }
+
+  .images-analysis {
+    margin-top: 1rem;
+  }
+
+  .image-section {
+    margin-bottom: 1.5rem;
+  }
+
+  .image-section h6 {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+  }
+
+  .image-info p {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin: 0.25rem 0;
+  }
+
+  .image-preview img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 4px;
+    margin-top: 0.5rem;
+  }
+
+  .no-data {
+    font-style: italic;
+    color: var(--text-tertiary);
+    margin-top: 0.5rem;
+  }
+
+  .favicon-section {
+    margin-top: 1.5rem;
+  }
+
+  .favicon-section h6 {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+  }
+
+  .favicon-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .favicon-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 0.25rem 0.75rem;
+  }
+
+  .favicon-info {
+    flex: 1;
+  }
+
+  .favicon-info p {
+    margin: 0.25rem 0;
+  }
+
+  .favicon-info a {
+    color: var(--accent-color);
+    text-decoration: none;
+  }
+
+  .favicon-info a:hover {
+    text-decoration: underline;
+  }
+
+  .favicon-preview img {
+    max-width: 64px;
+    max-height: 64px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+  }
+
+  .culoca-fallback {
+    color: var(--culoca-orange);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--bg-secondary);
+    padding: 8px;
+  }
+
+  .culoca-fallback-size {
+    color: var(--culoca-orange);
+    background: var(--bg-secondary);
+  }
+
+  .favicon-fallback-display {
+    margin-top: 1.5rem;
+    padding: 1rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+  }
+
+  .favicon-fallback-display h6 {
+    margin: 0 0 1rem 0;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+  }
+
+  .culoca-fallback-section {
+    margin-top: 1.5rem;
+    padding: 1rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+  }
+
+  .culoca-fallback-section h6 {
+    margin: 0 0 1rem 0;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+  }
+
+  .culoca-fallback-info p {
+    margin: 0.5rem 0;
+    color: var(--text-primary);
+  }
+
+  .culoca-fallback-info ul {
+    margin: 0.5rem 0;
+    padding-left: 1.5rem;
+    color: var(--text-secondary);
+  }
+
+  .culoca-fallback-info li {
+    margin: 0.25rem 0;
+    font-size: 0.9rem;
+  }
+
+  .favicon-sizes-display {
+    margin-top: 1.5rem;
+    padding: 1rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+  }
+
+  .favicon-sizes-display h6 {
+    margin: 0 0 1rem 0;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+  }
+
+  .favicon-sizes-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: flex-end;
+  }
+
+  .favicon-size-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .favicon-size-label {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+    text-align: center;
+  }
+
+  .favicon-size-display {
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+
+  .favicon-size-display img {
+    display: block;
+  }
+
+  .favicon-stats {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-top: 0.5rem;
+  }
+
+  .culoca-logo-section {
+    margin-top: 1.5rem;
+  }
+
+  .culoca-logo-section h6 {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+  }
+
+  .culoca-logo-info {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+  }
+
+  .culoca-logo-info p {
+    margin: 0.25rem 0;
+  }
+
+  .culoca-references {
+    margin-top: 0.5rem;
+  }
+
+  .culoca-references ul {
+    margin-left: 1rem;
+    padding-left: 1rem;
+  }
+
+  .culoca-references li {
+    list-style: disc;
+    margin-bottom: 0.25rem;
+  }
+
+  .fallback-references {
+    margin-top: 0.5rem;
+  }
+
+  .fallback-references ul {
+    margin-left: 1rem;
+    padding-left: 1rem;
+  }
+
+  .fallback-references li {
+    list-style: disc;
+    margin-bottom: 0.25rem;
   }
 
   .stats-grid {
