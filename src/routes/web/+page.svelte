@@ -650,7 +650,7 @@
     
     <div class="og-examples">
       {#each ogExamples as item}
-      <a href="/item/{item.slug}" class="og-example-link">
+      <a href={item.id === 'map-share' ? `/map-view-share/${item.slug}` : `/item/${item.slug}`} class="og-example-link">
         <div class="og-example">
           <div class="og-preview">
             {#if item.id === 'map-share'}
@@ -672,7 +672,7 @@
             <div class="og-text">
               <h5>{item.title || 'Ohne Titel'}{item.id !== 'map-share' ? ', ' + item.creator : ''}</h5>
               <p>{item.description || 'Keine Beschreibung verfügbar.'}</p>
-              <span class="og-link">https://culoca.com/{item.id === 'map-share' ? item.slug : 'item/' + item.slug}</span>
+              <span class="og-link">https://culoca.com/{item.id === 'map-share' ? 'map-view-share/' + item.slug : 'item/' + item.slug}</span>
             </div>
           </div>
         </div>
