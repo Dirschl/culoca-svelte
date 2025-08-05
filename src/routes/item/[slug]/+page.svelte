@@ -263,6 +263,42 @@
     console.log(`[Item Detail] Current radius value: ${radius}m`);
   }
   
+  // Ensure radius never exceeds 2000m
+  $: if (radius > 2000) {
+    radius = 2000;
+    console.log('[Item Detail] Radius limited to 2000m');
+  }
+  
+  // Handle radius input with limit
+  function handleRadiusInput() {
+    if (radius > 2000) {
+      radius = 2000;
+    }
+    // Update URL parameter
+    if (browser) {
+      const url = new URL(window.location.href);
+      url.searchParams.set('r', radius.toString());
+      window.history.replaceState({}, '', url.toString());
+    }
+  }
+  
+  // Handle radius change with limit
+  function handleRadiusChange() {
+    if (radius > 2000) {
+      radius = 2000;
+    }
+    // Save to localStorage
+    if (browser) {
+      localStorage.setItem('radius', radius.toString());
+    }
+    // Update URL parameter
+    if (browser) {
+      const url = new URL(window.location.href);
+      url.searchParams.set('r', radius.toString());
+      window.history.replaceState({}, '', url.toString());
+    }
+  }
+  
   // Copy current link to clipboard
   async function copyCurrentLink() {
     if (!browser) return;
@@ -299,9 +335,17 @@
   }
   function onRadiusInput(e) {
     radius = +e.target.value;
+    // Ensure radius never exceeds 2000m
+    if (radius > 2000) {
+      radius = 2000;
+    }
   }
   function onRadiusChange(e) {
     radius = +e.target.value;
+    // Ensure radius never exceeds 2000m
+    if (radius > 2000) {
+      radius = 2000;
+    }
     if (typeof window !== 'undefined') {
       localStorage.setItem('radius', String(radius));
       // Update URL with radius parameter
@@ -313,6 +357,10 @@
   $: visibleNearby = showHiddenItems
     ? nearby.filter(item => item.distance <= radius && item.id !== image?.id && item.gallery === false)
     : nearby.filter(item => item.distance <= radius && item.id !== image?.id && item.gallery !== false);
+  
+  // SEO-optimiert: Indikatoren für Limits
+  $: isAtItemLimit = filteredNearby.length >= 300;
+  $: showLimitIndicator = isAtItemLimit;
 
   let editingTitle = false;
   let titleEditValue = '';
@@ -1069,10 +1117,13 @@
     />
     {#if image.lat && image.lon}
       <div class="radius-control">
-        <div class="radius-value">
+        <div class="radius-value" class:limit-reached={isAtItemLimit}>
           {formatRadius(radius)}
           {#if filteredNearby.length > 0}
             <span class="nearby-count">• {filteredNearby.length} Items</span>
+            {#if isAtItemLimit}
+              <span class="limit-indicator">(max. 300)</span>
+            {/if}
           {/if}
           {#if typeof hiddenItems !== 'undefined' && hiddenItems.length > 0}
             <span class="hidden-count" class:active={showHiddenItems} on:click={toggleHiddenItems} on:keydown={(e) => handleKey(e, toggleHiddenItems)}>
@@ -1080,7 +1131,7 @@
             </span>
           {/if}
         </div>
-        <input id="radius" type="range" min="50" max="3000" step="50" value={radius} on:input={onRadiusInput} on:change={onRadiusChange}>
+        <input id="radius" type="range" min="50" max="2000" step="50" value={radius} on:input={onRadiusInput} on:change={onRadiusChange} class:limit-reached={isAtItemLimit}>
       </div>
     {/if}
     <NearbyGallery
@@ -1093,6 +1144,25 @@
       getGalleryStatus={getNearbyGalleryStatus}
       layout={galleryLayout}
     />
+    
+    <!-- SEO-optimiert: Serverseitig gerenderte Links für Google -->
+    {#if nearby && nearby.length > 0}
+      <div class="seo-nearby-links" style="display: none;">
+        <h3>Bilder in der Nähe</h3>
+        <ul>
+          {#each nearby.slice(0, 300) as item}
+            <li>
+              <a href="/item/{item.slug}" 
+                 title="{item.caption || item.description}"
+                 alt="{item.title} ({Math.round(item.distance)}m)">
+                {item.title} ({Math.round(item.distance)}m)
+              </a>
+            </li>
+          {/each}
+        </ul>
+      </div>
+    {/if}
+    
     <div class="meta-section single-exif">
       <!-- Column 1: Keywords -->
       <div class="keywords-column">
@@ -1351,12 +1421,6 @@
         }
       }}
     />
-    <!-- SEO-Liste für Bots, alle Nearby-Items als Links -->
-    <ul class="seo-nearby-links" aria-hidden="true" style="display:none;">
-      {#each nearby as item (item.slug)}
-        <li><a href={`/item/${item.slug}`}>{item.title}</a></li>
-      {/each}
-    </ul>
   {:else}
     <div class="error">❌ Bild nicht gefunden</div>
   {/if}
@@ -1641,6 +1705,16 @@
     margin-bottom: 0.1rem;
     text-align: center;
     background: transparent;
+  }
+  .radius-value.limit-reached {
+    color: var(--culoca-orange);
+  }
+  .limit-indicator {
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: var(--culoca-orange);
+    margin-left: 0.3rem;
+    opacity: 0.8;
   }
   .nearby-count {
     font-size: 0.85rem;
@@ -2222,5 +2296,8 @@
       width: 36px;
       height: 36px;
     }
+  }
+  .radius-control input[type="range"].limit-reached {
+    accent-color: var(--culoca-orange);
   }
 </style> 

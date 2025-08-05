@@ -134,7 +134,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
           user_lat: img.lat,
           user_lon: img.lon,
           page_value: 0,
-          page_size_value: 1000, // Alle Nearby-Items laden für Kartenansicht
+          page_size_value: 300, // SEO-optimiert: 300 Items statt 1000
           current_user_id: null, // Alle öffentlichen Items
           search_term: null, // Keine Suche für Nearby
           location_filter_lat: null, // Kein LocationFilter für Nearby
@@ -144,19 +144,19 @@ export const load: PageServerLoad = async ({ params, url }) => {
         if (nearbyError) {
           console.error('[DetailPage] PostGIS nearby error:', nearbyError);
           // Fallback auf alte Methode
-          const maxRadius = 5000;
+          const maxRadius = 2000; // SEO-optimiert: 2000m statt 5000m
           const degOffset = maxRadius / 111000;
           const latMin = img.lat - degOffset;
           const latMax = img.lat + degOffset;
           const lonMin = img.lon - degOffset;
           const lonMax = img.lon + degOffset;
-          const pageSize = 1000;
+          const pageSize = 300; // SEO-optimiert: 300 Items statt 1000
           let offset = 0;
           let fetched: any[] = [];
           while (true) {
             const { data: batch, error: nearbyError } = await supabase
               .from('items')
-              .select('id, slug, path_512, path_2048, path_64, original_name, title, description, lat, lon, width, height, is_private, gallery')
+              .select('id, slug, path_512, path_2048, path_64, original_name, title, description, caption, lat, lon, width, height, is_private, gallery')
               .not('lat', 'is', null)
               .not('lon', 'is', null)
               .not('path_512', 'is', null)
@@ -187,14 +187,17 @@ export const load: PageServerLoad = async ({ params, url }) => {
                 src64: item.path_64 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/${item.path_64}` : `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${item.path_512}`,
                 width: item.width,
                 height: item.height,
-                title: item.title || null,
+                title: item.title || item.original_name || 'Bild',
+                description: item.description || `Bild aus der Nähe von ${img.title}`,
+                caption: item.caption || item.description || `Bild aus der Nähe von ${img.title}`,
                 gallery: item.gallery ?? true
               };
             })
             .filter((item: any) => item.distance <= maxRadius)
-            .sort((a: any, b: any) => a.distance - b.distance);
+            .sort((a: any, b: any) => a.distance - b.distance)
+            .slice(0, 300); // SEO-optimiert: Maximal 300 Items
         } else {
-          // NEU: Verwende PostGIS-Ergebnisse
+          // NEU: Verwende PostGIS-Ergebnisse (SEO-optimiert)
           console.log('[DetailPage] PostGIS nearby success, items:', nearbyData?.length || 0);
           
           nearby = (nearbyData || [])
@@ -210,10 +213,13 @@ export const load: PageServerLoad = async ({ params, url }) => {
               src64: item.path_64 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/${item.path_64}` : `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${item.path_512}`,
               width: item.width,
               height: item.height,
-              title: item.title || null,
+              title: item.title || item.original_name || 'Bild',
+              description: item.description || `Bild aus der Nähe von ${img.title}`,
+              caption: item.caption || item.description || `Bild aus der Nähe von ${img.title}`,
               gallery: item.gallery ?? true
             }))
-            .filter((item: any) => item.distance <= 5000); // 5km Radius
+            .filter((item: any) => item.distance <= 2000) // SEO-optimiert: 2000m statt 5000m
+            .slice(0, 300); // SEO-optimiert: Maximal 300 Items
         }
       } catch (nearbyErr) {
         console.error('[DetailPage] Nearby error:', nearbyErr);
