@@ -1,5 +1,6 @@
 <script lang="ts">
   import GalleryLayout from '../GalleryLayout.svelte';
+  
   export let nearby: any[] = [];
   export let layout: 'justified' | 'grid' = 'justified';
   export let gap: number = 2;

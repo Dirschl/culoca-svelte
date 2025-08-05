@@ -8,6 +8,9 @@ export const GET = async ({ params }) => {
     throw error(400, 'Missing slug');
   }
 
+  // Vercel-spezifische Optimierungen
+  const startTime = Date.now();
+
   try {
     // 1. Hole das Item aus der DB
     const { data: item, error: dbError } = await supabase
@@ -40,13 +43,20 @@ export const GET = async ({ params }) => {
     const imageBuffer = await response.arrayBuffer();
 
     // 5. Konvertiere zu PNG für bessere Browser-Kompatibilität
-    const sharp = (await import('sharp')).default;
-    
     try {
-      const pngBuffer = await sharp(imageBuffer)
+      const sharp = (await import('sharp')).default;
+      
+      // Vercel-optimierte Sharp-Konfiguration
+      const pngBuffer = await sharp(imageBuffer, { 
+        failOnError: false,
+        limitInputPixels: false 
+      })
         .resize(512, 512, { fit: 'cover' })
         .png({ quality: 90 })
         .toBuffer();
+      
+      const processingTime = Date.now() - startTime;
+      console.log(`Favicon generated in ${processingTime}ms for slug: ${slug}`);
       
       return new Response(pngBuffer, {
         status: 200,
@@ -55,11 +65,15 @@ export const GET = async ({ params }) => {
           'Cache-Control': 'public, max-age=3600, s-maxage=86400', // 1 Stunde Browser, 24 Stunden CDN
           'Content-Disposition': 'inline',
           'Access-Control-Allow-Origin': '*',
-          'X-Favicon-Source': `Item: ${item.title || item.original_name || item.id}` // Debug-Header
+          'X-Favicon-Source': `Item: ${item.title || item.original_name || item.id}`, // Debug-Header
+          'X-Processing-Time': `${processingTime}ms`
         }
       });
     } catch (sharpError) {
       console.error('Sharp conversion error:', sharpError);
+      const processingTime = Date.now() - startTime;
+      console.log(`Favicon fallback in ${processingTime}ms for slug: ${slug}`);
+      
       // Fallback: Original JPEG zurückgeben
       return new Response(imageBuffer, {
         status: 200,
@@ -68,7 +82,8 @@ export const GET = async ({ params }) => {
           'Cache-Control': 'public, max-age=3600, s-maxage=86400',
           'Content-Disposition': 'inline',
           'Access-Control-Allow-Origin': '*',
-          'X-Favicon-Source': `Item: ${item.title || item.original_name || item.id}`
+          'X-Favicon-Source': `Item: ${item.title || item.original_name || item.id}`,
+          'X-Processing-Time': `${processingTime}ms`
         }
       });
     }
