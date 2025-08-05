@@ -309,7 +309,7 @@
             selectedItems.push({
               id: 'map-share',
               title: mapShareData.title,
-              slug: `map-view-share/${mapShareData.id}`,
+              slug: mapShareData.id,
               width: 1200,
               height: 630,
               creator: 'Culoca',
