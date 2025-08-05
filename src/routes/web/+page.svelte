@@ -650,31 +650,33 @@
     
     <div class="og-examples">
       {#each ogExamples as item}
-      <div class="og-example">
-        <div class="og-preview">
-          {#if item.id === 'map-share'}
-            <img src={item.screenshot_url} 
-                 alt="Open Graph Preview - Karte" class="og-image" />
-          {:else}
-            <img src={`/api/og-image/${item.slug}`} 
-                 alt="Open Graph Preview - {item.width > item.height ? 'Querformat' : 'Hochformat'}" class="og-image" />
-          {/if}
-        </div>
-        <div class="og-details">
-          <div class="og-favicon">
+      <a href="/item/{item.slug}" class="og-example-link">
+        <div class="og-example">
+          <div class="og-preview">
             {#if item.id === 'map-share'}
-              <img src="/culoca-icon.png" alt="Favicon" class="favicon" />
+              <img src={item.screenshot_url} 
+                   alt="Open Graph Preview - Karte" class="og-image" />
             {:else}
-              <img src={`/api/favicon/${item.slug}`} alt="Favicon" class="favicon" />
+              <img src={`/api/og-image/${item.slug}`} 
+                   alt="Open Graph Preview - {item.width > item.height ? 'Querformat' : 'Hochformat'}" class="og-image" />
             {/if}
           </div>
-          <div class="og-text">
-            <h5>{item.title || 'Ohne Titel'}{item.id !== 'map-share' ? ', ' + item.creator : ''}</h5>
-            <p>{item.description || 'Keine Beschreibung verfügbar.'}</p>
-            <span class="og-link">https://culoca.com/{item.id === 'map-share' ? item.slug : 'item/' + item.slug}</span>
+          <div class="og-details">
+            <div class="og-favicon">
+              {#if item.id === 'map-share'}
+                <img src="/culoca-icon.png" alt="Favicon" class="favicon" />
+              {:else}
+                <img src={`/api/favicon/${item.slug}`} alt="Favicon" class="favicon" />
+              {/if}
+            </div>
+            <div class="og-text">
+              <h5>{item.title || 'Ohne Titel'}{item.id !== 'map-share' ? ', ' + item.creator : ''}</h5>
+              <p>{item.description || 'Keine Beschreibung verfügbar.'}</p>
+              <span class="og-link">https://culoca.com/{item.id === 'map-share' ? item.slug : 'item/' + item.slug}</span>
+            </div>
           </div>
         </div>
-      </div>
+      </a>
       {/each}
     </div>
   </section>
@@ -1350,6 +1352,22 @@
     border-radius: 8px;
     overflow: hidden;
     background: var(--bg-tertiary);
+  }
+
+  .og-example-link {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .og-example-link:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px var(--shadow);
+  }
+
+  .og-example-link:hover .og-example {
+    border-color: var(--accent-color);
   }
 
   .og-preview {
