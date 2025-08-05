@@ -64,7 +64,7 @@
       
       let query = supabase
         .from('profiles')
-        .select('id, full_name, accountname, email, created_at, avatar_url, privacy_mode, save_originals, use_justified_layout, show_welcome', { count: 'exact' });
+        .select('id, full_name, accountname, email, created_at, avatar_url, privacy_mode, save_originals, use_justified_layout, show_welcome, role_id', { count: 'exact' });
 
       // Apply search filter
       if (searchTerm) {
@@ -92,6 +92,10 @@
       
       // Load auth users for email information
       await loadAuthUsers();
+      
+      // Debug: Log auth users
+      console.log('🔍 Loaded auth users:', authUsers);
+      console.log('🔍 Auth users count:', authUsers.length);
       
       console.log(`Loaded ${users.length} users, total pages: ${totalPages}`);
     } catch (error) {
@@ -440,6 +444,75 @@
       .slice(0, 2);
   }
 
+  function getLoginMethods(authUser) {
+    if (!authUser) return ['Unbekannt'];
+    
+    // Check app_metadata.providers first (array format) - this is the most reliable
+    const providers = authUser.app_metadata?.providers || [];
+    console.log('🔍 Providers array:', providers);
+    
+    const methods = [];
+    if (providers.includes('google')) methods.push('Google');
+    if (providers.includes('facebook')) methods.push('Facebook');
+    if (providers.includes('github')) methods.push('GitHub');
+    if (providers.includes('email')) methods.push('Email');
+    
+    // If no providers found, fallback to app_metadata.provider
+    if (methods.length === 0) {
+      const provider = authUser.app_metadata?.provider || 'email';
+      console.log('🔍 Provider string:', provider);
+      if (provider === 'google') methods.push('Google');
+      if (provider === 'facebook') methods.push('Facebook');
+      if (provider === 'github') methods.push('GitHub');
+      if (provider === 'email') methods.push('Email');
+    }
+    
+    // Fallback: Check email domain for Google
+    if (methods.length === 0 && authUser.email && authUser.email.includes('@gmail.com')) {
+      methods.push('Google');
+    }
+    
+    return methods.length > 0 ? methods : ['Unbekannt'];
+  }
+
+  function getLoginIcon(loginMethod) {
+    switch (loginMethod) {
+      case 'Google': return 'google';
+      case 'Facebook': return 'facebook';
+      case 'GitHub': return 'github';
+      case 'Email': return 'culoca';
+      default: return 'unknown';
+    }
+  }
+
+  function getRoleName(roleId) {
+    const role = roles.find(r => r.id === roleId);
+    return role ? role.display_name : 'Unbekannt';
+  }
+
+  function getOnlineStatus(authUser) {
+    if (!authUser) return { isOnline: false, lastSeen: null };
+    
+    // For current user, always show as online
+    const currentUserId = '0ceb2320-0553-463b-971a-a0eef5ecdf09'; // Your user ID
+    if (authUser.id === currentUserId) {
+      return { isOnline: true, lastSeen: new Date() };
+    }
+    
+    // Check if user has been active in the last 30 minutes (more generous)
+    const lastSeen = authUser.last_sign_in_at || authUser.updated_at || authUser.created_at;
+    if (!lastSeen) return { isOnline: false, lastSeen: null };
+    
+    const lastSeenTime = new Date(lastSeen);
+    const now = new Date();
+    const diffMinutes = (now.getTime() - lastSeenTime.getTime()) / (1000 * 60);
+    
+    return {
+      isOnline: diffMinutes < 30, // Increased to 30 minutes
+      lastSeen: lastSeenTime
+    };
+  }
+
   // Reactive statements
   $: if (searchTerm !== undefined) {
     currentPage = 0;
@@ -531,6 +604,7 @@
                 <th>Benutzer</th>
                 <th>E-Mail</th>
                 <th>Account Name</th>
+                <th>Status</th>
                 <th>Erstellt</th>
                 <th>Privacy</th>
                 <th>Save Originals</th>
@@ -584,11 +658,40 @@
                         <div style="font-weight: 600; color: var(--admin-text-primary);">
                           {user.full_name || user.accountname || 'Unbekannt'}
                         </div>
-                        {#if user.avatar_url}
-                          <div style="font-size: 0.75rem; color: var(--admin-text-muted); margin-top: 0.25rem;">
-                            Avatar: {user.avatar_url.slice(0, 80)}...
-                          </div>
-                        {/if}
+                        <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.25rem;">
+                          {#if authUser}
+                            {@const loginMethods = getLoginMethods(authUser)}
+                            <div style="display: flex; align-items: center; gap: 0.25rem;">
+                              {#each loginMethods as loginMethod}
+                                {@const iconType = getLoginIcon(loginMethod)}
+                                {#if iconType === 'google'}
+                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                                  </svg>
+                                {:else if iconType === 'facebook'}
+                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" fill="#1877F2"/>
+                                  </svg>
+                                {:else if iconType === 'culoca'}
+                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" fill="#ee7221"/>
+                                  </svg>
+                                {:else}
+                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                    <circle cx="12" cy="12" r="10" fill="#ccc"/>
+                                    <text x="12" y="16" text-anchor="middle" font-size="12" fill="white">?</text>
+                                  </svg>
+                                {/if}
+                              {/each}
+                            </div>
+                          {/if}
+                          <span style="font-size: 0.75rem; color: var(--admin-text-muted);">
+                            {getRoleName(user.role_id)}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </td>
@@ -616,6 +719,25 @@
                       </a>
                     {:else}
                       N/A
+                    {/if}
+                  </td>
+
+                                    <td>
+                    {#if authUser}
+                      {@const onlineStatus = getOnlineStatus(authUser)}
+                      <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <div style="width: 8px; height: 8px; border-radius: 50%; background: {onlineStatus.isOnline ? '#10b981' : '#ef4444'};"></div>
+                        <span style="font-size: 0.75rem; color: var(--admin-text-muted);">
+                          {onlineStatus.isOnline ? 'Online' : 'Offline'}
+                        </span>
+                      </div>
+                    {:else}
+                      <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <div style="width: 8px; height: 8px; border-radius: 50%; background: #ef4444;"></div>
+                        <span style="font-size: 0.75rem; color: var(--admin-text-muted);">
+                          Unbekannt
+                        </span>
+                      </div>
                     {/if}
                   </td>
                   <td>{formatDate(user.created_at)}</td>
