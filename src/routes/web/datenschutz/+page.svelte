@@ -2,6 +2,56 @@
   import InfoPageLayout from '$lib/InfoPageLayout.svelte';
 </script>
 
+<svelte:head>
+  <title>Datenschutz - DIRSCHL.com GmbH</title>
+  <meta name="description" content="Datenschutzerklärung der DIRSCHL.com GmbH - Informationen zur Verarbeitung personenbezogener Daten gemäß DSGVO" />
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="https://culoca.com/web/datenschutz" />
+  
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="/static/culoca-favicon.svg">
+  <link rel="icon" type="image/png" href="/static/culoca-icon.png" sizes="32x32">
+  <link rel="apple-touch-icon" href="/static/culoca-icon.png" sizes="180x180">
+  
+  <!-- Open Graph -->
+  <meta property="og:title" content="Datenschutz - DIRSCHL.com GmbH" />
+  <meta property="og:description" content="Datenschutzerklärung der DIRSCHL.com GmbH - Informationen zur Verarbeitung personenbezogener Daten gemäß DSGVO" />
+  <meta property="og:url" content="https://culoca.com/web/datenschutz" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="DIRSCHL.com GmbH" />
+  <meta property="og:locale" content="de_DE" />
+  <meta property="og:image" content="https://culoca.com/static/culoca-icon.png" />
+  
+  <!-- JSON-LD -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    "name": "Datenschutz - DIRSCHL.com GmbH",
+    "description": "Datenschutzerklärung der DIRSCHL.com GmbH - Informationen zur Verarbeitung personenbezogener Daten gemäß DSGVO",
+    "url": "https://culoca.com/web/datenschutz",
+    "inLanguage": "de",
+    "publisher": {
+      "@type": "Organization",
+      "name": "DIRSCHL.com GmbH",
+      "url": "https://culoca.com",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "Waldberg 84",
+        "addressLocality": "Reischach",
+        "postalCode": "84571",
+        "addressCountry": "DE"
+      },
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "telephone": "+49-179-9766666",
+        "email": "johann.dirschl@gmx.de"
+      }
+    }
+  }
+  </script>
+</svelte:head>
+
 <InfoPageLayout 
   currentPage="datenschutz"
   title="Datenschutz - DIRSCHL.com GmbH"
