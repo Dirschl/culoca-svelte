@@ -21,7 +21,13 @@ export const GET = async () => {
       email_confirmed_at: user.email_confirmed_at,
       created_at: user.created_at,
       last_sign_in_at: user.last_sign_in_at,
-      user_metadata: user.user_metadata
+      updated_at: user.updated_at,
+      user_metadata: user.user_metadata,
+      app_metadata: user.app_metadata,
+      identities: user.identities,
+      last_sign_in_with: user.last_sign_in_with,
+      phone: user.phone,
+      phone_confirmed_at: user.phone_confirmed_at
     }));
 
     return json(filteredUsers);
