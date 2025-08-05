@@ -570,6 +570,10 @@
       Culoca verwendet moderne JSON-LD (JavaScript Object Notation for Linked Data) Schema.org Markup für maximale Suchmaschinen-Kompatibilität. Diese strukturierten Daten ermöglichen es Google, Bing und anderen Suchmaschinen, Culoca-Inhalte als reichhaltige Snippets mit Bildern, Metadaten und GPS-Koordinaten zu verstehen und anzuzeigen. Die Innovation liegt in der automatischen Generierung von ImageObject-Schemas mit vollständigen EXIF-Daten, Creator-Informationen und geografischen Koordinaten.
     </p>
     
+    <p>
+      Google stellt zum testen der Schemas ein eigenes Werkzeug zur Verfügung. Hier könnt ihr eure Daten auf perfektion trimmen: <a href="https://search.google.com/test/rich-results" target="_blank" rel="noopener">https://search.google.com/test/rich-results</a>
+    </p>
+    
           <div class="jsonld-example">
         <h3>Live JSON-LD von: <a href="https://culoca.com/item/nachts-in-mitterskirchen-herbstbild-rottal-inn-johann-dirschl" target="_blank" rel="noopener">Nachts in Mitterskirchen</a></h3>
         <pre><code>{`{
