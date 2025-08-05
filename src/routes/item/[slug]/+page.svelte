@@ -10,30 +10,47 @@
   import { browser } from '$app/environment';
   import { supabase } from '$lib/supabaseClient';
 
-  // Client-seitige Umleitung für bekannte Fälle
+  // Client-seitige Umleitung für bekannte Fälle (nur für User, nicht für Bots)
   if (browser) {
     const currentSlug = $page.params.slug;
     console.log('🔍 [Client] Checking slug for redirect:', currentSlug);
     
-    // Städtenamen-Mappings
-    const cityMappings = {
-      'altotting': 'altoetting',
-      'muhldorf': 'muehldorf', 
-      'toging': 'toeging',
-      'neuotting': 'neuoetting',
-      'wohrsee': 'woehrsee',
-      'badhoring': 'badhöring'
-    };
+    // Prüfe, ob es sich um einen Bot handelt
+    const userAgent = navigator.userAgent.toLowerCase();
+    const isBot = userAgent.includes('bot') || 
+                  userAgent.includes('crawler') || 
+                  userAgent.includes('spider') || 
+                  userAgent.includes('scraper') ||
+                  userAgent.includes('googlebot') ||
+                  userAgent.includes('bingbot') ||
+                  userAgent.includes('slurp') ||
+                  userAgent.includes('duckduckbot');
+    
+    // Nur für echte User umleiten, nicht für Bots
+    if (!isBot) {
+      // Städtenamen-Mappings
+      const cityMappings = {
+        'altotting': 'altoetting',
+        'muhldorf': 'muehldorf', 
+        'toging': 'toeging',
+        'neuotting': 'neuoetting',
+        'wohrsee': 'woehrsee',
+        'sigrun': 'sigruen',
+        'badhoring': 'badhoering'
+      };
 
-    // Prüfe, ob der Slug einen der alten Städtenamen enthält
-    for (const [oldCity, newCity] of Object.entries(cityMappings)) {
-      if (currentSlug.includes(oldCity)) {
-        const newSlug = currentSlug.replace(oldCity, newCity);
-        console.log('🔍 [Client] City redirect:', oldCity, '->', newCity);
-        console.log('🔍 [Client] Redirecting:', currentSlug, '->', newSlug);
-        goto(`/item/${newSlug}`, { replaceState: true });
-        break;
+      // Prüfe, ob der Slug einen der alten Städtenamen enthält
+      for (const [oldCity, newCity] of Object.entries(cityMappings)) {
+        if (currentSlug.includes(oldCity)) {
+          const newSlug = currentSlug.replace(oldCity, newCity);
+          console.log('🔍 [Client] City redirect:', oldCity, '->', newCity);
+          console.log('🔍 [Client] Redirecting:', currentSlug, '->', newSlug);
+          goto(`/item/${newSlug}`, { replaceState: true });
+          break;
+        }
       }
+    } else {
+      console.log('🔍 [Client] Bot detected, skipping redirects');
     }
   }
 
