@@ -3,6 +3,12 @@
   <meta name="description" content="Entdecke alle Funktionen von Culoca: GPS-basierte Fotogalerie, Open Graph Integration, Account-System, Sicherheit und mehr. Vollständige System-Erklärung der DIRSCHL.com GmbH." />
   <meta name="robots" content="index, follow" />
   <link rel="canonical" href="https://culoca.com/see-you-local-system-faq" />
+  
+  <!-- Favicon für /web Seite -->
+  <link rel="icon" type="image/svg+xml" href="/static/culoca-favicon.svg">
+  <link rel="icon" type="image/png" href="/static/culoca-icon.png" sizes="32x32">
+  <link rel="apple-touch-icon" href="/static/culoca-icon.png" sizes="180x180">
+  
   <!-- Open Graph -->
   <meta property="og:title" content="Culoca - See You Local | System FAQ" />
   <meta property="og:description" content="Entdecke alle Funktionen von Culoca: GPS-basierte Fotogalerie, Open Graph Integration, Account-System und mehr." />
@@ -442,14 +448,16 @@
       
       <div class="items-grid">
         {#each stats.latestItems as item}
-        <div class="item-card">
-          <img src="https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/{item.path_512}" 
-               alt={item.title || 'Foto'} class="item-thumbnail" />
-          <div class="item-info">
-            <h4>{item.title || 'Ohne Titel'}</h4>
-            <p>{new Date(item.created_at).toLocaleDateString('de-DE')}</p>
+        <a href="/item/{item.slug}" class="item-card-link">
+          <div class="item-card">
+            <img src="https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/{item.path_512}" 
+                 alt={item.title || 'Foto'} class="item-thumbnail" />
+            <div class="item-info">
+              <h4>{item.title || 'Ohne Titel'}</h4>
+              <p>{new Date(item.created_at).toLocaleDateString('de-DE')}</p>
+            </div>
           </div>
-        </div>
+        </a>
         {/each}
       </div>
     </div>
@@ -1896,6 +1904,22 @@
     font-size: 0.8rem;
     color: var(--text-secondary);
     margin: 0;
+  }
+
+  .item-card-link {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .item-card-link:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px var(--shadow);
+  }
+
+  .item-card-link:hover .item-card {
+    border-color: var(--accent-color);
   }
 
   @media (max-width: 768px) {
