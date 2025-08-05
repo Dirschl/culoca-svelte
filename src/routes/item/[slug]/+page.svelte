@@ -1360,30 +1360,36 @@
     </svg>
   </button>
 
-  <!-- Floating Action Buttons - nur Scroll-to-Top und Vollbild -->
-  <FloatingActionButtons
-    {showScrollToTop}
-    showTestMode={false}
-    showMapButton={false}
-    showTrackButtons={false}
-    showUploadButton={false}
-    showProfileButton={false}
-    showSettingsButton={false}
-    showPublicContentButton={false}
-    isLoggedIn={false}
-    simulationMode={false}
-    profileAvatar={null}
-    settingsIconRotation={0}
-    continuousRotation={0}
-    rotationSpeed={1}
-    on:upload={() => {}}
-    on:publicContent={() => {}}
-    on:bulkUpload={() => {}}
-    on:profile={() => {}}
-    on:settings={() => {}}
-    on:map={() => {}}
-    on:testMode={() => {}}
-  />
+  <!-- Scroll to Top / Fullscreen FAB - ersetzt sich gegenseitig -->
+  {#if showScrollToTop}
+    <button
+      class="fab-button scroll-to-top"
+      on:click={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+      title="Nach oben scrollen"
+      aria-label="Nach oben scrollen"
+    >
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18 15l-6-6-6 6"/>
+      </svg>
+    </button>
+  {:else}
+    <button
+      class="fab-button fullscreen"
+      on:click={() => {
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen();
+        } else {
+          document.exitFullscreen();
+        }
+      }}
+      title="Vollbildmodus"
+      aria-label="Vollbildmodus"
+    >
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+      </svg>
+    </button>
+  {/if}
 </div>
 
 <style>
@@ -2134,6 +2140,68 @@
     }
     
     .gallery-back-fab svg {
+      width: 36px;
+      height: 36px;
+    }
+  }
+
+  /* FAB Styles für Detailseite */
+  .fab-button {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    width: 4rem;
+    height: 4rem;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px var(--shadow);
+    backdrop-filter: blur(10px);
+    background: transparent;
+    overflow: hidden;
+    pointer-events: auto;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    z-index: 1001;
+  }
+  
+  .fab-button:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 20px var(--shadow);
+    background: rgba(255, 255, 255, 0.1);
+  }
+  
+  .fab-button:active {
+    transform: scale(0.95);
+  }
+  
+  .fab-button.scroll-to-top,
+  .fab-button.fullscreen {
+    bottom: 2rem; /* Gleiche Position für beide FABs */
+  }
+  
+  /* Mobile responsive für FABs */
+  @media (max-width: 768px) {
+    .fab-button {
+      bottom: 1rem;
+      right: 1rem;
+      width: 3.5rem;
+      height: 3.5rem;
+    }
+    
+    .fab-button.scroll-to-top,
+    .fab-button.fullscreen {
+      bottom: 1rem; /* Gleiche Position für beide FABs */
+    }
+    
+    .fab-button svg {
       width: 36px;
       height: 36px;
     }
