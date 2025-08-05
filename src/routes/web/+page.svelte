@@ -1,6 +1,6 @@
 <svelte:head>
-  <title>Culoca - See You Local | System FAQ</title>
-  <meta name="description" content="Entdecke alle Funktionen von Culoca: GPS-basierte Fotogalerie, Open Graph Integration, Account-System, Sicherheit und mehr. Vollständige System-Erklärung der DIRSCHL.com GmbH." />
+  <title>Culoca - See You Local - Entdecke deine Umgebung</title>
+  <meta name="description" content="Alles, was du über Culoca wissen willst: Schnapp dir dein Handy, erkunde deine Umgebung, teile Momente und sammle lokale Schätze. FAQ für Entdecker!" />
   <meta name="robots" content="index, follow" />
   <link rel="canonical" href="https://culoca.com/see-you-local-system-faq" />
   
@@ -10,8 +10,8 @@
   <link rel="apple-touch-icon" href="/static/culoca-icon.png" sizes="180x180">
   
   <!-- Open Graph -->
-  <meta property="og:title" content="Culoca - See You Local | System FAQ" />
-  <meta property="og:description" content="Entdecke alle Funktionen von Culoca: GPS-basierte Fotogalerie, Open Graph Integration, Account-System und mehr." />
+  <meta property="og:title" content="Culoca - See You Local - Entdecke deine Umgebung" />
+  <meta property="og:description" content="Alles, was du über Culoca wissen willst: Schnapp dir dein Handy, erkunde deine Umgebung, teile Momente und sammle lokale Schätze. FAQ für Entdecker!" />
   <meta property="og:url" content="https://culoca.com/see-you-local-system-faq" />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="DIRSCHL.com GmbH" />
@@ -23,8 +23,8 @@
   {
     "@context": "https://schema.org",
     "@type": "WebPage",
-    "name": "Culoca - See You Local | System FAQ",
-    "description": "Entdecke alle Funktionen von Culoca: GPS-basierte Fotogalerie, Open Graph Integration, Account-System, Sicherheit und mehr.",
+    "name": "Culoca - See You Local - Entdecke deine Umgebung",
+    "description": "Alles, was du über Culoca wissen willst: Schnapp dir dein Handy, erkunde deine Umgebung, teile Momente und sammle lokale Schätze. FAQ für Entdecker!",
     "url": "https://culoca.com/see-you-local-system-faq",
     "inLanguage": "de",
     "publisher": {
@@ -404,7 +404,7 @@
     {/if}
   </svelte:fragment>
 
-  <h1 class="main-title">Culoca - See You Local | System FAQ</h1>
+  <h1 class="main-title">Culoca - See You Local, Entdecke deine Umgebung</h1>
   
   <p>
     Culoca verwaltet Items die an GPS Koordinaten gebunden sind. In Verdingung mit deiner eigenen Position lässt sich so eine neue Art von sozialen Medien schaffen. Wir nennen es Reverse Social Media, denn hier macht nicht ein Content um berühmt zu werden, sondern viele um nur Dich zu erreichen. Du stehst im Mittelpunkt aller Informationen und Culoca zeigt dir diese an. Wir starten mit einer kleinen Region zwischen München, Oberösterreich und dem Bayerischen Wald und hoffen auf viele neue Culoca User, die das System aktiv mit Material versorgen.
