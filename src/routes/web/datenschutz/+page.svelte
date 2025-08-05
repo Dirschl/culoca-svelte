@@ -20,7 +20,7 @@
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="DIRSCHL.com GmbH" />
   <meta property="og:locale" content="de_DE" />
-  <meta property="og:image" content="https://culoca.com/static/culoca-icon.png" />
+  <meta property="og:image" content="https://culoca.com/static/culoca-see-you-local-entdecke-deine-umgebung.jpg" />
   
   <!-- JSON-LD -->
   <script type="application/ld+json">
