@@ -768,7 +768,13 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
           on:keydown={handleUrlSubmit}
           class="url-input"
         />
-        <button on:click={fetchHeadData} class="analyze-btn" disabled={isLoading}>
+        <button 
+          on:click={fetchHeadData} 
+          class="analyze-btn" 
+          disabled={isLoading}
+          type="button"
+          style="display: inline-block; min-width: 120px;"
+        >
           {isLoading ? 'Analysiere...' : 'Analysieren'}
         </button>
       </div>
