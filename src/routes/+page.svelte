@@ -1,6 +1,6 @@
 <svelte:head>
   <title>Culoca - Entdecke deine Umgebung mit GPS & Fotos</title>
-  <meta name="description" content="Entdecke versteckte Orte, teile Fotos mit GPS-Koordinaten und starte deine eigene Culoca-Galerie. Finde lokale Events, Sehenswürdigkeiten und teile deine Entdeckungen." />
+  <meta name="description" content="Entdecke und teile Fotos, Events, Anzeigen, dein Profil oder Firma als GPS Items mit Geo Koordinaten. Zeige was dir gefällt starte deine eigene Culoca Galerie." />
   <meta name="robots" content="index, follow" />
   <meta name="author" content="DIRSCHL.com GmbH" />
   <meta name="keywords" content="GPS, Geo-Lokalisierung, Fotos, Bilder, Galerie, lokale Suche, versteckte Orte, Sehenswürdigkeiten, Events, Culoca, Entdeckungen, Umgebung, Regional, Fotografie, Wandern, Freizeit, Plattform, App, Landschaft, Lost Places, Fotolocations, Reiseführer, Urlaub, kennenlernen, Social Media, digital, für alle, Standort, Lokal, Items, Distanz, Entfernung, Freigeben, Download, Karten, Routenplaner, Anzeigen, Unterhaltung, Orte, Ort" />
@@ -10,7 +10,7 @@
   <meta property="og:locale" content="de_DE" />
   <meta property="og:type" content="website" />
   <meta property="og:title" content="Culoca - Entdecke deine Umgebung mit GPS & Fotos" />
-  <meta property="og:description" content="Entdecke versteckte Orte, teile Fotos mit GPS-Koordinaten und starte deine eigene Culoca-Galerie. Finde lokale Events, Sehenswürdigkeiten und teile deine Entdeckungen." />
+  <meta property="og:description" content="Entdecke und teile Fotos, Events, Anzeigen, dein Profil oder Firma als GPS Items mit Geo Koordinaten. Zeige was dir gefällt starte deine eigene Culoca Galerie." />
   <meta property="og:url" content="https://culoca.com/" />
   <meta property="og:site_name" content="Culoca" />
   <meta property="og:image" content="https://culoca.com/culoca-see-you-local-entdecke-deine-umgebung.jpg" />
@@ -21,7 +21,7 @@
   <!-- Twitter Card Meta-Tags -->
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Culoca - Entdecke deine Umgebung mit GPS & Fotos" />
-  <meta name="twitter:description" content="Entdecke versteckte Orte, teile Fotos mit GPS-Koordinaten und starte deine eigene Culoca-Galerie. Finde lokale Events, Sehenswürdigkeiten und teile deine Entdeckungen." />
+  <meta name="twitter:description" content="Entdecke und teile Fotos, Events, Anzeigen, dein Profil oder Firma als GPS Items mit Geo Koordinaten. Zeige was dir gefällt starte deine eigene Culoca Galerie." />
   <meta name="twitter:image" content="https://culoca.com/culoca-see-you-local-entdecke-deine-umgebung.jpg" />
   
   <!-- Strukturierte Daten (JSON-LD) für bessere SEO -->
@@ -30,7 +30,8 @@
     "@context": "https://schema.org",
     "@type": "WebPage",
     "name": "Culoca - Entdecke deine Umgebung mit GPS & Fotos",
-    "description": "Entdecke versteckte Orte, teile Fotos mit GPS-Koordinaten und starte deine eigene Culoca-Galerie. Finde lokale Events, Sehenswürdigkeiten und teile deine Entdeckungen.",
+    "description": "Entdecke und teile Fotos, Events, Anzeigen, dein Profil oder Firma als GPS Items mit Geo Koordinaten. Zeige was dir gefällt starte deine eigene Culoca Galerie.",
+    "caption": "Entdecke deine Umgabung und hilf anderen auch versteckte Orte zu finden.",
     "url": "https://culoca.com",
     "inLanguage": "de",
     "image": {
