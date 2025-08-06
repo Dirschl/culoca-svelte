@@ -3,8 +3,8 @@
 </script>
 
 <svelte:head>
-  <title>Impressum - DIRSCHL.com GmbH</title>
-  <meta name="description" content="Impressum und rechtliche Informationen der DIRSCHL.com GmbH - Angaben gemäß § 5 TMG" />
+  <title>Impressum der DIRSCHL.com GmbH für culoca.com, See You Local</title>
+  <meta name="description" content="Impressum und rechtliche Informationen der DIRSCHL.com GmbH - Angaben gemäß § 5 TMG, Gerne dürfen sie uns bei Fragen zur Plattform kontaktieren. Wir freuen uns." />
   <meta name="robots" content="index, follow" />
   <link rel="canonical" href="https://culoca.com/web/impressum" />
   
@@ -14,8 +14,8 @@
 	<link rel="apple-touch-icon" href="/culoca-icon.png" sizes="180x180">
   
   <!-- Open Graph -->
-  <meta property="og:title" content="Impressum - DIRSCHL.com GmbH" />
-  <meta property="og:description" content="Impressum und rechtliche Informationen der DIRSCHL.com GmbH - Angaben gemäß § 5 TMG" />
+  <meta property="og:title" content="Impressum der DIRSCHL.com GmbH für culoca.com, See You Local" />
+  <meta property="og:description" content="Impressum und rechtliche Informationen der DIRSCHL.com GmbH - Angaben gemäß § 5 TMG, Gerne dürfen sie uns bei Fragen zur Plattform kontaktieren. Wir freuen uns." />
   <meta property="og:url" content="https://culoca.com/web/impressum" />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="DIRSCHL.com GmbH" />
@@ -27,14 +27,33 @@
   {
     "@context": "https://schema.org",
     "@type": "WebPage",
-    "name": "Impressum - DIRSCHL.com GmbH",
-    "description": "Impressum und rechtliche Informationen der DIRSCHL.com GmbH - Angaben gemäß § 5 TMG",
+    "name": "Impressum der DIRSCHL.com GmbH für culoca.com, See You Local",
+    "description": "Impressum und rechtliche Informationen der DIRSCHL.com GmbH - Angaben gemäß § 5 TMG, Gerne dürfen sie uns bei Fragen zur Plattform kontaktieren. Wir freuen uns.",
     "url": "https://culoca.com/web/impressum",
     "inLanguage": "de",
+    "caption": "Contact Info for culoca.com, DIRSCHL.com GmbH",
+    "keywords": "Impressum, Dirschl, Johann Dirschl, DIRSCHL.com GmbH, culoca.com, Webseite, Rechtliche, Hinweise, Kontakt, Contact, Fragen, Requests, Information",
+    "author": {
+      "@type": "Person",
+      "name": "Johann Dirschl"
+    },
+    "contentLocation": {
+      "@type": "Place",
+      "name": "de_DE"
+    },
+    "image": {
+      "@type": "ImageObject",
+      "url": "https://culoca.com/culoca-see-you-local-entdecke-deine-umgebung.jpg",
+      "name": "culoca-see-you-local-entdecke-deine-umgebung.jpg"
+    },
     "publisher": {
       "@type": "Organization",
       "name": "DIRSCHL.com GmbH",
       "url": "https://culoca.com",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://culoca.com/culoca-icon.svg"
+      },
       "address": {
         "@type": "PostalAddress",
         "streetAddress": "Waldberg 84",
