@@ -1089,8 +1089,6 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
             <div class="images-analysis">
               <h5>Bilder & Icons Analyse:</h5>
               
-              <h5>Bilder & Icons Analyse:</h5>
-              
               <!-- Main Image Section -->
               {#if headData.mainImage}
                 <div class="image-section">
