@@ -174,7 +174,6 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
     error = '';
     headError = '';
     headData = null;
-    jsonLdData = '';
 
     try {
       // Use our server-side API to avoid CORS issues
