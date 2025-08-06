@@ -9,7 +9,10 @@
   let openDropdown: string | null = null;
   
   $: pages = [
-    { id: 'system', title: 'System', url: '/web' },
+    { id: 'system', title: 'System', url: '/web', hasSubmenu: true, submenu: [
+      { id: 'system-main', title: 'Übersicht', url: '/web' },
+      { id: 'system-seo', title: 'SEO', url: '/web#seo' }
+    ]},
     { id: 'license', title: 'Lizenz', url: '/web/license' },
     { id: 'impressum', title: 'Impressum', url: '/web/impressum' },
     { id: 'datenschutz', title: 'Datenschutz', url: '/web/datenschutz' },
