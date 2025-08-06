@@ -7,49 +7,7 @@
   export let description: string = '';
 </script>
 
-<svelte:head>
-  <title>{title}</title>
-  <meta name="description" content={description} />
-  <meta name="robots" content="index, follow" />
-  <link rel="canonical" href="https://culoca.com/{currentPage}" />
-  
-  <!-- Open Graph -->
-  <meta property="og:title" content={title} />
-  <meta property="og:description" content={description} />
-  <meta property="og:url" content="https://culoca.com/{currentPage}" />
-  <meta property="og:type" content="website" />
-  <meta property="og:site_name" content="Culoca" />
-  <meta property="og:locale" content="de_DE" />
-  
-  <!-- JSON-LD -->
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "WebPage",
-    "name": "{title}",
-    "description": "{description}",
-    "url": "https://culoca.com/{currentPage}",
-    "inLanguage": "de",
-    "publisher": {
-      "@type": "Organization",
-      "name": "DIRSCHL.com GmbH",
-      "url": "https://culoca.com",
-      "address": {
-        "@type": "PostalAddress",
-        "streetAddress": "Waldberg 84",
-        "addressLocality": "Reischach",
-        "postalCode": "84571",
-        "addressCountry": "DE"
-      },
-      "contactPoint": {
-        "@type": "ContactPoint",
-        "telephone": "+49-179-9766666",
-        "email": "johann.dirschl@gmx.de"
-      }
-    }
-  }
-  </script>
-</svelte:head>
+<!-- SEO wird von den einzelnen Seiten definiert, nicht hier -->
 
 <div class="info-page">
   <InfoPageHeader {currentPage} />
