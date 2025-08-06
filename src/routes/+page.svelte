@@ -102,12 +102,6 @@
   let userLon: number | null = null;
   let cachedLat: number | null = null;
   let cachedLon: number | null = null;
-<<<<<<< HEAD
-  // NEU: Separate Variablen für ausgewählte GPS-Koordinaten
-  // let selectedLat: number | null = null;
-  // let selectedLon: number | null = null;
-=======
->>>>>>> Rolemanager
   let showDistance = true;
   let showCompass = false;
   let isLoggedIn = false;
@@ -1324,15 +1318,9 @@
     
     // Save to localStorage
     if (browser) {
-<<<<<<< HEAD
-      const gpsData = { lat, lon, timestamp: Date.now() };
-      localStorage.setItem('userGps', JSON.stringify(gpsData));
-      console.log('[Location-Selected] Saved selected location:', gpsData);
-=======
       localStorage.setItem('gpsAllowed', 'true');
       saveGPSData(lat, lon);
       console.log('[Location-Selected] Saved selected location as GPS gemerkt:', { lat, lon });
->>>>>>> Rolemanager
     }
     
     // Update filterStore with the selected location
@@ -1853,32 +1841,6 @@
     }
   }
 
-<<<<<<< HEAD
-  // NEU: Funktion um GPS manuell zu stoppen
-  function stopGPS() {
-    console.log('[GPS] Manually stopping GPS...');
-    
-    // Stoppe GPS-Watcher
-    if (gpsWatchId) {
-      navigator.geolocation.clearWatch(gpsWatchId);
-      gpsWatchId = null;
-      console.log('[GPS] GPS watcher stopped');
-    }
-    
-    // Lösche aktive GPS-Koordinaten
-    userLat = null;
-    userLon = null;
-    lastGPSUpdateTime = null;
-    
-    // WICHTIG: Setze immer auf 'none' wenn GPS manuell gestoppt wird
-    gpsStatus = 'none';
-    console.log('[GPS] GPS stopped - status set to none');
-    
-    // Update filterStore
-    filterStore.updateGpsStatus(false);
-    
-    console.log('[GPS] GPS stopped and coordinates cleared');
-=======
   // NEU: Funktion zum manuellen Starten von GPS
   function startGPS() {
     console.log('[GPS] User requested GPS start');
@@ -1888,7 +1850,6 @@
     } else {
       gpsStatus = 'unavailable';
     }
->>>>>>> Rolemanager
   }
 
 </script>
