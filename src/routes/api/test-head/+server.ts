@@ -174,7 +174,7 @@ function extractMetaTags(headContent: string) {
 
 function extractJsonLdData(headContent: string) {
   // Extract ALL JSON-LD script tags (global match)
-  const jsonLdMatches = headContent.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g);
+  const jsonLdMatches = headContent.match(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/g);
   
   if (!jsonLdMatches || jsonLdMatches.length === 0) {
     return [];
@@ -185,7 +185,16 @@ function extractJsonLdData(headContent: string) {
   // Process each JSON-LD script tag
   for (let i = 0; i < jsonLdMatches.length; i++) {
     const match = jsonLdMatches[i];
-    const jsonLdString = match.replace(/<script type="application\/ld\+json">/, '').replace(/<\/script>/, '').trim();
+    let jsonLdString = match.replace(/<script[^>]*type="application\/ld\+json"[^>]*>/, '').replace(/<\/script>/, '').trim();
+    
+    // Handle Svelte's {JSON.stringify()} format
+    if (jsonLdString.includes('{JSON.stringify(')) {
+      // Extract the content between {JSON.stringify( and )}
+      const match = jsonLdString.match(/\{JSON\.stringify\(([\s\S]*)\)\}/);
+      if (match) {
+        jsonLdString = match[1];
+      }
+    }
     
     try {
       const jsonObj = JSON.parse(jsonLdString);
@@ -204,6 +213,7 @@ function extractJsonLdData(headContent: string) {
     } catch (parseError) {
       // Skip invalid JSON-LD
       console.error('Invalid JSON-LD data:', parseError);
+      console.error('Raw string:', jsonLdString);
     }
   }
   
