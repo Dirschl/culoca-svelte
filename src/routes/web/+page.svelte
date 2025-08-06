@@ -199,9 +199,6 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
         const caption = result.metaTags?.find(tag => tag.name === 'caption' || tag.property === 'og:caption')?.content;
         editableCaption = caption || '';
         
-        // Also fetch JSON-LD data first, then update caption if found in JSON-LD
-        await fetchJsonLd();
-        
         // Update caption from JSON-LD if not found in meta tags
         if (!caption && headData?.jsonLdData?.[0]?.data?.caption) {
           editableCaption = headData.jsonLdData[0].data.caption;
@@ -241,49 +238,22 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
     jsonLdData = '';
 
     try {
-      // Use our server-side API to avoid CORS issues
-      const response = await fetch(`/api/test-jsonld?url=${encodeURIComponent(testUrl)}`);
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `HTTP ${response.status}`);
+      // JSON-LD Daten sind jetzt bereits in headData verfügbar
+      if (headData && headData.jsonLdData) {
+        // Format all JSON-LD data found
+        let formattedData = `Gefunden: ${headData.jsonLdData.length} JSON-LD Strukturen\n\n`;
+        
+        // Add each valid JSON-LD structure
+        headData.jsonLdData.forEach((item: any, index: number) => {
+          formattedData += `=== ${item.index}. ${item.type}: ${item.name} ===\n`;
+          formattedData += item.formatted;
+          formattedData += '\n\n';
+        });
+        
+        jsonLdData = formattedData;
+      } else {
+        jsonLdData = 'Keine JSON-LD Daten gefunden';
       }
-      
-      const result = await response.json();
-      
-              if (result.success) {
-          // Speichere JSON-LD Daten in headData für die SEO-Analyse
-          if (headData) {
-            headData.jsonLdData = result.jsonLdData;
-          }
-          
-          // Format all JSON-LD data found
-          let formattedData = `Gefunden: ${result.totalFound} JSON-LD Strukturen\n`;
-          formattedData += `Gültig: ${result.validCount}, Fehler: ${result.errorCount}\n\n`;
-          
-          // Add each valid JSON-LD structure
-          result.jsonLdData.forEach((item: any, index: number) => {
-            formattedData += `=== ${item.index}. ${item.type}: ${item.name} ===\n`;
-            formattedData += item.formatted;
-            formattedData += '\n\n';
-          });
-          
-          // Add any errors
-          if (result.errors && result.errors.length > 0) {
-            formattedData += '=== FEHLER ===\n';
-            result.errors.forEach((err: any) => {
-              formattedData += `${err.index}. ${err.error}: ${err.content}\n`;
-            });
-          }
-          
-          jsonLdData = formattedData;
-        } else {
-          // JSON-LD nicht gefunden ist kein Fehler - setze Standard-Werte
-          if (headData) {
-            headData.jsonLdData = [];
-          }
-          jsonLdData = 'Keine JSON-LD Daten gefunden';
-        }
       
     } catch (err: any) {
       error = err.message || 'Fehler beim Laden der JSON-LD Daten';

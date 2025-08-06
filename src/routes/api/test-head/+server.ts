@@ -40,6 +40,9 @@ export const GET: RequestHandler = async ({ url }) => {
     const linkTags = headContent.match(/<link[^>]*>/gi) || [];
     const scriptTags = headContent.match(/<script[^>]*>([\s\S]*?)<\/script>/gi) || [];
     
+    // Extract JSON-LD data
+    const jsonLdData = extractJsonLdData(headContent);
+    
     // Extract main image and favicon information
     const mainImage = extractMainImage(headContent);
     const faviconInfo = extractFaviconInfo(headContent);
@@ -66,6 +69,7 @@ export const GET: RequestHandler = async ({ url }) => {
       linkTags: linkTags,
       scriptTags: scriptTags,
       rawHead: headContent,
+      jsonLdData: jsonLdData,
       mainImage: mainImage,
       faviconInfo: faviconInfo,
       culocaLogoFallback: culocaLogoFallback
@@ -166,6 +170,44 @@ function extractMetaTags(headContent: string) {
   });
   
   return metaTags;
+}
+
+function extractJsonLdData(headContent: string) {
+  // Extract ALL JSON-LD script tags (global match)
+  const jsonLdMatches = headContent.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g);
+  
+  if (!jsonLdMatches || jsonLdMatches.length === 0) {
+    return [];
+  }
+  
+  const jsonLdData = [];
+  
+  // Process each JSON-LD script tag
+  for (let i = 0; i < jsonLdMatches.length; i++) {
+    const match = jsonLdMatches[i];
+    const jsonLdString = match.replace(/<script type="application\/ld\+json">/, '').replace(/<\/script>/, '').trim();
+    
+    try {
+      const jsonObj = JSON.parse(jsonLdString);
+      
+      // Determine the type of JSON-LD
+      const type = jsonObj['@type'] || 'Unknown';
+      const name = jsonObj.name || jsonObj.title || 'Unnamed';
+      
+      jsonLdData.push({
+        index: i + 1,
+        type: type,
+        name: name,
+        data: jsonObj,
+        formatted: JSON.stringify(jsonObj, null, 2)
+      });
+    } catch (parseError) {
+      // Skip invalid JSON-LD
+      console.error('Invalid JSON-LD data:', parseError);
+    }
+  }
+  
+  return jsonLdData;
 }
 
 function extractCulocaLogoFallback(headContent: string) {
