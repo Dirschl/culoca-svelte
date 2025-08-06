@@ -771,11 +771,11 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
         <button 
           on:click={fetchHeadData} 
           class="analyze-btn" 
-          disabled={isLoading}
+          disabled={isHeadLoading}
           type="button"
           style="display: inline-block; min-width: 120px;"
         >
-          {isLoading ? 'Analysiere...' : 'Analysieren'}
+          {isHeadLoading ? 'Analysiere...' : 'Analysieren'}
         </button>
       </div>
       
