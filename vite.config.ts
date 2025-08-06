@@ -18,6 +18,10 @@ export default defineConfig({
 			'Cache-Control': 'no-cache'
 		},
 		port: 5173,
-		strictPort: true
+		strictPort: true,
+		fs: {
+			// Erlaube Zugriff auf static Verzeichnis für Favicon
+			allow: ['..']
+		}
 	}
 });
