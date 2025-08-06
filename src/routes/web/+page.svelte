@@ -130,7 +130,7 @@
 
 Title: "${editableTitle || headData?.title || 'Titel eingeben'}"
 Description: "${editableDescription || headData?.metaTags?.find(tag => tag.name === 'description' || tag.property === 'og:description')?.content || 'Description eingeben'}"
-Caption: "${editableCaption || headData?.metaTags?.find(tag => tag.name === 'caption' || tag.property === 'og:caption')?.content || 'Caption eingeben'}"
+Caption: "${editableCaption || headData?.metaTags?.find(tag => tag.name === 'caption' || tag.property === 'og:caption')?.content || headData?.jsonLdData?.[0]?.data?.caption || 'Caption eingeben'}"
 Seitentyp: ${editablePageType}
 Keywords: "${editableKeywords || headData?.metaTags?.find(tag => tag.name === 'keywords')?.content || 'Keywords eingeben'}"
 Autor: "${editableAuthor || headData?.metaTags?.find(tag => tag.name === 'author' || tag.property === 'og:author')?.content || 'Autor eingeben'}"
@@ -199,6 +199,14 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
         const caption = result.metaTags?.find(tag => tag.name === 'caption' || tag.property === 'og:caption')?.content;
         editableCaption = caption || '';
         
+        // Also fetch JSON-LD data first, then update caption if found in JSON-LD
+        await fetchJsonLd();
+        
+        // Update caption from JSON-LD if not found in meta tags
+        if (!caption && headData?.jsonLdData?.[0]?.data?.caption) {
+          editableCaption = headData.jsonLdData[0].data.caption;
+        }
+        
         // JSON-LD Daten sind optional - setze Standard-Werte
         const pageType = result.jsonLdData?.[0]?.data?.['@type'] || 'WebPage';
         editablePageType = pageType;
@@ -211,9 +219,6 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
         
         const location = result.metaTags?.find(tag => tag.name === 'geo.region' || tag.property === 'og:locale')?.content;
         editableLocation = location || '';
-        
-        // Also fetch JSON-LD data
-        await fetchJsonLd();
       } else {
         throw new Error(result.error || 'Unbekannter Fehler');
       }
@@ -900,8 +905,10 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
               <!-- Caption Analysis -->
               <div class="seo-item">
                 <h6>📷 Caption:</h6>
-                {#if headData.metaTags}
-                  {@const caption = headData.metaTags.find(tag => tag.name === 'caption' || tag.property === 'og:caption')?.content}
+                {#if headData}
+                  {@const captionFromMeta = headData.metaTags?.find(tag => tag.name === 'caption' || tag.property === 'og:caption')?.content}
+                  {@const captionFromJsonLd = headData.jsonLdData?.[0]?.data?.caption}
+                  {@const caption = captionFromMeta || captionFromJsonLd}
                   {#if caption}
                     {@const captionLength = editableCaption.length || caption.length}
                     <p><strong>Länge ({captionLength} Zeichen):</strong> <span class="status-{captionLength <= 200 ? 'good' : 'warning'}">{captionLength <= 200 ? '✅ Optimal' : '⚠️ Zu lang'}</span></p>
@@ -925,7 +932,7 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
                     </div>
                   {/if}
                 {:else}
-                  <p class="no-data">❌ Keine Meta-Tags verfügbar</p>
+                  <p class="no-data">❌ Keine Daten verfügbar</p>
                   <div class="editable-text-field">
                     <textarea 
                       bind:value={editableCaption} 
@@ -1064,7 +1071,7 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
 
 Title: "{editableTitle || headData.title || 'Titel eingeben'}"
 Description: "{editableDescription || headData.metaTags?.find(tag => tag.name === 'description' || tag.property === 'og:description')?.content || 'Description eingeben'}"
-Caption: "{editableCaption || headData.metaTags?.find(tag => tag.name === 'caption' || tag.property === 'og:caption')?.content || 'Caption eingeben'}"
+Caption: "{editableCaption || headData.metaTags?.find(tag => tag.name === 'caption' || tag.property === 'og:caption')?.content || headData.jsonLdData?.[0]?.data?.caption || 'Caption eingeben'}"
 Seitentyp: {editablePageType}
 Keywords: "{editableKeywords || headData.metaTags?.find(tag => tag.name === 'keywords')?.content || 'Keywords eingeben'}"
 Autor: "{editableAuthor || headData.metaTags?.find(tag => tag.name === 'author' || tag.property === 'og:author')?.content || 'Autor eingeben'}"
