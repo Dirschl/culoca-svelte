@@ -317,8 +317,8 @@ h2:hover {
 
 /* Culoca Icon als serverseitiger Fallback - wird sofort angezeigt */
 :root {
-  --culoca-favicon: url('/static/culoca-favicon.svg');
-  --culoca-favicon-png: url('/static/culoca-icon.png');
+	--culoca-favicon: url('/culoca-favicon.svg');
+	--culoca-favicon-png: url('/culoca-icon.png');
 }
 
 /* Fallback für fehlende Icons - wird überschrieben wenn echtes Icon geladen wird */
