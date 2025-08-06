@@ -2,11 +2,76 @@
   import InfoPageLayout from '$lib/InfoPageLayout.svelte';
 </script>
 
-<InfoPageLayout 
-  currentPage="license"
-  title="Lizenz - DIRSCHL.com GmbH"
-  description="Lizenzinformationen für Bilder auf Culoca - Nutzungsbedingungen und Copyright-Hinweise der DIRSCHL.com GmbH"
->
+<svelte:head>
+  <title>Lizenz der DIRSCHL.com GmbH für culoca.com, See You Local</title>
+  <meta name="description" content="Lizenzinformationen und Nutzungsbedingungen für Bilder auf Culoca - Urheberrecht, Copyright-Hinweise und kommerzielle Nutzung der DIRSCHL.com GmbH. Klare Richtlinien für Fotografen und Nutzer." />
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="https://culoca.com/web/license" />
+  
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="/culoca-icon.svg" />
+  <link rel="icon" type="image/png" href="/culoca-icon.png" sizes="32x32" />
+  <link rel="apple-touch-icon" href="/culoca-icon.png" sizes="180x180" />
+  
+  <!-- Open Graph -->
+  <meta property="og:title" content="Lizenz der DIRSCHL.com GmbH für culoca.com, See You Local" />
+  <meta property="og:description" content="Lizenzinformationen und Nutzungsbedingungen für Bilder auf Culoca - Urheberrecht, Copyright-Hinweise und kommerzielle Nutzung der DIRSCHL.com GmbH. Klare Richtlinien für Fotografen und Nutzer." />
+  <meta property="og:url" content="https://culoca.com/web/license" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="DIRSCHL.com GmbH" />
+  <meta property="og:locale" content="de_DE" />
+  <meta property="og:image" content="https://culoca.com/culoca-see-you-local-entdecke-deine-umgebung.jpg" />
+  
+  <!-- JSON-LD -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    "name": "Lizenz der DIRSCHL.com GmbH für culoca.com, See You Local",
+    "description": "Lizenzinformationen und Nutzungsbedingungen für Bilder auf Culoca - Urheberrecht, Copyright-Hinweise und kommerzielle Nutzung der DIRSCHL.com GmbH. Klare Richtlinien für Fotografen und Nutzer.",
+    "url": "https://culoca.com/web/license",
+    "inLanguage": "de",
+    "caption": "License Information for culoca.com, DIRSCHL.com GmbH",
+    "keywords": "Lizenz, Urheberrecht, Copyright, Nutzungsbedingungen, Culoca, DIRSCHL.com GmbH, Fotografie, Bilder, kommerzielle Nutzung, Attribution, Fotografen, Rechtliche Hinweise, Bildlizenzen, Creative Commons, Nutzungsrechte",
+    "author": {
+      "@type": "Person",
+      "name": "Johann Dirschl"
+    },
+    "contentLocation": {
+      "@type": "Place",
+      "name": "de_DE"
+    },
+    "image": {
+      "@type": "ImageObject",
+      "url": "https://culoca.com/culoca-see-you-local-entdecke-deine-umgebung.jpg",
+      "name": "culoca-see-you-local-entdecke-deine-umgebung.jpg"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "DIRSCHL.com GmbH",
+      "url": "https://culoca.com",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://culoca.com/culoca-icon.svg"
+      },
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "Waldberg 84",
+        "addressLocality": "Reischach",
+        "postalCode": "84571",
+        "addressCountry": "DE"
+      },
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "telephone": "+49-179-9766666",
+        "email": "johann.dirschl@gmx.de"
+      }
+    }
+  }
+  </script>
+</svelte:head>
+
+<InfoPageLayout currentPage="license">
   <h1>Lizenzinformationen</h1>
   
   <h2>Allgemeine Nutzungsbedingungen für Bilder auf Culoca</h2>
