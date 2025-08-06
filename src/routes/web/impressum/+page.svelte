@@ -26,12 +26,12 @@
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
-    "@type": "ContactPage",
+    "@type": "WebPage",
     "name": "Impressum - DIRSCHL.com GmbH",
     "description": "Impressum und rechtliche Informationen der DIRSCHL.com GmbH - Angaben gemäß § 5 TMG",
     "url": "https://culoca.com/web/impressum",
     "inLanguage": "de",
-    "mainEntity": {
+    "publisher": {
       "@type": "Organization",
       "name": "DIRSCHL.com GmbH",
       "url": "https://culoca.com",
