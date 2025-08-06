@@ -3,19 +3,19 @@
 </script>
 
 <svelte:head>
-  <title>Datenschutz - DIRSCHL.com GmbH</title>
-  <meta name="description" content="Datenschutzerklärung der DIRSCHL.com GmbH - Informationen zur Verarbeitung personenbezogener Daten gemäß DSGVO" />
+  <title>Datenschutz der DIRSCHL.com GmbH für culoca.com, See You Local</title>
+  <meta name="description" content="Datenschutzerklärung der DIRSCHL.com GmbH - Umfassende Informationen zur Verarbeitung personenbezogener Daten gemäß DSGVO. SSL-Verschlüsselung, Cookies, Server-Logs und Ihre Rechte auf Auskunft, Löschung und Datenübertragbarkeit." />
   <meta name="robots" content="index, follow" />
   <link rel="canonical" href="https://culoca.com/web/datenschutz" />
   
-  	<!-- Favicon -->
-	<link rel="icon" type="image/svg+xml" href="/culoca-icon.svg">
-	<link rel="icon" type="image/png" href="/culoca-icon.png" sizes="32x32">
-	<link rel="apple-touch-icon" href="/culoca-icon.png" sizes="180x180">
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="/culoca-icon.svg" />
+  <link rel="icon" type="image/png" href="/culoca-icon.png" sizes="32x32" />
+  <link rel="apple-touch-icon" href="/culoca-icon.png" sizes="180x180" />
   
   <!-- Open Graph -->
-  <meta property="og:title" content="Datenschutz - DIRSCHL.com GmbH" />
-  <meta property="og:description" content="Datenschutzerklärung der DIRSCHL.com GmbH - Informationen zur Verarbeitung personenbezogener Daten gemäß DSGVO" />
+  <meta property="og:title" content="Datenschutz der DIRSCHL.com GmbH für culoca.com, See You Local" />
+  <meta property="og:description" content="Datenschutzerklärung der DIRSCHL.com GmbH - Umfassende Informationen zur Verarbeitung personenbezogener Daten gemäß DSGVO. SSL-Verschlüsselung, Cookies, Server-Logs und Ihre Rechte auf Auskunft, Löschung und Datenübertragbarkeit." />
   <meta property="og:url" content="https://culoca.com/web/datenschutz" />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="DIRSCHL.com GmbH" />
@@ -26,38 +26,52 @@
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
-    "@type": "FAQPage",
-    "name": "Datenschutz - DIRSCHL.com GmbH",
-    "description": "Datenschutzerklärung der DIRSCHL.com GmbH - Informationen zur Verarbeitung personenbezogener Daten gemäß DSGVO",
+    "@type": "WebPage",
+    "name": "Datenschutz der DIRSCHL.com GmbH für culoca.com, See You Local",
+    "description": "Datenschutzerklärung der DIRSCHL.com GmbH - Umfassende Informationen zur Verarbeitung personenbezogener Daten gemäß DSGVO. SSL-Verschlüsselung, Cookies, Server-Logs und Ihre Rechte auf Auskunft, Löschung und Datenübertragbarkeit.",
     "url": "https://culoca.com/web/datenschutz",
     "inLanguage": "de",
-    "mainEntity": [
-      {
-        "@type": "Question",
-        "name": "Wie werden meine Daten geschützt?",
-        "acceptedAnswer": {
-          "@type": "Answer",
-          "text": "Die Betreiber dieser Seiten nehmen den Schutz Ihrer persönlichen Daten sehr ernst. Wir behandeln Ihre personenbezogenen Daten vertraulich und entsprechend den gesetzlichen Datenschutzvorschriften."
-        }
+    "caption": "Privacy Policy for culoca.com, DIRSCHL.com GmbH",
+    "keywords": "Datenschutz, DSGVO, Datenschutzerklärung, personenbezogene Daten, SSL-Verschlüsselung, Cookies, Server-Logs, Auskunftsrecht, Löschung, Datenübertragbarkeit, DIRSCHL.com GmbH, culoca.com, Datenschutzrichtlinien, GDPR, Privacy Policy, Datenschutzrecht, Verantwortliche Stelle, Johann Dirschl",
+    "author": {
+      "@type": "Person",
+      "name": "Johann Dirschl"
+    },
+    "contentLocation": {
+      "@type": "Place",
+      "name": "de_DE"
+    },
+    "image": {
+      "@type": "ImageObject",
+      "url": "https://culoca.com/culoca-see-you-local-entdecke-deine-umgebung.jpg",
+      "name": "culoca-see-you-local-entdecke-deine-umgebung.jpg"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "DIRSCHL.com GmbH",
+      "url": "https://culoca.com",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://culoca.com/culoca-icon.svg"
       },
-      {
-        "@type": "Question", 
-        "name": "Wer ist verantwortlich für die Datenverarbeitung?",
-        "acceptedAnswer": {
-          "@type": "Answer",
-          "text": "Die verantwortliche Stelle ist DIRSCHL.com GmbH, Waldberg 84, 84571 Reischach, vertreten durch Geschäftsführer Johann Dirschl."
-        }
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "Waldberg 84",
+        "addressLocality": "Reischach",
+        "postalCode": "84571",
+        "addressCountry": "DE"
+      },
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "telephone": "+49-179-9766666",
+        "email": "johann.dirschl@gmx.de"
       }
-    ]
+    }
   }
   </script>
 </svelte:head>
 
-<InfoPageLayout 
-  currentPage="datenschutz"
-  title="Datenschutz - DIRSCHL.com GmbH"
-  description="Datenschutzerklärung der DIRSCHL.com GmbH - Informationen zur Verarbeitung personenbezogener Daten gemäß DSGVO"
->
+<InfoPageLayout currentPage="datenschutz">
   <h1>Datenschutzerklärung</h1>
   
   <h2 style="margin-top: 2rem;">1. Datenschutz auf einen Blick</h2>
