@@ -9,7 +9,7 @@
   <link rel="canonical" href="https://culoca.com/web/datenschutz" />
   
   	<!-- Favicon -->
-	<link rel="icon" type="image/svg+xml" href="/culoca-favicon.svg">
+	<link rel="icon" type="image/svg+xml" href="/culoca-icon.svg">
 	<link rel="icon" type="image/png" href="/culoca-icon.png" sizes="32x32">
 	<link rel="apple-touch-icon" href="/culoca-icon.png" sizes="180x180">
   
