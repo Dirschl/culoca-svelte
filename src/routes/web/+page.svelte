@@ -82,6 +82,11 @@
   // Editierbare SEO-Textfelder
   let editableTitle = '';
   let editableDescription = '';
+  let editableCaption = '';
+  let editablePageType = 'WebPage';
+  let editableKeywords = '';
+  let editableAuthor = '';
+  let editableLocation = '';
 
   function clearInput() {
     testUrl = '';
@@ -99,6 +104,39 @@
 
   async function copyPrompt() {
     const promptText = `Bitte ändere auf der Seite ${testUrl} den Title auf "${editableTitle || headData?.title || 'Titel eingeben'}" und die Description auf "${editableDescription || headData?.metaTags?.find(tag => tag.name === 'description' || tag.property === 'og:description')?.content || 'Description eingeben'}"`;
+    
+    try {
+      await navigator.clipboard.writeText(promptText);
+      // Optional: Zeige eine kurze Bestätigung
+      const copyButton = document.querySelector('.copy-button') as HTMLElement;
+      if (copyButton) {
+        const originalHTML = copyButton.innerHTML;
+        copyButton.innerHTML = `
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M20 6L9 17l-5-5"/>
+          </svg>
+        `;
+        setTimeout(() => {
+          copyButton.innerHTML = originalHTML;
+        }, 1000);
+      }
+    } catch (err) {
+      console.error('Fehler beim Kopieren:', err);
+    }
+  }
+
+  async function copyAdvancedPrompt() {
+    const promptText = `Bitte optimiere die SEO-Daten für die Seite ${testUrl}:
+
+Title: "${editableTitle || headData?.title || 'Titel eingeben'}"
+Description: "${editableDescription || headData?.metaTags?.find(tag => tag.name === 'description' || tag.property === 'og:description')?.content || 'Description eingeben'}"
+Caption: "${editableCaption || headData?.metaTags?.find(tag => tag.name === 'caption' || tag.property === 'og:caption')?.content || 'Caption eingeben'}"
+Seitentyp: ${editablePageType}
+Keywords: "${editableKeywords || headData?.metaTags?.find(tag => tag.name === 'keywords')?.content || 'Keywords eingeben'}"
+Autor: "${editableAuthor || headData?.metaTags?.find(tag => tag.name === 'author' || tag.property === 'og:author')?.content || 'Autor eingeben'}"
+Standort: "${editableLocation || headData?.metaTags?.find(tag => tag.name === 'geo.region' || tag.property === 'og:locale')?.content || 'Standort eingeben'}"
+
+Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auch das entsprechende JSON-LD Schema.`;
     
     try {
       await navigator.clipboard.writeText(promptText);
@@ -157,6 +195,23 @@
         const description = result.metaTags?.find(tag => tag.name === 'description' || tag.property === 'og:description')?.content;
         editableDescription = description || '';
         
+        // Erweiterte Felder initialisieren
+        const caption = result.metaTags?.find(tag => tag.name === 'caption' || tag.property === 'og:caption')?.content;
+        editableCaption = caption || '';
+        
+        // JSON-LD Daten sind optional - setze Standard-Werte
+        const pageType = result.jsonLdData?.[0]?.data?.['@type'] || 'WebPage';
+        editablePageType = pageType;
+        
+        const keywords = result.metaTags?.find(tag => tag.name === 'keywords')?.content;
+        editableKeywords = keywords || '';
+        
+        const author = result.metaTags?.find(tag => tag.name === 'author' || tag.property === 'og:author')?.content;
+        editableAuthor = author || '';
+        
+        const location = result.metaTags?.find(tag => tag.name === 'geo.region' || tag.property === 'og:locale')?.content;
+        editableLocation = location || '';
+        
         // Also fetch JSON-LD data
         await fetchJsonLd();
       } else {
@@ -191,30 +246,39 @@
       
       const result = await response.json();
       
-      if (result.success) {
-        // Format all JSON-LD data found
-        let formattedData = `Gefunden: ${result.totalFound} JSON-LD Strukturen\n`;
-        formattedData += `Gültig: ${result.validCount}, Fehler: ${result.errorCount}\n\n`;
-        
-        // Add each valid JSON-LD structure
-        result.jsonLdData.forEach((item: any, index: number) => {
-          formattedData += `=== ${item.index}. ${item.type}: ${item.name} ===\n`;
-          formattedData += item.formatted;
-          formattedData += '\n\n';
-        });
-        
-        // Add any errors
-        if (result.errors && result.errors.length > 0) {
-          formattedData += '=== FEHLER ===\n';
-          result.errors.forEach((err: any) => {
-            formattedData += `${err.index}. ${err.error}: ${err.content}\n`;
+              if (result.success) {
+          // Speichere JSON-LD Daten in headData für die SEO-Analyse
+          if (headData) {
+            headData.jsonLdData = result.jsonLdData;
+          }
+          
+          // Format all JSON-LD data found
+          let formattedData = `Gefunden: ${result.totalFound} JSON-LD Strukturen\n`;
+          formattedData += `Gültig: ${result.validCount}, Fehler: ${result.errorCount}\n\n`;
+          
+          // Add each valid JSON-LD structure
+          result.jsonLdData.forEach((item: any, index: number) => {
+            formattedData += `=== ${item.index}. ${item.type}: ${item.name} ===\n`;
+            formattedData += item.formatted;
+            formattedData += '\n\n';
           });
+          
+          // Add any errors
+          if (result.errors && result.errors.length > 0) {
+            formattedData += '=== FEHLER ===\n';
+            result.errors.forEach((err: any) => {
+              formattedData += `${err.index}. ${err.error}: ${err.content}\n`;
+            });
+          }
+          
+          jsonLdData = formattedData;
+        } else {
+          // JSON-LD nicht gefunden ist kein Fehler - setze Standard-Werte
+          if (headData) {
+            headData.jsonLdData = [];
+          }
+          jsonLdData = 'Keine JSON-LD Daten gefunden';
         }
-        
-        jsonLdData = formattedData;
-      } else {
-        throw new Error(result.error || 'Unbekannter Fehler');
-      }
       
     } catch (err: any) {
       error = err.message || 'Fehler beim Laden der JSON-LD Daten';
@@ -776,88 +840,254 @@
         <div class="analysis-example">
           <h4>HTML Head von: <a href={testUrl} target="_blank" rel="noopener">{testUrl}</a></h4>
           <div class="head-tabs">
-                    <button class="tab-button" class:active={activeTab === 'images'} on:click={() => activeTab = 'images'}>Bilder & Icons</button>
-        <button class="tab-button" class:active={activeTab === 'jsonld'} on:click={() => activeTab = 'jsonld'}>JSON-LD</button>
-        <button class="tab-button" class:active={activeTab === 'formatted'} on:click={() => activeTab = 'formatted'}>Formatiert</button>
-        <button class="tab-button" class:active={activeTab === 'meta'} on:click={() => activeTab = 'meta'}>Meta-Tags</button>
-        <button class="tab-button" class:active={activeTab === 'raw'} on:click={() => activeTab = 'raw'}>Raw HTML</button>
+            <button class="tab-button" class:active={activeTab === 'images'} on:click={() => activeTab = 'images'}>Bilder & Icons</button>
+            <button class="tab-button" class:active={activeTab === 'prompt'} on:click={() => activeTab = 'prompt'}>Prompt</button>
+            <button class="tab-button" class:active={activeTab === 'jsonld'} on:click={() => activeTab = 'jsonld'}>JSON-LD</button>
+            <button class="tab-button" class:active={activeTab === 'formatted'} on:click={() => activeTab = 'formatted'}>Formatiert</button>
+            <button class="tab-button" class:active={activeTab === 'meta'} on:click={() => activeTab = 'meta'}>Meta-Tags</button>
+            <button class="tab-button" class:active={activeTab === 'raw'} on:click={() => activeTab = 'raw'}>Raw HTML</button>
           </div>
           
-          {#if activeTab === 'images'}
-            <div class="images-analysis">
-              <!-- SEO Information Section -->
-              <div class="seo-info-section">
-                <h5>📊 SEO-Informationen:</h5>
-                
-                <!-- Title Analysis -->
-                <div class="seo-item">
-                  <h6>📝 Title:</h6>
-                  {#if headData.title}
-                    {@const titleLength = editableTitle.length || headData.title.length}
-                    {@const titleStatus = titleLength >= 30 && titleLength <= 60 ? '✅ Optimal' : titleLength < 30 ? '⚠️ Zu kurz' : '⚠️ Zu lang'}
-                    <p><strong>Länge ({titleLength} Zeichen):</strong> <span class="status-{titleStatus.includes('✅') ? 'good' : 'warning'}">{titleStatus}</span></p>
+          {#if activeTab === 'prompt'}
+            <div class="prompt-analysis">
+              <h5>📊 SEO-Informationen & KI-Prompt Generator:</h5>
+              
+              <!-- Title Analysis -->
+              <div class="seo-item">
+                <h6>📝 Title:</h6>
+                {#if headData.title}
+                  {@const titleLength = editableTitle.length || headData.title.length}
+                  {@const titleStatus = titleLength >= 30 && titleLength <= 60 ? '✅ Optimal' : titleLength < 30 ? '⚠️ Zu kurz' : '⚠️ Zu lang'}
+                  <p><strong>Länge ({titleLength} Zeichen):</strong> <span class="status-{titleStatus.includes('✅') ? 'good' : 'warning'}">{titleStatus}</span></p>
+                  <div class="editable-text-field">
+                    <textarea 
+                      bind:value={editableTitle} 
+                      placeholder={headData.title || 'Title eingeben...'}
+                      rows="2"
+                      class="seo-textarea"
+                    ></textarea>
+                  </div>
+                {:else}
+                  <p class="no-data">❌ Kein Title gefunden</p>
+                {/if}
+              </div>
+              
+              <!-- Description Analysis -->
+              <div class="seo-item">
+                <h6>📄 Description:</h6>
+                {#if headData.metaTags}
+                  {@const description = headData.metaTags.find(tag => tag.name === 'description' || tag.property === 'og:description')?.content}
+                  {#if description}
+                    {@const descLength = editableDescription.length || description.length}
+                    {@const descStatus = descLength >= 120 && descLength <= 160 ? '✅ Optimal' : descLength < 120 ? '⚠️ Zu kurz' : '⚠️ Zu lang'}
+                    <p><strong>Länge ({descLength} Zeichen):</strong> <span class="status-{descStatus.includes('✅') ? 'good' : 'warning'}">{descStatus}</span></p>
                     <div class="editable-text-field">
                       <textarea 
-                        bind:value={editableTitle} 
-                        placeholder={headData.title || 'Title eingeben...'}
+                        bind:value={editableDescription} 
+                        placeholder={description || 'Description eingeben...'}
+                        rows="3"
+                        class="seo-textarea"
+                      ></textarea>
+                    </div>
+                  {:else}
+                    <p class="no-data">❌ Keine Description gefunden</p>
+                  {/if}
+                {:else}
+                  <p class="no-data">❌ Keine Meta-Tags verfügbar</p>
+                {/if}
+              </div>
+
+              <!-- Caption Analysis -->
+              <div class="seo-item">
+                <h6>📷 Caption:</h6>
+                {#if headData.metaTags}
+                  {@const caption = headData.metaTags.find(tag => tag.name === 'caption' || tag.property === 'og:caption')?.content}
+                  {#if caption}
+                    {@const captionLength = editableCaption.length || caption.length}
+                    <p><strong>Länge ({captionLength} Zeichen):</strong> <span class="status-{captionLength <= 200 ? 'good' : 'warning'}">{captionLength <= 200 ? '✅ Optimal' : '⚠️ Zu lang'}</span></p>
+                    <div class="editable-text-field">
+                      <textarea 
+                        bind:value={editableCaption} 
+                        placeholder={caption || 'Caption eingeben...'}
                         rows="2"
                         class="seo-textarea"
                       ></textarea>
                     </div>
                   {:else}
-                    <p class="no-data">❌ Kein Title gefunden</p>
+                    <p class="no-data">❌ Keine Caption gefunden</p>
+                    <div class="editable-text-field">
+                      <textarea 
+                        bind:value={editableCaption} 
+                        placeholder="Caption eingeben..."
+                        rows="2"
+                        class="seo-textarea"
+                      ></textarea>
+                    </div>
                   {/if}
-                </div>
-                
-                <!-- Description Analysis -->
-                <div class="seo-item">
-                  <h6>📄 Description:</h6>
-                  {#if headData.metaTags}
-                    {@const description = headData.metaTags.find(tag => tag.name === 'description' || tag.property === 'og:description')?.content}
-                    {#if description}
-                      {@const descLength = editableDescription.length || description.length}
-                      {@const descStatus = descLength >= 120 && descLength <= 160 ? '✅ Optimal' : descLength < 120 ? '⚠️ Zu kurz' : '⚠️ Zu lang'}
-                      <p><strong>Länge ({descLength} Zeichen):</strong> <span class="status-{descStatus.includes('✅') ? 'good' : 'warning'}">{descStatus}</span></p>
-                      <div class="editable-text-field">
-                        <textarea 
-                          bind:value={editableDescription} 
-                          placeholder={description || 'Description eingeben...'}
-                          rows="3"
-                          class="seo-textarea"
-                        ></textarea>
-                      </div>
-                      
-                      <!-- Kopierbarer Prompt -->
-                      {#if testUrl && (editableTitle || editableDescription)}
-                        <div class="prompt-section">
-                          <h6>📋 KI-Prompt zum Kopieren:</h6>
-                          <div class="prompt-container">
-                            <textarea 
-                              readonly 
-                              class="prompt-textarea"
-                              rows="4"
-                            >Bitte ändere auf der Seite {testUrl} den Title auf "{editableTitle || headData.title || 'Titel eingeben'}" und die Description auf "{editableDescription || description || 'Description eingeben'}"</textarea>
-                            <button 
-                              class="copy-button" 
-                              on:click={() => copyPrompt()}
-                              title="Prompt kopieren"
-                            >
-                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-                              </svg>
-                            </button>
-                          </div>
-                        </div>
-                      {/if}
-                    {:else}
-                      <p class="no-data">❌ Keine Description gefunden</p>
-                    {/if}
-                  {:else}
-                    <p class="no-data">❌ Keine Meta-Tags verfügbar</p>
-                  {/if}
+                {:else}
+                  <p class="no-data">❌ Keine Meta-Tags verfügbar</p>
+                  <div class="editable-text-field">
+                    <textarea 
+                      bind:value={editableCaption} 
+                      placeholder="Caption eingeben..."
+                      rows="2"
+                      class="seo-textarea"
+                    ></textarea>
+                  </div>
+                {/if}
+              </div>
+
+              <!-- Page Type Analysis -->
+              <div class="seo-item">
+                <h6>🏷️ Seitentyp (JSON-LD @type):</h6>
+                {#if headData.jsonLdData}
+                  {@const pageType = headData.jsonLdData[0]?.data?.['@type'] || 'WebPage'}
+                  <p><strong>Aktueller Typ:</strong> {pageType}</p>
+                {:else}
+                  <p><strong>Aktueller Typ:</strong> WebPage (Standard)</p>
+                {/if}
+                <div class="editable-text-field">
+                  <select bind:value={editablePageType} class="seo-select">
+                    <option value="WebPage">WebPage (Standard)</option>
+                    <option value="Article">Article (Artikel)</option>
+                    <option value="BlogPosting">BlogPosting (Blog)</option>
+                    <option value="Product">Product (Produkt)</option>
+                    <option value="Organization">Organization (Unternehmen)</option>
+                    <option value="Person">Person (Person)</option>
+                    <option value="Place">Place (Ort)</option>
+                    <option value="Event">Event (Veranstaltung)</option>
+                    <option value="FAQPage">FAQPage (FAQ)</option>
+                    <option value="ContactPage">ContactPage (Kontakt)</option>
+                    <option value="ImageObject">ImageObject (Bild)</option>
+                    <option value="CreativeWork">CreativeWork (Kreative Arbeit)</option>
+                  </select>
                 </div>
               </div>
+
+              <!-- Keywords Analysis -->
+              <div class="seo-item">
+                <h6>🔑 Keywords:</h6>
+                {#if headData.metaTags}
+                  {@const keywords = headData.metaTags.find(tag => tag.name === 'keywords')?.content}
+                  {#if keywords}
+                    <p><strong>Aktuelle Keywords:</strong> {keywords}</p>
+                  {/if}
+                  <div class="editable-text-field">
+                    <textarea 
+                      bind:value={editableKeywords} 
+                      placeholder={keywords || 'Keywords eingeben (kommagetrennt)...'}
+                      rows="2"
+                      class="seo-textarea"
+                    ></textarea>
+                  </div>
+                {:else}
+                  <p class="no-data">❌ Keine Meta-Tags verfügbar</p>
+                  <div class="editable-text-field">
+                    <textarea 
+                      bind:value={editableKeywords} 
+                      placeholder="Keywords eingeben (kommagetrennt)..."
+                      rows="2"
+                      class="seo-textarea"
+                    ></textarea>
+                  </div>
+                {/if}
+              </div>
+
+              <!-- Author Analysis -->
+              <div class="seo-item">
+                <h6>👤 Autor:</h6>
+                {#if headData.metaTags}
+                  {@const author = headData.metaTags.find(tag => tag.name === 'author' || tag.property === 'og:author')?.content}
+                  {#if author}
+                    <p><strong>Aktueller Autor:</strong> {author}</p>
+                  {/if}
+                  <div class="editable-text-field">
+                    <input 
+                      type="text" 
+                      bind:value={editableAuthor} 
+                      placeholder={author || 'Autor eingeben...'}
+                      class="seo-input"
+                    />
+                  </div>
+                {:else}
+                  <p class="no-data">❌ Keine Meta-Tags verfügbar</p>
+                  <div class="editable-text-field">
+                    <input 
+                      type="text" 
+                      bind:value={editableAuthor} 
+                      placeholder="Autor eingeben..."
+                      class="seo-input"
+                    />
+                  </div>
+                {/if}
+              </div>
+
+              <!-- Location Analysis -->
+              <div class="seo-item">
+                <h6>📍 Standort:</h6>
+                {#if headData.metaTags}
+                  {@const location = headData.metaTags.find(tag => tag.name === 'geo.region' || tag.property === 'og:locale')?.content}
+                  {#if location}
+                    <p><strong>Aktueller Standort:</strong> {location}</p>
+                  {/if}
+                  <div class="editable-text-field">
+                    <input 
+                      type="text" 
+                      bind:value={editableLocation} 
+                      placeholder={location || 'Standort eingeben...'}
+                      class="seo-input"
+                    />
+                  </div>
+                {:else}
+                  <p class="no-data">❌ Keine Meta-Tags verfügbar</p>
+                  <div class="editable-text-field">
+                    <input 
+                      type="text" 
+                      bind:value={editableLocation} 
+                      placeholder="Standort eingeben..."
+                      class="seo-input"
+                    />
+                  </div>
+                {/if}
+              </div>
+
+              <!-- KI-Prompt Section -->
+              {#if testUrl && (editableTitle || editableDescription)}
+                <div class="prompt-section">
+                  <h6>📋 Erweiterter KI-Prompt zum Kopieren:</h6>
+                  <div class="prompt-container">
+                    <textarea 
+                      readonly 
+                      class="prompt-textarea"
+                      rows="8"
+                    >Bitte optimiere die SEO-Daten für die Seite {testUrl}:
+
+Title: "{editableTitle || headData.title || 'Titel eingeben'}"
+Description: "{editableDescription || headData.metaTags?.find(tag => tag.name === 'description' || tag.property === 'og:description')?.content || 'Description eingeben'}"
+Caption: "{editableCaption || headData.metaTags?.find(tag => tag.name === 'caption' || tag.property === 'og:caption')?.content || 'Caption eingeben'}"
+Seitentyp: {editablePageType}
+Keywords: "{editableKeywords || headData.metaTags?.find(tag => tag.name === 'keywords')?.content || 'Keywords eingeben'}"
+Autor: "{editableAuthor || headData.metaTags?.find(tag => tag.name === 'author' || tag.property === 'og:author')?.content || 'Autor eingeben'}"
+Standort: "{editableLocation || headData.metaTags?.find(tag => tag.name === 'geo.region' || tag.property === 'og:locale')?.content || 'Standort eingeben'}"
+
+Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auch das entsprechende JSON-LD Schema.</textarea>
+                    <button 
+                      class="copy-button" 
+                      on:click={() => copyAdvancedPrompt()}
+                      title="Erweiterten Prompt kopieren"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              {/if}
+            </div>
+                    {:else if activeTab === 'images'}
+            <div class="images-analysis">
+              <h5>Bilder & Icons Analyse:</h5>
               
               <h5>Bilder & Icons Analyse:</h5>
               
@@ -1956,6 +2186,52 @@
   .seo-textarea::placeholder {
     color: var(--text-tertiary);
     font-style: italic;
+  }
+
+  /* Erweiterte SEO-Eingabefelder */
+  .seo-input {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.9rem;
+    line-height: 1.4;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .seo-input:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 2px rgba(238, 114, 33, 0.1);
+  }
+
+  .seo-select {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.9rem;
+    line-height: 1.4;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    cursor: pointer;
+  }
+
+  .seo-select:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 2px rgba(238, 114, 33, 0.1);
+  }
+
+  .seo-select option {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    padding: 0.5rem;
   }
 
   /* Prompt Section Styles */
