@@ -80,7 +80,7 @@ export const PATCH = async ({ params, request, locals }) => {
   }
 
   // Erlaubte Felder
-  const allowedFields = ['title', 'description', 'keywords', 'original_name', 'gallery', 'lat', 'lon'];
+  const allowedFields = ['title', 'description', 'caption', 'keywords', 'original_name', 'gallery', 'lat', 'lon', 'slug'];
   const updateData = {};
   for (const key of allowedFields) {
     if (body[key] !== undefined) {
@@ -105,6 +105,13 @@ export const PATCH = async ({ params, request, locals }) => {
     .single();
 
   if (updateError) {
+    console.error('Database update error:', updateError);
+    
+    // Spezielle Behandlung für Slug-Konflikte
+    if (updateError.code === '23505' && updateError.message.includes('slug')) {
+      throw error(409, 'Slug already exists. Please choose a different slug.');
+    }
+    
     throw error(500, updateError.message);
   }
 

@@ -2,22 +2,25 @@
   import { createEventDispatcher } from 'svelte';
   import { onMount } from 'svelte';
   import { trackStore } from './trackStore';
+  import { 
+    hasJoystickPermission, 
+    hasBulkUploadPermission, 
+    hasSettingsPermission, 
+    hasPublicContentPermission,
+    hasViewMapsPermission,
+    hasGpsTrackingPermission
+  } from './sessionStore';
   
   export let showScrollToTop = false;
-  export let showTestMode = false;
   export let isLoggedIn = false;
   export let simulationMode = false;
   export let profileAvatar: string | null = null;
   export let showMapButton = false;
   export let showTrackButtons = false;
-  export let showUploadButton = true;
-  export let showProfileButton = true;
-  export let showSettingsButton = true;
-  export let showPublicContentButton = true;
   export let showShareButton = false;
   export let settingsIconRotation = 0; // Rotation for movement mode
-export let continuousRotation = 0; // Kontinuierliche Rotation im mobilen Modus
-export let rotationSpeed = 1; // Geschwindigkeit der kontinuierlichen Rotation
+  export let continuousRotation = 0; // Kontinuierliche Rotation im mobilen Modus
+  export let rotationSpeed = 1; // Geschwindigkeit der kontinuierlichen Rotation
   
   // Track state
   let isRecording = false;
@@ -159,7 +162,7 @@ export let rotationSpeed = 1; // Geschwindigkeit der kontinuierlichen Rotation
 
 <div class="fab-container">
   <!-- Track Start/Stop FAB -->
-  {#if showTrackButtons}
+  {#if $hasGpsTrackingPermission && showTrackButtons}
     <button
       class="fab-button track {isRecording ? 'recording' : ''}"
       aria-label={isRecording ? 'Track beenden' : 'Track starten'}
@@ -199,7 +202,7 @@ export let rotationSpeed = 1; // Geschwindigkeit der kontinuierlichen Rotation
   {/if}
   
   <!-- Simulation/Test mode button - nur einer sichtbar: Joystick ODER Haus -->
-  {#if showTestMode && isLoggedIn}
+  {#if $hasJoystickPermission}
     {#if simulationMode}
       <button 
         class="fab-button test-mode"
@@ -231,7 +234,7 @@ export let rotationSpeed = 1; // Geschwindigkeit der kontinuierlichen Rotation
   {/if}
   
   <!-- Map button -->
-  {#if showMapButton}
+  {#if $hasViewMapsPermission}
     <button 
       class="fab-button map"
       on:click={handleMap}
@@ -247,7 +250,7 @@ export let rotationSpeed = 1; // Geschwindigkeit der kontinuierlichen Rotation
   {/if}
 
   <!-- Upload button -->
-  {#if showUploadButton}
+  {#if $hasBulkUploadPermission}
     <button 
       class="fab-button upload"
       on:click={handleUpload}
@@ -261,8 +264,8 @@ export let rotationSpeed = 1; // Geschwindigkeit der kontinuierlichen Rotation
     </button>
   {/if}
   
-  <!-- Public Content button - only for logged in users -->
-  {#if showPublicContentButton && isLoggedIn}
+  <!-- Public Content button - only for logged in users with permission -->
+  {#if $hasPublicContentPermission && isLoggedIn}
     <button 
       class="fab-button public-content"
       on:click={handlePublicContent}
@@ -295,31 +298,29 @@ export let rotationSpeed = 1; // Geschwindigkeit der kontinuierlichen Rotation
     </button>
   {/if}
   
-  <!-- Profile button -->
-  {#if showProfileButton}
-    <button 
-      class="fab-button profile"
-      on:click={handleProfile}
-      aria-label="Profil"
-      title="Profil"
-    >
-      {#if profileAvatar}
-        <img 
-          src={profileAvatar} 
-          alt="Profilbild" 
-          class="profile-avatar"
-        />
-      {:else}
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-          <circle cx="12" cy="7" r="4"/>
-        </svg>
-      {/if}
-    </button>
-  {/if}
+  <!-- Profile button - always visible for login/logout -->
+  <button 
+    class="fab-button profile"
+    on:click={handleProfile}
+    aria-label={isLoggedIn ? "Profil" : "Anmelden"}
+    title={isLoggedIn ? "Profil" : "Anmelden"}
+  >
+    {#if isLoggedIn && profileAvatar}
+      <img 
+        src={profileAvatar} 
+        alt="Profilbild" 
+        class="profile-avatar"
+      />
+    {:else}
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+        <circle cx="12" cy="7" r="4"/>
+      </svg>
+    {/if}
+  </button>
   
   <!-- Settings button -->
-  {#if showSettingsButton}
+  {#if $hasSettingsPermission}
     <button 
       class="fab-button settings"
       on:click={handleSettings}

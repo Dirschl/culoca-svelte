@@ -1,16 +1,54 @@
 import type { PageServerLoad } from './$types';
 import { createClient } from '@supabase/supabase-js';
-import { VITE_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } from '$env/static/private';
-
-const supabase = createClient(VITE_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-  auth: { persistSession: false }
-});
 
 export const load: PageServerLoad = async ({ url }) => {
   // Get page parameter for pagination
   const page = parseInt(url.searchParams.get('page') || '1');
   const itemsPerPage = 50;
-  const offset = (page - 1) * itemsPerPage;
+
+  // Supabase client für serverseitige Daten
+  const supabaseUrl = (process.env.PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL || import.meta.env.PUBLIC_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL) as string;
+  const supabaseServiceKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.PUBLIC_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || import.meta.env.PUBLIC_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY) as string;
+  
+  const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+    auth: { persistSession: false }
+  });
+
+  // Newsflash-Daten serverseitig laden für Bots
+  let newsFlashItems = [];
+  let totalCount = 0;
+  
+  try {
+    const { data, error } = await supabase.rpc('newsflash_items_postgis', {
+      page_value: page - 1, // 0-basiert
+      page_size_value: itemsPerPage,
+      current_user_id: null, // Für Bots: alle öffentlichen Bilder
+      mode: 'alle'
+    });
+
+    if (!error && data) {
+      newsFlashItems = data.map(item => ({
+        id: item.id,
+        slug: item.slug,
+        lat: item.lat,
+        lon: item.lon,
+        path_512: item.path_512,
+        title: item.title,
+        description: item.description,
+        original_name: item.original_name,
+        created_at: item.created_at,
+        accountname: item.accountname,
+        full_name: item.full_name
+      }));
+      
+      // Total count aus erstem Item extrahieren
+      if (data.length > 0 && data[0].total_count) {
+        totalCount = data[0].total_count;
+      }
+    }
+  } catch (error) {
+    console.error('[Server] Error loading newsflash items:', error);
+  }
 
   // SEO-Daten serverseitig laden
   const seo = {
@@ -36,58 +74,14 @@ export const load: PageServerLoad = async ({ url }) => {
     canonicalUrl: 'https://culoca.com'
   };
 
-  // Serverseitig NewsFlash-Daten laden (neueste Bilder) für SEO
-  let newsFlashItems = [];
-  try {
-    console.log(`[Server] Loading NewsFlash items for SEO (page ${page}, offset ${offset})...`);
-
-    // Verwende die gleiche Logik wie NewsFlash, aber serverseitig mit Pagination
-    const { data, error } = await supabase
-      .from('items')
-      .select('id, slug, lat, lon, path_512, path_2048, path_64, title, description, original_name, profile_id, is_private, created_at, width, height, gallery')
-      .not('path_512', 'is', null)
-      .eq('gallery', true) // Nur Galerie-Items
-      .or('is_private.eq.false,is_private.is.null') // Nur öffentliche Items für SEO
-      .order('created_at', { ascending: false })
-      .range(offset, offset + itemsPerPage - 1);
-
-    if (error) {
-      console.error('[Server] Error loading NewsFlash items:', error);
-    } else {
-      console.log(`[Server] Successfully loaded NewsFlash items: ${data?.length || 0} (page ${page})`);
-      console.log('[Server] First item:', data?.[0]);
-      
-      // Formatiere Items für NewsFlash
-      newsFlashItems = (data || []).map(item => ({
-        id: item.id,
-        slug: item.slug,
-        title: item.title,
-        description: item.description,
-        lat: item.lat,
-        lon: item.lon,
-        path_512: item.path_512,
-        original_name: item.original_name,
-        created_at: item.created_at
-      }));
-      
-      console.log('[Server] Formatted items:', newsFlashItems.length);
-      console.log('[Server] First formatted item:', newsFlashItems[0]);
-    }
-  } catch (error) {
-    console.error('[Server] Unexpected error loading NewsFlash items:', error);
-  }
-
-  console.log('[Server] Returning data:', {
-    seo: !!seo,
-    newsFlashItems: newsFlashItems.length,
-    page,
-    offset
-  });
+  console.log('[Server] Loading page data with SSR newsflash items:', newsFlashItems.length);
   
   return {
     seo,
     newsFlashItems,
     page,
-    totalPages: Math.ceil(2200 / itemsPerPage) // Approximate total pages
+    totalPages: Math.ceil(totalCount / itemsPerPage),
+    totalCount,
+    dbConnectionOk: true
   };
 };

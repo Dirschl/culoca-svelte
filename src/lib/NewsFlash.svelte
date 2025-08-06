@@ -68,29 +68,13 @@ async function loadNewsFlashImagesDirectFromDB(): Promise<NewsFlashImage[]> {
     const { data: { session } } = await supabase.auth.getSession();
     const currentUserId = session?.user?.id || null;
     
-    let query = supabase
-      .from('items')
-      .select('id, slug, lat, lon, path_512, title, description, original_name, profile_id, is_private, created_at')
-      .not('path_512', 'is', null)
-      .eq('gallery', true) // Only show images with gallery = true
-      .order('created_at', { ascending: false })
-      .range(currentOffset, currentOffset + limit - 1);
-    
-    // Apply privacy filtering based on mode and user
-    if (currentUserId && mode !== 'aus') {
-      if (mode === 'eigene') {
-        // For 'eigene' mode: only show user's own images
-        query = query.eq('profile_id', currentUserId);
-      } else if (mode === 'alle') {
-        // For 'alle' mode: show user's own images + other users' public images
-        query = query.or(`profile_id.eq.${currentUserId},is_private.eq.false,is_private.is.null`);
-      }
-    } else {
-      // For anonymous users or 'aus' mode: only show public images
-      query = query.or('is_private.eq.false,is_private.is.null');
-    }
-    
-    const { data, error } = await query;
+    // Use dedicated SQL function for NewsFlash with proper sorting
+    const { data, error } = await supabase.rpc('newsflash_items_postgis', {
+      page_value: Math.floor(currentOffset / limit),
+      page_size_value: limit,
+      current_user_id: currentUserId,
+      mode: mode
+    });
     
     if (error) {
       console.error('[NewsFlash DirectDB] Database error:', error);
@@ -99,7 +83,7 @@ async function loadNewsFlashImagesDirectFromDB(): Promise<NewsFlashImage[]> {
     
     const images = (data || []).map(item => ({
       id: item.id,
-      slug: item.slug, // Slug mitgeben!
+      slug: item.slug,
       lat: item.lat,
       lon: item.lon,
       path_512: item.path_512!,
@@ -107,8 +91,8 @@ async function loadNewsFlashImagesDirectFromDB(): Promise<NewsFlashImage[]> {
       description: item.description,
       original_name: item.original_name
     }));
-    console.log('[NewsFlash] Geladene Images:', images.slice(0, 5));
     
+    console.log('[NewsFlash] Geladene Images:', images.slice(0, 5));
     console.log(`[NewsFlash DirectDB] Successfully loaded ${images.length} images`);
     return images;
     
@@ -123,9 +107,15 @@ async function fetchImages(isLoadMore: boolean = false) {
   if (isLoadMore) {
     if (loadingMore || !hasMoreImages) return;
     loadingMore = true;
-    currentOffset += limit; // NEU: Offset erhöhen beim Nachladen
+    currentOffset += limit; // Offset erhöhen beim Nachladen
   } else {
-    currentOffset = usedInitialItems ? images.length : 0;
+    // WICHTIG: Bei Auto-Refresh oder initialem Laden immer die neuesten Items laden
+    // Nur bei initialem Laden mit Server-Daten den Offset beibehalten
+    if (usedInitialItems && initialItems && initialItems.length > 0 && !mounted) {
+      currentOffset = initialItems.length; // Weiter nach den Server-Daten
+    } else {
+      currentOffset = 0; // Von Anfang an - neueste Items
+    }
     hasMoreImages = true;
   }
 
@@ -145,20 +135,31 @@ async function fetchImages(isLoadMore: boolean = false) {
       }
       loadingMore = false;
     } else {
-      // Check if we have new images (not just a refresh)
-      const hasNewImages = newImages.length > 0 &&
-        (images.length === 0 || newImages[0]?.id !== images[0]?.id);
-      images = newImages;
+      // NEU: Verbesserte Logik für neue Bilder
+      const hasNewImages = newImages.length > 0 && (
+        images.length === 0 || 
+        newImages[0]?.id !== images[0]?.id ||
+        newImages.length !== images.length
+      );
+      
+      // NEU: Wenn neue Bilder vorhanden sind, ersetze die gesamte Liste
+      // um sicherzustellen, dass die neuesten Bilder vorne stehen
+      if (hasNewImages) {
+        console.log('[NewsFlash] Neue Bilder gefunden, ersetze Liste');
+        images = newImages;
+        // Auto-scroll to the beginning (newest images)
+        setTimeout(() => {
+          scrollToRight();
+        }, 100);
+      } else {
+        // Nur aktualisieren wenn keine neuen Bilder
+        images = newImages;
+      }
+      
       lastImageId = images[0]?.id || null;
       lastUpdate = new Date();
       loading = false;
       errorMsg = '';
-      // Auto-scroll to the right if we have new images
-      if (hasNewImages) {
-        setTimeout(() => {
-          scrollToRight();
-        }, 100); // Small delay to ensure DOM is updated
-      }
     }
   } catch (err) {
     console.error('NewsFlash: Unexpected error', err);
@@ -183,8 +184,11 @@ function startAutoRefresh() {
   }
   if (mode !== 'aus') {
     refreshInterval = setInterval(() => {
-      console.log('NewsFlash: Auto-refresh triggered');
-      fetchImages();
+      console.log('NewsFlash: Auto-refresh triggered - loading newest items');
+      // WICHTIG: Auto-Refresh soll die neuesten Items laden und die Liste ersetzen
+      // nicht anhängen! Deshalb currentOffset auf 0 setzen
+      currentOffset = 0;
+      fetchImages(false); // false = nicht nachladen, sondern ersetzen
     }, 60000); // Alle 60 Sekunden (1 Minute)
   }
 }
@@ -198,11 +202,15 @@ function stopAutoRefresh() {
 
 onMount(() => {
   mounted = true;
-  // Nur nachladen, wenn keine SSR-Items vorhanden sind
+  // WICHTIG: Server-Daten nicht überschreiben!
+  // Nur laden wenn keine Server-Daten vorhanden sind
   if (!initialItems || initialItems.length === 0) {
+    console.log('[NewsFlash] No server data, loading from client');
     fetchImages();
   } else {
-    currentOffset = initialItems.length; // NEU: Offset für Nachladen setzen
+    console.log('[NewsFlash] Using server data, setting offset for continuation');
+    // Offset für Nachladen setzen, aber nicht die Server-Daten überschreiben
+    currentOffset = initialItems.length;
   }
   startAutoRefresh();
 });
@@ -283,14 +291,14 @@ function handleScroll(event: Event) {
         <div class="newsflash-strip" tabindex="0" on:scroll={handleScroll} bind:this={stripContainer}>
           <div class="newsflash-time">{lastUpdate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} {displayedImageCount}/{$galleryStats.totalCount}</div>
           {#each images as img (img.id)}
-            <div class="newsflash-thumb" on:click={() => handleImageClick(img)} tabindex="0" role="button" aria-label={img.title || img.original_name || 'Bild'}>
+            <a href={`/item/${img.slug}`} class="newsflash-thumb" tabindex="0" role="button" aria-label={img.title || img.original_name || 'Bild'} title={img.title || img.original_name || 'Bild'}>
               <img src={"https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/" + img.path_512} alt={img.title || img.original_name || 'Bild'} />
               {#if showDistance && userLat !== null && userLon !== null && img.lat && img.lon && getDistanceFromLatLonInMeters}
                 <div class="gallery-distance">
                   {getDistanceFromLatLonInMeters(userLat, userLon, img.lat, img.lon)}
                 </div>
               {/if}
-            </div>
+            </a>
           {/each}
           {#if loadingMore}
             <div class="newsflash-loading-more">Lade mehr...</div>
@@ -305,14 +313,14 @@ function handleScroll(event: Event) {
         <div class="newsflash-grid" tabindex="0" on:scroll={handleScroll} bind:this={gridContainer}>
           <div class="newsflash-time">{lastUpdate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} {displayedImageCount}/{$galleryStats.totalCount}</div>
           {#each images as img (img.id)}
-            <div class="newsflash-thumb" on:click={() => handleImageClick(img)} tabindex="0" role="button" aria-label={img.title || img.original_name || 'Bild'}>
+            <a href={`/item/${img.slug}`} class="newsflash-thumb" tabindex="0" role="button" aria-label={img.title || img.original_name || 'Bild'} title={img.title || img.original_name || 'Bild'}>
               <img src={"https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/" + img.path_512} alt={img.title || img.original_name || 'Bild'} />
               {#if showDistance && userLat !== null && userLon !== null && img.lat && img.lon && getDistanceFromLatLonInMeters}
                 <div class="gallery-distance">
                   {getDistanceFromLatLonInMeters(userLat, userLon, img.lat, img.lon)}
                 </div>
               {/if}
-            </div>
+            </a>
           {/each}
           {#if loadingMore}
             <div class="newsflash-loading-more">Lade mehr...</div>
@@ -325,10 +333,14 @@ function handleScroll(event: Event) {
         </div>
       {/if}
       {#if initialItems && initialItems.length === 50}
-        <!-- SEO-Link nur für Bots sichtbar -->
-        <div class="newsflash-next-link-ssr" style="text-align:center;margin:1rem 0;display:none;">
+        <!-- SEO-Paginierung für Bots - versteckt für normale Benutzer -->
+        <div class="newsflash-pagination-ssr" style="display: none;">
+          {#if currentPage > 1}
+            <a href="/?page={currentPage - 1}" rel="prev" class="pagination-link">← Vorherige Seite</a>
+          {/if}
+          <span class="pagination-info">Seite {currentPage} von {totalPages}</span>
           {#if currentPage < totalPages}
-            <a href="/?page={currentPage + 1}" rel="next">Weitere Bilder anzeigen</a>
+            <a href="/?page={currentPage + 1}" rel="next" class="pagination-link">Weitere Bilder →</a>
           {/if}
         </div>
       {/if}
@@ -479,6 +491,8 @@ function handleScroll(event: Event) {
   padding: 0;
   overflow: hidden;
   position: relative;
+  text-decoration: none;
+  color: inherit;
 }
 .newsflash-thumb:focus, .newsflash-thumb:hover {
   outline: none !important;
@@ -530,5 +544,33 @@ function handleScroll(event: Event) {
   flex-shrink: 0;
 }
 
+.newsflash-pagination-ssr {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  margin: 1rem 0;
+  padding: 0.5rem;
+  background: var(--bg-secondary);
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.pagination-link {
+  color: var(--accent-color);
+  text-decoration: none;
+  padding: 0.25rem 0.5rem;
+  border-radius: 3px;
+  transition: background 0.2s;
+}
+
+.pagination-link:hover {
+  background: var(--border-color);
+}
+
+.pagination-info {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
 
 </style> 

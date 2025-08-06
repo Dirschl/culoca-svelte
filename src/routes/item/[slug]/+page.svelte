@@ -10,30 +10,47 @@
   import { browser } from '$app/environment';
   import { supabase } from '$lib/supabaseClient';
 
-  // Client-seitige Umleitung für bekannte Fälle
+  // Client-seitige Umleitung für bekannte Fälle (nur für User, nicht für Bots)
   if (browser) {
     const currentSlug = $page.params.slug;
     console.log('🔍 [Client] Checking slug for redirect:', currentSlug);
     
-    // Städtenamen-Mappings
-    const cityMappings = {
-      'altotting': 'altoetting',
-      'muhldorf': 'muehldorf', 
-      'toging': 'toeging',
-      'neuotting': 'neuoetting',
-      'wohrsee': 'woehrsee',
-      'badhoring': 'badhöring'
-    };
+    // Prüfe, ob es sich um einen Bot handelt
+    const userAgent = navigator.userAgent.toLowerCase();
+    const isBot = userAgent.includes('bot') || 
+                  userAgent.includes('crawler') || 
+                  userAgent.includes('spider') || 
+                  userAgent.includes('scraper') ||
+                  userAgent.includes('googlebot') ||
+                  userAgent.includes('bingbot') ||
+                  userAgent.includes('slurp') ||
+                  userAgent.includes('duckduckbot');
+    
+    // Nur für echte User umleiten, nicht für Bots
+    if (!isBot) {
+      // Städtenamen-Mappings
+      const cityMappings = {
+        'altotting': 'altoetting',
+        'muhldorf': 'muehldorf', 
+        'toging': 'toeging',
+        'neuotting': 'neuoetting',
+        'wohrsee': 'woehrsee',
+        'sigrun': 'sigruen',
+        'badhoring': 'badhoering'
+      };
 
-    // Prüfe, ob der Slug einen der alten Städtenamen enthält
-    for (const [oldCity, newCity] of Object.entries(cityMappings)) {
-      if (currentSlug.includes(oldCity)) {
-        const newSlug = currentSlug.replace(oldCity, newCity);
-        console.log('🔍 [Client] City redirect:', oldCity, '->', newCity);
-        console.log('🔍 [Client] Redirecting:', currentSlug, '->', newSlug);
-        goto(`/item/${newSlug}`, { replaceState: true });
-        break;
+      // Prüfe, ob der Slug einen der alten Städtenamen enthält
+      for (const [oldCity, newCity] of Object.entries(cityMappings)) {
+        if (currentSlug.includes(oldCity)) {
+          const newSlug = currentSlug.replace(oldCity, newCity);
+          console.log('🔍 [Client] City redirect:', oldCity, '->', newCity);
+          console.log('🔍 [Client] Redirecting:', currentSlug, '->', newSlug);
+          goto(`/item/${newSlug}`, { replaceState: true });
+          break;
+        }
       }
+    } else {
+      console.log('🔍 [Client] Bot detected, skipping redirects');
     }
   }
 
@@ -246,6 +263,42 @@
     console.log(`[Item Detail] Current radius value: ${radius}m`);
   }
   
+  // Ensure radius never exceeds 2000m
+  $: if (radius > 2000) {
+    radius = 2000;
+    console.log('[Item Detail] Radius limited to 2000m');
+  }
+  
+  // Handle radius input with limit
+  function handleRadiusInput() {
+    if (radius > 2000) {
+      radius = 2000;
+    }
+    // Update URL parameter
+    if (browser) {
+      const url = new URL(window.location.href);
+      url.searchParams.set('r', radius.toString());
+      window.history.replaceState({}, '', url.toString());
+    }
+  }
+  
+  // Handle radius change with limit
+  function handleRadiusChange() {
+    if (radius > 2000) {
+      radius = 2000;
+    }
+    // Save to localStorage
+    if (browser) {
+      localStorage.setItem('radius', radius.toString());
+    }
+    // Update URL parameter
+    if (browser) {
+      const url = new URL(window.location.href);
+      url.searchParams.set('r', radius.toString());
+      window.history.replaceState({}, '', url.toString());
+    }
+  }
+  
   // Copy current link to clipboard
   async function copyCurrentLink() {
     if (!browser) return;
@@ -282,9 +335,17 @@
   }
   function onRadiusInput(e) {
     radius = +e.target.value;
+    // Ensure radius never exceeds 2000m
+    if (radius > 2000) {
+      radius = 2000;
+    }
   }
   function onRadiusChange(e) {
     radius = +e.target.value;
+    // Ensure radius never exceeds 2000m
+    if (radius > 2000) {
+      radius = 2000;
+    }
     if (typeof window !== 'undefined') {
       localStorage.setItem('radius', String(radius));
       // Update URL with radius parameter
@@ -296,15 +357,23 @@
   $: visibleNearby = showHiddenItems
     ? nearby.filter(item => item.distance <= radius && item.id !== image?.id && item.gallery === false)
     : nearby.filter(item => item.distance <= radius && item.id !== image?.id && item.gallery !== false);
+  
+  // SEO-optimiert: Indikatoren für Limits
+  $: isAtItemLimit = filteredNearby.length >= 300;
+  $: showLimitIndicator = isAtItemLimit;
 
   let editingTitle = false;
   let titleEditValue = '';
+  let editingCaption = false;
+  let captionEditValue = '';
   let editingDescription = false;
   let descriptionEditValue = '';
   let editingKeywords = false;
   let keywordsEditValue = '';
   let editingFilename = false;
   let filenameEditValue = '';
+  let editingSlug = false;
+  let slugEditValue = '';
 
   let showFullExif = false;
   let hiddenItems = [];
@@ -423,6 +492,47 @@
     if (event.key === 'Enter') { event.preventDefault(); saveDescription(); }
     else if (event.key === 'Escape') { event.preventDefault(); cancelEditDescription(); }
   }
+  // --- Caption ---
+  function startEditCaption() {
+    if (currentUser && image && image.profile_id === currentUser.id) {
+      editingCaption = true;
+      captionEditValue = image.caption || '';
+      setTimeout(() => {
+        const input = document.getElementById('caption-edit-input') as HTMLTextAreaElement;
+        if (input) {
+          input.focus();
+          input.setSelectionRange(input.value.length, input.value.length);
+          input.click();
+        }
+      }, 100);
+    }
+  }
+  async function saveCaption() {
+    if (!editingCaption || !currentUser || !image || image.profile_id !== currentUser.id) return;
+    const newCaption = captionEditValue.trim();
+    if (newCaption.length > 300) return;
+    try {
+      const res = await authFetch(`/api/item/${image.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ caption: newCaption })
+      });
+      if (!res.ok) return;
+      image.caption = newCaption;
+      editingCaption = false;
+    } catch (err) { console.error('Failed to save caption:', err); }
+  }
+  function cancelEditCaption() { editingCaption = false; captionEditValue = image.caption || ''; }
+  function handleCaptionKeydown(event: KeyboardEvent) {
+    if (event.key === 'Enter' && !event.shiftKey) { 
+      event.preventDefault(); 
+      saveCaption(); 
+    }
+    else if (event.key === 'Escape') { 
+      event.preventDefault(); 
+      cancelEditCaption(); 
+    }
+  }
   // --- Keywords ---
   function startEditKeywords() {
     if (currentUser && image && image.profile_id === currentUser.id) {
@@ -504,6 +614,61 @@
   function handleFilenameKeydown(event: KeyboardEvent) {
     if (event.key === 'Enter') { event.preventDefault(); saveFilename(); }
     else if (event.key === 'Escape') { event.preventDefault(); cancelEditFilename(); }
+  }
+  // --- Slug ---
+  function startEditSlug() {
+    if (currentUser && image && image.profile_id === currentUser.id) {
+      editingSlug = true;
+      slugEditValue = image.slug || '';
+      setTimeout(() => {
+        const input = document.getElementById('slug-edit-input') as HTMLInputElement;
+        if (input) {
+          input.focus();
+          input.setSelectionRange(input.value.length, input.value.length);
+          input.click();
+        }
+      }, 100);
+    }
+  }
+  async function saveSlug() {
+    if (!editingSlug || !currentUser || !image || image.profile_id !== currentUser.id) return;
+    const newSlug = slugEditValue.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    if (newSlug.length < 3 || newSlug.length > 100) {
+      console.error('Slug validation failed:', { length: newSlug.length, slug: newSlug });
+      return;
+    }
+    try {
+      console.log('Saving slug:', { oldSlug: image.slug, newSlug });
+      const res = await authFetch(`/api/item/${image.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug: newSlug })
+      });
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error('Failed to save slug:', { status: res.status, error: errorText });
+        
+        // Spezielle Behandlung für Slug-Konflikte
+        if (res.status === 409) {
+          alert('Dieser Slug existiert bereits. Bitte wählen Sie einen anderen Slug.');
+        } else {
+          alert('Fehler beim Speichern des Slugs. Bitte versuchen Sie es erneut.');
+        }
+        return;
+      }
+      image.slug = newSlug;
+      editingSlug = false;
+      // Redirect to new slug URL
+      goto(`/item/${newSlug}`, { replaceState: true });
+    } catch (err) { 
+      console.error('Failed to save slug:', err); 
+      editingSlug = false;
+    }
+  }
+  function cancelEditSlug() { editingSlug = false; slugEditValue = image.slug || ''; }
+  function handleSlugKeydown(event: KeyboardEvent) {
+    if (event.key === 'Enter') { event.preventDefault(); saveSlug(); }
+    else if (event.key === 'Escape') { event.preventDefault(); cancelEditSlug(); }
   }
 
   function getDistanceFromLatLonInMeters(lat1: number, lon1: number, lat2: number, lon2: number): string {
@@ -748,6 +913,77 @@
     <meta property="twitter:title" content="Item {itemSlug} - culoca.com">
   {/if}
   <meta name="debug-test" content="true">
+  
+  <!-- Strukturierte Daten (JSON-LD) für bessere SEO - Optimiert nach Google-Richtlinien -->
+  {#if image}
+    {@const itemName = (image.title || image.original_name || `Bild ${image.id}`).length > 110 ? 
+      (image.title || image.original_name || `Bild ${image.id}`).substring(0, 107) + '...' : 
+      (image.title || image.original_name || `Bild ${image.id}`)}
+    {@const itemUrl = `https://culoca.com/item/${image.slug}`}
+    {@const thumbnailUrl = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${image.path_512 || image.path_2048}`}
+    {@const uploadDate = image.created_at ? new Date(image.created_at).toISOString() : null}
+    {@const dateModified = image.updated_at ? new Date(image.updated_at).toISOString() : 
+      (image.created_at ? new Date(image.created_at).toISOString() : null)}
+    {@const keywordsCsv = image.keywords ? image.keywords.join(', ') : ''}
+    {@const rawCaption = image.exif_data?.Caption || image.title || itemName}
+    {@const exifCaption = image.exif_data?.Caption ? decodeURIComponent(escape(rawCaption)) : (image.title || itemName)}
+    {@const caption = image.caption || exifCaption}
+    {@const sha256 = image.sha256 || undefined}
+    {@const creatorName = image.full_name || 'Culoca User'}
+    {@const createdYear = image.created_at ? new Date(image.created_at).getFullYear() : new Date().getFullYear()}
+    {@const copyrightNotice = `© ${createdYear} ${creatorName} | culoca.com. Alle Rechte vorbehalten.`}
+    {@html `<script type="application/ld+json">
+    ${JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "ImageObject",
+      "url": itemUrl,
+      "contentUrl": imageSource,
+      "thumbnailUrl": thumbnailUrl,
+      "name": itemName,
+      "description": image.description || '',
+      "inLanguage": "de",
+      "width": { "@type": "QuantitativeValue", "value": image.width || 0, "unitCode": "PX" },
+      "height": { "@type": "QuantitativeValue", "value": image.height || 0, "unitCode": "PX" },
+      "encodingFormat": "image/jpeg",
+      "license": "https://culoca.com/web/license",
+      "creditText": creatorName,
+      "copyrightNotice": copyrightNotice,
+      "acquireLicensePage": "https://culoca.com/web/license",
+      "caption": caption,
+      "keywords": keywordsCsv,
+      "representativeOfPage": true,
+      ...(sha256 ? { "sha256": sha256 } : {}),
+      "creator": {
+        "@type": "Person",
+        "name": creatorName
+      },
+      "author": {
+        "@type": "Person",
+        "name": creatorName
+      },
+      "copyrightHolder": {
+        "@type": "Person",
+        "name": creatorName
+      },
+      "publisher": {
+        "@type": "Organization",
+        "name": "Culoca",
+        "url": "https://culoca.com"
+      },
+      "contentLocation": {
+        "@type": "Place",
+        "name": image.title || 'Unbekannter Ort',
+        "geo": {
+          "@type": "GeoCoordinates",
+          "latitude": image.lat || 0,
+          "longitude": image.lon || 0
+        }
+      },
+      ...(uploadDate && { "uploadDate": uploadDate }),
+      ...(dateModified && { "dateModified": dateModified })
+    }, null, 2)}
+    </script>`}
+  {/if}
 </svelte:head>
 
 <div class="page">
@@ -796,6 +1032,46 @@
             </span>
           {/if}
         </h1>
+        {#if isCreator}
+          <p class="caption" class:editable={isCreator} class:editing={editingCaption}>
+            {#if editingCaption}
+              <div class="caption-edit-container">
+                <textarea
+                  id="caption-edit-input"
+                  bind:value={captionEditValue}
+                  maxlength="300"
+                  on:keydown={handleCaptionKeydown}
+                  on:blur={saveCaption}
+                  class="caption-edit-input"
+                  class:valid={captionEditValue.length >= 80 && captionEditValue.length <= 120}
+                  placeholder="Emotionale Beschreibung eingeben (80-120 Zeichen ideal)..."
+                  rows="2"
+                  autocomplete="off"
+                  autocorrect="off"
+                  autocapitalize="sentences"
+                  inputmode="text"
+                ></textarea>
+                <span class="char-count" class:valid={captionEditValue.length >= 80 && captionEditValue.length <= 120}>
+                  {captionEditValue.length}/300
+                </span>
+              </div>
+            {:else}
+              <span class="caption-text" tabindex="0" role="button" on:click={startEditCaption} on:keydown={(e) => handleKey(e, startEditCaption)}>
+                {#if image.caption}
+                  <em>{@html image.caption.replace(/\\n/g, '<br>').replace(/\n/g, '<br>')}</em>
+                {:else}
+                  <em class="placeholder">Klicke hier um eine emotionale Beschreibung hinzuzufügen</em>
+                {/if}
+              </span>
+            {/if}
+          </p>
+        {:else if image.caption}
+          <p class="caption">
+            <span class="caption-text">
+              <em>{image.caption}</em>
+            </span>
+          </p>
+        {/if}
         <p class="description" class:editable={isCreator} class:editing={editingDescription}>
           {#if editingDescription}
             <div class="description-edit-container">
@@ -818,16 +1094,16 @@
                 {descriptionEditValue.length}/160
               </span>
             </div>
-          {:else}
-            <span class="description-text" tabindex="0" role="button" on:click={startEditDescription} on:keydown={(e) => handleKey(e, startEditDescription)}>
-              {#if image.description}
-                {image.description}
-              {:else}
-                <span class="placeholder">Keine Beschreibung verfügbar</span>
-              {/if}
-            </span>
-          {/if}
-        </p>
+                      {:else}
+              <span class="description-text" tabindex="0" role="button" on:click={startEditDescription} on:keydown={(e) => handleKey(e, startEditDescription)}>
+                {#if image.description}
+                  {image.description}
+                {:else}
+                  <span class="placeholder">Keine Beschreibung verfügbar</span>
+                {/if}
+              </span>
+            {/if}
+
       </div>
     </div>
     <ImageControlsSection
@@ -841,10 +1117,13 @@
     />
     {#if image.lat && image.lon}
       <div class="radius-control">
-        <div class="radius-value">
+        <div class="radius-value" class:limit-reached={isAtItemLimit}>
           {formatRadius(radius)}
           {#if filteredNearby.length > 0}
             <span class="nearby-count">• {filteredNearby.length} Items</span>
+            {#if isAtItemLimit}
+              <span class="limit-indicator">(max. 300)</span>
+            {/if}
           {/if}
           {#if typeof hiddenItems !== 'undefined' && hiddenItems.length > 0}
             <span class="hidden-count" class:active={showHiddenItems} on:click={toggleHiddenItems} on:keydown={(e) => handleKey(e, toggleHiddenItems)}>
@@ -852,7 +1131,7 @@
             </span>
           {/if}
         </div>
-        <input id="radius" type="range" min="50" max="3000" step="50" value={radius} on:input={onRadiusInput} on:change={onRadiusChange}>
+        <input id="radius" type="range" min="50" max="2000" step="50" value={radius} on:input={onRadiusInput} on:change={onRadiusChange} class:limit-reached={isAtItemLimit}>
       </div>
     {/if}
     <NearbyGallery
@@ -865,6 +1144,25 @@
       getGalleryStatus={getNearbyGalleryStatus}
       layout={galleryLayout}
     />
+    
+    <!-- SEO-optimiert: Serverseitig gerenderte Links für Google -->
+    {#if nearby && nearby.length > 0}
+      <div class="seo-nearby-links" style="display: none;">
+        <h3>Bilder in der Nähe</h3>
+        <ul>
+          {#each nearby.slice(0, 300) as item}
+            <li>
+              <a href="/item/{item.slug}" 
+                 title="{item.caption || item.description}"
+                 alt="{item.title} ({Math.round(item.distance)}m)">
+                {item.title} ({Math.round(item.distance)}m)
+              </a>
+            </li>
+          {/each}
+        </ul>
+      </div>
+    {/if}
+    
     <div class="meta-section single-exif">
       <!-- Column 1: Keywords -->
       <div class="keywords-column">
@@ -876,7 +1174,7 @@
             <textarea
               id="keywords-edit-input"
               bind:value={keywordsEditValue}
-              maxlength="500"
+              maxlength="800"
               on:keydown={handleKeywordsKeydown}
               on:blur={saveKeywords}
               class="keywords-edit-input"
@@ -926,6 +1224,31 @@
           {/if}
         </div>
         <div class="filename">{browser ? window.location.href : ''}</div>
+        {#if image.slug}
+          <div class="filename" class:editable={isCreator} class:editing={editingSlug}>
+            {#if editingSlug}
+              <div class="filename-edit-container">
+                <input
+                  id="slug-edit-input"
+                  type="text"
+                  bind:value={slugEditValue}
+                  maxlength="100"
+                  on:keydown={handleSlugKeydown}
+                  on:blur={saveSlug}
+                  class="filename-edit-input"
+                  placeholder="Slug eingeben..."
+                  autocomplete="off"
+                  autocorrect="off"
+                  autocapitalize="none"
+                  inputmode="text"
+                />
+                <span class="char-count">{slugEditValue.length}/100</span>
+              </div>
+            {:else}
+              <span class="filename-text" tabindex="0" role="button" on:click={startEditSlug} on:keydown={(e) => handleKey(e, startEditSlug)}>Slug: {image.slug}</span>
+            {/if}
+          </div>
+        {/if}
         <div class="filename">ID: {image?.id}</div>
         <div class="filename">64px: {fileSizes.size64 ? formatFileSize(fileSizes.size64) : 'unbekannt'}  |  512px: {fileSizes.size512 ? formatFileSize(fileSizes.size512) : 'unbekannt'}  |  2048px: {fileSizes.size2048 ? formatFileSize(fileSizes.size2048) : 'unbekannt'}</div>
       </div>
@@ -1098,40 +1421,56 @@
         }
       }}
     />
-    <!-- SEO-Liste für Bots, alle Nearby-Items als Links -->
-    <ul class="seo-nearby-links" aria-hidden="true" style="display:none;">
-      {#each nearby as item (item.slug)}
-        <li><a href={`/item/${item.slug}`}>{item.title}</a></li>
-      {/each}
-    </ul>
   {:else}
     <div class="error">❌ Bild nicht gefunden</div>
   {/if}
   
-  <!-- Floating Action Buttons - nur Scroll-to-Top und Vollbild -->
-  <FloatingActionButtons
-    {showScrollToTop}
-    showTestMode={false}
-    showMapButton={false}
-    showTrackButtons={false}
-    showUploadButton={false}
-    showProfileButton={false}
-    showSettingsButton={false}
-    showPublicContentButton={false}
-    isLoggedIn={false}
-    simulationMode={false}
-    profileAvatar={null}
-    settingsIconRotation={0}
-    continuousRotation={0}
-    rotationSpeed={1}
-    on:upload={() => {}}
-    on:publicContent={() => {}}
-    on:bulkUpload={() => {}}
-    on:profile={() => {}}
-    on:settings={() => {}}
-    on:map={() => {}}
-    on:testMode={() => {}}
-  />
+  <!-- Zur Galerie zurückkehren FAB -->
+  <button 
+    class="gallery-back-fab"
+    on:click={() => goto('/')}
+    title="Zur Galerie zurückkehren"
+    aria-label="Zur Galerie zurückkehren"
+  >
+    <!-- Gallery Grid Icon for back to gallery -->
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="3" width="6" height="6"/>
+      <rect x="15" y="3" width="6" height="6"/>
+      <rect x="3" y="15" width="6" height="6"/>
+      <rect x="15" y="15" width="6" height="6"/>
+    </svg>
+  </button>
+
+  <!-- Scroll to Top / Fullscreen FAB - ersetzt sich gegenseitig -->
+  {#if showScrollToTop}
+    <button
+      class="fab-button scroll-to-top"
+      on:click={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+      title="Nach oben scrollen"
+      aria-label="Nach oben scrollen"
+    >
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18 15l-6-6-6 6"/>
+      </svg>
+    </button>
+  {:else}
+    <button
+      class="fab-button fullscreen"
+      on:click={() => {
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen();
+        } else {
+          document.exitFullscreen();
+        }
+      }}
+      title="Vollbildmodus"
+      aria-label="Vollbildmodus"
+    >
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+      </svg>
+    </button>
+  {/if}
 </div>
 
 <style>
@@ -1366,6 +1705,16 @@
     margin-bottom: 0.1rem;
     text-align: center;
     background: transparent;
+  }
+  .radius-value.limit-reached {
+    color: var(--culoca-orange);
+  }
+  .limit-indicator {
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: var(--culoca-orange);
+    margin-left: 0.3rem;
+    opacity: 0.8;
   }
   .nearby-count {
     font-size: 0.85rem;
@@ -1649,6 +1998,54 @@
     transition: color 0.2s;
     background: transparent;
   }
+  .caption {
+    font-style: italic;
+    color: var(--text-secondary);
+    font-size: 1rem;
+    line-height: 1.4;
+    margin: 0.5rem 0;
+    background: transparent;
+  }
+  .caption.editable {
+    cursor: pointer;
+    transition: color 0.2s;
+  }
+  .caption.editable:hover {
+    color: var(--culoca-orange);
+  }
+  .caption-text {
+    display: block;
+    background: transparent;
+  }
+  .caption-edit-container {
+    position: relative;
+    width: 100%;
+  }
+  .caption-edit-input {
+    width: 100%;
+    padding: 0.5rem;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 1rem;
+    line-height: 1.4;
+    resize: vertical;
+    min-height: 60px;
+    transition: border-color 0.2s;
+  }
+  .caption-edit-input:focus {
+    outline: none;
+    border-color: var(--culoca-orange);
+  }
+  .caption-edit-input.valid {
+    border-color: var(--success-color);
+  }
+  .caption.placeholder {
+    color: var(--text-tertiary);
+    font-style: italic;
+  }
   .keywords-title.editable:hover {
     color: var(--culoca-orange);
     background: transparent;
@@ -1785,5 +2182,122 @@
     .creator-socials {
       justify-content: center;
     }
+  }
+
+  /* Zur Galerie zurückkehren FAB */
+  .gallery-back-fab {
+    position: fixed;
+    bottom: 7rem; /* Über dem Vollbild-FAB */
+    right: 2rem;
+    width: 4rem;
+    height: 4rem;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px var(--shadow);
+    backdrop-filter: blur(10px);
+    background: transparent;
+    overflow: hidden;
+    pointer-events: auto;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    z-index: 1001;
+  }
+  
+  .gallery-back-fab:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 20px var(--shadow);
+    background: rgba(255, 255, 255, 0.1);
+  }
+  
+  .gallery-back-fab:active {
+    transform: scale(0.95);
+  }
+  
+  /* Mobile responsive */
+  @media (max-width: 768px) {
+    .gallery-back-fab {
+      bottom: 6rem;
+      right: 1rem;
+      width: 3.5rem;
+      height: 3.5rem;
+    }
+    
+    .gallery-back-fab svg {
+      width: 36px;
+      height: 36px;
+    }
+  }
+
+  /* FAB Styles für Detailseite */
+  .fab-button {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    width: 4rem;
+    height: 4rem;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px var(--shadow);
+    backdrop-filter: blur(10px);
+    background: transparent;
+    overflow: hidden;
+    pointer-events: auto;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    z-index: 1001;
+  }
+  
+  .fab-button:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 20px var(--shadow);
+    background: rgba(255, 255, 255, 0.1);
+  }
+  
+  .fab-button:active {
+    transform: scale(0.95);
+  }
+  
+  .fab-button.scroll-to-top,
+  .fab-button.fullscreen {
+    bottom: 2rem; /* Gleiche Position für beide FABs */
+  }
+  
+  /* Mobile responsive für FABs */
+  @media (max-width: 768px) {
+    .fab-button {
+      bottom: 1rem;
+      right: 1rem;
+      width: 3.5rem;
+      height: 3.5rem;
+    }
+    
+    .fab-button.scroll-to-top,
+    .fab-button.fullscreen {
+      bottom: 1rem; /* Gleiche Position für beide FABs */
+    }
+    
+    .fab-button svg {
+      width: 36px;
+      height: 36px;
+    }
+  }
+  .radius-control input[type="range"].limit-reached {
+    accent-color: var(--culoca-orange);
   }
 </style> 

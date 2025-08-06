@@ -1041,6 +1041,23 @@
   <title>Simulation - Culoca</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  
+  <!-- Strukturierte Daten (JSON-LD) für bessere SEO -->
+  <script type="application/ld+json">
+  {JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    "name": "Simulation - Culoca",
+    "description": "Simulationsmodus für Culoca - Teste die App-Funktionalität mit Beispieldaten",
+    "url": "https://culoca.com/simulation",
+    "inLanguage": "de",
+    "publisher": {
+      "@type": "Organization",
+      "name": "Culoca",
+      "url": "https://culoca.com"
+    }
+  })}
+  </script>
 </svelte:head>
 
 <FloatingActionButtons

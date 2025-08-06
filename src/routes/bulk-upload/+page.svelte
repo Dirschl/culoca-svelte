@@ -5,6 +5,7 @@
   import { env as publicEnv } from '$env/dynamic/public';
   import { authFetch } from '$lib/authFetch';
   import AIButton from '$lib/AIButton.svelte';
+  import { ITEM_TYPES, ITEM_TYPE_LABELS, getAvailableTypes, getTypeDescription } from '$lib/constants/itemTypes';
 
   // Map picker state
   let mapContainer: HTMLElement;
@@ -67,6 +68,7 @@
     title: string;
     description: string;
     keywords: string;
+    typeId: number; // Neue type_id für Item-Typ
     lat: number | null;
     lon: number | null;
     isValid: boolean;
@@ -244,6 +246,7 @@
         title: '',
         description: '',
         keywords: '',
+        typeId: ITEM_TYPES.PHOTO, // Default: Foto
         lat: null,
         lon: null,
         isValid: false,
@@ -263,13 +266,13 @@
           
           // Title - IPTC Headline hat Priorität, dann andere Quellen (wie im Backend)
           if (exifData['IPTC:Headline']) {
-            imageFile.title = fixEncoding(exifData['IPTC:Headline']) || '';
+            imageFile.title = (fixEncoding(exifData['IPTC:Headline']) || '').trim();
           } else if (exifData.iptc && exifData.iptc.Headline) {
-            imageFile.title = fixEncoding(exifData.iptc.Headline) || '';
+            imageFile.title = (fixEncoding(exifData.iptc.Headline) || '').trim();
           } else if (exifData.iptc && exifData.iptc.ObjectName) {
-            imageFile.title = fixEncoding(exifData.iptc.ObjectName) || '';
+            imageFile.title = (fixEncoding(exifData.iptc.ObjectName) || '').trim();
           } else if (exifData['IPTC:ObjectName']) {
-            imageFile.title = fixEncoding(exifData['IPTC:ObjectName']) || '';
+            imageFile.title = (fixEncoding(exifData['IPTC:ObjectName']) || '').trim();
           }
           
           // Heuristische Suche: jedes Feld, das auf 'title' oder 'headline' endet
@@ -277,7 +280,7 @@
             for (const [k, v] of Object.entries(exifData)) {
               const keyLower = k.toLowerCase();
               if (keyLower.endsWith('title') || keyLower.endsWith('headline') || keyLower.endsWith('objectname')) {
-                imageFile.title = fixEncoding(v as string) || '';
+                imageFile.title = (fixEncoding(v as string) || '').trim();
                 break;
               }
             }
@@ -285,31 +288,31 @@
           
           // Description - IPTC Description hat Priorität, dann andere Quellen
           if (exifData['IPTC:Description']) {
-            imageFile.description = fixEncoding(exifData['IPTC:Description']) || '';
+            imageFile.description = (fixEncoding(exifData['IPTC:Description']) || '').trim();
           } else if (exifData.iptc && exifData.iptc.Description) {
-            imageFile.description = fixEncoding(exifData.iptc.Description) || '';
+            imageFile.description = (fixEncoding(exifData.iptc.Description) || '').trim();
           } else if (exifData.iptc && exifData.iptc.CaptionAbstract) {
-            imageFile.description = fixEncoding(exifData.iptc.CaptionAbstract) || '';
+            imageFile.description = (fixEncoding(exifData.iptc.CaptionAbstract) || '').trim();
           } else if (exifData['IPTC:CaptionAbstract']) {
-            imageFile.description = fixEncoding(exifData['IPTC:CaptionAbstract']) || '';
+            imageFile.description = (fixEncoding(exifData['IPTC:CaptionAbstract']) || '').trim();
           } else if (exifData.ImageDescription) {
             // ImageDescription ist eine Beschreibung, nicht ein Titel
-            imageFile.description = fixEncoding(exifData.ImageDescription) || '';
+            imageFile.description = (fixEncoding(exifData.ImageDescription) || '').trim();
           }
           
           // Keywords – unterstützen mehrere Quellen (EXIF, IPTC)
           if (Array.isArray(exifData.Keywords)) {
-            imageFile.keywords = fixEncoding(exifData.Keywords.join(', ')) || '';
+            imageFile.keywords = (fixEncoding(exifData.Keywords.join(', ')) || '').trim();
           } else if (typeof exifData.Keywords === 'string') {
-            imageFile.keywords = fixEncoding(exifData.Keywords) || '';
+            imageFile.keywords = (fixEncoding(exifData.Keywords) || '').trim();
           }
 
           if (!imageFile.keywords && exifData.iptc && Array.isArray(exifData.iptc.Keywords)) {
-            imageFile.keywords = fixEncoding(exifData.iptc.Keywords.join(', ')) || '';
+            imageFile.keywords = (fixEncoding(exifData.iptc.Keywords.join(', ')) || '').trim();
           }
 
           if (!imageFile.keywords && typeof exifData['IPTC:Keywords'] === 'string') {
-            imageFile.keywords = fixEncoding(exifData['IPTC:Keywords']) || '';
+            imageFile.keywords = (fixEncoding(exifData['IPTC:Keywords']) || '').trim();
           }
           
           // Heuristische Suche: jedes Feld, das auf 'keywords' endet und ein Array/String ist
@@ -317,9 +320,9 @@
             for (const [k, v] of Object.entries(exifData)) {
               if (k.toLowerCase().endsWith('keywords')) {
                 if (Array.isArray(v)) {
-                  imageFile.keywords = fixEncoding((v as any).join(', ')) || '';
+                  imageFile.keywords = (fixEncoding((v as any).join(', ')) || '').trim();
                 } else if (typeof v === 'string') {
-                  imageFile.keywords = fixEncoding(v as string) || '';
+                  imageFile.keywords = (fixEncoding(v as string) || '').trim();
                 }
                 if (imageFile.keywords) break;
               }
@@ -442,6 +445,7 @@
         formData.append('title', image.title);
         formData.append('description', image.description);
         formData.append('keywords', image.keywords);
+        formData.append('type_id', image.typeId.toString());
         if (image.lat !== null) formData.append('lat', image.lat.toString());
         if (image.lon !== null) formData.append('lon', image.lon.toString());
 
@@ -1066,6 +1070,23 @@
 
 <svelte:head>
   <title>Massen-Upload - Culoca</title>
+  
+  <!-- Strukturierte Daten (JSON-LD) für bessere SEO -->
+  <script type="application/ld+json">
+  {JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    "name": "Massen-Upload - Culoca",
+    "description": "Lade mehrere Bilder gleichzeitig hoch - Unterstützt JPEG, PNG, WebP (max. 50MB pro Datei)",
+    "url": "https://culoca.com/bulk-upload",
+    "inLanguage": "de",
+    "publisher": {
+      "@type": "Organization",
+      "name": "Culoca",
+      "url": "https://culoca.com"
+    }
+  })}
+  </script>
 </svelte:head>
 
 <div class="bulk-upload-container">
@@ -1228,6 +1249,24 @@
                   {#if image.title && image.title.split(',')[0]}
                     <span class="audioguide-hint">Audio / Info: {image.title.split(',')[0]}</span>
                   {/if}
+                </div>
+              </div>
+
+              <!-- Type Selection -->
+              <div class="input-group">
+                <span class="field-label">Typ *</span>
+                <div class="type-row">
+                  <select 
+                    bind:value={image.typeId}
+                    class="type-select"
+                  >
+                    {#each getAvailableTypes() as type}
+                      <option value={type.id}>{type.label}</option>
+                    {/each}
+                  </select>
+                </div>
+                <div class="type-info">
+                  <span class="type-description">{getTypeDescription(image.typeId)}</span>
                 </div>
               </div>
 
@@ -2216,10 +2255,43 @@
   color: var(--text-primary);
   box-shadow: 0 6px 20px rgba(0, 123, 255, 0.4);
 }
-.camera-round-btn:disabled {
-  background: #6c757d;
-  color: #eee;
-  cursor: not-allowed;
-  box-shadow: none;
-}
+  .camera-round-btn:disabled {
+    background: #6c757d;
+    color: #eee;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+
+  /* Type Selection Styles */
+  .type-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .type-select {
+    flex: 1;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    background: var(--bg-primary);
+    color: var(--text-color);
+    font-size: 1rem;
+    transition: border-color 0.2s;
+  }
+
+  .type-select:focus {
+    outline: none;
+    border-color: var(--accent-color);
+  }
+
+  .type-info {
+    margin-top: 0.5rem;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+  }
+
+  .type-description {
+    font-style: italic;
+  }
 </style> 

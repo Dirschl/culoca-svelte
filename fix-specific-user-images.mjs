@@ -4,7 +4,7 @@ import fetch from 'node-fetch';
 
 const supabase = createClient(
   'https://caskhmcbvtevdwsolvwk.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNhc2tobWNidnRldmR3c29sdndrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTEzMTU0NDcsImV4cCI6MjA2Njg5MTQ0N30.hSsjiOm2P9njyNhpzKzBpUlSyMr6YjqH39yMaUyYF6s'
+  process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY
 );
 
 async function fixSpecificUserImages(userId = null) {
