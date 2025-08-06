@@ -87,6 +87,8 @@
   let editableKeywords = '';
   let editableAuthor = '';
   let editableLocation = '';
+  let editableOgImage = '';
+  let editableIcon = '';
 
   function clearInput() {
     testUrl = '';
@@ -135,6 +137,8 @@ Seitentyp: ${editablePageType}
 Keywords: "${editableKeywords || headData?.metaTags?.find(tag => tag.name === 'keywords')?.content || 'Keywords eingeben'}"
 Autor: "${editableAuthor || headData?.metaTags?.find(tag => tag.name === 'author' || tag.property === 'og:author')?.content || 'Autor eingeben'}"
 Standort: "${editableLocation || headData?.metaTags?.find(tag => tag.name === 'geo.region' || tag.property === 'og:locale')?.content || 'Standort eingeben'}"
+og:image: "${editableOgImage || headData?.metaTags?.find(tag => tag.property === 'og:image')?.content || 'og:image eingeben'}"
+Icon: "${editableIcon || headData?.linkTags?.find(tag => tag.rel === 'icon')?.href || 'Icon eingeben'}"
 
 Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auch das entsprechende JSON-LD Schema.`;
     
@@ -215,6 +219,16 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
         
         const location = result.metaTags?.find(tag => tag.name === 'geo.region' || tag.property === 'og:locale')?.content;
         editableLocation = location || '';
+        
+        // og:image und icon mit intelligenten Defaults
+        const ogImage = result.metaTags?.find(tag => tag.property === 'og:image')?.content;
+        const icon = result.linkTags?.find(tag => tag.rel === 'icon')?.href;
+        
+        // Prüfe ob es eine Culoca-URL ist
+        const isCulocaUrl = testUrl.toLowerCase().includes('culoca') || testUrl.toLowerCase().includes('localhost');
+        
+        editableOgImage = ogImage || (isCulocaUrl ? 'culoca-see-you-local-entdecke-deine-umgebung.jpg' : '');
+        editableIcon = icon || (isCulocaUrl ? 'culoca-icon.svg' : '');
       } else {
         throw new Error(result.error || 'Unbekannter Fehler');
       }
@@ -1004,6 +1018,68 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
                 {/if}
               </div>
 
+              <!-- og:image Analysis -->
+              <div class="seo-item">
+                <h6>🖼️ og:image:</h6>
+                {#if headData}
+                  {@const ogImageFromMeta = headData.metaTags?.find(tag => tag.property === 'og:image')?.content}
+                  {@const isCulocaUrl = testUrl.toLowerCase().includes('culoca') || testUrl.toLowerCase().includes('localhost')}
+                  {@const ogImage = ogImageFromMeta || (isCulocaUrl ? 'culoca-see-you-local-entdecke-deine-umgebung.jpg' : '')}
+                  {#if ogImage}
+                    <p><strong>Aktuelles og:image:</strong> {ogImage}</p>
+                  {/if}
+                  <div class="editable-text-field">
+                    <input 
+                      type="text" 
+                      bind:value={editableOgImage} 
+                      placeholder={ogImage || 'og:image eingeben...'}
+                      class="seo-input"
+                    />
+                  </div>
+                {:else}
+                  <p class="no-data">❌ Keine Daten verfügbar</p>
+                  <div class="editable-text-field">
+                    <input 
+                      type="text" 
+                      bind:value={editableOgImage} 
+                      placeholder="og:image eingeben..."
+                      class="seo-input"
+                    />
+                  </div>
+                {/if}
+              </div>
+
+              <!-- Icon Analysis -->
+              <div class="seo-item">
+                <h6>🎯 Icon:</h6>
+                {#if headData}
+                  {@const iconFromLink = headData.linkTags?.find(tag => tag.rel === 'icon')?.href}
+                  {@const isCulocaUrl = testUrl.toLowerCase().includes('culoca') || testUrl.toLowerCase().includes('localhost')}
+                  {@const icon = iconFromLink || (isCulocaUrl ? 'culoca-icon.svg' : '')}
+                  {#if icon}
+                    <p><strong>Aktuelles Icon:</strong> {icon}</p>
+                  {/if}
+                  <div class="editable-text-field">
+                    <input 
+                      type="text" 
+                      bind:value={editableIcon} 
+                      placeholder={icon || 'Icon eingeben...'}
+                      class="seo-input"
+                    />
+                  </div>
+                {:else}
+                  <p class="no-data">❌ Keine Daten verfügbar</p>
+                  <div class="editable-text-field">
+                    <input 
+                      type="text" 
+                      bind:value={editableIcon} 
+                      placeholder="Icon eingeben..."
+                      class="seo-input"
+                    />
+                  </div>
+                {/if}
+              </div>
+
               <!-- KI-Prompt Section -->
               {#if testUrl && (editableTitle || editableDescription)}
                 <div class="prompt-section">
@@ -1022,6 +1098,8 @@ Seitentyp: {editablePageType}
 Keywords: "{editableKeywords || headData.metaTags?.find(tag => tag.name === 'keywords')?.content || headData.jsonLdData?.find(ld => ld.data?.keywords)?.data?.keywords || 'Keywords eingeben'}"
 Autor: "{editableAuthor || headData.metaTags?.find(tag => tag.name === 'author' || tag.property === 'og:author')?.content || 'Autor eingeben'}"
 Standort: "{editableLocation || headData.metaTags?.find(tag => tag.name === 'geo.region' || tag.property === 'og:locale')?.content || headData.jsonLdData?.find(ld => ld.data?.contentLocation?.name)?.data?.contentLocation?.name || 'Standort eingeben'}"
+og:image: "{editableOgImage || headData.metaTags?.find(tag => tag.property === 'og:image')?.content || 'og:image eingeben'}"
+Icon: "{editableIcon || headData.linkTags?.find(tag => tag.rel === 'icon')?.href || 'Icon eingeben'}"
 
 Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auch das entsprechende JSON-LD Schema.</textarea>
                     <button 
