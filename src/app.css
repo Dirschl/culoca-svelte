@@ -321,33 +321,6 @@ h2:hover {
   --culoca-favicon-png: url('/static/culoca-icon.png');
 }
 
-/* Favicon-Fallback für alle Seiten - wird sofort geladen */
-html::before {
-  content: '';
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 16px;
-  height: 16px;
-  background-image: var(--culoca-favicon);
-  background-size: contain;
-  background-repeat: no-repeat;
-  background-position: center;
-  z-index: 9999;
-  pointer-events: none;
-  opacity: 0.8;
-  transition: opacity 0.3s ease;
-}
-
-/* Mobile Touch Icon Fallback - größer für Touch-Geräte */
-@media (max-width: 768px) {
-  html::before {
-    width: 32px;
-    height: 32px;
-    background-image: var(--culoca-favicon-png);
-  }
-}
-
 /* Fallback für fehlende Icons - wird überschrieben wenn echtes Icon geladen wird */
 link[rel="icon"]:not([href*="culoca"]):not([href*="api"]) {
   background-image: var(--culoca-favicon);
