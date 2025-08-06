@@ -1,9 +1,3 @@
-<svelte:head>
-  <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex" />
-  <meta name="googlebot" content="noindex, nofollow" />
-  <meta name="bingbot" content="noindex, nofollow" />
-</svelte:head>
-
 <script lang="ts">
   import { onMount } from 'svelte';
   import { supabase } from '$lib/supabaseClient.ts';
@@ -151,6 +145,9 @@
 <svelte:head>
   <title>Admin - Rollen-Management</title>
   <meta name="description" content="Admin-Bereich für Rollen- und Benutzer-Management" />
+  <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex" />
+  <meta name="googlebot" content="noindex, nofollow" />
+  <meta name="bingbot" content="noindex, nofollow" />
 </svelte:head>
 
 {#if loading}
