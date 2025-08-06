@@ -1,47 +1,88 @@
 <svelte:head>
-  <title>Culoca – See You Local | Fotos, Events & Anzeigen mit GPS entdecken</title>
-  <meta name="description" content="Entdecke und teile Fotos, Firmen, Events und Anzeigen – alles mit präzisen GPS-Daten. Starte deine kostenlose Galerie auf Culoca." />
+  <title>Culoca - Entdecke deine Umgebung mit GPS & Fotos</title>
+  <meta name="description" content="Entdecke versteckte Orte, teile Fotos mit GPS-Koordinaten und starte deine eigene Culoca-Galerie. Finde lokale Events, Sehenswürdigkeiten und teile deine Entdeckungen." />
   <meta name="robots" content="index, follow" />
   <meta name="author" content="DIRSCHL.com GmbH" />
+  <meta name="keywords" content="GPS, Geo-Lokalisierung, Fotos, Bilder, Galerie, lokale Suche, versteckte Orte, Sehenswürdigkeiten, Events, Culoca, Entdeckungen, Umgebung, Regional, Fotografie, Wandern, Freizeit, Plattform, App, Landschaft, Lost Places, Fotolocations, Reiseführer, Urlaub, kennenlernen, Social Media, digital, für alle, Standort, Lokal, Items, Distanz, Entfernung, Freigeben, Download, Karten, Routenplaner, Anzeigen, Unterhaltung, Orte, Ort" />
   <link rel="canonical" href="https://culoca.com/" />
+  
   <!-- Open Graph Meta-Tags -->
   <meta property="og:locale" content="de_DE" />
   <meta property="og:type" content="website" />
-  <meta property="og:title" content="Culoca – See You Local | Entdecke deine Umgebung" />
-  <meta property="og:description" content="Fotos, Firmen, Events & Anzeigen mit GPS-Daten – jetzt aus deiner Region entdecken." />
+  <meta property="og:title" content="Culoca - Entdecke deine Umgebung mit GPS & Fotos" />
+  <meta property="og:description" content="Entdecke versteckte Orte, teile Fotos mit GPS-Koordinaten und starte deine eigene Culoca-Galerie. Finde lokale Events, Sehenswürdigkeiten und teile deine Entdeckungen." />
   <meta property="og:url" content="https://culoca.com/" />
   <meta property="og:site_name" content="Culoca" />
   <meta property="og:image" content="https://culoca.com/culoca-see-you-local-entdecke-deine-umgebung.jpg" />
-  <meta property="og:image:alt" content="Culoca Logo – See You Local" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="Culoca - Entdecke deine Umgebung mit GPS & Fotos" />
+  
   <!-- Twitter Card Meta-Tags -->
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Culoca – See You Local | Entdecke deine Umgebung" />
-  <meta name="twitter:description" content="Fotos, Firmen, Events & Anzeigen mit GPS-Daten – jetzt lokal entdecken." />
+  <meta name="twitter:title" content="Culoca - Entdecke deine Umgebung mit GPS & Fotos" />
+  <meta name="twitter:description" content="Entdecke versteckte Orte, teile Fotos mit GPS-Koordinaten und starte deine eigene Culoca-Galerie. Finde lokale Events, Sehenswürdigkeiten und teile deine Entdeckungen." />
   <meta name="twitter:image" content="https://culoca.com/culoca-see-you-local-entdecke-deine-umgebung.jpg" />
   
   <!-- Strukturierte Daten (JSON-LD) für bessere SEO -->
   <script type="application/ld+json">
   {JSON.stringify({
     "@context": "https://schema.org",
-    "@type": "WebSite",
-    "name": "Culoca",
-    "alternateName": "See You Local",
+    "@type": "WebPage",
+    "name": "Culoca - Entdecke deine Umgebung mit GPS & Fotos",
+    "description": "Entdecke versteckte Orte, teile Fotos mit GPS-Koordinaten und starte deine eigene Culoca-Galerie. Finde lokale Events, Sehenswürdigkeiten und teile deine Entdeckungen.",
     "url": "https://culoca.com",
-    "description": "Entdecke und teile Fotos, Firmen, Events und Anzeigen – alles mit präzisen GPS-Daten. Starte deine kostenlose Galerie auf Culoca.",
     "inLanguage": "de",
-    "publisher": {
+    "image": {
+      "@type": "ImageObject",
+      "url": "https://culoca.com/culoca-see-you-local-entdecke-deine-umgebung.jpg",
+      "width": 1200,
+      "height": 630,
+      "alt": "Culoca - Entdecke deine Umgebung mit GPS & Fotos"
+    },
+    "author": {
       "@type": "Organization",
       "name": "DIRSCHL.com GmbH",
       "url": "https://culoca.com"
     },
-    "potentialAction": {
-      "@type": "SearchAction",
-      "target": {
-        "@type": "EntryPoint",
-        "urlTemplate": "https://culoca.com/?search={search_term_string}"
+    "publisher": {
+      "@type": "Organization",
+      "name": "DIRSCHL.com GmbH",
+      "url": "https://culoca.com",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://culoca.com/culoca-icon.svg",
+        "width": 32,
+        "height": 32
+      }
+    },
+    "mainEntity": {
+      "@type": "SoftwareApplication",
+      "name": "Culoca",
+      "applicationCategory": "SocialNetworkingApplication",
+      "operatingSystem": "Web Browser",
+      "description": "GPS-basierte Foto-Sharing-Plattform für lokale Entdeckungen",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "EUR"
+      }
+    },
+    "keywords": "GPS, Geo-Lokalisierung, Fotos, Bilder, Galerie, lokale Suche, versteckte Orte, Sehenswürdigkeiten, Events, Culoca, Entdeckungen, Umgebung, Regional, Fotografie, Wandern, Freizeit, Plattform, App, Landschaft, Lost Places, Fotolocations, Reiseführer, Urlaub, kennenlernen, Social Media, digital, für alle, Standort, Lokal, Items, Distanz, Entfernung, Freigeben, Download, Karten, Routenplaner, Anzeigen, Unterhaltung, Orte, Ort",
+    "about": [
+      {
+        "@type": "Thing",
+        "name": "GPS-basierte Fotografie"
       },
-      "query-input": "required name=search_term_string"
-    }
+      {
+        "@type": "Thing", 
+        "name": "Lokale Entdeckungen"
+      },
+      {
+        "@type": "Thing",
+        "name": "Social Media Plattform"
+      }
+    ]
   })}
   </script>
 </svelte:head>
