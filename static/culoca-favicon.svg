@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <title>Culoca Favicon</title>
+  <defs>
+    <linearGradient id="culocaGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ee7221;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#ff8c42;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Hintergrund -->
+  <rect width="32" height="32" rx="6" fill="url(#culocaGradient)"/>
+  
+  <!-- C Buchstabe -->
+  <path d="M8 16c0-4.4 3.6-8 8-8s8 3.6 8 8-3.6 8-8 8-8-3.6-8-8z" fill="none" stroke="white" stroke-width="2" stroke-linecap="round"/>
+  <path d="M12 12c2.2-2.2 5.8-2.2 8 0" fill="none" stroke="white" stroke-width="2" stroke-linecap="round"/>
+  
+  <!-- Punkt für Culoca -->
+  <circle cx="20" cy="12" r="2" fill="white"/>
+</svg> 
