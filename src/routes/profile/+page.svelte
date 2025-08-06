@@ -342,6 +342,23 @@
 
 <svelte:head>
   <title>Mein Profil - Culoca</title>
+  
+  <!-- Strukturierte Daten (JSON-LD) für bessere SEO -->
+  <script type="application/ld+json">
+  {JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    "name": "Mein Profil - Culoca",
+    "description": "Verwalte dein Culoca-Profil - Persönliche Informationen, Einstellungen und mehr",
+    "url": "https://culoca.com/profile",
+    "inLanguage": "de",
+    "publisher": {
+      "@type": "Organization",
+      "name": "Culoca",
+      "url": "https://culoca.com"
+    }
+  })}
+  </script>
 </svelte:head>
 
 <div class="profile-page">

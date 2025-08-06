@@ -8,5 +8,8 @@
       "destination": "https://culoca.com/:path*",
       "permanent": true
     }
-  ]
+  ],
+  "buildCommand": "npm run build",
+  "installCommand": "npm install",
+  "framework": "sveltekit"
 } 

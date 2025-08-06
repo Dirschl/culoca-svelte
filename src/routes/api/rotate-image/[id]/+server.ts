@@ -3,8 +3,8 @@ import type { RequestHandler } from './$types';
 import { createClient } from '@supabase/supabase-js';
 import sharp from 'sharp';
 
-const supabaseUrl = (process.env.PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL)!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabaseUrl = (process.env.PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL) || 'https://caskhmcbvtevdwsolvwk.supabase.co';
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 export const POST: RequestHandler = async ({ params, request }) => {
   try {
@@ -14,10 +14,10 @@ export const POST: RequestHandler = async ({ params, request }) => {
     const token = authHeader?.replace('Bearer ', '');
     
     // Supabase-Client mit Service Role Key für Storage-Operationen
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const supabase = supabaseServiceKey ? createClient(supabaseUrl, supabaseServiceKey) : null;
     
     // User prüfen mit separatem Client für Auth
-    const authSupabase = createClient(supabaseUrl, (process.env.PUBLIC_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY)!, {
+    const authSupabase = createClient(supabaseUrl, (process.env.PUBLIC_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY) || 'dummy-key-for-build', {
       global: { headers: { Authorization: `Bearer ${token}` } }
     });
     

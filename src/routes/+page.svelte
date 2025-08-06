@@ -18,6 +18,32 @@
   <meta name="twitter:title" content="Culoca – See You Local | Entdecke deine Umgebung" />
   <meta name="twitter:description" content="Fotos, Firmen, Events & Anzeigen mit GPS-Daten – jetzt lokal entdecken." />
   <meta name="twitter:image" content="https://culoca.com/culoca-see-you-local-entdecke-deine-umgebung.jpg" />
+  
+  <!-- Strukturierte Daten (JSON-LD) für bessere SEO -->
+  <script type="application/ld+json">
+  {JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "Culoca",
+    "alternateName": "See You Local",
+    "url": "https://culoca.com",
+    "description": "Entdecke und teile Fotos, Firmen, Events und Anzeigen – alles mit präzisen GPS-Daten. Starte deine kostenlose Galerie auf Culoca.",
+    "inLanguage": "de",
+    "publisher": {
+      "@type": "Organization",
+      "name": "DIRSCHL.com GmbH",
+      "url": "https://culoca.com"
+    },
+    "potentialAction": {
+      "@type": "SearchAction",
+      "target": {
+        "@type": "EntryPoint",
+        "urlTemplate": "https://culoca.com/?search={search_term_string}"
+      },
+      "query-input": "required name=search_term_string"
+    }
+  })}
+  </script>
 </svelte:head>
 <script lang="ts">
   import type { PageData } from './$types';
@@ -42,7 +68,7 @@
   import LoginOverlay from '$lib/LoginOverlay.svelte';
   import FullscreenMap from '$lib/FullscreenMap.svelte';
   import { searchQuery, isSearching, useSearchResults, performSearch, clearSearch, setSearchQuery } from '$lib/searchStore';
-  import { sessionStore } from '$lib/sessionStore';
+  import { sessionStore, hasPublicContentPermission } from '$lib/sessionStore';
   import { filterStore, locationFilter, userFilter } from '$lib/filterStore';
   import { page as pageStore } from '$app/stores';
   import { galleryStats } from '$lib/galleryStats';
@@ -63,6 +89,9 @@
   // Check if location filter is active
   $: hasLocationFilter = !!$locationFilter;
 
+  // Permission states - now using sessionStore
+  $: hasPublicContentPermissionValue = $hasPublicContentPermission;
+
 
 
   // Globale States für Umschaltung, Overlay, etc.
@@ -73,9 +102,12 @@
   let userLon: number | null = null;
   let cachedLat: number | null = null;
   let cachedLon: number | null = null;
+<<<<<<< HEAD
   // NEU: Separate Variablen für ausgewählte GPS-Koordinaten
   // let selectedLat: number | null = null;
   // let selectedLon: number | null = null;
+=======
+>>>>>>> Rolemanager
   let showDistance = true;
   let showCompass = false;
   let isLoggedIn = false;
@@ -708,78 +740,16 @@
         speechSynthesis.resume();
       }
       
-      // Teste die Sprachausgabe mit einem kurzen Text - nur nach direkter Benutzerinteraktion
-      const testUtterance = new SpeechSynthesisUtterance('Audio aktiviert');
-      testUtterance.lang = 'de-DE';
-      testUtterance.volume = 1.0;
-      testUtterance.rate = 0.9; // Slightly slower for better clarity
-      
-      testUtterance.onstart = () => {
-        console.log('🎤 Audio guide activation started');
-        audioActivated = true;
-      };
-      
-      // Set audioActivated immediately for better reactivity
+      // Stille Aktivierung des Audioguides ohne Sprachausgabe
+      console.log('🎤 Audio guide activated silently');
       audioActivated = true;
       
-      testUtterance.onend = () => {
-        console.log('🎤 Audio guide activated successfully');
-        // Announce first image after activation - nur im mobilen Modus
-        if (isManual3x3Mode) {
-          setTimeout(() => {
-            announceFirstImage();
-          }, 500);
-        }
-      };
-      
-      // Also announce immediately if audio is activated - nur im mobilen Modus
+      // Announce first image after activation - nur im mobilen Modus
       if (isManual3x3Mode) {
         setTimeout(() => {
           announceFirstImage();
         }, 200);
       }
-      
-      // Don't log canceled errors as errors - they're expected
-      testUtterance.onerror = (event) => {
-        if (event.error === 'canceled') {
-          console.log('🎤 Speech was canceled (expected behavior)');
-          return;
-        }
-        
-        console.error('🎤 Audio guide activation error:', event.error);
-        
-        if (event.error === 'not-allowed') {
-          console.log('🎤 Speech not allowed - user interaction required');
-          // Wait for user interaction and retry
-          const retryActivation = () => {
-            console.log('🎤 User interaction detected - retrying audio guide activation');
-            try {
-              if (speechSynthesis) {
-                speechSynthesis.resume();
-                speechSynthesis.speak(testUtterance);
-              }
-            } catch (error) {
-              console.error('🎤 Retry activation failed:', error);
-            }
-            document.removeEventListener('click', retryActivation);
-            document.removeEventListener('touchstart', retryActivation);
-          };
-          document.addEventListener('click', retryActivation, { once: true });
-          document.addEventListener('touchstart', retryActivation, { once: true });
-        }
-      };
-      
-      // Chrome fix: Small delay to ensure speech synthesis is ready
-      setTimeout(() => {
-        try {
-          if (speechSynthesis) {
-            speechSynthesis.speak(testUtterance);
-            console.log('🎤 Audio guide activation test spoken');
-          }
-        } catch (error) {
-          console.error('🎤 Audio guide activation error:', error);
-        }
-      }, 100);
     }
   }
 
@@ -1045,16 +1015,19 @@
           // Verwende gespeicherte GPS-Daten nur wenn sie nicht älter als 24 Stunden sind
           if (gpsData.lat && gpsData.lon && gpsAge < 24 * 60 * 60 * 1000) {
             console.log('[App-Start] Found saved GPS data:', gpsData);
-            // NEU: Setze cached GPS-Daten für 3-stufige Logik
+            
+            // WICHTIG: Setze sowohl userLat/userLon als auch cachedLat/cachedLon
+            userLat = gpsData.lat;
+            userLon = gpsData.lon;
             cachedLat = gpsData.lat;
             cachedLon = gpsData.lon;
-            gpsStatus = 'cached';
+            gpsStatus = 'active'; // Setze auf 'active' da wir GPS-Daten haben
             lastGPSUpdateTime = gpsData.timestamp;
             
             // Update filterStore with saved GPS data
-            filterStore.updateGpsStatus(true, { lat: cachedLat, lon: cachedLon });
+            filterStore.updateGpsStatus(true, { lat: userLat, lon: userLon });
             
-            console.log('[App-Start] Using cached GPS data:', { cachedLat, cachedLon, gpsAge: Math.round(gpsAge / 1000 / 60) + ' minutes' });
+            console.log('[App-Start] Using saved GPS data:', { userLat, userLon, cachedLat, cachedLon, gpsAge: Math.round(gpsAge / 1000 / 60) + ' minutes' });
           } else {
             console.log('[App-Start] Saved GPS data too old, clearing:', { gpsAge: Math.round(gpsAge / 1000 / 60) + ' minutes' });
             localStorage.removeItem('userGps');
@@ -1068,30 +1041,21 @@
       }
     }
     
+    // NEU: Lade gespeicherte GPS-Daten zuerst
+    const hasLoadedGPS = loadGPSData();
+    
     // Intelligente GPS-Initialisierung
     console.log('[App-Start] Starting GPS initialization...');
     
-    // NEU: Verzögerte GPS-Initialisierung um sicherzustellen, dass sie ausgeführt wird
-    setTimeout(() => {
-      console.log('[App-Start] Delayed GPS initialization...');
-      if (navigator.geolocation) {
-        console.log('[App-Start] Geolocation available, initializing...');
-        initializeGPSIntelligently();
-        
-        // NEU: Fallback GPS-Initialisierung nach 5 Sekunden falls die erste fehlschlägt
-        setTimeout(() => {
-          if (gpsStatus === 'checking' || gpsStatus === 'none') {
-            console.log('[App-Start] Fallback GPS initialization...');
-            if (navigator.geolocation) {
-              initializeGPSIntelligently();
-            }
-          }
-        }, 5000);
-      } else {
-        console.log('[App-Start] Geolocation not available');
-        gpsStatus = 'unavailable';
-      }
-    }, 100);
+    // EINFACH: GPS-Initialisierung sofort starten (auch wenn gespeicherte Daten vorhanden sind)
+    if (navigator.geolocation) {
+      console.log('[App-Start] Geolocation available, initializing...');
+      gpsStatus = 'checking';
+      initializeGPS();
+    } else {
+      console.log('[App-Start] Geolocation not available');
+      gpsStatus = 'unavailable';
+    }
     
     // Setze Default-Settings für anonyme User
     setAnonymousUserDefaults();
@@ -1360,9 +1324,15 @@
     
     // Save to localStorage
     if (browser) {
+<<<<<<< HEAD
       const gpsData = { lat, lon, timestamp: Date.now() };
       localStorage.setItem('userGps', JSON.stringify(gpsData));
       console.log('[Location-Selected] Saved selected location:', gpsData);
+=======
+      localStorage.setItem('gpsAllowed', 'true');
+      saveGPSData(lat, lon);
+      console.log('[Location-Selected] Saved selected location as GPS gemerkt:', { lat, lon });
+>>>>>>> Rolemanager
     }
     
     // Update filterStore with the selected location
@@ -1412,7 +1382,7 @@
     gpsStatus = "checking";
 
     try {
-      // Live-Tracking: watchPosition
+      // EINFACH: Direkt GPS anfordern - das sollte das Location-Symbol im Browser anzeigen
       gpsWatchId = navigator.geolocation.watchPosition(
         (position) => {
           console.log('[GPS] Position received:', position);
@@ -1425,6 +1395,9 @@
           
           // WICHTIG: GPS-Position in filterStore speichern
           filterStore.updateGpsStatus(true, { lat: userLat, lon: userLon });
+          
+          // WICHTIG: GPS-Daten in localStorage speichern für Persistierung
+          saveGPSData(userLat, userLon);
         },
         (error) => {
           console.warn("GPS-Fehler:", error.message, "Code:", error.code);
@@ -1621,6 +1594,53 @@
       gpsWatchId = null;
       console.log('[GPS] Tracking gestoppt');
     }
+  }
+  
+  // NEU: Funktion zum Speichern von GPS-Daten
+  function saveGPSData(lat: number, lon: number) {
+    if (browser) {
+      const gpsData = { lat, lon, timestamp: Date.now() };
+      localStorage.setItem('userGps', JSON.stringify(gpsData));
+      console.log('[GPS] Saved GPS data to localStorage:', gpsData);
+    }
+  }
+  
+  // NEU: Funktion zum Laden von GPS-Daten
+  function loadGPSData() {
+    if (browser) {
+      try {
+        const savedGPS = localStorage.getItem('userGps');
+        if (savedGPS) {
+          const gpsData = JSON.parse(savedGPS);
+          const now = Date.now();
+          const gpsAge = now - gpsData.timestamp;
+          
+          // Verwende gespeicherte GPS-Daten nur wenn sie nicht älter als 24 Stunden sind
+          if (gpsData.lat && gpsData.lon && gpsAge < 24 * 60 * 60 * 1000) {
+            console.log('[GPS] Loading saved GPS data:', gpsData);
+            userLat = gpsData.lat;
+            userLon = gpsData.lon;
+            cachedLat = gpsData.lat;
+            cachedLon = gpsData.lon;
+            gpsStatus = 'active';
+            lastGPSUpdateTime = gpsData.timestamp;
+            
+            // Update filterStore with saved GPS data
+            filterStore.updateGpsStatus(true, { lat: userLat, lon: userLon });
+            
+            console.log('[GPS] Loaded GPS data:', { userLat, userLon, cachedLat, cachedLon });
+            return true;
+          } else {
+            console.log('[GPS] Saved GPS data too old, clearing');
+            localStorage.removeItem('userGps');
+          }
+        }
+      } catch (error) {
+        console.warn('[GPS] Error loading saved GPS data:', error);
+        localStorage.removeItem('userGps');
+      }
+    }
+    return false;
   }
 
   // Umschalt-Logik für Galerie/3x3-Modus
@@ -1833,6 +1853,7 @@
     }
   }
 
+<<<<<<< HEAD
   // NEU: Funktion um GPS manuell zu stoppen
   function stopGPS() {
     console.log('[GPS] Manually stopping GPS...');
@@ -1857,25 +1878,36 @@
     filterStore.updateGpsStatus(false);
     
     console.log('[GPS] GPS stopped and coordinates cleared');
+=======
+  // NEU: Funktion zum manuellen Starten von GPS
+  function startGPS() {
+    console.log('[GPS] User requested GPS start');
+    if (navigator.geolocation) {
+      gpsStatus = 'checking';
+      initializeGPS();
+    } else {
+      gpsStatus = 'unavailable';
+    }
+>>>>>>> Rolemanager
   }
 
 </script>
 
-{#if (gpsStatus === 'denied' || gpsStatus === 'unavailable') && !userLat && !userLon}
+{#if browser && (gpsStatus === 'denied' || gpsStatus === 'unavailable') && !userLat && !userLon}
   <div style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(30,30,30,0.92);z-index:10000;display:flex;flex-direction:column;align-items:center;justify-content:center;">
     <div style="background:#222;padding:2rem 2.5rem;border-radius:1rem;box-shadow:0 2px 16px #0008;max-width:90vw;text-align:center;">
       <h2 style="color:#fff;margin-bottom:1rem;">Standort auswählen</h2>
       <p style="color:#ccc;font-size:1.1rem;margin-bottom:1.5rem;">
-        {#if gpsStatus === 'denied'}
+        {#if browser && gpsStatus === 'denied'}
           GPS ist nicht verfügbar. Wähle deinen Standort auf der Karte aus, um die Galerie nach Entfernung zu sortieren.
-        {:else if gpsStatus === 'unavailable'}
+        {:else if browser && gpsStatus === 'unavailable'}
           GPS ist nicht verfügbar. Wähle deinen Standort auf der Karte aus, um die Galerie nach Entfernung zu sortieren.
         {:else}
           Keine GPS-Daten verfügbar. Wähle deinen Standort aus, um die Galerie nach Entfernung zu sortieren.
         {/if}
       </p>
       <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;">
-        <button on:click={tryInitializeGPS} style="padding: 0.9rem 2.2rem; font-size: 1.15rem; border-radius: 0.5rem; background: #3a7; color: #fff; border: none; cursor: pointer; font-weight:600;">
+        <button on:click={startGPS} style="padding: 0.9rem 2.2rem; font-size: 1.15rem; border-radius: 0.5rem; background: #3a7; color: #fff; border: none; cursor: pointer; font-weight:600;">
           📍 Standort verwenden
         </button>
         <button on:click={() => {
@@ -1902,19 +1934,19 @@
           Ohne Standort fortfahren
         </button>
       </div>
-      {#if gpsStatus === 'denied'}
+      {#if browser && gpsStatus === 'denied'}
         <div style="margin-top:1.2rem;color:#f66;font-size:1.05rem;">
           Standort-Freigabe wurde abgelehnt.<br>Du kannst die Galerie trotzdem nutzen.
         </div>
       {/if}
-      {#if gpsStatus === 'unavailable'}
+      {#if browser && gpsStatus === 'unavailable'}
         <div style="margin-top:1.2rem;color:#f66;font-size:1.05rem;">
           Standort konnte nicht ermittelt werden.<br>Du kannst die Galerie trotzdem nutzen.
         </div>
       {/if}
     </div>
   </div>
-{:else if gpsStatus === 'checking'}
+{:else if browser && gpsStatus === 'checking'}
   <!-- GPS wird geladen - zeige Ladeindikator -->
   <div style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(30,30,30,0.92);z-index:10000;display:flex;flex-direction:column;align-items:center;justify-content:center;">
     <div style="background:#222;padding:2rem 2.5rem;border-radius:1rem;box-shadow:0 2px 16px #0008;max-width:90vw;text-align:center;">
@@ -1940,7 +1972,7 @@
     userLon={userLon}
     {showDistance}
     {isLoggedIn}
-    gpsStatus={gpsStatus}
+    gpsStatus={browser && typeof gpsStatus !== 'undefined' ? gpsStatus : 'none'}
     lastGPSUpdateTime={lastGPSUpdateTime}
     isManual3x3Mode={isManual3x3Mode}
     originalGalleryLat={originalGalleryLat}
@@ -2055,7 +2087,6 @@
   {#if !isInIframe}
     <FloatingActionButtons
       {showScrollToTop}
-      showTestMode={true}
       showMapButton={true}
       isLoggedIn={isLoggedIn}
       {simulationMode}
@@ -2107,9 +2138,11 @@
           console.log('[FullscreenMap] Stopped GPS watcher to prevent conflicts');
         }
         
-        // Set the selected location as "GPS gemerkt"
+        // Set the selected location as both active and cached GPS
         userLat = lat;
         userLon = lon;
+        cachedLat = lat;
+        cachedLon = lon;
         
         // Update GPS status to active (as if GPS was working)
         gpsStatus = 'active';
@@ -2118,9 +2151,8 @@
         // Save to localStorage as "GPS gemerkt"
         if (browser) {
           localStorage.setItem('gpsAllowed', 'true');
-          const gpsData = { lat, lon, timestamp: Date.now() };
-          localStorage.setItem('userGps', JSON.stringify(gpsData));
-          console.log('[FullscreenMap] Saved selected location as GPS gemerkt:', gpsData);
+          saveGPSData(lat, lon);
+          console.log('[FullscreenMap] Saved selected location as GPS gemerkt:', { lat, lon });
         }
         
         // Update filterStore with the selected location
@@ -2137,8 +2169,8 @@
       }}
     />
   {/if}
-  <a class="impressum-link" href="/impressum" target="_blank" rel="noopener">Impressum</a>
-  <a class="datenschutz-link" href="/datenschutz" target="_blank" rel="noopener">Datenschutz</a>
+  <a class="impressum-link" href="/web/impressum" target="_blank" rel="noopener">Impressum</a>
+  <a class="datenschutz-link" href="/web/datenschutz" target="_blank" rel="noopener">Datenschutz</a>
 {/if}
 
 <style>

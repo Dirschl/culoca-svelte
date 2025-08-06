@@ -29,7 +29,7 @@
     slug?: string; // Added slug to the interface
   }[] = [];
   export let layout: 'justified' | 'grid' = 'justified';
-  export let containerWidth = 1024;
+  export let containerWidth = 1200; // Set a reasonable default width
   export let targetRowHeight = 200;
   export let gap = 2;
   export let showDistance: boolean = false;
@@ -45,6 +45,7 @@
   let boxes: LayoutBox[] = [];
   let layoutResult: JustifiedLayoutResult = { boxes: [], containerHeight: 0, widowCount: 0 };
   let deviceHeading: number | null = null;
+  let isInitialized = false; // Track if layout has been initialized
   
   // Responsive target row height calculation
   $: responsiveTargetRowHeight = (() => {
@@ -58,10 +59,7 @@
   })();
 
   // Reactive layout calculation for justified layout
-  $: if (layout === 'justified' && items.length > 0) {
-    // Use a fallback width if containerWidth is not yet available
-    const effectiveWidth = containerWidth > 0 ? containerWidth : 1200;
-    
+  $: if (layout === 'justified' && items.length > 0 && containerWidth > 0) {
     try {
       const inputItems = items.map((item) => ({ 
         width: item.width || 400, 
@@ -69,7 +67,7 @@
       }));
       
       layoutResult = justifiedLayout(inputItems, { 
-        containerWidth: effectiveWidth, 
+        containerWidth: containerWidth, 
         targetRowHeight: responsiveTargetRowHeight, 
         boxSpacing: gap,
         containerPadding: 0,
@@ -80,6 +78,7 @@
       });
       
       boxes = layoutResult.boxes || [];
+      isInitialized = true;
     } catch (error) {
       console.error('[GalleryLayout] Error calculating justified layout:', error);
       boxes = [];
@@ -98,6 +97,16 @@
       }
     }
   }
+
+  // Initialize container width immediately if possible
+  function initializeWidth() {
+    if (galleryEl && galleryEl.clientWidth > 0) {
+      containerWidth = galleryEl.clientWidth;
+    } else if (typeof window !== 'undefined') {
+      // Fallback to window width for initial render
+      containerWidth = window.innerWidth;
+    }
+  }
   
   function handleOrientation(event: DeviceOrientationEvent) {
     if (event.absolute && typeof event.alpha === 'number') {
@@ -106,7 +115,8 @@
   }
   
   onMount(() => {
-    resize();
+    initializeWidth(); // Call initializeWidth on mount
+    resize(); // Also call resize to ensure proper sizing
     window.addEventListener('resize', resize);
     
     const resizeObserver = new ResizeObserver(() => {
@@ -361,30 +371,26 @@
   {#if layout === 'justified'}
     <div class="justified-wrapper">
       <div 
-        class="justified-gallery"
-        style="height:{layoutResult.containerHeight}px;"
+        class="justified-gallery" 
+        style="height: {isInitialized ? layoutResult.containerHeight : 'auto'}px;"
       >
-        {#if boxes.length > 0}
-          {#each items as item, i}
-            {#if boxes[i]}
-              <div
-                class="justified-pic-container"
-                role="button"
-                tabindex="0"
-                aria-label="View image {item.id}"
-                style="
-                  left:{boxes[i].left}px;
-                  top:{boxes[i].top}px;
-                  width:{boxes[i].width}px;
-                  height:{boxes[i].height}px;
-                "
+        {#if isInitialized && boxes.length > 0}
+          {#each items as item, index}
+            {#if boxes[index]}
+              <div 
+                class="justified-pic-container" 
+                role="button" 
+                tabindex="0" 
+                aria-label="View image {item.id}" 
+                style="left:{boxes[index].left}px; top:{boxes[index].top}px; width:{boxes[index].width}px; height:{boxes[index].height}px;"
                 on:click={() => handleImageClick(item.slug)}
                 on:keydown={(e) => handleKeydown(e, item.slug)}
+                title={item.title || ''}
               >
-                <img
-                  class="justified-pic"
-                  src={item.src}
-                  alt="Gallery image {item.id}"
+                <img 
+                  class="justified-pic" 
+                  src={item.src} 
+                  alt={item.title || `Bild ${item.id}`} 
                   loading="lazy"
                 />
                 {#if showDistance && userLat !== null && userLon !== null && item.lat && item.lon}
@@ -465,7 +471,7 @@
         >
           <img 
             src={item.src}
-            alt={item.title || 'Bild'} 
+            alt={item.title || `Bild ${item.id}`} 
             loading="lazy"
           />
           {#if showDistance && userLat !== null && userLon !== null && item.lat && item.lon}

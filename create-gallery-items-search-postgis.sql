@@ -1,5 +1,5 @@
 -- Create gallery_items_search_postgis function
--- Combines normal gallery functionality with built-in search
+-- Combines normal gallery functionality with built-in search using optimized full-text search
 
 -- Drop existing function if it exists
 DROP FUNCTION IF EXISTS public.gallery_items_search_postgis(double precision, double precision, integer, integer, uuid, text);
@@ -66,9 +66,8 @@ BEGIN
       -- Suchfilter: Wenn search_term vorhanden, dann suchen
       CASE
         WHEN search_term IS NOT NULL AND search_term != '' THEN
-          i.title ILIKE '%' || search_term || '%' OR 
-          i.description ILIKE '%' || search_term || '%' OR
-          (i.keywords && string_to_array(search_term, ' '))
+          -- NEU: Verwende optimierte Volltext-Suche mit UND-Funktionalität
+          i.tsv @@ to_tsquery('german', make_and_query(search_term))
         ELSE
           TRUE -- Keine Suche, alle Items
       END

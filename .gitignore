@@ -18,6 +18,12 @@ Thumbs.db
 !.env.example
 !.env.test
 
+# Tools with potential secrets
+tools/*.mjs
+fix-*.mjs
+recreate-*.mjs
+create-*.mjs
+
 # Vite
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*

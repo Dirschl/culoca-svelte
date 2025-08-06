@@ -73,12 +73,11 @@
     </div>
   </div>
 {:else}
-  <a href="/system" class="logo-link">
+  <a href="/see-you-local-system-faq" class="logo-link">
     <img 
       src="/culoca-logo-512px.png" 
       alt="Culoca" 
       class="culoca-logo clickable"
-      on:click|preventDefault={onToggleSearchField}
     />
   </a>
 {/if}
@@ -182,7 +181,8 @@
     left: 1.8rem;
     right: auto;
     z-index: 50;
-    width: 15rem;
+    height: 40px;
+    width: auto;
     transition: opacity 0.2s ease;
     object-fit: contain;
   }
