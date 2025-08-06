@@ -35,8 +35,8 @@ export const GET: RequestHandler = async ({ url }) => {
     const headContent = headMatch[1];
     
     // Extract individual meta tags and other head elements
-    const metaTags = headContent.match(/<meta[^>]*>/gi) || [];
-    const titleTags = headContent.match(/<title[^>]*>([\s\S]*?)<\/title>/gi) || [];
+    const metaTags = extractMetaTags(headContent);
+    const title = extractTitle(headContent);
     const linkTags = headContent.match(/<link[^>]*>/gi) || [];
     const scriptTags = headContent.match(/<script[^>]*>([\s\S]*?)<\/script>/gi) || [];
     
@@ -62,7 +62,7 @@ export const GET: RequestHandler = async ({ url }) => {
       url: targetUrl,
       headContent: formattedHead,
       metaTags: metaTags,
-      titleTags: titleTags,
+      title: title,
       linkTags: linkTags,
       scriptTags: scriptTags,
       rawHead: headContent,
@@ -141,6 +141,31 @@ function extractFaviconInfo(headContent: string) {
     hasMultipleSizes: favicons.some(f => f.sizes && f.sizes.includes(' ')),
     hasAppleTouchIcon: favicons.some(f => f.rel === 'apple-touch-icon')
   };
+}
+
+function extractTitle(headContent: string) {
+  const titleMatch = headContent.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  return titleMatch ? titleMatch[1].trim() : null;
+}
+
+function extractMetaTags(headContent: string) {
+  const metaMatches = headContent.match(/<meta[^>]*>/gi) || [];
+  const metaTags = [];
+  
+  metaMatches.forEach(match => {
+    const nameMatch = match.match(/name="([^"]+)"/i);
+    const propertyMatch = match.match(/property="([^"]+)"/i);
+    const contentMatch = match.match(/content="([^"]+)"/i);
+    
+    metaTags.push({
+      name: nameMatch ? nameMatch[1] : null,
+      property: propertyMatch ? propertyMatch[1] : null,
+      content: contentMatch ? contentMatch[1] : null,
+      fullTag: match.trim()
+    });
+  });
+  
+  return metaTags;
 }
 
 function extractCulocaLogoFallback(headContent: string) {

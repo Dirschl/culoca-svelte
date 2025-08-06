@@ -5,9 +5,9 @@
   <link rel="canonical" href="https://culoca.com/see-you-local-system-faq" />
   
   <!-- Favicon für /web Seite -->
-  <link rel="icon" type="image/svg+xml" href="/static/culoca-favicon.svg">
-  <link rel="icon" type="image/png" href="/static/culoca-icon.png" sizes="32x32">
-  <link rel="apple-touch-icon" href="/static/culoca-icon.png" sizes="180x180">
+  <link rel="icon" type="image/svg+xml" href="/culoca-favicon.svg">
+  <link rel="icon" type="image/png" href="/culoca-icon.png" sizes="32x32">
+  <link rel="apple-touch-icon" href="/culoca-icon.png" sizes="180x180">
   
   <!-- Open Graph -->
   <meta property="og:title" content="Culoca - See You Local - Entdecke deine Umgebung" />
@@ -16,7 +16,7 @@
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="DIRSCHL.com GmbH" />
   <meta property="og:locale" content="de_DE" />
-  <meta property="og:image" content="https://culoca.com/static/culoca-see-you-local-entdecke-deine-umgebung.jpg" />
+  <meta property="og:image" content="https://culoca.com/culoca-see-you-local-entdecke-deine-umgebung.jpg" />
   
   <!-- JSON-LD -->
   <script type="application/ld+json">
@@ -78,6 +78,10 @@
   let isHeadLoading = false;
   let headError = '';
           let activeTab = 'images';
+  
+  // Editierbare SEO-Textfelder
+  let editableTitle = '';
+  let editableDescription = '';
 
   function clearInput() {
     testUrl = '';
@@ -90,6 +94,29 @@
   function handleUrlSubmit(event: KeyboardEvent) {
     if (event.key === 'Enter') {
       fetchHeadData();
+    }
+  }
+
+  async function copyPrompt() {
+    const promptText = `Bitte ändere auf der Seite ${testUrl} den Title auf "${editableTitle || headData?.title || 'Titel eingeben'}" und die Description auf "${editableDescription || headData?.metaTags?.find(tag => tag.name === 'description' || tag.property === 'og:description')?.content || 'Description eingeben'}"`;
+    
+    try {
+      await navigator.clipboard.writeText(promptText);
+      // Optional: Zeige eine kurze Bestätigung
+      const copyButton = document.querySelector('.copy-button') as HTMLElement;
+      if (copyButton) {
+        const originalHTML = copyButton.innerHTML;
+        copyButton.innerHTML = `
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M20 6L9 17l-5-5"/>
+          </svg>
+        `;
+        setTimeout(() => {
+          copyButton.innerHTML = originalHTML;
+        }, 1000);
+      }
+    } catch (err) {
+      console.error('Fehler beim Kopieren:', err);
     }
   }
 
@@ -124,6 +151,12 @@
       
       if (result.success) {
         headData = result;
+        
+        // Initialisiere editierbare Felder mit den ursprünglichen Werten
+        editableTitle = result.title || '';
+        const description = result.metaTags?.find(tag => tag.name === 'description' || tag.property === 'og:description')?.content;
+        editableDescription = description || '';
+        
         // Also fetch JSON-LD data
         await fetchJsonLd();
       } else {
@@ -143,13 +176,6 @@
       return;
     }
 
-    // Validate URL format
-            // URL validation removed - allow any URL for testing
-        // if (!testUrl.includes('culoca.com/item/')) {
-        //   error = 'Bitte gib eine gültige Culoca Item URL ein (z.B. https://culoca.com/item/...)';
-        //   return;
-        // }
-
     isLoading = true;
     error = '';
     jsonLdData = '';
@@ -166,7 +192,26 @@
       const result = await response.json();
       
       if (result.success) {
-        jsonLdData = result.formatted;
+        // Format all JSON-LD data found
+        let formattedData = `Gefunden: ${result.totalFound} JSON-LD Strukturen\n`;
+        formattedData += `Gültig: ${result.validCount}, Fehler: ${result.errorCount}\n\n`;
+        
+        // Add each valid JSON-LD structure
+        result.jsonLdData.forEach((item: any, index: number) => {
+          formattedData += `=== ${item.index}. ${item.type}: ${item.name} ===\n`;
+          formattedData += item.formatted;
+          formattedData += '\n\n';
+        });
+        
+        // Add any errors
+        if (result.errors && result.errors.length > 0) {
+          formattedData += '=== FEHLER ===\n';
+          result.errors.forEach((err: any) => {
+            formattedData += `${err.index}. ${err.error}: ${err.content}\n`;
+          });
+        }
+        
+        jsonLdData = formattedData;
       } else {
         throw new Error(result.error || 'Unbekannter Fehler');
       }
@@ -740,6 +785,80 @@
           
           {#if activeTab === 'images'}
             <div class="images-analysis">
+              <!-- SEO Information Section -->
+              <div class="seo-info-section">
+                <h5>📊 SEO-Informationen:</h5>
+                
+                <!-- Title Analysis -->
+                <div class="seo-item">
+                  <h6>📝 Title:</h6>
+                  {#if headData.title}
+                    {@const titleLength = editableTitle.length || headData.title.length}
+                    {@const titleStatus = titleLength >= 30 && titleLength <= 60 ? '✅ Optimal' : titleLength < 30 ? '⚠️ Zu kurz' : '⚠️ Zu lang'}
+                    <p><strong>Länge ({titleLength} Zeichen):</strong> <span class="status-{titleStatus.includes('✅') ? 'good' : 'warning'}">{titleStatus}</span></p>
+                    <div class="editable-text-field">
+                      <textarea 
+                        bind:value={editableTitle} 
+                        placeholder={headData.title || 'Title eingeben...'}
+                        rows="2"
+                        class="seo-textarea"
+                      ></textarea>
+                    </div>
+                  {:else}
+                    <p class="no-data">❌ Kein Title gefunden</p>
+                  {/if}
+                </div>
+                
+                <!-- Description Analysis -->
+                <div class="seo-item">
+                  <h6>📄 Description:</h6>
+                  {#if headData.metaTags}
+                    {@const description = headData.metaTags.find(tag => tag.name === 'description' || tag.property === 'og:description')?.content}
+                    {#if description}
+                      {@const descLength = editableDescription.length || description.length}
+                      {@const descStatus = descLength >= 120 && descLength <= 160 ? '✅ Optimal' : descLength < 120 ? '⚠️ Zu kurz' : '⚠️ Zu lang'}
+                      <p><strong>Länge ({descLength} Zeichen):</strong> <span class="status-{descStatus.includes('✅') ? 'good' : 'warning'}">{descStatus}</span></p>
+                      <div class="editable-text-field">
+                        <textarea 
+                          bind:value={editableDescription} 
+                          placeholder={description || 'Description eingeben...'}
+                          rows="3"
+                          class="seo-textarea"
+                        ></textarea>
+                      </div>
+                      
+                      <!-- Kopierbarer Prompt -->
+                      {#if testUrl && (editableTitle || editableDescription)}
+                        <div class="prompt-section">
+                          <h6>📋 KI-Prompt zum Kopieren:</h6>
+                          <div class="prompt-container">
+                            <textarea 
+                              readonly 
+                              class="prompt-textarea"
+                              rows="4"
+                            >Bitte ändere auf der Seite {testUrl} den Title auf "{editableTitle || headData.title || 'Titel eingeben'}" und die Description auf "{editableDescription || description || 'Description eingeben'}"</textarea>
+                            <button 
+                              class="copy-button" 
+                              on:click={() => copyPrompt()}
+                              title="Prompt kopieren"
+                            >
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                      {/if}
+                    {:else}
+                      <p class="no-data">❌ Keine Description gefunden</p>
+                    {/if}
+                  {:else}
+                    <p class="no-data">❌ Keine Meta-Tags verfügbar</p>
+                  {/if}
+                </div>
+              </div>
+              
               <h5>Bilder & Icons Analyse:</h5>
               
               <!-- Main Image Section -->
@@ -929,196 +1048,22 @@
           {:else if activeTab === 'meta'}
             <div class="meta-analysis">
               <h5>Meta-Tags Analyse:</h5>
-              <div class="meta-stats">
-                <span>Meta-Tags: {headData.metaTags.length}</span>
-                <span>Title-Tags: {headData.titleTags.length}</span>
-                <span>Link-Tags: {headData.linkTags.length}</span>
-                <span>Script-Tags: {headData.scriptTags.length}</span>
-              </div>
-              <div class="meta-list">
-                {#each headData.metaTags as tag}
-                  <div class="meta-item">{tag}</div>
-                {/each}
-              </div>
-            </div>
-            <div class="images-analysis">
-              <h5>Bilder & Icons Analyse:</h5>
-              
-              <!-- Main Image Section -->
-              {#if headData.mainImage}
-                <div class="image-section">
-                  <h6>📸 Hauptbild:</h6>
-                  <div class="image-info">
-                    <p><strong>Typ:</strong> {headData.mainImage.type}</p>
-                    <p><strong>Quelle:</strong> {headData.mainImage.source}</p>
-                    <p><strong>URL:</strong> <a href={headData.mainImage.url} target="_blank" rel="noopener">{headData.mainImage.url}</a></p>
-                    <div class="image-preview">
-                      <img src={headData.mainImage.url} alt="Hauptbild Vorschau" on:error={(e) => e.target.style.display = 'none'} />
+              {#if headData.metaTags}
+                <div class="meta-stats">
+                  <span>Meta-Tags: {headData.metaTags.length}</span>
+                  <span>Link-Tags: {headData.linkTags?.length || 0}</span>
+                  <span>Script-Tags: {headData.scriptTags?.length || 0}</span>
+                </div>
+                <div class="meta-list">
+                  {#each headData.metaTags as tag}
+                    <div class="meta-item">
+                      <strong>{tag.name || tag.property || 'Unbekannt'}:</strong> {tag.content || 'Kein Inhalt'}
                     </div>
-                  </div>
+                  {/each}
                 </div>
               {:else}
-                <div class="image-section">
-                  <h6>📸 Hauptbild:</h6>
-                  <p class="no-data">Kein Hauptbild gefunden</p>
-                </div>
+                <p class="no-data">Keine Meta-Tags verfügbar</p>
               {/if}
-              
-              <!-- Favicon Section -->
-              <div class="favicon-section">
-                <h6>🎨 Favicons ({headData.faviconInfo.count} gefunden):</h6>
-                {#if headData.faviconInfo.favicons.length > 0}
-                  <div class="favicon-list">
-                    {#each headData.faviconInfo.favicons as favicon}
-                      <div class="favicon-item">
-                        <div class="favicon-info">
-                          <p><strong>URL:</strong> <a href={favicon.url} target="_blank" rel="noopener">{favicon.url}</a></p>
-                          {#if favicon.sizes}<p><strong>Größen:</strong> {favicon.sizes}</p>{/if}
-                          {#if favicon.type}<p><strong>Typ:</strong> {favicon.type}</p>{/if}
-                          {#if favicon.rel}<p><strong>Rel:</strong> {favicon.rel}</p>{/if}
-                        </div>
-                        <div class="favicon-preview">
-                          <img 
-                            src={favicon.url} 
-                            alt="Favicon Vorschau" 
-                            on:error={(e) => {
-                              e.target.style.display = 'none';
-                              e.target.nextElementSibling.style.display = 'block';
-                            }} 
-                          />
-                          <svg 
-                            class="culoca-fallback" 
-                            style="display: none; width: 64px; height: 64px;" 
-                            viewBox="0 0 24 24" 
-                            fill="currentColor"
-                          >
-                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-                          </svg>
-                        </div>
-                      </div>
-                    {/each}
-                  </div>
-                  
-                  <!-- Actual Size Favicon Display -->
-                  <div class="favicon-sizes-display">
-                    <h6>📏 Favicon-Größen in echter Größe:</h6>
-                    <div class="favicon-sizes-grid">
-                      {#each headData.faviconInfo.favicons as favicon}
-                        {#if favicon.sizes}
-                          {#each favicon.sizes.split(' ').filter(size => size.includes('x')) as size}
-                            {@const [width, height] = size.split('x').map(Number)}
-                            {#if width && height && width <= 512 && height <= 512}
-                              <div class="favicon-size-item">
-                                <div class="favicon-size-label">{size}</div>
-                                <div class="favicon-size-display" style="width: {width}px; height: {height}px;">
-                                  <img 
-                                    src={favicon.url} 
-                                    alt="Favicon {size}" 
-                                    style="width: 100%; height: 100%; object-fit: contain;"
-                                    on:error={(e) => {
-                                      e.target.style.display = 'none';
-                                      e.target.nextElementSibling.style.display = 'block';
-                                    }} 
-                                  />
-                                  <svg 
-                                    class="culoca-fallback-size" 
-                                    style="display: none; width: 100%; height: 100%;" 
-                                    viewBox="0 0 24 24" 
-                                    fill="currentColor"
-                                  >
-                                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-                                  </svg>
-                                </div>
-                              </div>
-                            {/if}
-                          {/each}
-                        {/if}
-                      {/each}
-                    </div>
-                  </div>
-                  
-                  <div class="favicon-stats">
-                    <p><strong>Mehrere Größen:</strong> {headData.faviconInfo.hasMultipleSizes ? '✅ Ja' : '❌ Nein'}</p>
-                    <p><strong>Apple Touch Icon:</strong> {headData.faviconInfo.hasAppleTouchIcon ? '✅ Ja' : '❌ Nein'}</p>
-                  </div>
-                {:else}
-                  <p class="no-data">Keine Favicons gefunden</p>
-                  <!-- Show Culoca Fallback when no favicons are found -->
-                  <div class="favicon-fallback-display">
-                    <h6>🛡️ Culoca Fallback-Icon (wenn keine Favicons gefunden):</h6>
-                    <div class="favicon-sizes-grid">
-                      <div class="favicon-size-item">
-                        <div class="favicon-size-label">32x32</div>
-                        <div class="favicon-size-display" style="width: 32px; height: 32px;">
-                          <svg 
-                            class="culoca-fallback-size" 
-                            style="width: 100%; height: 100%;" 
-                            viewBox="0 0 24 24" 
-                            fill="currentColor"
-                          >
-                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-                          </svg>
-                        </div>
-                      </div>
-                      <div class="favicon-size-item">
-                        <div class="favicon-size-label">48x48</div>
-                        <div class="favicon-size-display" style="width: 48px; height: 48px;">
-                          <svg 
-                            class="culoca-fallback-size" 
-                            style="width: 100%; height: 100%;" 
-                            viewBox="0 0 24 24" 
-                            fill="currentColor"
-                          >
-                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-                          </svg>
-                        </div>
-                      </div>
-                      <div class="favicon-size-item">
-                        <div class="favicon-size-label">96x96</div>
-                        <div class="favicon-size-display" style="width: 96px; height: 96px;">
-                          <svg 
-                            class="culoca-fallback-size" 
-                            style="width: 100%; height: 100%;" 
-                            viewBox="0 0 24 24" 
-                            fill="currentColor"
-                          >
-                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-                          </svg>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                {/if}
-              </div>
-              
-              <!-- Culoca Logo Fallback Section -->
-              <div class="culoca-fallback-section">
-                <h6>🛡️ Culoca Logo Fallback (Wenn kein Icon möglich):</h6>
-                {#if headData.culocaLogoFallback}
-                  <div class="culoca-fallback-info">
-                    <p><strong>Culoca Logo Referenz:</strong> {headData.culocaLogoFallback.hasCulocaLogoReference ? '✅ Ja' : '❌ Nein'}</p>
-                    <p><strong>Fallback Referenz:</strong> {headData.culocaLogoFallback.hasFallbackReference ? '✅ Ja' : '❌ Nein'}</p>
-                    {#if headData.culocaLogoFallback.culocaLogoReferences.length > 0}
-                      <p><strong>Culoca Logo Referenzen:</strong></p>
-                      <ul>
-                        {#each headData.culocaLogoFallback.culocaLogoReferences as ref}
-                          <li>{ref}</li>
-                        {/each}
-                      </ul>
-                    {/if}
-                    {#if headData.culocaLogoFallback.fallbackReferences.length > 0}
-                      <p><strong>Fallback Referenzen:</strong></p>
-                      <ul>
-                        {#each headData.culocaLogoFallback.fallbackReferences as ref}
-                          <li>{ref}</li>
-                        {/each}
-                      </ul>
-                    {/if}
-                  </div>
-                {:else}
-                  <p class="no-data">Keine Culoca Logo Fallback-Information verfügbar</p>
-                {/if}
-              </div>
             </div>
           {:else if activeTab === 'raw'}
             <pre><code>{headData.rawHead}</code></pre>
@@ -1253,19 +1198,19 @@
   .banner-title {
     font-size: 1.2rem;
     font-weight: 500;
-    color: var(--text-primary);
+    color: white;
     margin: 0;
   }
 
   .banner-creator {
     font-size: 1rem;
-    color: var(--text-primary);
+    color: white;
     margin: 0rem 0 0 0;
   }
 
   .banner-resolution {
     font-size: 0.8rem;
-    color: var(--text-primary);
+    color: white;
     margin: 0.25rem 0 0 0;
   }
 
@@ -1549,7 +1494,7 @@
 
   .head-tabs {
     display: flex;
-    margin-bottom: 1rem;
+    /* margin-bottom: 1rem; */
     border-bottom: 1px solid var(--border-color);
   }
 
@@ -1612,7 +1557,7 @@
   }
 
   .images-analysis {
-    margin-top: 1rem;
+    /* margin-top: 1rem; */
   }
 
   .image-section {
@@ -1940,6 +1885,146 @@
   .item-card-link:hover .item-card {
     border-color: var(--accent-color);
   }
+
+  /* SEO Information Styles */
+  .seo-info-section {
+    margin: 0 0 1.5rem 0;
+    padding: 1.5rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+  }
+
+  .seo-item {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .seo-item:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+  }
+
+  .seo-item h6 {
+    margin: 0 0 0.5rem 0;
+    color: var(--text-primary);
+    font-size: 1rem;
+  }
+
+  .seo-item p {
+    margin: 0.25rem 0;
+    color: var(--text-secondary);
+  }
+
+  .status-good {
+    color: #28a745;
+    font-weight: 600;
+  }
+
+  .status-warning {
+    color: #ffc107;
+    font-weight: 600;
+  }
+
+  /* Editierbare SEO-Textfelder */
+  .editable-text-field {
+    margin-top: 0.5rem;
+  }
+
+  .seo-textarea {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.9rem;
+    line-height: 1.4;
+    resize: vertical;
+    min-height: 60px;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .seo-textarea:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 2px rgba(238, 114, 33, 0.1);
+  }
+
+  .seo-textarea::placeholder {
+    color: var(--text-tertiary);
+    font-style: italic;
+  }
+
+  /* Prompt Section Styles */
+  .prompt-section {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+  }
+
+  .prompt-section h6 {
+    margin: 0 0 0.5rem 0;
+    color: var(--text-primary);
+    font-size: 1rem;
+  }
+
+  .prompt-container {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .prompt-textarea {
+    flex: 1;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    resize: none;
+    min-height: 80px;
+    cursor: text;
+  }
+
+  .prompt-textarea:focus {
+    outline: none;
+    border-color: var(--accent-color);
+  }
+
+  .copy-button {
+    flex-shrink: 0;
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 40px;
+    height: 40px;
+  }
+
+  .copy-button:hover {
+    background: var(--bg-secondary);
+    border-color: var(--accent-color);
+    color: var(--accent-color);
+  }
+
+  .copy-button:active {
+    transform: scale(0.95);
+  }
+
+
 
   @media (max-width: 768px) {
     .banner-section-fullwidth {
