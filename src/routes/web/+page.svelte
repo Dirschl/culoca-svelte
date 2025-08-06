@@ -69,7 +69,7 @@
 
   // JSON-LD Test Feature
   let testUrl = '';
-  let jsonLdData = '';
+
   let isLoading = false;
   let error = '';
 
@@ -227,40 +227,7 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
     }
   }
 
-  async function fetchJsonLd() {
-    if (!testUrl.trim()) {
-      error = 'Bitte gib eine URL ein';
-      return;
-    }
 
-    isLoading = true;
-    error = '';
-    jsonLdData = '';
-
-    try {
-      // JSON-LD Daten sind jetzt bereits in headData verfügbar
-      if (headData && headData.jsonLdData) {
-        // Format all JSON-LD data found
-        let formattedData = `Gefunden: ${headData.jsonLdData.length} JSON-LD Strukturen\n\n`;
-        
-        // Add each valid JSON-LD structure
-        headData.jsonLdData.forEach((item: any, index: number) => {
-          formattedData += `=== ${item.index}. ${item.type}: ${item.name} ===\n`;
-          formattedData += item.formatted;
-          formattedData += '\n\n';
-        });
-        
-        jsonLdData = formattedData;
-      } else {
-        jsonLdData = 'Keine JSON-LD Daten gefunden';
-      }
-      
-    } catch (err: any) {
-      error = err.message || 'Fehler beim Laden der JSON-LD Daten';
-    } finally {
-      isLoading = false;
-    }
-  }
 
   // Auto-execute first example on page load
   onMount(async () => {
@@ -1247,8 +1214,8 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
               </div>
             </div>
           {:else if activeTab === 'jsonld'}
-            {#if jsonLdData}
-              <pre><code>{jsonLdData}</code></pre>
+            {#if headData && headData.jsonLdData && headData.jsonLdData.length > 0}
+              <pre><code>{headData.jsonLdData.map(item => `=== ${item.index}. ${item.type}: ${item.name} ===\n${item.formatted}`).join('\n\n')}</code></pre>
             {:else}
               <div class="loading">Lade JSON-LD Daten...</div>
             {/if}
