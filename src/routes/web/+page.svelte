@@ -877,7 +877,7 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
                 <h6>📷 Caption:</h6>
                 {#if headData}
                   {@const captionFromMeta = headData.metaTags?.find(tag => tag.name === 'caption' || tag.property === 'og:caption')?.content}
-                  {@const captionFromJsonLd = headData.jsonLdData?.[0]?.data?.caption}
+                  {@const captionFromJsonLd = headData.jsonLdData?.find(ld => ld.data?.caption)?.data?.caption}
                   {@const caption = captionFromMeta || captionFromJsonLd}
                   {#if caption}
                     {@const captionLength = editableCaption.length || caption.length}
@@ -944,8 +944,10 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
               <!-- Keywords Analysis -->
               <div class="seo-item">
                 <h6>🔑 Keywords:</h6>
-                {#if headData.metaTags}
-                  {@const keywords = headData.metaTags.find(tag => tag.name === 'keywords')?.content}
+                {#if headData}
+                  {@const keywordsFromMeta = headData.metaTags?.find(tag => tag.name === 'keywords')?.content}
+                  {@const keywordsFromJsonLd = headData.jsonLdData?.find(ld => ld.data?.keywords)?.data?.keywords}
+                  {@const keywords = keywordsFromMeta || keywordsFromJsonLd}
                   {#if keywords}
                     <p><strong>Aktuelle Keywords:</strong> {keywords}</p>
                   {/if}
@@ -958,7 +960,7 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
                     ></textarea>
                   </div>
                 {:else}
-                  <p class="no-data">❌ Keine Meta-Tags verfügbar</p>
+                  <p class="no-data">❌ Keine Daten verfügbar</p>
                   <div class="editable-text-field">
                     <textarea 
                       bind:value={editableKeywords} 
@@ -1002,8 +1004,10 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
               <!-- Location Analysis -->
               <div class="seo-item">
                 <h6>📍 Standort:</h6>
-                {#if headData.metaTags}
-                  {@const location = headData.metaTags.find(tag => tag.name === 'geo.region' || tag.property === 'og:locale')?.content}
+                {#if headData}
+                  {@const locationFromMeta = headData.metaTags?.find(tag => tag.name === 'geo.region' || tag.property === 'og:locale')?.content}
+                  {@const locationFromJsonLd = headData.jsonLdData?.find(ld => ld.data?.contentLocation?.name)?.data?.contentLocation?.name}
+                  {@const location = locationFromMeta || locationFromJsonLd}
                   {#if location}
                     <p><strong>Aktueller Standort:</strong> {location}</p>
                   {/if}
@@ -1016,7 +1020,7 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
                     />
                   </div>
                 {:else}
-                  <p class="no-data">❌ Keine Meta-Tags verfügbar</p>
+                  <p class="no-data">❌ Keine Daten verfügbar</p>
                   <div class="editable-text-field">
                     <input 
                       type="text" 
@@ -1041,11 +1045,11 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
 
 Title: "{editableTitle || headData.title || 'Titel eingeben'}"
 Description: "{editableDescription || headData.metaTags?.find(tag => tag.name === 'description' || tag.property === 'og:description')?.content || 'Description eingeben'}"
-Caption: "{editableCaption || headData.metaTags?.find(tag => tag.name === 'caption' || tag.property === 'og:caption')?.content || headData.jsonLdData?.[0]?.data?.caption || 'Caption eingeben'}"
+Caption: "{editableCaption || headData.metaTags?.find(tag => tag.name === 'caption' || tag.property === 'og:caption')?.content || headData.jsonLdData?.find(ld => ld.data?.caption)?.data?.caption || 'Caption eingeben'}"
 Seitentyp: {editablePageType}
-Keywords: "{editableKeywords || headData.metaTags?.find(tag => tag.name === 'keywords')?.content || 'Keywords eingeben'}"
+Keywords: "{editableKeywords || headData.metaTags?.find(tag => tag.name === 'keywords')?.content || headData.jsonLdData?.find(ld => ld.data?.keywords)?.data?.keywords || 'Keywords eingeben'}"
 Autor: "{editableAuthor || headData.metaTags?.find(tag => tag.name === 'author' || tag.property === 'og:author')?.content || 'Autor eingeben'}"
-Standort: "{editableLocation || headData.metaTags?.find(tag => tag.name === 'geo.region' || tag.property === 'og:locale')?.content || 'Standort eingeben'}"
+Standort: "{editableLocation || headData.metaTags?.find(tag => tag.name === 'geo.region' || tag.property === 'og:locale')?.content || headData.jsonLdData?.find(ld => ld.data?.contentLocation?.name)?.data?.contentLocation?.name || 'Standort eingeben'}"
 
 Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auch das entsprechende JSON-LD Schema.</textarea>
                     <button 
