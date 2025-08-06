@@ -1378,6 +1378,9 @@
           userLon = position.coords.longitude;
           lastGPSUpdateTime = Date.now();
           
+          // WICHTIG: Status auf 'active' setzen wenn GPS erfolgreich ist
+          gpsStatus = 'active';
+          
           if (browser) localStorage.setItem('gpsAllowed', 'true');
           console.log("[GPS] Position geändert:", userLat, userLon);
           
@@ -1392,6 +1395,16 @@
           // EINFACH: Lösche GPS-Koordinaten bei Fehler
           userLat = null;
           userLon = null;
+          
+          // WICHTIG: Status entsprechend setzen
+          if (error.code === 1) {
+            gpsStatus = 'denied';
+          } else if (error.code === 2) {
+            gpsStatus = 'unavailable';
+          } else {
+            gpsStatus = 'none';
+          }
+          
           filterStore.updateGpsStatus(false);
         },
         {
