@@ -214,6 +214,14 @@
              userAgent.includes('telegrambot');
   }
 
+  // Feste GPS-Koordinaten für Bots (Pfarrkirchen, Rottal-Inn)
+  if (isBot) {
+    userLat = 48.4167; // Pfarrkirchen Latitude
+    userLon = 12.9333; // Pfarrkirchen Longitude
+    gpsStatus = 'active';
+    console.log('[Bot] Using fixed GPS coordinates for SEO:', userLat, userLon);
+  }
+
   // Anonyme User bekommen justified Layout als Default
   $: if (browser && !isLoggedIn) {
     // Setze Default nur wenn noch nicht gesetzt
