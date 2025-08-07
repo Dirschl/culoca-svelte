@@ -194,6 +194,9 @@
   let currentImageId = ''; // Track current image ID to know when to update text
   let lastAnnouncedImageId = ''; // Track last announced image to prevent duplicates
   let scrollTimeout: number | null = null;
+  
+  // Bot-Erkennung als globale Variable
+  let isBot = false;
 
 
 
@@ -1086,7 +1089,6 @@
     console.log('[App-Start] Starting GPS initialization...');
     
     // BOT-CHECK: Überspringe GPS-Initialisierung für Bots
-    let isBot = false;
     if (browser) {
       const userAgent = navigator.userAgent.toLowerCase();
       // TEMPORÄR: Bot-Erkennung deaktiviert für normale User
