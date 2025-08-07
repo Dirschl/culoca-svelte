@@ -1786,6 +1786,27 @@
     width: 100%;
     background: transparent;
   }
+  
+  /* Nur den Thumb größer machen für bessere Touch-Bedienung */
+  .radius-control input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 24px;
+    width: 24px;
+    border-radius: 50%;
+    background: var(--culoca-orange);
+    cursor: pointer;
+    border: 2px solid var(--bg-primary);
+  }
+  
+  .radius-control input[type="range"]::-moz-range-thumb {
+    height: 24px;
+    width: 24px;
+    border-radius: 50%;
+    background: var(--culoca-orange);
+    cursor: pointer;
+    border: 2px solid var(--bg-primary);
+  }
   .transition-area {
     position: relative;
     background: var(--bg-secondary);
