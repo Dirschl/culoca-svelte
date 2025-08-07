@@ -1089,11 +1089,8 @@
     let isBot = false;
     if (browser) {
       const userAgent = navigator.userAgent.toLowerCase();
-      isBot = userAgent.includes('bot') || 
-               userAgent.includes('crawler') || 
-               userAgent.includes('spider') || 
-               userAgent.includes('scraper') ||
-               userAgent.includes('googlebot') ||
+      // Nur spezifische Bot-User-Agents erkennen, nicht zu breit
+      isBot = userAgent.includes('googlebot') ||
                userAgent.includes('bingbot') ||
                userAgent.includes('slurp') ||
                userAgent.includes('duckduckbot') ||
@@ -1101,7 +1098,12 @@
                userAgent.includes('twitterbot') ||
                userAgent.includes('linkedinbot') ||
                userAgent.includes('whatsapp') ||
-               userAgent.includes('telegrambot');
+               userAgent.includes('telegrambot') ||
+               userAgent.includes('yandexbot') ||
+               userAgent.includes('baiduspider') ||
+               userAgent.includes('rogerbot') ||
+               userAgent.includes('dotbot') ||
+               userAgent.includes('ia_archiver');
     }
     
     if (isBot) {
