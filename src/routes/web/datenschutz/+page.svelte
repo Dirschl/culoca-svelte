@@ -3,8 +3,8 @@
 </script>
 
 <svelte:head>
-  <title>Datenschutz der DIRSCHL.com GmbH für culoca.com, See You Local</title>
-  <meta name="description" content="Datenschutzerklärung der DIRSCHL.com GmbH - Umfassende Informationen zur Verarbeitung personenbezogener Daten gemäß DSGVO. SSL-Verschlüsselung, Cookies, Server-Logs und Ihre Rechte auf Auskunft, Löschung und Datenübertragbarkeit." />
+  <title>Datenschutzerklärung der DIRSCHL.com GmbH für culoca.com</title>
+  <meta name="description" content="Datenschutzerklärung der DIRSCHL.com GmbH - Informationen zur Verarbeitung personenbezogener Daten gemäß DSGVO. Auskunft, Löschung und Datenübertragbarkeit." />
   <meta name="robots" content="index, follow" />
   <link rel="canonical" href="https://culoca.com/web/datenschutz" />
   
@@ -14,8 +14,8 @@
   <link rel="apple-touch-icon" href="/culoca-icon.png" sizes="180x180" />
   
   <!-- Open Graph -->
-  <meta property="og:title" content="Datenschutz der DIRSCHL.com GmbH für culoca.com, See You Local" />
-  <meta property="og:description" content="Datenschutzerklärung der DIRSCHL.com GmbH - Umfassende Informationen zur Verarbeitung personenbezogener Daten gemäß DSGVO. SSL-Verschlüsselung, Cookies, Server-Logs und Ihre Rechte auf Auskunft, Löschung und Datenübertragbarkeit." />
+  <meta property="og:title" content="Datenschutzerklärung der DIRSCHL.com GmbH für culoca.com" />
+  <meta property="og:description" content="Datenschutzerklärung der DIRSCHL.com GmbH - Informationen zur Verarbeitung personenbezogener Daten gemäß DSGVO. Auskunft, Löschung und Datenübertragbarkeit." />
   <meta property="og:url" content="https://culoca.com/web/datenschutz" />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="DIRSCHL.com GmbH" />
@@ -27,8 +27,8 @@
   {
     "@context": "https://schema.org",
     "@type": "WebPage",
-    "name": "Datenschutz der DIRSCHL.com GmbH für culoca.com, See You Local",
-    "description": "Datenschutzerklärung der DIRSCHL.com GmbH - Umfassende Informationen zur Verarbeitung personenbezogener Daten gemäß DSGVO. SSL-Verschlüsselung, Cookies, Server-Logs und Ihre Rechte auf Auskunft, Löschung und Datenübertragbarkeit.",
+                  "name": "Datenschutzerklärung der DIRSCHL.com GmbH für culoca.com",
+              "description": "Datenschutzerklärung der DIRSCHL.com GmbH - Informationen zur Verarbeitung personenbezogener Daten gemäß DSGVO. Auskunft, Löschung und Datenübertragbarkeit.",
     "url": "https://culoca.com/web/datenschutz",
     "inLanguage": "de",
     "caption": "Privacy Policy for culoca.com, DIRSCHL.com GmbH",
