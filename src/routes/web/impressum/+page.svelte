@@ -5,7 +5,9 @@
 <svelte:head>
   <title>Impressum der DIRSCHL.com GmbH für culoca.com, See You Local</title>
   <meta name="description" content="Impressum und rechtliche Informationen der DIRSCHL.com GmbH - Angaben gemäß § 5 TMG, Gerne dürfen sie uns bei Fragen zur Plattform kontaktieren. Wir freuen uns." />
-  <meta name="robots" content="index, follow" />
+  <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+  <meta name="googlebot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+  <meta name="bingbot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
   <link rel="canonical" href="https://culoca.com/web/impressum" />
   
   	<!-- Favicon -->
