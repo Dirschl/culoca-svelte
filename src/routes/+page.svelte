@@ -219,6 +219,14 @@
     userLat = 48.4167; // Pfarrkirchen Latitude
     userLon = 12.9333; // Pfarrkirchen Longitude
     gpsStatus = 'active';
+    
+    // Auch den filterStore für Bots setzen
+    filterStore.update(state => ({
+      ...state,
+      lastGpsPosition: { lat: 48.4167, lon: 12.9333 },
+      gpsAvailable: true
+    }));
+    
     console.log('[Bot] Using fixed GPS coordinates for SEO:', userLat, userLon);
   }
 
