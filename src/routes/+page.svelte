@@ -195,6 +195,25 @@
   let lastAnnouncedImageId = ''; // Track last announced image to prevent duplicates
   let scrollTimeout: number | null = null;
 
+  // Bot-Erkennung für SEO-Optimierung
+  let isBot = false;
+  if (browser) {
+    const userAgent = navigator.userAgent.toLowerCase();
+    isBot = userAgent.includes('bot') || 
+             userAgent.includes('crawler') || 
+             userAgent.includes('spider') || 
+             userAgent.includes('scraper') ||
+             userAgent.includes('googlebot') ||
+             userAgent.includes('bingbot') ||
+             userAgent.includes('slurp') ||
+             userAgent.includes('duckduckbot') ||
+             userAgent.includes('facebookexternalhit') ||
+             userAgent.includes('twitterbot') ||
+             userAgent.includes('linkedinbot') ||
+             userAgent.includes('whatsapp') ||
+             userAgent.includes('telegrambot');
+  }
+
   // Anonyme User bekommen justified Layout als Default
   $: if (browser && !isLoggedIn) {
     // Setze Default nur wenn noch nicht gesetzt
@@ -1909,7 +1928,7 @@
 
 </script>
 
-{#if browser && (gpsStatus === 'denied' || gpsStatus === 'unavailable') && !userLat && !userLon}
+{#if browser && (gpsStatus === 'denied' || gpsStatus === 'unavailable') && !userLat && !userLon && !isBot}
   <div style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(30,30,30,0.92);z-index:10000;display:flex;flex-direction:column;align-items:center;justify-content:center;">
     <div style="background:#222;padding:2rem 2.5rem;border-radius:1rem;box-shadow:0 2px 16px #0008;max-width:90vw;text-align:center;">
       <h2 style="color:#fff;margin-bottom:1rem;">Standort auswählen</h2>
@@ -1962,7 +1981,7 @@
       {/if}
     </div>
   </div>
-{:else if browser && gpsStatus === 'checking'}
+{:else if browser && gpsStatus === 'checking' && !isBot}
   <!-- GPS wird geladen - zeige Ladeindikator -->
   <div style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(30,30,30,0.92);z-index:10000;display:flex;flex-direction:column;align-items:center;justify-content:center;">
     <div style="background:#222;padding:2rem 2.5rem;border-radius:1rem;box-shadow:0 2px 16px #0008;max-width:90vw;text-align:center;">
