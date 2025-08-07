@@ -26,7 +26,7 @@
   
   <!-- Strukturierte Daten (JSON-LD) für bessere SEO -->
   <script type="application/ld+json">
-  {JSON.stringify({
+  {
     "@context": "https://schema.org",
     "@type": "WebPage",
     "name": "Culoca - Entdecke deine Umgebung mit GPS & Fotos",
@@ -84,7 +84,7 @@
         "name": "Social Media Plattform"
       }
     ]
-  })}
+  }
   </script>
 </svelte:head>
 <script lang="ts">
