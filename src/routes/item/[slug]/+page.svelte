@@ -1785,6 +1785,49 @@
   .radius-control input[type="range"] {
     width: 100%;
     background: transparent;
+    /* Touch-optimierte Größe für bessere Bedienung */
+    height: 24px;
+    -webkit-appearance: none;
+    appearance: none;
+    cursor: pointer;
+  }
+  
+  /* Webkit-basierte Browser (Safari, Chrome) */
+  .radius-control input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 28px;
+    width: 28px;
+    border-radius: 50%;
+    background: var(--culoca-orange);
+    cursor: pointer;
+    border: 2px solid var(--bg-primary);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  }
+  
+  .radius-control input[type="range"]::-webkit-slider-track {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 8px;
+    border-radius: 4px;
+    background: var(--border-color);
+  }
+  
+  /* Firefox */
+  .radius-control input[type="range"]::-moz-range-thumb {
+    height: 28px;
+    width: 28px;
+    border-radius: 50%;
+    background: var(--culoca-orange);
+    cursor: pointer;
+    border: 2px solid var(--bg-primary);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  }
+  
+  .radius-control input[type="range"]::-moz-range-track {
+    height: 8px;
+    border-radius: 4px;
+    background: var(--border-color);
   }
   .transition-area {
     position: relative;
