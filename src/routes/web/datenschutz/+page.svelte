@@ -27,8 +27,8 @@
   {
     "@context": "https://schema.org",
     "@type": "WebPage",
-                  "name": "Datenschutzerklärung der DIRSCHL.com GmbH für culoca.com",
-              "description": "Datenschutzerklärung der DIRSCHL.com GmbH - Informationen zur Verarbeitung personenbezogener Daten gemäß DSGVO. Auskunft, Löschung und Datenübertragbarkeit.",
+    "name": "Datenschutzerklärung der DIRSCHL.com GmbH für culoca.com",
+    "description": "Datenschutzerklärung der DIRSCHL.com GmbH - Informationen zur Verarbeitung personenbezogener Daten gemäß DSGVO. Auskunft, Löschung und Datenübertragbarkeit.",
     "url": "https://culoca.com/web/datenschutz",
     "inLanguage": "de",
     "caption": "Privacy Policy for culoca.com, DIRSCHL.com GmbH",
