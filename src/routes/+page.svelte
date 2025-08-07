@@ -1091,8 +1091,7 @@
     // BOT-CHECK: Überspringe GPS-Initialisierung für Bots
     if (browser) {
       const userAgent = navigator.userAgent.toLowerCase();
-      // TEMPORÄR: Bot-Erkennung deaktiviert für normale User
-      // Nur sehr spezifische Bot-User-Agents erkennen
+      // Nur sehr spezifische Bot-User-Agents erkennen - nicht zu aggressiv
       isBot = userAgent.includes('googlebot') ||
                userAgent.includes('bingbot') ||
                userAgent.includes('slurp') ||
@@ -1100,44 +1099,43 @@
                userAgent.includes('facebookexternalhit') ||
                userAgent.includes('twitterbot') ||
                userAgent.includes('linkedinbot') ||
-               userAgent.includes('whatsapp') ||
-               userAgent.includes('telegrambot') ||
                userAgent.includes('yandexbot') ||
                userAgent.includes('baiduspider') ||
                userAgent.includes('rogerbot') ||
                userAgent.includes('dotbot') ||
-               userAgent.includes('ia_archiver') ||
-               userAgent.includes('bot') ||
-               userAgent.includes('crawler') ||
-               userAgent.includes('spider') ||
-               userAgent.includes('scraper');
+               userAgent.includes('ia_archiver');
       
-      // TEMPORÄR: Debug-Ausgabe
+      // Debug-Ausgabe
       console.log('[Bot-Debug] User-Agent:', userAgent);
       console.log('[Bot-Debug] isBot:', isBot);
     }
     
     if (isBot) {
-      console.log('[App-Start] Bot detected - skipping GPS initialization');
+      console.log('[App-Start] Bot detected - using fixed GPS coordinates');
       userLat = 48.4167; // Pfarrkirchen Latitude
       userLon = 12.9333; // Pfarrkirchen Longitude
       gpsStatus = 'active'; // Setze direkt auf active für Bots
       
       // Auch den filterStore für Bots setzen
-      filterStore.update(state => ({
-        ...state,
-        lastGpsPosition: { lat: 48.4167, lon: 12.9333 },
-        gpsAvailable: true
-      }));
+      filterStore.updateGpsStatus(true, { lat: 48.4167, lon: 12.9333 });
       
       console.log('[Bot] Using fixed GPS coordinates for SEO:', userLat, userLon);
-    } else if (navigator.geolocation) {
-      console.log('[App-Start] Geolocation available, initializing...');
-      gpsStatus = 'checking';
-      initializeGPS();
     } else {
-      console.log('[App-Start] Geolocation not available');
-      gpsStatus = 'unavailable';
+      // Normale User: Lade gespeicherte GPS-Daten zuerst
+      console.log('[App-Start] Normal user - loading saved GPS data first');
+      
+      // Versuche gespeicherte GPS-Daten zu laden
+      const hasSavedGPS = loadGPSData();
+      
+      // Dann versuche live GPS zu starten
+      if (navigator.geolocation) {
+        console.log('[App-Start] Geolocation available, initializing...');
+        gpsStatus = 'checking';
+        initializeGPS();
+      } else {
+        console.log('[App-Start] Geolocation not available');
+        gpsStatus = 'unavailable';
+      }
     }
     
     // Setze Default-Settings für anonyme User
@@ -1527,13 +1525,16 @@
       return;
     }
 
-    // NEU: Wenn bereits cached GPS-Daten vorhanden sind, nicht sofort live GPS starten
-    if (gpsStatus === 'cached' && cachedLat && cachedLon) {
+    // Prüfe zuerst gespeicherte GPS-Daten
+    const hasSavedGPS = loadGPSData();
+    
+    // Wenn bereits cached GPS-Daten vorhanden sind, nicht sofort live GPS starten
+    if (hasSavedGPS && gpsStatus === 'cached' && cachedLat && cachedLon) {
       console.log('[GPS-Init] Using cached GPS data, not starting live GPS immediately');
       return;
     }
 
-    // NEU: Setze Status auf 'checking' bevor GPS gestartet wird
+    // Setze Status auf 'checking' bevor GPS gestartet wird
     gpsStatus = 'checking';
     console.log('[GPS-Init] Starting GPS initialization...');
 
@@ -1695,8 +1696,15 @@
   // NEU: Funktion zum Speichern von GPS-Daten
   function saveGPSData(lat: number, lon: number) {
     if (browser) {
+      // Speichere in beiden Formaten für Kompatibilität
       const gpsData = { lat, lon, timestamp: Date.now() };
       localStorage.setItem('userGps', JSON.stringify(gpsData));
+      
+      // Einfache localStorage-Werte für bessere Kompatibilität
+      localStorage.setItem('userLat', lat.toString());
+      localStorage.setItem('userLon', lon.toString());
+      localStorage.setItem('gpsAllowed', 'true');
+      
       console.log('[GPS] Saved GPS data to localStorage:', gpsData);
     }
   }
@@ -1705,6 +1713,31 @@
   function loadGPSData() {
     if (browser) {
       try {
+        // Prüfe zuerst die einfachen localStorage-Werte
+        const savedLat = localStorage.getItem('userLat');
+        const savedLon = localStorage.getItem('userLon');
+        const savedGPSAllowed = localStorage.getItem('gpsAllowed');
+        
+        if (savedLat && savedLon && savedGPSAllowed === 'true') {
+          const lat = parseFloat(savedLat);
+          const lon = parseFloat(savedLon);
+          
+          console.log('[GPS] Loading simple saved GPS data:', { lat, lon });
+          userLat = lat;
+          userLon = lon;
+          cachedLat = lat;
+          cachedLon = lon;
+          gpsStatus = 'cached';
+          lastGPSUpdateTime = Date.now();
+          
+          // Update filterStore with saved GPS data
+          filterStore.updateGpsStatus(true, { lat, lon });
+          
+          console.log('[GPS] Loaded simple GPS data:', { userLat, userLon, cachedLat, cachedLon });
+          return true;
+        }
+        
+        // Fallback: Prüfe das JSON-Format
         const savedGPS = localStorage.getItem('userGps');
         if (savedGPS) {
           const gpsData = JSON.parse(savedGPS);
@@ -1713,18 +1746,18 @@
           
           // Verwende gespeicherte GPS-Daten nur wenn sie nicht älter als 24 Stunden sind
           if (gpsData.lat && gpsData.lon && gpsAge < 24 * 60 * 60 * 1000) {
-            console.log('[GPS] Loading saved GPS data:', gpsData);
+            console.log('[GPS] Loading JSON saved GPS data:', gpsData);
             userLat = gpsData.lat;
             userLon = gpsData.lon;
             cachedLat = gpsData.lat;
             cachedLon = gpsData.lon;
-            gpsStatus = 'active';
+            gpsStatus = 'cached';
             lastGPSUpdateTime = gpsData.timestamp;
             
             // Update filterStore with saved GPS data
             filterStore.updateGpsStatus(true, { lat: userLat, lon: userLon });
             
-            console.log('[GPS] Loaded GPS data:', { userLat, userLon, cachedLat, cachedLon });
+            console.log('[GPS] Loaded JSON GPS data:', { userLat, userLon, cachedLat, cachedLon });
             return true;
           } else {
             console.log('[GPS] Saved GPS data too old, clearing');
