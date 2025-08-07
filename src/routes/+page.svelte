@@ -195,40 +195,7 @@
   let lastAnnouncedImageId = ''; // Track last announced image to prevent duplicates
   let scrollTimeout: number | null = null;
 
-  // Bot-Erkennung für SEO-Optimierung - FRÜHER!
-  let isBot = false;
-  if (browser) {
-    const userAgent = navigator.userAgent.toLowerCase();
-    isBot = userAgent.includes('bot') || 
-             userAgent.includes('crawler') || 
-             userAgent.includes('spider') || 
-             userAgent.includes('scraper') ||
-             userAgent.includes('googlebot') ||
-             userAgent.includes('bingbot') ||
-             userAgent.includes('slurp') ||
-             userAgent.includes('duckduckbot') ||
-             userAgent.includes('facebookexternalhit') ||
-             userAgent.includes('twitterbot') ||
-             userAgent.includes('linkedinbot') ||
-             userAgent.includes('whatsapp') ||
-             userAgent.includes('telegrambot');
-  }
 
-  // Feste GPS-Koordinaten für Bots (Pfarrkirchen, Rottal-Inn) - SOFORT!
-  if (isBot) {
-    userLat = 48.4167; // Pfarrkirchen Latitude
-    userLon = 12.9333; // Pfarrkirchen Longitude
-    gpsStatus = 'active';
-    
-    // Auch den filterStore für Bots setzen
-    filterStore.update(state => ({
-      ...state,
-      lastGpsPosition: { lat: 48.4167, lon: 12.9333 },
-      gpsAvailable: true
-    }));
-    
-    console.log('[Bot] Using fixed GPS coordinates for SEO:', userLat, userLon);
-  }
 
   // Anonyme User bekommen justified Layout als Default
   $: if (browser && !isLoggedIn) {
@@ -1119,9 +1086,38 @@
     console.log('[App-Start] Starting GPS initialization...');
     
     // BOT-CHECK: Überspringe GPS-Initialisierung für Bots
+    let isBot = false;
+    if (browser) {
+      const userAgent = navigator.userAgent.toLowerCase();
+      isBot = userAgent.includes('bot') || 
+               userAgent.includes('crawler') || 
+               userAgent.includes('spider') || 
+               userAgent.includes('scraper') ||
+               userAgent.includes('googlebot') ||
+               userAgent.includes('bingbot') ||
+               userAgent.includes('slurp') ||
+               userAgent.includes('duckduckbot') ||
+               userAgent.includes('facebookexternalhit') ||
+               userAgent.includes('twitterbot') ||
+               userAgent.includes('linkedinbot') ||
+               userAgent.includes('whatsapp') ||
+               userAgent.includes('telegrambot');
+    }
+    
     if (isBot) {
       console.log('[App-Start] Bot detected - skipping GPS initialization');
+      userLat = 48.4167; // Pfarrkirchen Latitude
+      userLon = 12.9333; // Pfarrkirchen Longitude
       gpsStatus = 'active'; // Setze direkt auf active für Bots
+      
+      // Auch den filterStore für Bots setzen
+      filterStore.update(state => ({
+        ...state,
+        lastGpsPosition: { lat: 48.4167, lon: 12.9333 },
+        gpsAvailable: true
+      }));
+      
+      console.log('[Bot] Using fixed GPS coordinates for SEO:', userLat, userLon);
     } else if (navigator.geolocation) {
       console.log('[App-Start] Geolocation available, initializing...');
       gpsStatus = 'checking';
