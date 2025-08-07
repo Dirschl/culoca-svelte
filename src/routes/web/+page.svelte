@@ -811,7 +811,7 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
           
           {#if activeTab === 'prompt'}
 <div class="prompt-analysis">
-<h5 id="seo">📊 SEO-Informationen & KI-Prompt Generator:</h5>
+<h2 id="seo" class="I9FEuXZmAOEC">📊 SEO-Informationen & KI-Prompt Generator:</h2>
               
               <!-- Title Analysis -->
               <div class="seo-item">
