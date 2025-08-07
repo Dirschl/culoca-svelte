@@ -1118,8 +1118,11 @@
     // Intelligente GPS-Initialisierung
     console.log('[App-Start] Starting GPS initialization...');
     
-    // EINFACH: GPS-Initialisierung sofort starten (auch wenn gespeicherte Daten vorhanden sind)
-    if (navigator.geolocation) {
+    // BOT-CHECK: Überspringe GPS-Initialisierung für Bots
+    if (isBot) {
+      console.log('[App-Start] Bot detected - skipping GPS initialization');
+      gpsStatus = 'active'; // Setze direkt auf active für Bots
+    } else if (navigator.geolocation) {
       console.log('[App-Start] Geolocation available, initializing...');
       gpsStatus = 'checking';
       initializeGPS();
