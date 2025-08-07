@@ -1091,7 +1091,7 @@
     // BOT-CHECK: Überspringe GPS-Initialisierung für Bots
     if (browser) {
       const userAgent = navigator.userAgent.toLowerCase();
-      // Nur sehr spezifische Bot-User-Agents erkennen - nicht zu aggressiv
+      // Bot-User-Agents erkennen (inkl. Google Inspection Tool)
       isBot = userAgent.includes('googlebot') ||
                userAgent.includes('bingbot') ||
                userAgent.includes('slurp') ||
@@ -1103,7 +1103,9 @@
                userAgent.includes('baiduspider') ||
                userAgent.includes('rogerbot') ||
                userAgent.includes('dotbot') ||
-               userAgent.includes('ia_archiver');
+               userAgent.includes('ia_archiver') ||
+               userAgent.includes('google-inspectiontool') ||
+               userAgent.includes('inspectiontool');
       
       // Debug-Ausgabe
       console.log('[Bot-Debug] User-Agent:', userAgent);
