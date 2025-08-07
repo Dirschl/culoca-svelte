@@ -901,46 +901,7 @@
   {#if image}
     <link rel="icon" type="image/png" href={`/api/favicon/${itemSlug}`} sizes="32x32 48x48 96x96 192x192 512x512">
     
-    <!-- JSON-LD Schema für ImageObject -->
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "ImageObject",
-      "url": "{imageSource}",
-      "name": "{image.title || image.original_name || `Item ${itemSlug}`}",
-      "caption": "{image.caption || ''}",
-      "description": "{image.description || ''}",
-      "contentUrl": "{imageSource}",
-      "thumbnailUrl": "https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/{image.path_512}",
-      "uploadDate": "{image.created_at}",
-      "author": {
-        "@type": "Person",
-        "name": "{image.profile?.full_name || image.profile?.accountname || 'Unknown'}"
-      },
-      "creator": {
-        "@type": "Person",
-        "name": "{image.profile?.full_name || image.profile?.accountname || 'Unknown'}"
-      },
-      "license": "https://creativecommons.org/licenses/by/4.0/",
-      "acquireLicensePage": "https://culoca.com/web/license",
-      "creditText": "© {image.profile?.full_name || image.profile?.accountname || 'Unknown'}",
-      "copyrightHolder": {
-        "@type": "Person",
-        "name": "{image.profile?.full_name || image.profile?.accountname || 'Unknown'}"
-      },
-      "copyrightYear": "{new Date(image.created_at).getFullYear()}",
-      "keywords": "{image.keywords ? image.keywords.join(', ') : ''}",
-      "contentLocation": {
-        "@type": "Place",
-        "name": "{image.title || 'Unknown Location'}",
-        "geo": {
-          "@type": "GeoCoordinates",
-          "latitude": {image.lat || 0},
-          "longitude": {image.lon || 0}
-        }
-      }
-    }
-    </script>
+
     <link rel="apple-touch-icon" href={`/api/favicon/${itemSlug}`} sizes="180x180">
     <!-- Zusätzliche Meta-Tags für bessere SEO -->
     <meta name="image" content={`https://culoca.com/api/favicon/${itemSlug}`}>
