@@ -768,7 +768,7 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
     </p>
     
     <div class="jsonld-test-section">
-      <h3>SEO & Meta-Daten Analyse</h3>
+      <h3 id="seo">SEO & Meta-Daten Analyse</h3>
       <p>
         Teste die SEO & Meta-Daten von beliebigen Webseiten. Gib eine URL ein und analysiere JSON-LD, Meta-Tags, Favicons und mehr.
       </p>
@@ -811,7 +811,7 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
           
           {#if activeTab === 'prompt'}
 <div class="prompt-analysis">
-<h2 id="seo" class="I9FEuXZmAOEC">📊 SEO-Informationen & KI-Prompt Generator:</h2>
+<h5>📊 SEO-Informationen & KI-Prompt Generator:</h5>
               
               <!-- Title Analysis -->
               <div class="seo-item">
