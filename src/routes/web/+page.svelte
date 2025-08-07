@@ -79,7 +79,11 @@
   let headData = null;
   let isHeadLoading = false;
   let headError = '';
-          let activeTab = 'images';
+  let activeTab = 'images';
+  
+  // Bot-Test Feature
+  let isBotMode = false;
+  let originalUserAgent = '';
   
   // Editierbare SEO-Textfelder
   let editableTitle = '';
@@ -181,6 +185,16 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
     headError = '';
     headData = null;
 
+    // Bot-Modus: User-Agent ändern
+    if (isBotMode && browser) {
+      originalUserAgent = navigator.userAgent;
+      Object.defineProperty(navigator, 'userAgent', {
+        value: 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
+        configurable: true
+      });
+      console.log('🤖 Bot-Modus aktiviert - User-Agent geändert zu Googlebot');
+    }
+
     try {
       // Use our server-side API to avoid CORS issues
       const response = await fetch(`/api/test-head?url=${encodeURIComponent(testUrl)}`);
@@ -239,6 +253,15 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
       headError = err.message || 'Fehler beim Laden der HTML Head Daten';
     } finally {
       isHeadLoading = false;
+      
+      // Bot-Modus: User-Agent wiederherstellen
+      if (isBotMode && browser && originalUserAgent) {
+        Object.defineProperty(navigator, 'userAgent', {
+          value: originalUserAgent,
+          configurable: true
+        });
+        console.log('🤖 Bot-Modus beendet - User-Agent wiederhergestellt');
+      }
     }
   }
 
@@ -793,6 +816,30 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
         >
           {isHeadLoading ? 'Analysiere...' : 'Analysieren'}
         </button>
+        
+        <!-- Bot-Test Checkbox -->
+        <div class="bot-test-section" style="margin-top: 10px; padding: 10px; background: #f8f9fa; border-radius: 5px; border: 1px solid #e9ecef;">
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+            <input 
+              type="checkbox" 
+              bind:checked={isBotMode}
+              style="margin: 0;"
+            />
+            <span style="font-weight: 500; color: #495057;">🤖 Als Bot agieren</span>
+            <span style="font-size: 0.875rem; color: #6c757d;">(Simuliert Googlebot für SEO-Tests)</span>
+          </label>
+          {#if isBotMode}
+            <div style="margin-top: 8px; padding: 8px; background: #e3f2fd; border-radius: 4px; border-left: 4px solid #2196f3;">
+              <p style="margin: 0; font-size: 0.875rem; color: #1976d2;">
+                <strong>Bot-Modus aktiv:</strong> User-Agent wird zu Googlebot geändert. 
+                Die Seite wird so analysiert, wie Google sie sieht.
+              </p>
+              <p style="margin: 4px 0 0 0; font-size: 0.75rem; color: #1565c0; font-family: monospace;">
+                User-Agent: {navigator.userAgent}
+              </p>
+            </div>
+          {/if}
+        </div>
       </div>
       
       {#if isHeadLoading}

@@ -74,71 +74,71 @@
   <meta name="description" content="Test-Seite für Bot-Erkennung" />
 </svelte:head>
 
-<div class="container mx-auto px-4 py-8 max-w-4xl">
-  <h1 class="text-3xl font-bold mb-6">Bot-Test Tool</h1>
+<div style="max-width: 800px; margin: 0 auto; padding: 2rem;">
+  <h1 style="font-size: 2rem; font-weight: bold; margin-bottom: 1.5rem;">Bot-Test Tool</h1>
   
-  <div class="bg-gray-100 dark:bg-gray-800 p-6 rounded-lg mb-6">
-    <h2 class="text-xl font-semibold mb-4">Aktueller Status</h2>
+  <div style="background: #f3f4f6; padding: 1.5rem; border-radius: 0.5rem; margin-bottom: 1.5rem;">
+    <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem;">Aktueller Status</h2>
     <p><strong>User-Agent:</strong> {navigator.userAgent}</p>
     <p><strong>Bot-Modus:</strong> {isBotMode ? 'Aktiviert' : 'Deaktiviert'}</p>
   </div>
   
-  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-    <div class="bg-blue-100 dark:bg-blue-900 p-4 rounded-lg">
-      <h3 class="text-lg font-semibold mb-2">Als Googlebot testen</h3>
-      <p class="text-sm mb-3">Simuliert den echten Googlebot User-Agent</p>
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+    <div style="background: #dbeafe; padding: 1rem; border-radius: 0.5rem;">
+      <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 0.5rem;">Als Googlebot testen</h3>
+      <p style="font-size: 0.875rem; margin-bottom: 0.75rem;">Simuliert den echten Googlebot User-Agent</p>
       <button 
         on:click={testAsGooglebot}
-        class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
+        style="background: #3b82f6; color: white; padding: 0.5rem 1rem; border: none; border-radius: 0.25rem; cursor: pointer;"
       >
         Als Googlebot testen
       </button>
     </div>
     
-    <div class="bg-green-100 dark:bg-green-900 p-4 rounded-lg">
-      <h3 class="text-lg font-semibold mb-2">Als Bingbot testen</h3>
-      <p class="text-sm mb-3">Simuliert den echten Bingbot User-Agent</p>
+    <div style="background: #dcfce7; padding: 1rem; border-radius: 0.5rem;">
+      <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 0.5rem;">Als Bingbot testen</h3>
+      <p style="font-size: 0.875rem; margin-bottom: 0.75rem;">Simuliert den echten Bingbot User-Agent</p>
       <button 
         on:click={testAsBingbot}
-        class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded"
+        style="background: #16a34a; color: white; padding: 0.5rem 1rem; border: none; border-radius: 0.25rem; cursor: pointer;"
       >
         Als Bingbot testen
       </button>
     </div>
   </div>
   
-  <div class="bg-yellow-100 dark:bg-yellow-900 p-4 rounded-lg mb-6">
-    <h3 class="text-lg font-semibold mb-2">Bot-Modus aktivieren</h3>
-    <p class="text-sm mb-3">Aktiviert den Bot-Modus und lädt die Seite neu</p>
+  <div style="background: #fef3c7; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1.5rem;">
+    <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 0.5rem;">Bot-Modus aktivieren</h3>
+    <p style="font-size: 0.875rem; margin-bottom: 0.75rem;">Aktiviert den Bot-Modus und lädt die Seite neu</p>
     <button 
       on:click={enableBotMode}
-      class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded mr-2"
+      style="background: #eab308; color: white; padding: 0.5rem 1rem; border: none; border-radius: 0.25rem; cursor: pointer; margin-right: 0.5rem;"
     >
       Bot-Modus aktivieren
     </button>
     <button 
       on:click={disableBotMode}
-      class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded"
+      style="background: #6b7280; color: white; padding: 0.5rem 1rem; border: none; border-radius: 0.25rem; cursor: pointer;"
     >
       Normal-Modus wiederherstellen
     </button>
   </div>
   
   {#if testResults}
-    <div class="bg-gray-100 dark:bg-gray-800 p-4 rounded-lg">
-      <h3 class="text-lg font-semibold mb-2">Test-Ergebnisse</h3>
-      <pre class="text-sm">{testResults}</pre>
+    <div style="background: #f3f4f6; padding: 1rem; border-radius: 0.5rem;">
+      <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 0.5rem;">Test-Ergebnisse</h3>
+      <pre style="font-size: 0.875rem;">{testResults}</pre>
     </div>
   {/if}
   
-  <div class="mt-8">
-    <h2 class="text-xl font-semibold mb-4">Anleitung</h2>
-    <ol class="list-decimal list-inside space-y-2">
-      <li>Klicke auf "Als Googlebot testen" um den echten Googlebot zu simulieren</li>
-      <li>Gehe dann zu <a href="/" class="text-blue-500 hover:underline">culoca.com</a></li>
-      <li>Prüfe in der Browser-Konsole die Bot-Erkennung</li>
-      <li>Du solltest sehen: <code>[Bot-Debug] isBot: true</code></li>
-      <li>Die Seite sollte feste GPS-Koordinaten verwenden (48.4167, 12.9333)</li>
+  <div style="margin-top: 2rem;">
+    <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem;">Anleitung</h2>
+    <ol style="list-style-type: decimal; padding-left: 1.5rem;">
+      <li style="margin-bottom: 0.5rem;">Klicke auf "Als Googlebot testen" um den echten Googlebot zu simulieren</li>
+      <li style="margin-bottom: 0.5rem;">Gehe dann zu <a href="/" style="color: #3b82f6; text-decoration: underline;">culoca.com</a></li>
+      <li style="margin-bottom: 0.5rem;">Prüfe in der Browser-Konsole die Bot-Erkennung</li>
+      <li style="margin-bottom: 0.5rem;">Du solltest sehen: <code>[Bot-Debug] isBot: true</code></li>
+      <li style="margin-bottom: 0.5rem;">Die Seite sollte feste GPS-Koordinaten verwenden (48.4167, 12.9333)</li>
     </ol>
   </div>
 </div>
