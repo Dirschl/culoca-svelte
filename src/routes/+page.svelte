@@ -195,7 +195,7 @@
   let lastAnnouncedImageId = ''; // Track last announced image to prevent duplicates
   let scrollTimeout: number | null = null;
 
-  // Bot-Erkennung für SEO-Optimierung
+  // Bot-Erkennung für SEO-Optimierung - FRÜHER!
   let isBot = false;
   if (browser) {
     const userAgent = navigator.userAgent.toLowerCase();
@@ -214,7 +214,7 @@
              userAgent.includes('telegrambot');
   }
 
-  // Feste GPS-Koordinaten für Bots (Pfarrkirchen, Rottal-Inn)
+  // Feste GPS-Koordinaten für Bots (Pfarrkirchen, Rottal-Inn) - SOFORT!
   if (isBot) {
     userLat = 48.4167; // Pfarrkirchen Latitude
     userLon = 12.9333; // Pfarrkirchen Longitude
@@ -1502,6 +1502,12 @@
   // Intelligente GPS-Initialisierung, die Berechtigungen berücksichtigt
   function initializeGPSIntelligently() {
     console.log('[GPS-Init] initializeGPSIntelligently called');
+    
+    // BOT-CHECK: Überspringe GPS-Initialisierung für Bots
+    if (isBot) {
+      console.log('[GPS-Init] Bot detected - skipping GPS initialization');
+      return;
+    }
     
     if (!navigator.geolocation) {
       console.log('[GPS-Init] Geolocation not available');
