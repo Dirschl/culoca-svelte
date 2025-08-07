@@ -3,8 +3,8 @@
 </script>
 
 <svelte:head>
-  <title>Lizenz der DIRSCHL.com GmbH für culoca.com, See You Local</title>
-  <meta name="description" content="Lizenzinformationen und Nutzungsbedingungen für Bilder auf Culoca - Urheberrecht, Copyright-Hinweise und kommerzielle Nutzung der DIRSCHL.com GmbH. Klare Richtlinien für Fotografen und Nutzer." />
+  <title>Lizenzinformationen der DIRSCHL.com GmbH für culoca.com</title>
+  <meta name="description" content="Lizenzinformationen und Nutzungsbedingungen für Bilder auf culoca.com - Urheberrecht, Copyright-Hinweise und kommerzielle Nutzung von Items unserer Autoren." />
   <meta name="robots" content="index, follow" />
   <link rel="canonical" href="https://culoca.com/web/license" />
   
@@ -14,8 +14,8 @@
   <link rel="apple-touch-icon" href="/culoca-icon.png" sizes="180x180" />
   
   <!-- Open Graph -->
-  <meta property="og:title" content="Lizenz der DIRSCHL.com GmbH für culoca.com, See You Local" />
-  <meta property="og:description" content="Lizenzinformationen und Nutzungsbedingungen für Bilder auf Culoca - Urheberrecht, Copyright-Hinweise und kommerzielle Nutzung der DIRSCHL.com GmbH. Klare Richtlinien für Fotografen und Nutzer." />
+  <meta property="og:title" content="Lizenzinformationen der DIRSCHL.com GmbH für culoca.com" />
+  <meta property="og:description" content="Lizenzinformationen und Nutzungsbedingungen für Bilder auf culoca.com - Urheberrecht, Copyright-Hinweise und kommerzielle Nutzung von Items unserer Autoren." />
   <meta property="og:url" content="https://culoca.com/web/license" />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="DIRSCHL.com GmbH" />
@@ -27,8 +27,8 @@
   {
     "@context": "https://schema.org",
     "@type": "WebPage",
-    "name": "Lizenz der DIRSCHL.com GmbH für culoca.com, See You Local",
-    "description": "Lizenzinformationen und Nutzungsbedingungen für Bilder auf Culoca - Urheberrecht, Copyright-Hinweise und kommerzielle Nutzung der DIRSCHL.com GmbH. Klare Richtlinien für Fotografen und Nutzer.",
+    "name": "Lizenzinformationen der DIRSCHL.com GmbH für culoca.com",
+    "description": "Lizenzinformationen und Nutzungsbedingungen für Bilder auf culoca.com - Urheberrecht, Copyright-Hinweise und kommerzielle Nutzung von Items unserer Autoren.",
     "url": "https://culoca.com/web/license",
     "inLanguage": "de",
     "caption": "License Information for culoca.com, DIRSCHL.com GmbH",
