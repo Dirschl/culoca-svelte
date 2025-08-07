@@ -1928,7 +1928,7 @@
 
 </script>
 
-{#if browser && (gpsStatus === 'denied' || gpsStatus === 'unavailable') && !userLat && !userLon && !isBot}
+{#if browser && (gpsStatus === 'denied' || gpsStatus === 'unavailable') && !userLat && !userLon && !isBot && typeof window !== 'undefined'}
   <div style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(30,30,30,0.92);z-index:10000;display:flex;flex-direction:column;align-items:center;justify-content:center;">
     <div style="background:#222;padding:2rem 2.5rem;border-radius:1rem;box-shadow:0 2px 16px #0008;max-width:90vw;text-align:center;">
       <h2 style="color:#fff;margin-bottom:1rem;">Standort auswählen</h2>
@@ -1981,7 +1981,7 @@
       {/if}
     </div>
   </div>
-{:else if browser && gpsStatus === 'checking' && !isBot}
+{:else if browser && gpsStatus === 'checking' && !isBot && typeof window !== 'undefined'}
   <!-- GPS wird geladen - zeige Ladeindikator -->
   <div style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(30,30,30,0.92);z-index:10000;display:flex;flex-direction:column;align-items:center;justify-content:center;">
     <div style="background:#222;padding:2rem 2.5rem;border-radius:1rem;box-shadow:0 2px 16px #0008;max-width:90vw;text-align:center;">
