@@ -1089,7 +1089,8 @@
     let isBot = false;
     if (browser) {
       const userAgent = navigator.userAgent.toLowerCase();
-      // Nur spezifische Bot-User-Agents erkennen, nicht zu breit
+      // TEMPORÄR: Bot-Erkennung deaktiviert für normale User
+      // Nur sehr spezifische Bot-User-Agents erkennen
       isBot = userAgent.includes('googlebot') ||
                userAgent.includes('bingbot') ||
                userAgent.includes('slurp') ||
@@ -1103,7 +1104,15 @@
                userAgent.includes('baiduspider') ||
                userAgent.includes('rogerbot') ||
                userAgent.includes('dotbot') ||
-               userAgent.includes('ia_archiver');
+               userAgent.includes('ia_archiver') ||
+               userAgent.includes('bot') ||
+               userAgent.includes('crawler') ||
+               userAgent.includes('spider') ||
+               userAgent.includes('scraper');
+      
+      // TEMPORÄR: Debug-Ausgabe
+      console.log('[Bot-Debug] User-Agent:', userAgent);
+      console.log('[Bot-Debug] isBot:', isBot);
     }
     
     if (isBot) {
