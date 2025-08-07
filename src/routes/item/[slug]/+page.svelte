@@ -891,7 +891,9 @@
   <meta name="twitter:title" content={image?.title || `Item ${itemSlug} - culoca.com`}>
   <meta name="twitter:description" content={image?.description || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
   <meta name="twitter:image" content={`https://culoca.com/api/og-image/${itemSlug}`}> <!-- Slug statt ID -->
-  <meta name="robots" content="index, follow">
+  <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+  <meta name="googlebot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+  <meta name="bingbot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
   <meta name="author" content="culoca.com">
   <link rel="canonical" href={`https://culoca.com/item/${itemSlug}`}> <!-- Slug statt ID -->
   
