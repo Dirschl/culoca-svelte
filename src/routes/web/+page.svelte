@@ -1,7 +1,9 @@
 <svelte:head>
   <title>Culoca - See You Local - Entdecke deine Umgebung</title>
   <meta name="description" content="Alles, was du über Culoca wissen willst: Schnapp dir dein Handy, erkunde deine Umgebung, teile Momente und sammle lokale Schätze. FAQ für Entdecker!" />
-  <meta name="robots" content="index, follow" />
+  <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+  <meta name="googlebot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+  <meta name="bingbot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
   <link rel="canonical" href="https://culoca.com/see-you-local-system-faq" />
   
   <!-- Favicon für /web Seite -->
