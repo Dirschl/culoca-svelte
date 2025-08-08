@@ -236,5 +236,62 @@
     position: relative;
     display: block;
     background: transparent;
+    -webkit-appearance: none;
+    appearance: none;
+    --thumb: 30px;      /* Thumb-Größe */
+    --track: 2px;       /* Track-Höhe */
+    --pct: 0%;          /* wird per JS gesetzt */
+  }
+
+  /* ===== WebKit (Chrome/Safari/Edge) ===== */
+  .radius-control input[type="range"]::-webkit-slider-runnable-track {
+    height: var(--track);
+    border-radius: 999px;
+    background:
+      linear-gradient(to right,
+        var(--tw-ring-color) 0%,
+        var(--tw-ring-color) var(--pct),
+        #e5e7eb var(--pct),
+        #e5e7eb 100%);
+  }
+  .radius-control input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: var(--thumb);
+    height: var(--thumb);
+    border-radius: 50%;
+    background: var(--accent-color);
+    border: 2px solid var(--bg-primary);
+    cursor: pointer;
+    /* Track mittig unter dem Thumb ausrichten */
+    margin-top: calc((var(--track) - var(--thumb)) / 2);
+    transition: transform .1s ease;
+  }
+
+  /* ===== Firefox ===== */
+  .radius-control input[type="range"]::-moz-range-track {
+    height: var(--track);
+    background: #e5e7eb;
+    border-radius: 999px;
+  }
+  .radius-control input[type="range"]::-moz-range-progress {
+    height: var(--track);
+    background: var(--tw-ring-color);
+    border-radius: 999px;
+  }
+  .radius-control input[type="range"]::-moz-range-thumb {
+    width: var(--thumb);
+    height: var(--thumb);
+    border-radius: 50%;
+    background: var(--accent-color);
+    border: 2px solid var(--bg-primary);
+    cursor: pointer;
+    transition: transform .1s ease;
+  }
+
+  /* (optional) kleine Interaktions-Details */
+  .radius-control input[type="range"]:hover::-webkit-slider-thumb,
+  .radius-control input[type="range"]:hover::-moz-range-thumb { 
+    transform: scale(.98); 
   }
 </style> 
