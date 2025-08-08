@@ -69,10 +69,25 @@ export const GET: RequestHandler = async ({ url }) => {
       linkTags: linkTags,
       scriptTags: scriptTags,
       rawHead: headContent,
+      rawHtml: html, // Kompletter HTML-Quelltext
+      htmlLength: html.length,
       jsonLdData: jsonLdData,
       mainImage: mainImage,
       faviconInfo: faviconInfo,
-      culocaLogoFallback: culocaLogoFallback
+      culocaLogoFallback: culocaLogoFallback,
+      responseInfo: {
+        status: response.status,
+        statusText: response.statusText,
+        contentType: response.headers.get('content-type'),
+        contentLength: response.headers.get('content-length'),
+        server: response.headers.get('server'),
+        date: response.headers.get('date')
+      },
+      // Zusätzliche Informationen für bessere Debugging
+      htmlPreview: html.substring(0, 500) + '...',
+      hasBody: html.includes('<body'),
+      hasHead: html.includes('<head'),
+      hasHtml: html.includes('<html')
     });
     
   } catch (error: any) {

@@ -1374,7 +1374,73 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
               {/if}
             </div>
           {:else if activeTab === 'raw'}
-            <pre><code>{headData.rawHead}</code></pre>
+            <div class="raw-html-section">
+              <h5>🔍 Kompletter HTML-Quelltext der Seite:</h5>
+              <div class="raw-html-info">
+                <p><strong>URL:</strong> {testUrl}</p>
+                <p><strong>Bot-Modus:</strong> {isBotMode ? '✅ Aktiv (Googlebot Simulation)' : '❌ Inaktiv (Normaler Browser)'}</p>
+                <p><strong>User-Agent:</strong> <code>{navigator.userAgent}</code></p>
+                <p><strong>HTML-Länge:</strong> {headData.rawHtml ? headData.rawHtml.length.toLocaleString() : 'Unbekannt'} Zeichen</p>
+                {#if headData.responseInfo}
+                  <p><strong>Server-Response:</strong> {headData.responseInfo.status} {headData.responseInfo.statusText}</p>
+                  <p><strong>Content-Type:</strong> {headData.responseInfo.contentType || 'Unbekannt'}</p>
+                  <p><strong>Server:</strong> {headData.responseInfo.server || 'Unbekannt'}</p>
+                {/if}
+                <p><strong>Status:</strong> <span class="status-good">✅ HTML erfolgreich geladen</span></p>
+              </div>
+              
+              {#if headData.rawHtml}
+                <div class="raw-html-container">
+                  <div class="raw-html-header">
+                    <span class="raw-html-title">Vollständiger HTML-Quelltext ({headData.rawHtml.length.toLocaleString()} Zeichen)</span>
+                    <div class="raw-html-actions">
+                      <button 
+                        class="copy-raw-html-btn" 
+                        on:click={() => copyRawHtml(headData.rawHtml)}
+                        title="HTML-Quelltext kopieren"
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                        </svg>
+                        Kopieren
+                      </button>
+                      <button 
+                        class="expand-html-btn" 
+                        on:click={() => document.querySelector('.raw-html-content').classList.toggle('expanded')}
+                        title="HTML-Ansicht erweitern/verkleinern"
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <path d="M7 14l5-5 5 5"/>
+                          <path d="M7 10l5 5 5-5"/>
+                        </svg>
+                        Erweitern
+                      </button>
+                    </div>
+                  </div>
+                  <div class="raw-html-wrapper">
+                    <pre class="raw-html-content"><code>{headData.rawHtml}</code></pre>
+                  </div>
+                </div>
+              {:else}
+                <div class="raw-html-error">
+                  <p>❌ Kein HTML-Quelltext verfügbar</p>
+                  <p>Mögliche Ursachen:</p>
+                  <ul>
+                    <li>Die Seite konnte nicht geladen werden</li>
+                    <li>CORS-Beschränkungen verhindern den Zugriff</li>
+                    <li>Die URL ist nicht erreichbar</li>
+                    <li>Die API konnte die Seite nicht abrufen</li>
+                  </ul>
+                  <p><strong>Debug-Info:</strong></p>
+                  <ul>
+                    <li>URL: {testUrl}</li>
+                    <li>Bot-Modus: {isBotMode ? 'Aktiv' : 'Inaktiv'}</li>
+                    <li>User-Agent: {navigator.userAgent}</li>
+                  </ul>
+                </div>
+              {/if}
+            </div>
           {/if}
         </div>
       {/if}
