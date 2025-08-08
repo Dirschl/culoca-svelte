@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy, createEventDispatcher } from 'svelte';
+  import { goto } from '$app/navigation';
   export let image: any;
   export let isCreator: boolean = false;
   export let nearby: any[] = [];
@@ -97,10 +98,14 @@
         });
         const nearbyMarker = map ? L.marker([nearbyItem.lat, nearbyItem.lon], { icon: nearbyIcon }).addTo(map) : null;
         if (nearbyMarker) {
-          nearbyMarker.on('click', () => {
+                    nearbyMarker.on('click', (event) => {
             if (nearbyItem.slug) {
-              const url = new URL(`/item/${nearbyItem.slug}`, window.location.origin);
-              window.location.href = url.toString();
+              // Prevent default behavior and use direct navigation
+              event.preventDefault();
+              event.stopPropagation();
+              
+              // Use direct navigation for map markers (outside SvelteKit context)
+              window.location.href = `/item/${nearbyItem.slug}`;
             } else {
               alert('Kein Slug für dieses Item vorhanden!');
             }
@@ -518,9 +523,9 @@
     justify-content: center;
   }
   .map-modal-content-fullscreen {
-    background: #fff;
+    background: var(--bg-primary);
     border-radius: 16px;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.2);
+    box-shadow: 0 4px 24px var(--shadow);
     padding: 1.5rem;
     width: 95vw;
     max-width: 600px;
@@ -529,6 +534,7 @@
     flex-direction: column;
     gap: 1rem;
     position: relative;
+    transition: background-color 0.3s ease;
   }
   .map-modal-header-fullscreen {
     display: flex;
@@ -551,12 +557,13 @@
     font-size: 1rem;
   }
   .map-search-results {
-    background: #f3f4f6;
+    background: var(--bg-secondary);
     border-radius: 8px;
     margin: 0.5rem 0;
     max-height: 180px;
     overflow-y: auto;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    box-shadow: 0 2px 8px var(--shadow);
+    transition: background-color 0.3s ease;
   }
   .map-search-result {
     padding: 0.5rem 1rem;
@@ -575,9 +582,10 @@
     width: 100%;
     height: 300px;
     border-radius: 12px;
-    background: #e5e7eb;
+    background: var(--bg-secondary);
     margin-bottom: 0.5rem;
     position: relative;
+    transition: background-color 0.3s ease;
   }
   .map-picker-pin {
     position: absolute;

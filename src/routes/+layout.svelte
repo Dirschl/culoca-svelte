@@ -7,15 +7,11 @@
   import { supabase } from '$lib/supabaseClient';
   import { sessionReady } from '$lib/sessionStore';
   import { browser } from '$app/environment';
+  import { beforeNavigate, afterNavigate } from '$app/navigation';
 
-  // Apply dark mode class to document
-  $: if (typeof document !== 'undefined') {
-    if ($darkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }
+  // Navigation debugging
+  beforeNavigate((e) => console.log('🚀 beforeNavigate', e));
+  afterNavigate((e) => console.log('✅ afterNavigate', e));
 
   onMount(() => {
     console.log('🚀 Layout mounted, starting session initialization...');

@@ -211,6 +211,7 @@ onMount(() => {
     console.log('[NewsFlash] Using server data, setting offset for continuation');
     // Offset für Nachladen setzen, aber nicht die Server-Daten überschreiben
     currentOffset = initialItems.length;
+    // WICHTIG: Kein fetchImages() hier - Server-Daten beibehalten!
   }
   startAutoRefresh();
 });

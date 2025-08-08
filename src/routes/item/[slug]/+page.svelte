@@ -79,11 +79,9 @@
   let loading = !image;
   let profile = null;
 
-  // SEO/Meta: Slug statt ID verwenden
+  // SEO/Meta: Slug statt ID verwenden - reaktiv auf URL-Parameter
   let itemSlug: string = '';
-  $: if (image?.slug) {
-    itemSlug = image.slug;
-  }
+  $: itemSlug = $page.params.slug || image?.slug || '';
 
   // Dynamisches Favicon aktualisieren
   $: if (image && browser) {
@@ -1029,15 +1027,16 @@
 </svelte:head>
 
 <div class="page">
-  {#if loading}
-    <div class="loading">
-      <div class="spinner"></div>
-      <span>Lade Bild...</span>
-    </div>
-  {:else if error}
-    <div class="error">❌ Fehler: {error}</div>
-  {:else if image}
-    <div class="passepartout-container" class:dark={$darkMode}>
+  {#key itemSlug}
+    {#if loading}
+      <div class="loading">
+        <div class="spinner"></div>
+        <span>Lade Bild...</span>
+      </div>
+    {:else if error}
+      <div class="error">❌ Fehler: {error}</div>
+    {:else if image}
+    <div class="passepartout-container">
       <a href="/" class="image-link">
         <img
           src={imageSource}
@@ -1177,7 +1176,7 @@
       </div>
     {/if}
     <NearbyGallery
-      nearby={visibleNearby}
+      nearby={nearby}
       isCreator={isCreator}
       userLat={image?.lat}
       userLon={image?.lon}
@@ -1185,6 +1184,7 @@
       onGalleryToggle={handleNearbyGalleryToggle}
       getGalleryStatus={getNearbyGalleryStatus}
       layout={galleryLayout}
+      forceReload={true}
     />
     
     <!-- SEO-optimiert: Serverseitig gerenderte Links für Google -->
@@ -1513,6 +1513,7 @@
       </svg>
     </button>
   {/if}
+    {/key}
 </div>
 
 <style>
@@ -1551,12 +1552,8 @@
     justify-content: flex-start;
     width: 100%;
     padding: 12px 12px 12px 12px;
-    background: #f5f5f5;
     margin: 0 auto;
-    overflow: hidden;
-  }
-  .passepartout-container.dark {
-    background: #1a1a1a;
+    background: var(--passepartout-bg);
     overflow: hidden;
   }
   .passepartout-info {
@@ -1579,35 +1576,27 @@
   .title {
     font-size: 1.8rem;
     font-weight: 600;
-    color: white;
+    color: var(--text-primary);
     margin: 0 0 1rem 0;
     line-height: 1.3;
     background: transparent;
   }
-  .passepartout-container:not(.dark) .title {
-    color: #4a4a4a;
-    font-weight: 700;
-    background: transparent;
-  }
+
   .description {
     font-size: 1rem;
-    color: #ccc;
+    color: var(--text-secondary);
     line-height: 1.6;
     margin: 0 0 0.5rem 0;
     background: transparent;
   }
-  .passepartout-container:not(.dark) .description {
-    color: #6b6b6b;
-    font-weight: 500;
-    background: transparent;
-  }
+
   .description.placeholder {
-    color: #666;
+    color: var(--text-muted);
     font-style: italic;
     background: transparent;
   }
-  .passepartout-container:not(.dark) .description.placeholder {
-    color: #999;
+  .passepartout-container .description.placeholder {
+    color: var(--bg-secondary);
     font-style: italic;
     background: transparent;
   }
@@ -1791,9 +1780,6 @@
     padding: 1rem 0.5rem;
     margin-top: -2px;
     overflow: hidden;
-  }
-  .transition-area.dark {
-    background: #18181b;
   }
   .controls-section {
     position: relative;
@@ -2085,7 +2071,7 @@
     border-color: var(--success-color);
   }
   .caption.placeholder {
-    color: var(--text-tertiary);
+    color: var(--text-muted);
     font-style: italic;
   }
   .keywords-title.editable:hover {
