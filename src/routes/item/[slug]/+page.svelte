@@ -98,6 +98,19 @@
     // Erstelle neuen Favicon-Link mit Cache-Buster
     const faviconLink = document.createElement('link');
     faviconLink.rel = 'icon';
+
+  // Slider-Fortschritt aktualisieren
+  function updateSliderProgress(slider: HTMLInputElement) {
+    const min = +slider.min || 0, max = +slider.max || 100, val = +slider.value;
+    const pct = ((val - min) * 100 / (max - min)) + '%';
+    slider.style.setProperty('--pct', pct);
+  }
+
+  // Slider-Event-Handler
+  function handleSliderInput(event: Event) {
+    const slider = event.target as HTMLInputElement;
+    updateSliderProgress(slider);
+  }
     faviconLink.type = 'image/jpeg';
     
     let faviconUrl = '';
@@ -227,6 +240,14 @@
       // Log item view when page loads
       if (image?.id && !viewLogged) {
         logItemView();
+      }
+
+      // Initialize slider progress
+      const slider = document.querySelector('#radius') as HTMLInputElement;
+      if (slider) {
+        const min = +slider.min || 0, max = +slider.max || 100, val = +slider.value;
+        const pct = ((val - min) * 100 / (max - min)) + '%';
+        slider.style.setProperty('--pct', pct);
       }
     }
   });
@@ -369,6 +390,12 @@
     if (radius > 2000) {
       radius = 2000;
     }
+    
+    // Update slider progress
+    const slider = e.target as HTMLInputElement;
+    const min = +slider.min || 0, max = +slider.max || 100, val = +slider.value;
+    const pct = ((val - min) * 100 / (max - min)) + '%';
+    slider.style.setProperty('--pct', pct);
   }
   function onRadiusChange(e) {
     radius = +e.target.value;
@@ -1777,9 +1804,75 @@
     color: var(--culoca-orange);
     opacity: 1;
   }
+  /* Range-Slider mit gefüllter Spur */
   .radius-control input[type="range"] {
     width: 100%;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    margin: 20px 0 10px 0;
     background: transparent;
+    --thumb: 32px;      /* Thumb-Größe */
+    --track: 8px;       /* Track-Höhe */
+    --pct: 0%;          /* wird per JS gesetzt */
+    --tw-ring-color: #0066cc; /* Standard Blauton */
+  }
+
+  /* Orange bei max. 300 Items */
+  .radius-control input[type="range"].limit-reached {
+    --tw-ring-color: var(--culoca-orange);
+  }
+
+  /* ===== WebKit (Chrome/Safari/Edge) ===== */
+  .radius-control input[type="range"]::-webkit-slider-runnable-track {
+    height: var(--track);
+    border-radius: 999px;
+    background:
+      linear-gradient(to right,
+        var(--tw-ring-color) 0%,
+        var(--tw-ring-color) var(--pct),
+        #e5e7eb var(--pct),
+        #e5e7eb 100%);
+  }
+  .radius-control input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: var(--thumb);
+    height: var(--thumb);
+    border-radius: 50%;
+    background: var(--tw-ring-color);
+    border: 0px solid var(--bg-primary);
+    cursor: pointer;
+    /* Track mittig unter dem Thumb ausrichten */
+    margin-top: calc((var(--track) - var(--thumb)) / 2);
+    transition: transform .1s ease;
+  }
+
+  /* ===== Firefox ===== */
+  .radius-control input[type="range"]::-moz-range-track {
+    height: var(--track);
+    background: #e5e7eb;
+    border-radius: 999px;
+  }
+  .radius-control input[type="range"]::-moz-range-progress {
+    height: var(--track);
+    background: var(--tw-ring-color);
+    border-radius: 999px;
+  }
+  .radius-control input[type="range"]::-moz-range-thumb {
+    width: var(--thumb);
+    height: var(--thumb);
+    border-radius: 50%;
+    background: var(--tw-ring-color);
+    border: 2px solid var(--bg-primary);
+    cursor: pointer;
+    transition: transform .1s ease;
+  }
+
+  /* (optional) kleine Interaktions-Details */
+  .radius-control input[type="range"]:hover::-webkit-slider-thumb,
+  .radius-control input[type="range"]:hover::-moz-range-thumb { 
+    transform: scale(.98); 
   }
   .transition-area {
     position: relative;

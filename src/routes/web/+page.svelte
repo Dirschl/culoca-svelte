@@ -168,6 +168,249 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
     }
   }
 
+  async function copyRawHtml(html: string) {
+    try {
+      await navigator.clipboard.writeText(html);
+      // Zeige eine kurze Bestätigung
+      const copyButton = document.querySelector('.code-action-btn') as HTMLElement;
+      if (copyButton) {
+        const originalHTML = copyButton.innerHTML;
+        copyButton.innerHTML = `
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M20 6L9 17l-5-5"/>
+          </svg>
+        `;
+        setTimeout(() => {
+          copyButton.innerHTML = originalHTML;
+        }, 2000);
+      }
+    } catch (err) {
+      console.error('Fehler beim Kopieren des HTML:', err);
+    }
+  }
+
+  function toggleExpand() {
+    const content = document.querySelector('.raw-html-content') as HTMLElement;
+    if (content) {
+      content.classList.toggle('expanded');
+      const expandBtn = document.querySelector('.code-action-btn:nth-child(2)') as HTMLElement;
+      if (expandBtn) {
+        const svg = expandBtn.querySelector('svg');
+        if (svg) {
+          if (content.classList.contains('expanded')) {
+            svg.innerHTML = '<path d="M7 10l5 5 5-5"/>';
+          } else {
+            svg.innerHTML = '<path d="M7 14l5-5 5 5"/>';
+          }
+        }
+      }
+    }
+  }
+
+  function toggleWordWrap() {
+    const content = document.querySelector('.raw-html-content') as HTMLElement;
+    if (content) {
+      console.log('Toggle Word-Wrap clicked');
+      content.classList.toggle('word-wrap');
+      console.log('Classes after toggle:', content.classList.toString());
+      
+      // Inline-Styles für sofortige Wirkung
+      if (content.classList.contains('word-wrap')) {
+        content.style.whiteSpace = 'pre-wrap';
+        content.style.wordWrap = 'break-word';
+        content.style.overflowWrap = 'break-word';
+        console.log('Applied word-wrap styles');
+      } else {
+        content.style.whiteSpace = 'pre';
+        content.style.wordWrap = 'normal';
+        content.style.overflowWrap = 'normal';
+        console.log('Removed word-wrap styles');
+      }
+      
+      const wrapBtn = document.querySelector('.code-action-btn:nth-child(3)') as HTMLElement;
+      if (wrapBtn) {
+        if (content.classList.contains('word-wrap')) {
+          wrapBtn.style.color = 'var(--accent-color)';
+        } else {
+          wrapBtn.style.color = 'var(--text-secondary)';
+        }
+      }
+    }
+  }
+
+  // Alternative: Nur Head anzeigen
+  function toggleHeadOnly() {
+    const content = document.querySelector('.raw-html-content') as HTMLElement;
+    if (content) {
+      console.log('Toggle Head-Only clicked');
+      content.classList.toggle('head-only');
+      console.log('Classes after toggle:', content.classList.toString());
+      
+      // Inline-Styles für sofortige Wirkung
+      if (content.classList.contains('head-only')) {
+        content.style.maxHeight = '200px';
+        content.style.overflow = 'hidden';
+        console.log('Applied head-only styles');
+      } else {
+        content.style.maxHeight = '400px';
+        content.style.overflow = 'auto';
+        console.log('Removed head-only styles');
+      }
+      
+      const expandBtn = document.querySelector('.code-action-btn:nth-child(2)') as HTMLElement;
+      if (expandBtn) {
+        const svg = expandBtn.querySelector('svg');
+        if (svg) {
+          if (content.classList.contains('head-only')) {
+            svg.innerHTML = '<path d="M7 10l5 5 5-5"/>';
+          } else {
+            svg.innerHTML = '<path d="M7 14l5-5 5 5"/>';
+          }
+        }
+      }
+    }
+  }
+
+  // Formatiert Tab Funktionen
+  async function copyFormattedContent(content: string) {
+    try {
+      await navigator.clipboard.writeText(content);
+      console.log('Formatted content copied');
+      // Zeige eine kurze Bestätigung
+      const copyButton = document.querySelector('.formatted-actions .code-action-btn') as HTMLElement;
+      if (copyButton) {
+        const originalHTML = copyButton.innerHTML;
+        copyButton.innerHTML = `
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M20 6L9 17l-5-5"/>
+          </svg>
+        `;
+        setTimeout(() => {
+          copyButton.innerHTML = originalHTML;
+        }, 2000);
+      }
+    } catch (err) {
+      console.error('Fehler beim Kopieren des formatierten Inhalts:', err);
+    }
+  }
+
+  function toggleFormattedHeadOnly() {
+    const content = document.querySelector('.formatted-content') as HTMLElement;
+    if (content) {
+      console.log('Toggle Formatted Head-Only clicked');
+      content.classList.toggle('head-only');
+      console.log('Formatted classes after toggle:', content.classList.toString());
+      
+      // Inline-Styles für sofortige Wirkung
+      if (content.classList.contains('head-only')) {
+        content.style.maxHeight = '200px';
+        content.style.overflow = 'hidden';
+        console.log('Applied formatted head-only styles');
+      } else {
+        content.style.maxHeight = '400px';
+        content.style.overflow = 'auto';
+        console.log('Removed formatted head-only styles');
+      }
+      
+      const expandBtn = document.querySelector('.formatted-actions .code-action-btn:nth-child(2)') as HTMLElement;
+      if (expandBtn) {
+        const svg = expandBtn.querySelector('svg');
+        if (svg) {
+          if (content.classList.contains('head-only')) {
+            svg.innerHTML = '<path d="M7 10l5 5 5-5"/>';
+          } else {
+            svg.innerHTML = '<path d="M7 14l5-5 5 5"/>';
+          }
+        }
+      }
+    }
+  }
+
+  function toggleFormattedWordWrap() {
+    const content = document.querySelector('.formatted-content') as HTMLElement;
+    if (content) {
+      console.log('Toggle Formatted Word-Wrap clicked');
+      content.classList.toggle('word-wrap');
+      console.log('Formatted classes after toggle:', content.classList.toString());
+      
+      // Inline-Styles für sofortige Wirkung
+      if (content.classList.contains('word-wrap')) {
+        content.style.whiteSpace = 'pre-wrap';
+        content.style.wordWrap = 'break-word';
+        content.style.overflowWrap = 'break-word';
+        console.log('Applied formatted word-wrap styles');
+      } else {
+        content.style.whiteSpace = 'pre';
+        content.style.wordWrap = 'normal';
+        content.style.overflowWrap = 'normal';
+        console.log('Removed formatted word-wrap styles');
+      }
+      
+      const wrapBtn = document.querySelector('.formatted-actions .code-action-btn:nth-child(3)') as HTMLElement;
+      if (wrapBtn) {
+        if (content.classList.contains('word-wrap')) {
+          wrapBtn.style.color = 'var(--accent-color)';
+        } else {
+          wrapBtn.style.color = 'var(--text-secondary)';
+        }
+      }
+    }
+  }
+
+  // JSON-LD Tab Funktionen
+  async function copyJsonLdContent(content: string) {
+    try {
+      await navigator.clipboard.writeText(content);
+      console.log('JSON-LD content copied');
+      // Zeige eine kurze Bestätigung
+      const copyButton = document.querySelector('.jsonld-actions .code-action-btn') as HTMLElement;
+      if (copyButton) {
+        const originalHTML = copyButton.innerHTML;
+        copyButton.innerHTML = `
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M20 6L9 17l-5-5"/>
+          </svg>
+        `;
+        setTimeout(() => {
+          copyButton.innerHTML = originalHTML;
+        }, 2000);
+      }
+    } catch (err) {
+      console.error('Fehler beim Kopieren des JSON-LD Inhalts:', err);
+    }
+  }
+
+  function toggleJsonLdWordWrap() {
+    const content = document.querySelector('.jsonld-content') as HTMLElement;
+    if (content) {
+      console.log('Toggle JSON-LD Word-Wrap clicked');
+      content.classList.toggle('word-wrap');
+      console.log('JSON-LD classes after toggle:', content.classList.toString());
+      
+      // Inline-Styles für sofortige Wirkung
+      if (content.classList.contains('word-wrap')) {
+        content.style.whiteSpace = 'pre-wrap';
+        content.style.wordWrap = 'break-word';
+        content.style.overflowWrap = 'break-word';
+        console.log('Applied JSON-LD word-wrap styles');
+      } else {
+        content.style.whiteSpace = 'pre';
+        content.style.wordWrap = 'normal';
+        content.style.overflowWrap = 'normal';
+        console.log('Removed JSON-LD word-wrap styles');
+      }
+      
+      const wrapBtn = document.querySelector('.jsonld-actions .code-action-btn:nth-child(2)') as HTMLElement;
+      if (wrapBtn) {
+        if (content.classList.contains('word-wrap')) {
+          wrapBtn.style.color = 'var(--accent-color)';
+        } else {
+          wrapBtn.style.color = 'var(--text-secondary)';
+        }
+      }
+    }
+  }
+
   async function fetchHeadData() {
     if (!testUrl.trim()) {
       error = 'Bitte gib eine URL ein';
@@ -1347,12 +1590,90 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
             </div>
           {:else if activeTab === 'jsonld'}
             {#if headData && headData.jsonLdData && headData.jsonLdData.length > 0}
-              <pre><code>{headData.jsonLdData.map(item => `=== ${item.index}. ${item.type}: ${item.name} ===\n${item.formatted}`).join('\n\n')}</code></pre>
+              <div class="jsonld-container">
+                <div class="jsonld-wrapper">
+                  <div class="jsonld-actions">
+                    <button 
+                      class="code-action-btn" 
+                      on:click={() => {
+                        console.log('Copy JSON-LD Button clicked!');
+                        copyJsonLdContent(headData.jsonLdData.map(item => `=== ${item.index}. ${item.type}: ${item.name} ===\n${item.formatted}`).join('\n\n'));
+                      }}
+                      title="JSON-LD Code kopieren"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                      </svg>
+                    </button>
+                    <button 
+                      class="code-action-btn" 
+                      on:click={() => {
+                        console.log('JSON-LD Word-Wrap Button clicked!');
+                        toggleJsonLdWordWrap();
+                      }}
+                      title="Code umbrechen"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 6h18"/>
+                        <path d="M3 12h18"/>
+                        <path d="M3 18h18"/>
+                      </svg>
+                    </button>
+                  </div>
+                  <pre class="jsonld-content"><code>{headData.jsonLdData.map(item => `=== ${item.index}. ${item.type}: ${item.name} ===\n${item.formatted}`).join('\n\n')}</code></pre>
+                </div>
+              </div>
             {:else}
               <div class="loading">Lade JSON-LD Daten...</div>
             {/if}
           {:else if activeTab === 'formatted'}
-            <pre><code>{headData.headContent}</code></pre>
+            <div class="formatted-container">
+              <div class="formatted-wrapper">
+                <div class="formatted-actions">
+                  <button 
+                    class="code-action-btn" 
+                    on:click={() => {
+                      console.log('Copy Formatted Button clicked!');
+                      copyFormattedContent(headData.headContent);
+                    }}
+                    title="Formatierten Code kopieren"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                    </svg>
+                  </button>
+                  <button 
+                    class="code-action-btn" 
+                    on:click={() => {
+                      console.log('Formatted Head-Only Button clicked!');
+                      toggleFormattedHeadOnly();
+                    }}
+                    title="Nur Head-Bereich anzeigen"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M7 14l5-5 5 5"/>
+                    </svg>
+                  </button>
+                  <button 
+                    class="code-action-btn" 
+                    on:click={() => {
+                      console.log('Formatted Word-Wrap Button clicked!');
+                      toggleFormattedWordWrap();
+                    }}
+                    title="Code umbrechen"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M3 6h18"/>
+                      <path d="M3 12h18"/>
+                      <path d="M3 18h18"/>
+                    </svg>
+                  </button>
+                </div>
+                <pre class="formatted-content"><code>{headData.headContent}</code></pre>
+              </div>
+            </div>
           {:else if activeTab === 'meta'}
             <div class="meta-analysis">
               <h5>Meta-Tags Analyse:</h5>
@@ -1391,11 +1712,10 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
               
               {#if headData.rawHtml}
                 <div class="raw-html-container">
-                  <div class="raw-html-header">
-                    <span class="raw-html-title">Vollständiger HTML-Quelltext ({headData.rawHtml.length.toLocaleString()} Zeichen)</span>
+                  <div class="raw-html-wrapper">
                     <div class="raw-html-actions">
                       <button 
-                        class="copy-raw-html-btn" 
+                        class="code-action-btn" 
                         on:click={() => copyRawHtml(headData.rawHtml)}
                         title="HTML-Quelltext kopieren"
                       >
@@ -1403,22 +1723,34 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
                           <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
                           <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
                         </svg>
-                        Kopieren
                       </button>
                       <button 
-                        class="expand-html-btn" 
-                        on:click={() => document.querySelector('.raw-html-content').classList.toggle('expanded')}
-                        title="HTML-Ansicht erweitern/verkleinern"
+                        class="code-action-btn" 
+                        on:click={() => {
+                          console.log('Head-Only Button clicked!');
+                          toggleHeadOnly();
+                        }}
+                        title="Nur Head-Bereich anzeigen"
                       >
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                           <path d="M7 14l5-5 5 5"/>
-                          <path d="M7 10l5 5 5-5"/>
                         </svg>
-                        Erweitern
+                      </button>
+                      <button 
+                        class="code-action-btn" 
+                        on:click={() => {
+                          console.log('Word-Wrap Button clicked!');
+                          toggleWordWrap();
+                        }}
+                        title="Code umbrechen"
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <path d="M3 6h18"/>
+                          <path d="M3 12h18"/>
+                          <path d="M3 18h18"/>
+                        </svg>
                       </button>
                     </div>
-                  </div>
-                  <div class="raw-html-wrapper">
                     <pre class="raw-html-content"><code>{headData.rawHtml}</code></pre>
                   </div>
                 </div>
@@ -2442,6 +2774,189 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
 
   .copy-button:active {
     transform: scale(0.95);
+  }
+
+  /* Raw HTML Container Styles */
+  .raw-html-container {
+    margin-top: 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .raw-html-wrapper {
+    position: relative;
+  }
+
+  .raw-html-actions {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    display: flex;
+    gap: 0.25rem;
+    z-index: 10;
+  }
+
+  .code-action-btn {
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--bg-primary);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+  }
+
+  .code-action-btn:hover {
+    background: var(--bg-secondary);
+    border-color: var(--accent-color);
+    color: var(--accent-color);
+  }
+
+  .raw-html-content {
+    background: var(--bg-secondary);
+    border: none;
+    border-radius: 0;
+    padding: 1rem;
+    overflow-x: auto;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    color: var(--text-secondary);
+    margin: 0;
+    max-height: 400px;
+    transition: max-height 0.3s ease;
+  }
+
+  .raw-html-content.expanded {
+    max-height: none;
+  }
+
+  .raw-html-content.word-wrap {
+    white-space: pre-wrap !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+    max-width: 100% !important;
+  }
+
+  .raw-html-content.head-only {
+    max-height: 200px !important;
+    overflow: hidden !important;
+  }
+
+  .raw-html-content.head-only:not(.expanded) {
+    max-height: 200px !important;
+    overflow: hidden !important;
+  }
+
+  /* Höhere Spezifität für Word-Wrap */
+  pre.raw-html-content.word-wrap {
+    white-space: pre-wrap !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+    max-width: 100% !important;
+  }
+
+  /* Höhere Spezifität für Head-Only */
+  pre.raw-html-content.head-only {
+    max-height: 200px !important;
+    overflow: hidden !important;
+  }
+
+  /* Formatiert Tab Styles */
+  .formatted-container {
+    margin-top: 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .formatted-wrapper {
+    position: relative;
+  }
+
+  .formatted-actions {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    display: flex;
+    gap: 0.25rem;
+    z-index: 10;
+  }
+
+  .formatted-content {
+    background: var(--bg-secondary);
+    border: none;
+    border-radius: 0;
+    padding: 1rem;
+    overflow-x: auto;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    color: var(--text-secondary);
+    margin: 0;
+    max-height: 400px;
+    transition: max-height 0.3s ease;
+  }
+
+  .formatted-content.head-only {
+    max-height: 200px !important;
+    overflow: hidden !important;
+  }
+
+  .formatted-content.word-wrap {
+    white-space: pre-wrap !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+    max-width: 100% !important;
+  }
+
+  /* JSON-LD Tab Styles */
+  .jsonld-container {
+    margin-top: 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .jsonld-wrapper {
+    position: relative;
+  }
+
+  .jsonld-actions {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    display: flex;
+    gap: 0.25rem;
+    z-index: 10;
+  }
+
+  .jsonld-content {
+    background: var(--bg-secondary);
+    border: none;
+    border-radius: 0;
+    padding: 1rem;
+    overflow-x: auto;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    color: var(--text-secondary);
+    margin: 0;
+    max-height: 400px;
+    transition: max-height 0.3s ease;
+  }
+
+  .jsonld-content.word-wrap {
+    white-space: pre-wrap !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+    max-width: 100% !important;
   }
 
 
