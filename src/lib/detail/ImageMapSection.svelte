@@ -74,7 +74,7 @@
     const thumbnailUrl = image.path_64 ? `${baseUrl}/images-64/${image.path_64}` : `${baseUrl}/images-512/${image.path_512}`;
     const currentImageIcon = L.divIcon({
       className: 'custom-marker current-image',
-      html: `<img src="${thumbnailUrl}" alt="${image.title || 'Bild'}" style="width: 48px; height: 48px; border-radius: 50%; border: 3px solid #ee7221; box-shadow: 0 2px 8px rgba(0,0,0,0.3); object-fit: cover;">`,
+      html: `<img src="${thumbnailUrl}" alt="${image.title || 'Bild'}" style="width: 48px; height: 48px; border-radius: 50%; border: 3px solid #ee7221; box-shadow: 0 2px 8px rgba(0,0,0,0.3); object-fit: cover;" title="Aktuelles Bild">`,
       iconSize: [48, 48],
       iconAnchor: [48, 48],
       popupAnchor: [0, -48]
@@ -90,7 +90,7 @@
         const nearbyThumbnailUrl = nearbyItem.src64 || nearbyItem.src;
         const nearbyIcon = L.divIcon({
           className: 'custom-marker nearby-image',
-          html: `<img src="${nearbyThumbnailUrl}" alt="${nearbyItem.title || 'Item'}" style="width: 48px; height: 48px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3); object-fit: cover; cursor: pointer;">`,
+          html: `<img src="${nearbyThumbnailUrl}" alt="${nearbyItem.title || 'Item'}" rel="nofollow" style="width: 48px; height: 48px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3); object-fit: cover; cursor: pointer;">`,
           iconSize: [48, 48],
           iconAnchor: [48, 48],
           popupAnchor: [0, -48]
@@ -109,7 +109,7 @@
             <div style="text-align: center; min-width: 200px;">
               <strong>${nearbyItem.title || 'Item'}</strong><br>
               <small>Entfernung: ${getDistanceFromLatLonInMeters(image.lat, image.lon, nearbyItem.lat, nearbyItem.lon)}</small><br>
-              ${nearbyItem.slug ? `<a href="/item/${nearbyItem.slug}" style="color: #0066cc; text-decoration: none; font-weight: 500;">Item anzeigen →</a>` : `<span style='color: #888;'>Kein Slug vorhanden</span>`}
+              ${nearbyItem.slug ? `<a href="/item/${nearbyItem.slug}" style="color: #0066cc; text-decoration: none; font-weight: 500;" title="Weitere Bilder in der Nähe">Item anzeigen →</a>` : `<span style='color: #888;'>Kein Slug vorhanden</span>`}
             </div>
           `;
           nearbyMarker.bindPopup(popupContent);
