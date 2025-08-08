@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
   import justifiedLayout from 'justified-layout';
 
   // Types for justified-layout
@@ -41,6 +42,7 @@
   export let showGalleryToggle: boolean = false;
   export let onGalleryToggle: ((itemId: string, newGalleryValue: boolean) => void) | null = null;
   export let getGalleryStatus: ((itemId: string) => boolean) | null = null;
+  export let forceReload: boolean = false; // Force window.location.href for detail page navigation
 
   let boxes: LayoutBox[] = [];
   let layoutResult: JustifiedLayoutResult = { boxes: [], containerHeight: 0, widowCount: 0 };
@@ -143,8 +145,15 @@
   function handleImageClick(itemSlug: string) {
     const item = items.find(item => item.slug === itemSlug);
     if (item && item.slug) {
-      const url = new URL(`/item/${item.slug}`, window.location.origin);
-      location.href = url.toString();
+      console.log('[GalleryLayout] Click detected for item:', itemSlug);
+      console.log('[GalleryLayout] Item found:', item);
+      console.log('[GalleryLayout] Attempting navigation to:', `/item/${item.slug}`);
+      
+      // Use SvelteKit goto for proper navigation (like main page)
+      goto(`/item/${item.slug}`);
+      console.log('[GalleryLayout] goto() called successfully');
+    } else {
+      console.error('[GalleryLayout] Item not found for slug:', itemSlug);
     }
   }
 
@@ -153,8 +162,15 @@
       event.preventDefault();
       const item = items.find(item => item.slug === itemSlug);
       if (item && item.slug) {
-        const url = new URL(`/item/${item.slug}`, window.location.origin);
-        location.href = url.toString();
+        console.log('[GalleryLayout] Keyboard navigation for item:', itemSlug);
+        console.log('[GalleryLayout] Attempting navigation to:', `/item/${item.slug}`);
+        
+        // Use SvelteKit goto for proper navigation
+        goto(`/item/${item.slug}`);
+        
+        console.log('[GalleryLayout] goto() called successfully');
+      } else {
+        console.error('[GalleryLayout] Item not found for keyboard navigation:', itemSlug);
       }
     }
   }
@@ -182,11 +198,11 @@
 </script>
 
 <style>
+
   .gallery-container {
     width: 100%;
     margin: 0;
     padding: 0;
-    background: var(--bg-primary);
     border: none;
     box-shadow: none;
   }
@@ -203,7 +219,7 @@
     padding: 0 !important;
     margin: 0 !important;
     border: none !important;
-    background: var(--bg-primary) !important;
+    background: transparent !important;
     box-shadow: none !important;
     overflow: hidden;
   }
@@ -247,7 +263,7 @@
     width: 100%;
     margin: 0 auto;
     padding: 0;
-    background: var(--bg-primary);
+    background: transparent;
     border: none;
     box-shadow: none;
   }
@@ -377,15 +393,24 @@
         {#if isInitialized && boxes.length > 0}
           {#each items as item, index}
             {#if boxes[index]}
-              <div 
+              <a 
+                href={`/item/${item.slug}`}
                 class="justified-pic-container" 
                 role="button" 
                 tabindex="0" 
                 aria-label="View image {item.id}" 
                 style="left:{boxes[index].left}px; top:{boxes[index].top}px; width:{boxes[index].width}px; height:{boxes[index].height}px;"
-                on:click={() => handleImageClick(item.slug)}
-                on:keydown={(e) => handleKeydown(e, item.slug)}
                 title={item.title || ''}
+                on:click|preventDefault={async (e) => {
+                  console.log('🔍 [GalleryLayout] Clicked item slug:', item.slug);
+                  if (forceReload) {
+                    // Force full page reload for detail page navigation
+                    window.location.href = `/item/${item.slug}`;
+                  } else {
+                    // Use SvelteKit navigation for main page navigation
+                    await goto(`/item/${item.slug}`, { invalidateAll: true });
+                  }
+                }}
               >
                 <img 
                   class="justified-pic" 
@@ -446,7 +471,7 @@
                     {/if}
                   </button>
                 {/if}
-              </div>
+              </a>
             {/if}
           {/each}
         {:else}
@@ -460,14 +485,23 @@
     <!-- Grid Layout -->
     <div class="grid-layout">
       {#each items as item}
-        <div 
+        <a 
+          href={`/item/${item.slug}`}
           class="grid-item" 
-          on:click={() => handleImageClick(item.slug)}
-          on:keydown={(e) => handleKeydown(e, item.slug)}
           tabindex="0" 
           role="button" 
           aria-label="View image {item.slug}"
           title={item.title || ''}
+          on:click|preventDefault={async (e) => {
+            console.log('🔍 [GalleryLayout] Clicked item slug:', item.slug);
+            if (forceReload) {
+              // Force full page reload for detail page navigation
+              window.location.href = `/item/${item.slug}`;
+            } else {
+              // Use SvelteKit navigation for main page navigation
+              await goto(`/item/${item.slug}`, { invalidateAll: true });
+            }
+          }}
         >
           <img 
             src={item.src}
@@ -517,7 +551,7 @@
               {/if}
             </button>
           {/if}
-        </div>
+        </a>
       {/each}
     </div>
   {/if}

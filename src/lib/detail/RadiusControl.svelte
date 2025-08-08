@@ -46,11 +46,11 @@
     margin-left: 0.5rem;
   }
   .hidden-count {
-    color: #888;
+    color: var(--text-muted);
     margin-left: 0.5rem;
     cursor: pointer;
     font-size: 0.98rem;
-    border-bottom: 1px dashed #bbb;
+    border-bottom: 1px dashed var(--border-color);
     transition: color 0.2s;
   }
   .hidden-count.active {

@@ -250,8 +250,10 @@
 								console.log('[FilterBar] isManual3x3Mode:', isManual3x3Mode);
 								
 								if (isPermalinkMode && permalinkImageId) {
-									const url = new URL(`/item/${permalinkImageId}`, window.location.origin); 
-									window.location.href = url.toString();
+									        // Use SvelteKit navigation
+        if (typeof window !== 'undefined') {
+          window.location.href = `/item/${permalinkImageId}`;
+        }
 								} else {
 									console.log('[FilterBar] Clearing location filter');
 									filterStore.clearLocationFilter();

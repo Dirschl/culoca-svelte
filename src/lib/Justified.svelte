@@ -141,8 +141,10 @@
   });
 
   function handleImageClick(slug: string) {
-    const url = new URL(`/item/${slug}`, window.location.origin);
-    location.href = url.toString();
+    // Use SvelteKit navigation
+    if (typeof window !== 'undefined') {
+      window.location.href = `/item/${slug}`;
+    }
   }
 
   function handleKeydown(event: KeyboardEvent, slug: string) {

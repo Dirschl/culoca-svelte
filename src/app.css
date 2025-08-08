@@ -2,6 +2,71 @@
 @tailwind components;
 @tailwind utilities;
 
+/* CRITICAL: Prevent white flash on hot reload - MUST be first */
+html {
+  background: #f5f5f5 !important;  /* Light mode fallback */
+  color: #6b6b6b !important;       /* Light mode fallback */
+  width: 100% !important;
+  min-width: 100% !important;
+  max-width: none !important;
+}
+
+/* CRITICAL: Dark mode fallback - MUST be second */
+html[data-theme="dark"] {
+  background: #0f1419 !important;  /* Dark mode fallback */
+  color: #ffffff !important;       /* Dark mode fallback */
+}
+
+/* CRITICAL: Body fallback - MUST be third */
+body {
+  background: #f5f5f5 !important;  /* Light mode fallback */
+  color: #6b6b6b !important;       /* Light mode fallback */
+  width: 100% !important;
+  min-width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+body[data-theme="dark"] {
+  background: #0f1419 !important;  /* Dark mode fallback */
+  color: #ffffff !important;       /* Dark mode fallback */
+}
+
+/* CRITICAL: Container width fallback - MUST be fourth */
+.container, .gallery-container, .gallery-layout {
+  width: 100% !important;
+  min-width: 100% !important;
+  max-width: none !important;
+}
+
+/* CRITICAL: Page background fallback - MUST be fifth */
+main, .page, [data-sveltekit-page], [data-sveltekit-preload-data] {
+  background: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
+  width: 100% !important;
+  min-width: 100% !important;
+  max-width: none !important;
+}
+
+/* CRITICAL: Specific component backgrounds - MUST be sixth */
+.controls-section, .radius-control, .gallery-container {
+  background: transparent !important;
+  color: var(--text-primary) !important;
+}
+
+/* CRITICAL: Prevent flash of unstyled content - MUST be fifth */
+html {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+/* CRITICAL: Ensure immediate theme application - MUST be sixth */
+html[data-theme="dark"] {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
 /* Global Theme System */
 :root {
   /* Light Mode Colors */
@@ -20,6 +85,7 @@
   --success-color: #4caf50;
   --warning-color: #ff9800;
   --culoca-orange: #ee7221;
+  --passepartout-bg: #f0f0f0;
 }
 
 /* Dark Mode Colors */
@@ -39,6 +105,7 @@
   --success-color: #4caf50;
   --warning-color: #ff9800;
   --culoca-orange: #ee7221;
+  --passepartout-bg: #1a1a1a;
 }
 
 /* Global Styles */
@@ -259,6 +326,18 @@ textarea::placeholder {
     /* width: 85%; */
     /* padding: 15px 0; */
   }
+}
+
+/* Gallery Layout - Ensure full width on first load */
+.gallery-layout {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 100% !important;
+}
+
+.gallery-layout > div {
+  width: 100% !important;
+  max-width: 100% !important;
 }
 
 /* Gallery Distance Label - Unified Style for all galleries */

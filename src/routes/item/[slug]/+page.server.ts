@@ -45,8 +45,12 @@ function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: num
   return Math.round(R * c);
 }
 
-export const load: PageServerLoad = async ({ params, url }) => {
+export const load: PageServerLoad = async ({ params, url, depends }) => {
   const { slug } = params;
+  
+  // Mark dependency for proper invalidation (stable key)
+  depends('app:item');
+  
   console.log('🔍 [DetailPage] ===== LOAD FUNCTION CALLED =====');
   console.log('🔍 [DetailPage] Loading item with slug:', slug);
   console.log('🔍 [DetailPage] URL:', url.toString());
