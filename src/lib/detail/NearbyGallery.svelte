@@ -10,12 +10,10 @@
   export let isCreator: boolean = false;
   export let onGalleryToggle: ((itemId: string, newGalleryValue: boolean) => void) | null = null;
   export let getGalleryStatus: ((itemId: string) => boolean) | null = null;
-  export let forceReload: boolean = false; // Force window.location.href for detail page navigation
+  export let forceReload: boolean = true; // Force window.location.href for detail page navigation
 </script>
 
 {#if nearby.length > 0}
-  <!-- Debug: Log nearby items -->
-  {console.log('🔍 [NearbyGallery] Nearby items:', nearby.map(n => n.slug))}
   <GalleryLayout
     items={nearby}
     {layout}

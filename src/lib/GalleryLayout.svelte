@@ -402,7 +402,6 @@
                 style="left:{boxes[index].left}px; top:{boxes[index].top}px; width:{boxes[index].width}px; height:{boxes[index].height}px;"
                 title={item.title || ''}
                 on:click|preventDefault={async (e) => {
-                  console.log('🔍 [GalleryLayout] Clicked item slug:', item.slug);
                   if (forceReload) {
                     // Force full page reload for detail page navigation
                     window.location.href = `/item/${item.slug}`;
