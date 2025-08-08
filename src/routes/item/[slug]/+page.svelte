@@ -388,6 +388,11 @@
     ? nearby.filter(item => item.distance <= radius && item.id !== image?.id && item.gallery === false)
     : nearby.filter(item => item.distance <= radius && item.id !== image?.id && item.gallery !== false);
   
+  // Automatisch showHiddenItems zurücksetzen wenn keine ausgeblendeten Items mehr vorhanden sind
+  $: if (showHiddenItems && hiddenItems.length === 0) {
+    showHiddenItems = false;
+  }
+  
   // SEO-optimiert: Indikatoren für Limits
   $: isAtItemLimit = filteredNearby.length >= 300;
   $: showLimitIndicator = isAtItemLimit;
@@ -406,7 +411,6 @@
   let slugEditValue = '';
 
   let showFullExif = false;
-  let hiddenItems = [];
   let showHiddenItems = false;
   function toggleHiddenItems() {
     showHiddenItems = !showHiddenItems;
@@ -721,7 +725,11 @@
     }).then(() => {
       // Nach dem Update: nearby-Array aktualisieren (optimistisch)
       const idx = nearby.findIndex(i => i.id === itemId);
-      if (idx !== -1) nearby[idx].gallery = newGalleryValue;
+      if (idx !== -1) {
+        nearby[idx].gallery = newGalleryValue;
+        // Array neu zuweisen für Reaktivität
+        nearby = [...nearby];
+      }
     });
   }
   function getNearbyGalleryStatus(itemId: string) {
@@ -1176,7 +1184,7 @@
       </div>
     {/if}
     <NearbyGallery
-      nearby={nearby}
+      nearby={visibleNearby}
       isCreator={isCreator}
       userLat={image?.lat}
       userLon={image?.lon}
@@ -1184,7 +1192,6 @@
       onGalleryToggle={handleNearbyGalleryToggle}
       getGalleryStatus={getNearbyGalleryStatus}
       layout={galleryLayout}
-      forceReload={true}
     />
     
     <!-- SEO-optimiert: Serverseitig gerenderte Links für Google -->
