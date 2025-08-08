@@ -85,6 +85,38 @@
     itemSlug = image.slug;
   }
 
+  // Dynamisches Favicon aktualisieren
+  $: if (image && browser) {
+    updateFavicon();
+  }
+
+  function updateFavicon() {
+    if (!image) return;
+    
+    // Entferne alte Favicon-Links
+    const oldFavicons = document.querySelectorAll('link[rel="icon"]');
+    oldFavicons.forEach(link => link.remove());
+    
+    // Erstelle neuen Favicon-Link mit Cache-Buster
+    const faviconLink = document.createElement('link');
+    faviconLink.rel = 'icon';
+    faviconLink.type = 'image/jpeg';
+    
+    let faviconUrl = '';
+    if (image.path_64) {
+      faviconUrl = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/${image.path_64}`;
+    } else if (image.path_512) {
+      faviconUrl = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${image.path_512}`;
+    }
+    
+    if (faviconUrl) {
+      // Füge Cache-Buster hinzu
+      const timestamp = Date.now();
+      faviconLink.href = `${faviconUrl}?t=${timestamp}`;
+      document.head.appendChild(faviconLink);
+    }
+  }
+
   // Für CreatorCard
   let currentUser: any = null;
   $: currentUser = $sessionStore.isAuthenticated && $sessionStore.userId
