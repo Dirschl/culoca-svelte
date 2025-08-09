@@ -1599,6 +1599,7 @@
         } else if (permissionStatus.state === 'denied') {
           // Berechtigung verweigert - zeige Hinweis für Browser-Einstellungen
           console.log('[GPS] Permission denied - showing browser settings hint');
+          gpsStatus = 'denied';
           showGPSSettingsHint();
         } else {
           // Berechtigung noch nicht entschieden - versuche GPS zu starten
@@ -2014,7 +2015,7 @@
         {/if}
       </p>
       <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;">
-        <button on:click={startGPS} style="padding: 0.9rem 2.2rem; font-size: 1.15rem; border-radius: 0.5rem; background: #3a7; color: #fff; border: none; cursor: pointer; font-weight:600;">
+        <button on:click={tryInitializeGPS} style="padding: 0.9rem 2.2rem; font-size: 1.15rem; border-radius: 0.5rem; background: #3a7; color: #fff; border: none; cursor: pointer; font-weight:600;">
           📍 Standort verwenden
         </button>
         <button on:click={() => {
@@ -2041,14 +2042,15 @@
           Ohne Standort fortfahren
         </button>
       </div>
-      {#if browser && gpsStatus === 'denied'}
+      {#if browser && (gpsStatus === 'denied' || gpsStatus === 'unavailable' || gpsStatus === 'none')}
         <div style="margin-top:1.2rem;color:#f66;font-size:1.05rem;">
-          Standort-Freigabe wurde abgelehnt.<br>Du kannst die Galerie trotzdem nutzen.
-        </div>
-      {/if}
-      {#if browser && gpsStatus === 'unavailable'}
-        <div style="margin-top:1.2rem;color:#f66;font-size:1.05rem;">
-          Standort konnte nicht ermittelt werden.<br>Du kannst die Galerie trotzdem nutzen.
+          {#if gpsStatus === 'denied'}
+            Standort-Freigabe wurde abgelehnt.<br>Du kannst die Galerie trotzdem nutzen.
+          {:else if gpsStatus === 'unavailable'}
+            Standort konnte nicht ermittelt werden.<br>Du kannst die Galerie trotzdem nutzen.
+          {:else}
+            GPS-Berechtigung erforderlich.<br>Klicke auf "Standort verwenden" um GPS zu aktivieren.
+          {/if}
         </div>
       {/if}
     </div>
