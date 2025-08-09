@@ -100,11 +100,8 @@
         if (nearbyMarker) {
                     nearbyMarker.on('click', (event) => {
             if (nearbyItem.slug) {
-              // Prevent default behavior and use direct navigation
-              event.preventDefault();
-              event.stopPropagation();
-              
-              // Use the same pattern as in the backup for reliable navigation
+              // Leaflet event doesn't have preventDefault/stopPropagation like DOM events
+              // Just navigate directly
               const url = new URL(`/item/${nearbyItem.slug}`, window.location.origin);
               window.location.href = url.toString();
             } else {
@@ -115,7 +112,7 @@
             <div style="text-align: center; min-width: 200px;">
               <strong>${nearbyItem.title || 'Item'}</strong><br>
               <small>Entfernung: ${getDistanceFromLatLonInMeters(image.lat, image.lon, nearbyItem.lat, nearbyItem.lon)}</small><br>
-              ${nearbyItem.slug ? `<a href="javascript:void(0)" onclick="(() => { const url = new URL('/item/${nearbyItem.slug}', window.location.origin); window.location.href = url.toString(); })()" style="color: #0066cc; text-decoration: none; font-weight: 500;">Item anzeigen →</a>` : `<span style='color: #888;'>Kein Slug vorhanden</span>`}
+              ${nearbyItem.slug ? `<a href="javascript:void(0)" onclick="(() => { const url = new URL('/item/${nearbyItem.slug}', window.location.origin); window.location.href = url.toString(); })()" style="color: #0066cc; text-decoration: none; font-weight: 500; cursor: pointer;" title="Weitere Bilder in der Nähe">Item anzeigen →</a>` : `<span style='color: #888;'>Kein Slug vorhanden</span>`}
             </div>
           `;
           nearbyMarker.bindPopup(popupContent);
