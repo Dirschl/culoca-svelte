@@ -140,10 +140,9 @@
   let showLoginOverlay = false;
   let showFullscreenMap = false;
   let isManual3x3Mode = false;
-  let userLat: number | null = null;
-  let userLon: number | null = null;
-  let cachedLat: number | null = null;
-  let cachedLon: number | null = null;
+  // GPS-Koordinaten reaktiv aus dem filterStore lesen
+  $: userLat = $filterStore.lastGpsPosition?.lat ?? null;
+  $: userLon = $filterStore.lastGpsPosition?.lon ?? null;
   let showDistance = true;
   let showCompass = false;
   let isLoggedIn = false;
@@ -1057,18 +1056,15 @@
           if (gpsData.lat && gpsData.lon && gpsAge < 24 * 60 * 60 * 1000) {
             console.log('[App-Start] Found saved GPS data:', gpsData);
             
-            // WICHTIG: Setze sowohl userLat/userLon als auch cachedLat/cachedLon
-            userLat = gpsData.lat;
-            userLon = gpsData.lon;
-            cachedLat = gpsData.lat;
-            cachedLon = gpsData.lon;
+                    // GPS-Daten sind jetzt reaktiv aus dem filterStore
+        // Keine manuelle Zuweisung mehr nötig
             gpsStatus = 'active'; // Setze auf 'active' da wir GPS-Daten haben
             lastGPSUpdateTime = gpsData.timestamp;
             
             // Update filterStore with saved GPS data
             filterStore.updateGpsStatus(true, { lat: userLat, lon: userLon });
             
-            console.log('[App-Start] Using saved GPS data:', { userLat, userLon, cachedLat, cachedLon, gpsAge: Math.round(gpsAge / 1000 / 60) + ' minutes' });
+            console.log('[App-Start] Using saved GPS data:', { userLat, userLon, gpsAge: Math.round(gpsAge / 1000 / 60) + ' minutes' });
           } else {
             console.log('[App-Start] Saved GPS data too old, clearing:', { gpsAge: Math.round(gpsAge / 1000 / 60) + ' minutes' });
             localStorage.removeItem('userGps');
@@ -1532,7 +1528,7 @@
     const hasSavedGPS = loadGPSData();
     
     // Wenn bereits cached GPS-Daten vorhanden sind, nicht sofort live GPS starten
-    if (hasSavedGPS && gpsStatus === 'cached' && cachedLat && cachedLon) {
+          if (hasSavedGPS && gpsStatus === 'cached' && userLat && userLon) {
       console.log('[GPS-Init] Using cached GPS data, not starting live GPS immediately');
       return;
     }
@@ -1727,17 +1723,14 @@
           const lon = parseFloat(savedLon);
           
           console.log('[GPS] Loading simple saved GPS data:', { lat, lon });
-          userLat = lat;
-          userLon = lon;
-          cachedLat = lat;
-          cachedLon = lon;
+          // GPS-Daten werden jetzt reaktiv aus dem filterStore gelesen
           gpsStatus = 'cached';
           lastGPSUpdateTime = Date.now();
           
           // Update filterStore with saved GPS data
           filterStore.updateGpsStatus(true, { lat, lon });
           
-          console.log('[GPS] Loaded simple GPS data:', { userLat, userLon, cachedLat, cachedLon });
+          console.log('[GPS] Loaded simple GPS data:', { userLat, userLon });
           return true;
         }
         
@@ -1751,17 +1744,14 @@
           // Verwende gespeicherte GPS-Daten nur wenn sie nicht älter als 24 Stunden sind
           if (gpsData.lat && gpsData.lon && gpsAge < 24 * 60 * 60 * 1000) {
             console.log('[GPS] Loading JSON saved GPS data:', gpsData);
-            userLat = gpsData.lat;
-            userLon = gpsData.lon;
-            cachedLat = gpsData.lat;
-            cachedLon = gpsData.lon;
+            // GPS-Daten werden jetzt reaktiv aus dem filterStore gelesen
             gpsStatus = 'cached';
             lastGPSUpdateTime = gpsData.timestamp;
             
             // Update filterStore with saved GPS data
             filterStore.updateGpsStatus(true, { lat: userLat, lon: userLon });
             
-            console.log('[GPS] Loaded JSON GPS data:', { userLat, userLon, cachedLat, cachedLon });
+            console.log('[GPS] Loaded JSON GPS data:', { userLat, userLon });
             return true;
           } else {
             console.log('[GPS] Saved GPS data too old, clearing');
@@ -2239,11 +2229,7 @@
           console.log('[FullscreenMap] Stopped GPS watcher to prevent conflicts');
         }
         
-        // Set the selected location as both active and cached GPS
-        userLat = lat;
-        userLon = lon;
-        cachedLat = lat;
-        cachedLon = lon;
+        // GPS-Daten werden jetzt reaktiv aus dem filterStore gelesen
         
         // Update GPS status to active (as if GPS was working)
         gpsStatus = 'active';
