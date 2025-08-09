@@ -51,14 +51,12 @@ export const load: PageServerLoad = async ({ params, url, depends }) => {
   // Mark dependency for proper invalidation (stable key)
   depends('app:item');
   
-  console.log('🔍 [DetailPage] ===== LOAD FUNCTION CALLED =====');
-  console.log('🔍 [DetailPage] Loading item with slug:', slug);
-  console.log('🔍 [DetailPage] URL:', url.toString());
+  // Load function called (debug removed)
   
   // Prüfe auf Städtenamen-Umleitung VOR der Datenbank-Abfrage
   const redirectSlug = getRedirectSlug(slug);
   if (redirectSlug) {
-    console.log('🔍 [DetailPage] Found city redirect, redirecting:', slug, '->', redirectSlug);
+    // Found city redirect (debug removed)
     throw redirect(301, `/item/${redirectSlug}`);
   }
   
@@ -72,24 +70,14 @@ export const load: PageServerLoad = async ({ params, url, depends }) => {
     
     // Wenn nicht gefunden, versuche Umleitung von altem Slug zu neuem
     if (!image || image.length === 0) {
-      console.log('🔍 [DetailPage] Item not found with original slug:', slug);
+      // Item not found with original slug (debug removed)
     }
     
-    console.log('🔍 [DetailPage] Supabase query result:', { 
-      hasData: !!image, 
-      dataLength: Array.isArray(image) ? image.length : (image ? 1 : 0),
-      error: error?.message,
-      slug
-    });
+    // Supabase query result (debug removed)
     
     const img = Array.isArray(image) ? image[0] : image;
     
-    console.log('🔍 [DetailPage] Processed image:', { 
-      hasImage: !!img, 
-      imageId: img?.id,
-      imageTitle: img?.title,
-      imageSlug: img?.slug
-    });
+    // Processed image (debug removed)
 
     if (error) {
       console.error('🔍 [DetailPage] Supabase error:', error);
@@ -108,11 +96,7 @@ export const load: PageServerLoad = async ({ params, url, depends }) => {
       };
     }
 
-    console.log('🔍 [DetailPage] Successfully loaded image:', { 
-      id: img.id, 
-      title: img.title, 
-      slug: img.slug 
-    });
+    // Successfully loaded image (debug removed)
 
     // Lade das Profil des Erstellers
     let profile = null;
@@ -202,7 +186,7 @@ export const load: PageServerLoad = async ({ params, url, depends }) => {
             .slice(0, 300); // SEO-optimiert: Maximal 300 Items
         } else {
           // NEU: Verwende PostGIS-Ergebnisse (SEO-optimiert)
-          console.log('[DetailPage] PostGIS nearby success, items:', nearbyData?.length || 0);
+          // PostGIS nearby success (debug removed)
           
           nearby = (nearbyData || [])
             .filter((item: any) => item.id !== img.id) // Aktuelles Bild ausschließen

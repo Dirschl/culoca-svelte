@@ -81,11 +81,9 @@
   $: if (isManual3x3Mode) {
     // Mobile Mode aktiviert → Automatische Zentrierung aktivieren (wie Navi)
     keepMarkerCentered = true;
-    console.log('[FullscreenMap] Mobile Mode aktiviert → Marker-Zentrierung aktiviert');
   } else {
     // Normal Mode → Standard-Einstellung (deaktiviert für freie Erkundung)
     keepMarkerCentered = false;
-    console.log('[FullscreenMap] Normal Mode → Marker-Zentrierung deaktiviert (freie Erkundung)');
   }
   
     // Load saved map state from localStorage
@@ -240,11 +238,7 @@
   function updateCurrentTrack() {
     // Use the store value directly instead of subscribing
     const state: any = get(trackStore);
-    console.log('[FullscreenMap] Updating current track:', { 
-      hasTrack: !!state.currentTrack, 
-      isRecording: state.isRecording,
-      pointsCount: state.currentTrack?.points?.length || 0 
-    });
+    // Track update (debug removed)
     
     if (state.currentTrack && state.isRecording) {
       // Remove previous current track layer
@@ -255,15 +249,15 @@
       // Only display track if it has at least 2 points
       if (state.currentTrack.points && state.currentTrack.points.length >= 2) {
         currentTrackLayer = displayTrackOnMap(state.currentTrack, map);
-        console.log('[FullscreenMap] Current track displayed with', state.currentTrack.points.length, 'points');
+        // Track displayed (debug removed)
       } else {
-        console.log('[FullscreenMap] Track has less than 2 points, not displaying yet');
+        // Track has less than 2 points (debug removed)
       }
     } else if (currentTrackLayer && map) {
       // Remove current track layer if not recording
       map.removeLayer(currentTrackLayer);
       currentTrackLayer = null;
-      console.log('[FullscreenMap] Current track removed from map');
+      // Track removed (debug removed)
     }
   }
 
@@ -490,7 +484,7 @@
     // Handle map clicks for location selection
     map.on('click', function(e: any) {
       const { lat, lng } = e.latlng;
-      console.log(`Map clicked at: ${lat}, ${lng}`);
+      // Map clicked (debug removed)
       
       // Dispatch location selected event
       dispatch('locationSelected', {
@@ -570,7 +564,7 @@
           imageEl.style.backgroundImage = `url(${imageUrl})`;
         };
         testImg.onerror = () => {
-          console.warn(`[FullscreenMap] Image failed to load: ${imageUrl}`);
+          // Image failed to load (debug removed)
           // Show fallback icon if image fails to load
           imageEl.innerHTML = `
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="2">
@@ -586,7 +580,7 @@
         };
         testImg.src = imageUrl;
       } else {
-        console.warn(`[FullscreenMap] No image path available for image ${image.id}`);
+        // No image path available (debug removed)
         // No image path available - show fallback
         imageEl.innerHTML = `
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="2">
@@ -654,7 +648,7 @@
       markerEl.appendChild(labelEl);
       
       // Create marker
-      console.log(`[FullscreenMap] Creating marker for image ${image.id} at [${image.lat}, ${image.lon}]`);
+              // Creating marker (debug removed)
       const marker = new (window as any).L.marker([image.lat, image.lon], {
         icon: (window as any).L.divIcon({
           html: markerEl.outerHTML,
@@ -677,7 +671,7 @@
       markerClusterGroup.addLayer(marker);
     });
     
-    console.log(`[FullscreenMap] Finished adding ${imageMarkers.length} markers to cluster group`);
+          // Finished adding markers (debug removed)
   }
   
   function updateUserMarker() {
@@ -786,14 +780,14 @@
     userLon = lon;
     
     if (!map) {
-      console.log('[FullscreenMap] updateUserPosition: Map not initialized yet');
+      // Map not initialized yet (debug removed)
       return;
     }
     
     // Check if map container is properly initialized
     const mapContainer = map.getContainer();
     if (!mapContainer || !mapContainer._leaflet_pos) {
-      console.log('[FullscreenMap] updateUserPosition: Map container not ready yet');
+      // Map container not ready yet (debug removed)
       return;
     }
     
@@ -819,7 +813,7 @@
   // Detect iOS device
   onMount(() => {
     isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    console.log(`[FullscreenMap] Device detected: ${isIOS ? 'iOS' : 'Other'}`);
+    // Device detected (debug removed)
     
     // Setup GPS simulation listener
     setupSimulationListener();
@@ -833,11 +827,11 @@
         const DeviceOrientationEventAny = DeviceOrientationEvent as any;
         if (typeof DeviceOrientationEventAny.requestPermission === 'function') {
           const permission = await DeviceOrientationEventAny.requestPermission();
-          console.log(`[FullscreenMap] Device orientation permission: ${permission}`);
+          // Device orientation permission (debug removed)
           return permission === 'granted';
         }
       } catch (error) {
-        console.warn('[FullscreenMap] Error requesting device orientation permission:', error);
+        // Error requesting device orientation permission (debug removed)
       }
     }
     return true; // Non-iOS or no permission needed
@@ -864,7 +858,7 @@
         // Apply map rotation based on compass heading
         if (autoRotateEnabled) {
           const targetBearing = -heading; // Negative because we want the heading to point up
-          console.log(`[FullscreenMap] Compass heading: ${heading.toFixed(1)}° -> Map bearing: ${targetBearing.toFixed(1)}°`);
+          // Compass heading update (debug removed)
           setMapRotation(targetBearing);
         }
         
@@ -875,7 +869,7 @@
     if (orientationListener) {
       window.addEventListener('deviceorientation', orientationListener);
     }
-    console.log('[FullscreenMap] Compass listener setup complete');
+          // Compass listener setup complete (debug removed)
   }
 
   // Remove compass listener
@@ -889,19 +883,19 @@
         setMapRotation(0);
       }
       
-      console.log('[FullscreenMap] Compass listener removed');
+      // Compass listener removed (debug removed)
     }
   }
 
   // Toggle auto-rotation based on movement direction
   function toggleAutoRotate() {
     autoRotateEnabled = !autoRotateEnabled;
-    console.log(`[FullscreenMap] Auto-rotation ${autoRotateEnabled ? 'enabled' : 'disabled'}`);
+    // Auto-rotation status (debug removed)
     
     if (autoRotateEnabled) {
       // Check if simulation is active
       if (simulationActive) {
-        console.log('[FullscreenMap] Using GPS simulation for auto-rotation');
+        // Using GPS simulation for auto-rotation (debug removed)
         // Don't start real GPS tracking when simulation is active
         return;
       }
@@ -943,7 +937,7 @@
   // Toggle display mode between distance and title
   function toggleDisplayMode() {
     showDistance = !showDistance;
-    console.log(`[FullscreenMap] Display mode toggled: ${showDistance ? 'distance' : 'title'}`);
+    // Display mode toggled (debug removed)
     // Update all existing markers
     updateMarkerLabels();
     // Save the new state
@@ -953,11 +947,11 @@
   // Toggle marker centering
   function toggleMarkerCentering() {
     keepMarkerCentered = !keepMarkerCentered;
-    console.log(`[FullscreenMap] Marker centering ${keepMarkerCentered ? 'enabled' : 'disabled'}`);
+    // Marker centering status (debug removed)
     
     // Sofort auf User-Marker zentrieren wenn aktiviert und GPS verfügbar
     if (keepMarkerCentered && map && userLat !== null && userLon !== null) {
-      console.log(`[FullscreenMap] Centering map on user position: ${userLat}, ${userLon}`);
+      // Centering map on user position (debug removed)
       map.setView([userLat, userLon], map.getZoom(), { animate: true });
     }
     
@@ -969,7 +963,7 @@
   function updateMarkerLabels() {
     if (!map || !mapInitialized || !allImages.length) return;
     
-    console.log(`[FullscreenMap] Updating marker labels for ${allImages.length} images`);
+    // Updating marker labels (debug removed)
     
     // Clear existing markers and recreate them with new labels
     imageMarkers.forEach(marker => {
@@ -988,7 +982,7 @@
     // Load all images for map after map is initialized
     setTimeout(() => {
       if (mapInitialized) {
-        console.log('[FullscreenMap] onMount: Loading all images for map');
+        // Loading all images for map (debug removed)
         loadAllImagesForMap();
       }
     }, 1000); // Wait for map to be fully initialized
@@ -1028,13 +1022,13 @@
   
   // Reactive updates
   $: if (mapInitialized && allImages.length > 0) {
-    console.log(`[FullscreenMap] Reactive update triggered: ${allImages.length} images`);
+          // Reactive update triggered (debug removed)
     const leaflet = (window as any).L;
     if (leaflet) {
-      console.log(`[FullscreenMap] Leaflet available, calling addImageMarkers`);
+              // Leaflet available, calling addImageMarkers (debug removed)
       addImageMarkers();
     } else {
-      console.log(`[FullscreenMap] Leaflet not available yet`);
+              // Leaflet not available yet (debug removed)
     }
   }
   
@@ -1052,13 +1046,13 @@
       const { lat, lon } = $filterStore.locationFilter;
       if (map) {
         map.setView([lat, lon], map.getZoom(), { animate: true });
-        console.log(`[FullscreenMap] Centered map on location filter: ${lat}, ${lon}`);
+        // Centered map on location filter (debug removed)
       }
     } else if (userLat !== null && userLon !== null) {
       // No location filter but GPS available - center on GPS position
       if (map) {
         map.setView([userLat, userLon], map.getZoom(), { animate: true });
-        console.log(`[FullscreenMap] Centered map on GPS position: ${userLat}, ${userLon}`);
+        // Centered map on GPS position (debug removed)
       }
     }
   }
@@ -1076,13 +1070,13 @@
       (position) => {
         // Ignore real GPS if simulation is active
         if (simulationActive) {
-          console.log('[FullscreenMap] Ignoring real GPS - simulation active');
+          // Ignoring real GPS - simulation active (debug removed)
           return;
         }
         
         // Check if map is ready before processing GPS updates
         if (!map || !mapInitialized) {
-          console.log('[FullscreenMap] GPS update ignored - map not ready');
+          // GPS update ignored - map not ready (debug removed)
           return;
         }
         
@@ -1093,12 +1087,7 @@
           timestamp: Date.now()
         };
         
-        console.log(`[FullscreenMap] GPS position update:`, {
-          lat: newPos.lat,
-          lon: newPos.lon,
-          accuracy: newPos.accuracy,
-          heading: position.coords.heading
-        });
+        // GPS position update (debug removed)
         
         // Update user position on map - ensure proper centering
         userLat = newPos.lat;
@@ -1122,7 +1111,7 @@
         
         // Use device heading if available (better for short distances)
         if (position.coords.heading !== null && position.coords.heading !== undefined) {
-          console.log(`[FullscreenMap] Using device heading: ${position.coords.heading}°`);
+          // Using device heading (debug removed)
           const targetBearing = -position.coords.heading; // Negative because we want the heading to point up
           setMapRotation(targetBearing);
           return;
@@ -1168,12 +1157,12 @@
     if (typeof window !== 'undefined') {
       window.addEventListener('message', (event) => {
         if (event.data && event.data.type === 'gps-simulation') {
-          console.log('[FullscreenMap] Received GPS simulation data:', event.data);
+          // Received GPS simulation data (debug removed)
           simulationActive = true;
           
           // Check if map is ready before processing simulation updates
           if (!map || !mapInitialized) {
-            console.log('[FullscreenMap] Simulation update ignored - map not ready');
+            // Simulation update ignored - map not ready (debug removed)
             return;
           }
           
@@ -1214,19 +1203,13 @@
             const timeDiff = newPos.timestamp - lastSimulatedPosition.timestamp;
             const minDistance = 0.5; // 0.5 Meter minimum für glattere Simulation-Updates
             const minTime = 100; // 0.1 Sekunden für glattere Simulation
-            console.log(`[FullscreenMap] Simulation movement check:`, {
-              distanceKm: distanceKm,
-              distanceMeters: distanceMeters,
-              minDistance: minDistance,
-              timeDiff: timeDiff,
-              minTime: minTime
-            });
+            // Simulation movement check (debug removed)
             if (distanceMeters >= minDistance && timeDiff >= minTime) {
               const bearing = calculateBearing(
                 lastSimulatedPosition.lat, lastSimulatedPosition.lon,
                 newPos.lat, newPos.lon
               );
-              console.log(`[FullscreenMap] Simulated bearing: ${bearing}° (distance: ${distanceMeters.toFixed(1)}m)`);
+              // Simulated bearing (debug removed)
               const targetBearing = -bearing; // Negative because we want the heading to point up
               setMapRotation(targetBearing);
               currentBearing = bearing;
@@ -1236,7 +1219,7 @@
           lastSimulatedPosition = newPos;
           
         } else if (event.data && event.data.type === 'gps-simulation-stop') {
-          console.log('[FullscreenMap] GPS simulation stopped');
+          // GPS simulation stopped (debug removed)
           simulationActive = false;
           lastSimulatedPosition = null;
         }
@@ -1262,7 +1245,7 @@
   
   // Reactive statement to update markers when allImages changes
   $: if (mapInitialized && markerClusterGroup && allImages.length > 0) {
-    console.log(`[FullscreenMap] Reactive update: ${allImages.length} images available`);
+    // Reactive update (debug removed)
     addImageMarkers();
   }
   
@@ -1285,7 +1268,7 @@
   // Load all images for the map using robust PostGIS pagination
   async function loadAllImagesForMap() {
     try {
-      console.log('[FullscreenMap] Loading all images for map with robust pagination...');
+      // Loading all images for map (debug removed)
       
       // Get current user for privacy filtering
       const { data: { user } } = await supabase.auth.getUser();
@@ -1299,12 +1282,7 @@
       const locationFilterLat = currentFilters.locationFilter?.lat || null;
       const locationFilterLon = currentFilters.locationFilter?.lon || null;
       
-      console.log('[FullscreenMap] Filter parameters:', {
-        userFilterId,
-        locationFilterLat,
-        locationFilterLon,
-        currentUserId
-      });
+      // Filter parameters (debug removed)
       
       // Use the robust PostGIS loader with pagination
       const mapImagesData = await loadAllMapImages(
@@ -1317,12 +1295,11 @@
       );
       
       if (!mapImagesData || mapImagesData.length === 0) {
-        console.error('[FullscreenMap] No images loaded from PostGIS functions');
+        // No images loaded from PostGIS functions (debug removed)
         return;
       }
       
-      console.log('[FullscreenMap] PostGIS loaded', mapImagesData.length, 'images for map');
-      console.log('[FullscreenMap] Sample image data:', mapImagesData[0]);
+              // PostGIS loaded images (debug removed)
       allImages = mapImagesData;
       
       // Re-add markers if map is already initialized

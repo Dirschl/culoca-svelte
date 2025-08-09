@@ -11,7 +11,7 @@ export async function GET({ url }) {
     const locationFilterLon = parseFloat(url.searchParams.get('locationFilterLon') || '0');
     const userId = url.searchParams.get('user_id');
     
-    console.log('[Normal API] Request params:', { page, lat, lon, locationFilterLat, locationFilterLon, userId });
+    // Request params (debug removed)
 
     // Hole aktuelle User-ID für Privacy-Filter
     const { data: { user } } = await supabase.auth.getUser();
@@ -32,21 +32,7 @@ export async function GET({ url }) {
       current_user_id: effectiveUserId
     };
     
-    console.log('[Normal API] Function params:', functionParams);
-    console.log('[Normal API] GPS Debug:', { 
-      lat, 
-      lon, 
-      latIsValid: lat !== 0 && !isNaN(lat), 
-      lonIsValid: lon !== 0 && !isNaN(lon),
-      latForFunction: lat || 0,
-      lonForFunction: lon || 0
-    });
-    console.log('[Normal API] User filter logic:', { 
-      userId, 
-      currentUserId, 
-      effectiveUserId,
-      hasUserFilter: !!userId
-    });
+    // Function params and GPS debug (debug removed)
     
     const { data, error } = await safeFunctionCall(supabase, 'gallery_items_normal_postgis', functionParams);
 
@@ -55,22 +41,7 @@ export async function GET({ url }) {
       return json({ error: 'Failed to fetch gallery items', details: error }, { status: 500 });
     }
 
-    console.log('[Normal API] PostGIS RPC success, items:', data?.length || 0);
-    
-    // Debug: Zeige erste paar Items mit Entfernungen
-    if (data && data.length > 0) {
-      console.log('[Normal API] Sample items with distances:', data.slice(0, 3).map(item => ({
-        id: item.id,
-        title: item.title,
-        distance: item.distance,
-        lat: item.lat,
-        lon: item.lon,
-        profile_id: item.profile_id,
-        is_private: item.is_private
-      })));
-    } else {
-      console.log('[Normal API] No items returned from function');
-    }
+    // PostGIS RPC success (debug removed)
 
     // Nur total_count entfernen, distance behalten für Frontend-Sortierung
     const items = data?.map(item => {

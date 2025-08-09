@@ -9,7 +9,7 @@ export async function safeFunctionCall(
   params: Record<string, any>
 ) {
   try {
-    console.log(`[Database] Calling ${functionName} with params:`, params);
+    // Database function call (debug removed)
     
     const { data, error } = await supabase.rpc(functionName, params, { head: false });
     
@@ -18,7 +18,7 @@ export async function safeFunctionCall(
       return { data: null, error };
     }
     
-    console.log(`[Database] ${functionName} success, returned ${data?.length || 0} items`);
+    // Database function success (debug removed)
     return { data, error: null };
   } catch (error) {
     console.error(`[Database] Unexpected error in ${functionName}:`, error);
@@ -30,5 +30,5 @@ export async function safeFunctionCall(
  * Log database operations for debugging
  */
 export function logDatabaseOperation(operation: string, params?: Record<string, any>) {
-  console.log(`[Database] ${operation}`, params ? `with params: ${JSON.stringify(params)}` : '');
+  // Database operation logging disabled for performance
 } 
