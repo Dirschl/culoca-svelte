@@ -278,7 +278,38 @@
 					<div class="gps-status active">
 						<button class="gps-coords-clickable" on:click={() => {
 							console.log('🎯 GPS-Koordinaten geklickt!');
-							window.dispatchEvent(new CustomEvent('toggle3x3Mode'));
+							
+							// Location-Filter entfernen falls vorhanden
+							filterStore.clearLocationFilter();
+							
+							// Frische GPS-Koordinaten anfordern falls nötig
+							if (navigator.geolocation) {
+								navigator.geolocation.getCurrentPosition(
+									(position) => {
+										const { latitude, longitude } = position.coords;
+										console.log('[FilterBar] Got fresh GPS coordinates for mobile mode:', { latitude, longitude });
+										
+										// GPS-Status und Koordinaten aktualisieren
+										filterStore.updateGpsStatus(true, { lat: latitude, lon: longitude });
+										
+										// In den mobilen Modus wechseln
+										window.dispatchEvent(new CustomEvent('toggle3x3Mode'));
+									},
+									(error) => {
+										console.warn('[FilterBar] Failed to get fresh GPS for mobile mode:', error);
+										// Trotzdem in den mobilen Modus wechseln mit vorhandenen Daten
+										window.dispatchEvent(new CustomEvent('toggle3x3Mode'));
+									},
+									{
+										enableHighAccuracy: true,
+										timeout: 10000,
+										maximumAge: 0 // Immer frische Daten anfordern
+									}
+								);
+							} else {
+								// Fallback: Direkt in den mobilen Modus wechseln
+								window.dispatchEvent(new CustomEvent('toggle3x3Mode'));
+							}
 						}}>
 							{#if gpsStatusInfo && gpsStatusInfo.text}
 								<span class="gps-time {gpsStatusInfo.isStale ? 'stale' : ''}">
