@@ -744,7 +744,7 @@
 		color: #ee7221; /* Culoca Orange */
 		cursor: pointer;
 		transition: color 0.2s ease;
-		padding: 4px;
+		margin-top: 4px;
 		border-radius: 4px;
 	}
 
