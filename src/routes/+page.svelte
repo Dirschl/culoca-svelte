@@ -1110,6 +1110,8 @@
       // Debug-Ausgabe
       console.log('[Bot-Debug] User-Agent:', userAgent);
       console.log('[Bot-Debug] isBot:', isBot);
+      console.log('[GPS-Debug] Navigator geolocation available:', !!navigator.geolocation);
+      console.log('[GPS-Debug] Browser environment:', browser);
     }
     
     if (isBot) {
@@ -1131,9 +1133,8 @@
       
       // Dann versuche live GPS zu starten
       if (navigator.geolocation) {
-        console.log('[App-Start] Geolocation available, initializing...');
-        gpsStatus = 'checking';
-        initializeGPS();
+        console.log('[App-Start] Geolocation available, initializing intelligently...');
+        initializeGPSIntelligently();
       } else {
         console.log('[App-Start] Geolocation not available');
         gpsStatus = 'unavailable';
@@ -1825,23 +1826,23 @@
     }, 50);
   }
 
-  // Location Filter löschen und Galerie neu laden
+  // Location Filter löschen und Galerie neu laden (alte Funktion für Kompatibilität)
   function clearLocationFilterAndReloadGallery() {
     console.log('[Location-Clear] Starting clearLocationFilterAndReloadGallery');
     console.log('[Location-Clear] Current mode - isManual3x3Mode:', isManual3x3Mode);
     
-    // Lade die normale Galerie mit aktuellen GPS-Daten
-    const gps = getEffectiveGpsPosition();
+    // Lade die normale Galerie mit aktuellen GPS-Daten (ohne Location-Filter)
+    const effectiveGps = getEffectiveGpsPosition();
     let effectiveLat: number | undefined = undefined;
     let effectiveLon: number | undefined = undefined;
     
-    // EINFACH: Verwende nur aktive GPS oder Fallback
+    // Verwende aktuelle GPS-Koordinaten (ohne Location-Filter)
     if (gpsStatus === 'active' && userLat !== null && userLon !== null) {
       effectiveLat = userLat;
       effectiveLon = userLon;
-    } else if (gps?.lat && gps?.lon) {
-      effectiveLat = gps.lat;
-      effectiveLon = gps.lon;
+    } else if (effectiveGps?.lat && effectiveGps?.lon) {
+      effectiveLat = effectiveGps.lat;
+      effectiveLon = effectiveGps.lon;
     }
     
     const galleryParams: any = {};
@@ -1851,7 +1852,7 @@
     }
     
     console.log('[Location-Clear] About to resetGallery with params:', galleryParams);
-    console.log('[Location-Clear] GPS data:', { gps, userLat, userLon, effectiveLat, effectiveLon, gpsStatus });
+    console.log('[Location-Clear] GPS data:', { effectiveGps, userLat, userLon, effectiveLat, effectiveLon, gpsStatus });
     
     // Kurze Verzögerung um sicherzustellen dass clearLocationFilter abgeschlossen ist
     setTimeout(() => {
@@ -1870,6 +1871,8 @@
       }
     }, 50);
   }
+
+
 
   // Berechne effektive GPS-Koordinaten für alle Components
   $: {
@@ -2072,12 +2075,8 @@
 {:else}
   <!-- Galerie-Komponenten und restliche Seite -->
   <FilterBar
-    userLat={userLat}
-    userLon={userLon}
     {showDistance}
     {isLoggedIn}
-    gpsStatus={browser && typeof gpsStatus !== 'undefined' ? gpsStatus : 'none'}
-    lastGPSUpdateTime={lastGPSUpdateTime}
     isManual3x3Mode={isManual3x3Mode}
     originalGalleryLat={originalGalleryLat}
     originalGalleryLon={originalGalleryLon}
