@@ -291,33 +291,52 @@
 				// Location-Filter entfernen falls vorhanden
 				filterStore.clearLocationFilter();
 				
-				// Frische GPS-Koordinaten anfordern falls nötig
+				// Zweistufige GPS-Anfrage: Erst schnell, dann präzise
 				if (navigator.geolocation) {
+					// Erste Anfrage: Schnell mit niedriger Genauigkeit
 					navigator.geolocation.getCurrentPosition(
 									(position) => {
 										const { latitude, longitude } = position.coords;
-										console.log('[FilterBar] Got fresh GPS coordinates for mobile mode:', { latitude, longitude });
+										console.log('[FilterBar] Got quick GPS coordinates for mobile mode:', { latitude, longitude });
 										
-										// GPS-Status und Koordinaten aktualisieren
+										// Sofort GPS-Status und Koordinaten aktualisieren
 										filterStore.updateGpsStatus(true, { lat: latitude, lon: longitude });
 										
-										// Kurze Verzögerung für Store-Update, dann in mobilen Modus wechseln
-										setTimeout(() => {
-											console.log('[FilterBar] Switching to mobile mode with fresh GPS');
-											window.dispatchEvent(new CustomEvent('toggle3x3Mode'));
-											isGpsRequestInProgress = false;
-										}, 100);
+										// Sofort in mobilen Modus wechseln
+										console.log('[FilterBar] Switching to mobile mode with quick GPS');
+										window.dispatchEvent(new CustomEvent('toggle3x3Mode'));
+										
+										// Zweite Anfrage: Präzise GPS-Daten im Hintergrund
+										navigator.geolocation.getCurrentPosition(
+											(precisePosition) => {
+												const { latitude: preciseLat, longitude: preciseLon } = precisePosition.coords;
+												console.log('[FilterBar] Got precise GPS coordinates:', { preciseLat, preciseLon });
+												
+												// Präzise GPS-Daten aktualisieren
+												filterStore.updateGpsStatus(true, { lat: preciseLat, lon: preciseLon });
+												isGpsRequestInProgress = false;
+											},
+											(preciseError) => {
+												console.log('[FilterBar] Precise GPS failed, keeping quick GPS:', preciseError);
+												isGpsRequestInProgress = false;
+											},
+											{
+												enableHighAccuracy: true,
+												timeout: 10000,
+												maximumAge: 0
+											}
+										);
 									},
 									(error) => {
-										console.warn('[FilterBar] Failed to get fresh GPS for mobile mode:', error);
+										console.warn('[FilterBar] Failed to get quick GPS for mobile mode:', error);
 										// Trotzdem in den mobilen Modus wechseln mit vorhandenen Daten
 										window.dispatchEvent(new CustomEvent('toggle3x3Mode'));
 										isGpsRequestInProgress = false;
 									},
 									{
-										enableHighAccuracy: true,
-										timeout: 5000, // Reduziert von 10 auf 5 Sekunden
-										maximumAge: 0 // Immer frische Daten anfordern
+										enableHighAccuracy: false, // Erst schnell, dann präzise
+										timeout: 3000, // Schneller Timeout für erste Anfrage
+										maximumAge: 30000 // Erlaube GPS-Daten bis 30 Sekunden alt
 									}
 								);
 							} else {
