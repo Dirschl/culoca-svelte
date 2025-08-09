@@ -292,8 +292,11 @@
 										// GPS-Status und Koordinaten aktualisieren
 										filterStore.updateGpsStatus(true, { lat: latitude, lon: longitude });
 										
-										// In den mobilen Modus wechseln
-										window.dispatchEvent(new CustomEvent('toggle3x3Mode'));
+										// Kurze Verzögerung für Store-Update, dann in mobilen Modus wechseln
+										setTimeout(() => {
+											console.log('[FilterBar] Switching to mobile mode with fresh GPS');
+											window.dispatchEvent(new CustomEvent('toggle3x3Mode'));
+										}, 100);
 									},
 									(error) => {
 										console.warn('[FilterBar] Failed to get fresh GPS for mobile mode:', error);
