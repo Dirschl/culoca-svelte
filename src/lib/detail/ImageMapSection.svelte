@@ -104,8 +104,9 @@
               event.preventDefault();
               event.stopPropagation();
               
-              // Use direct navigation for map markers (outside SvelteKit context)
-              window.location.href = `/item/${nearbyItem.slug}`;
+              // Use the same pattern as in the backup for reliable navigation
+              const url = new URL(`/item/${nearbyItem.slug}`, window.location.origin);
+              window.location.href = url.toString();
             } else {
               alert('Kein Slug für dieses Item vorhanden!');
             }
@@ -114,7 +115,7 @@
             <div style="text-align: center; min-width: 200px;">
               <strong>${nearbyItem.title || 'Item'}</strong><br>
               <small>Entfernung: ${getDistanceFromLatLonInMeters(image.lat, image.lon, nearbyItem.lat, nearbyItem.lon)}</small><br>
-              ${nearbyItem.slug ? `<a href="/item/${nearbyItem.slug}" style="color: #0066cc; text-decoration: none; font-weight: 500;" title="Weitere Bilder in der Nähe">Item anzeigen →</a>` : `<span style='color: #888;'>Kein Slug vorhanden</span>`}
+              ${nearbyItem.slug ? `<a href="javascript:void(0)" onclick="(() => { const url = new URL('/item/${nearbyItem.slug}', window.location.origin); window.location.href = url.toString(); })()" style="color: #0066cc; text-decoration: none; font-weight: 500;">Item anzeigen →</a>` : `<span style='color: #888;'>Kein Slug vorhanden</span>`}
             </div>
           `;
           nearbyMarker.bindPopup(popupContent);
