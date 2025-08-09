@@ -2075,11 +2075,7 @@
 {:else}
   <!-- Galerie-Komponenten und restliche Seite -->
   <FilterBar
-    {showDistance}
-    {isLoggedIn}
     isManual3x3Mode={isManual3x3Mode}
-    originalGalleryLat={originalGalleryLat}
-    originalGalleryLon={originalGalleryLon}
     onLocationFilterClear={clearLocationFilterAndReloadGallery}
   />
   <SearchBar

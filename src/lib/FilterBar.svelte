@@ -18,14 +18,14 @@
 	$: userLon = $filterStore.lastGpsPosition?.lon ?? null;
 	export let isPermalinkMode = false; // Enable clickable filter names for detail navigation
 	export let permalinkImageId: string | null = null;
-	export let showDistance = false; // New prop to show current sorting method
-	export let isLoggedIn = false; // New prop to determine if user is logged in
+	// Props removed as they are not used in the component
 	// GPS status from filterStore instead of props
 	$: gpsStatus = $filterStore.gpsAvailable ? 'active' : 'none';
 	$: lastGPSUpdateTime = $filterStore.lastGpsPosition?.timestamp ?? null;
 	export let isManual3x3Mode = false;
-	export let originalGalleryLat: number | null = null;
-	export let originalGalleryLon: number | null = null;
+	// Original gallery coordinates from filterStore instead of props
+	$: originalGalleryLat = $filterStore.lastGpsPosition?.lat ?? null;
+	$: originalGalleryLon = $filterStore.lastGpsPosition?.lon ?? null;
 	export let onLocationFilterClear: (() => void) | undefined = undefined; // New callback for location filter clearing
 	
 	let cachedLat: number | null = null;
@@ -292,7 +292,7 @@
 						{#if !isManual3x3Mode && originalGalleryLat && originalGalleryLon}
 							<div class="original-gps-coords" 
 								on:click={() => {
-									console.log('[FilterBar] Original GPS coords clicked - updating current GPS');
+									console.log('[FilterBar] Original GPS coords clicked - updating GPS then reloading');
 									
 									// Location-Filter löschen
 									filterStore.clearLocationFilter();
@@ -310,24 +310,16 @@
 												// GPS-Status und Koordinaten aktualisieren
 												filterStore.updateGpsStatus(true, { lat: latitude, lon: longitude });
 												
-												// Galerie neu laden
-												resetGallery();
-												
-												// Rufe Callback auf um Galerie neu zu laden
-												if (onLocationFilterClear) {
-													console.log('[FilterBar] Calling onLocationFilterClear callback');
-													onLocationFilterClear();
-												} else {
-													console.log('[FilterBar] No onLocationFilterClear callback provided');
-												}
+												// Kurze Verzögerung für Store-Update, dann Seite neu laden
+												setTimeout(() => {
+													console.log('[FilterBar] Reloading page with fresh GPS coordinates');
+													window.location.href = window.location.href;
+												}, 100);
 											},
 											(error) => {
 												console.warn('[FilterBar] Failed to get fresh GPS:', error);
-												// Fallback: Verwende vorhandene Koordinaten
-												if (userLat && userLon) {
-													filterStore.updateGpsStatus(true, { lat: userLat, lon: userLon });
-												}
-												resetGallery();
+												// Fallback: Seite trotzdem neu laden
+												window.location.href = window.location.href;
 											},
 											{
 												enableHighAccuracy: true,
@@ -337,10 +329,7 @@
 										);
 									} else {
 										// Fallback wenn Geolocation nicht verfügbar
-										if (userLat && userLon) {
-											filterStore.updateGpsStatus(true, { lat: userLat, lon: userLon });
-										}
-										resetGallery();
+										window.location.href = window.location.href;
 									}
 								}}
 								title="Aktuelle GPS-Koordinaten aktualisieren"
