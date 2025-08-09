@@ -28,8 +28,8 @@
 	$: originalGalleryLon = $filterStore.lastGpsPosition?.lon ?? null;
 	export let onLocationFilterClear: (() => void) | undefined = undefined; // New callback for location filter clearing
 	
-	let cachedLat: number | null = null;
-	let cachedLon: number | null = null;
+	// State für GPS-Anfragen
+	let isGpsRequestInProgress = false;
 	
 
 	
@@ -279,12 +279,21 @@
 						<button class="gps-coords-clickable" on:click={() => {
 							console.log('🎯 GPS-Koordinaten geklickt!');
 							
-							// Location-Filter entfernen falls vorhanden
-							filterStore.clearLocationFilter();
-							
-							// Frische GPS-Koordinaten anfordern falls nötig
-							if (navigator.geolocation) {
-								navigator.geolocation.getCurrentPosition(
+											// Verhindere mehrere gleichzeitige GPS-Anfragen
+				if (isGpsRequestInProgress) {
+					console.log('[FilterBar] GPS request already in progress, skipping');
+					return;
+				}
+				
+				isGpsRequestInProgress = true;
+				console.log('[FilterBar] Starting GPS request for mobile mode');
+				
+				// Location-Filter entfernen falls vorhanden
+				filterStore.clearLocationFilter();
+				
+				// Frische GPS-Koordinaten anfordern falls nötig
+				if (navigator.geolocation) {
+					navigator.geolocation.getCurrentPosition(
 									(position) => {
 										const { latitude, longitude } = position.coords;
 										console.log('[FilterBar] Got fresh GPS coordinates for mobile mode:', { latitude, longitude });
@@ -296,22 +305,25 @@
 										setTimeout(() => {
 											console.log('[FilterBar] Switching to mobile mode with fresh GPS');
 											window.dispatchEvent(new CustomEvent('toggle3x3Mode'));
+											isGpsRequestInProgress = false;
 										}, 100);
 									},
 									(error) => {
 										console.warn('[FilterBar] Failed to get fresh GPS for mobile mode:', error);
 										// Trotzdem in den mobilen Modus wechseln mit vorhandenen Daten
 										window.dispatchEvent(new CustomEvent('toggle3x3Mode'));
+										isGpsRequestInProgress = false;
 									},
 									{
 										enableHighAccuracy: true,
-										timeout: 10000,
+										timeout: 5000, // Reduziert von 10 auf 5 Sekunden
 										maximumAge: 0 // Immer frische Daten anfordern
 									}
 								);
 							} else {
 								// Fallback: Direkt in den mobilen Modus wechseln
 								window.dispatchEvent(new CustomEvent('toggle3x3Mode'));
+								isGpsRequestInProgress = false;
 							}
 						}}>
 							{#if gpsStatusInfo && gpsStatusInfo.text}
