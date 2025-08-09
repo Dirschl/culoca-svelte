@@ -427,6 +427,13 @@
 
     for (let i = 0; i < files.length; i++) {
       const image = files[i];
+      
+      // Zusätzliche Sicherheit: Prüfe ob das Bild bereits hochgeladen wurde
+      if (image.uploadProgress === 100) {
+        console.warn('⚠️ Image already uploaded, skipping bulk upload:', image.name);
+        continue;
+      }
+      
       image.isUploading = true;
       image.uploadProgress = 0;
 
@@ -864,6 +871,12 @@
   async function uploadSingleImage(image: ImageFile) {
     if (!image.isValid || image.isUploading) return;
     
+    // Zusätzliche Sicherheit: Prüfe ob das Bild bereits hochgeladen wird
+    if (image.uploadProgress === 100) {
+      console.warn('⚠️ Image already uploaded, skipping:', image.name);
+      return;
+    }
+    
     startUpload(image);
           image.statusMessage = '🔧 Fixed encoding...';
       // Simulate the encoding fix messages from the log
@@ -972,6 +985,13 @@
     let errorCount = 0;
     for (let i = 0; i < images.length; i++) {
       const image = images[i];
+      
+      // Zusätzliche Sicherheit: Prüfe ob das Bild bereits hochgeladen wurde
+      if (image.uploadProgress === 100) {
+        console.warn('⚠️ Image already uploaded, skipping auto-upload:', image.name);
+        continue;
+      }
+      
       startUpload(image);
       try {
         const id = crypto.randomUUID();
@@ -1027,12 +1047,20 @@
         } else {
           errorCount++;
           image.errors.push(`Auto-Upload fehlgeschlagen: ${result.message}`);
-          files = [...files, image];
+          // Zur files Liste hinzufügen für manuelle Korrektur, aber nur wenn es noch nicht dort ist
+          const alreadyInFiles = files.some(f => f.id === image.id);
+          if (!alreadyInFiles) {
+            files = [...files, image];
+          }
         }
       } catch (error) {
         errorCount++;
         image.errors.push(`Auto-Upload fehlgeschlagen: ${error}`);
-        files = [...files, image];
+        // Zur files Liste hinzufügen für manuelle Korrektur, aber nur wenn es noch nicht dort ist
+        const alreadyInFiles = files.some(f => f.id === image.id);
+        if (!alreadyInFiles) {
+          files = [...files, image];
+        }
       } finally {
         image.isUploading = false;
       }
