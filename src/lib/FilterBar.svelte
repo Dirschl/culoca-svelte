@@ -13,14 +13,16 @@
 
 
 	export let showOnMap = false; // Different styling for map vs gallery
-	export let userLat: number | null = null;
-	export let userLon: number | null = null;
+	// GPS coordinates from filterStore instead of props
+	$: userLat = $filterStore.lastGpsPosition?.lat ?? null;
+	$: userLon = $filterStore.lastGpsPosition?.lon ?? null;
 	export let isPermalinkMode = false; // Enable clickable filter names for detail navigation
 	export let permalinkImageId: string | null = null;
 	export let showDistance = false; // New prop to show current sorting method
 	export let isLoggedIn = false; // New prop to determine if user is logged in
-	export let gpsStatus: 'active' | 'cached' | 'none' | 'checking' | 'denied' | 'unavailable' = 'none';
-	export let lastGPSUpdateTime: number | null = null; // Add this prop
+	// GPS status from filterStore instead of props
+	$: gpsStatus = $filterStore.gpsAvailable ? 'active' : 'none';
+	$: lastGPSUpdateTime = $filterStore.lastGpsPosition?.timestamp ?? null;
 	export let isManual3x3Mode = false;
 	export let originalGalleryLat: number | null = null;
 	export let originalGalleryLon: number | null = null;
@@ -242,7 +244,6 @@
 							<path d="M0,41.35c0-5.67,1.1-11.03,3.29-16.07,2.19-5.04,5.19-9.43,8.98-13.17,3.79-3.74,8.25-6.69,13.36-8.86,5.11-2.17,10.54-3.25,16.29-3.25s11.18,1.08,16.29,3.25c5.11,2.17,9.56,5.12,13.36,8.86,3.79,3.74,6.79,8.13,8.98,13.17,2.19,5.04,3.29,10.4,3.29,16.07s-1.1,11.03-3.29,16.07c-2.2,5.04-5.19,9.43-8.98,13.17-3.8,3.74-8.25,6.7-13.36,8.86-5.11,2.17-9.49,21.42-15.25,21.42s-12.23-19.25-17.34-21.42c-5.11-2.17-9.56-5.12-13.36-8.86-3.79-3.74-6.79-8.13-8.98-13.17-2.2-5.04-3.29-10.4-3.29-16.07ZM25.16,41.35c0,2.29.44,4.43,1.32,6.44.88,2.01,2.07,3.76,3.59,5.26,1.52,1.5,3.29,2.68,5.33,3.55,2.04.87,4.21,1.3,6.53,1.3s4.49-.43,6.53-1.3c2.04-.87,3.81-2.05,5.33-3.55,1.52-1.5,2.71-3.25,3.59-5.26.88-2.01,1.32-4.15,1.32-6.44s-.44-4.43-1.32-6.44c-.88-2.01-2.08-3.76-3.59-5.26-1.52-1.5-3.29-2.68-5.33-3.55-2.03-.87-4.21-1.3-6.53-1.3s-4.49.43-6.53,1.3c-2.04.87-3.81,2.05-5.33,3.55-1.52,1.5-2.72,3.25-3.59,5.26-.88,2.01-1.32,4.16-1.32,6.44Z"/>
 						</svg>
 						<span class="location-name" 
-							class:clickable={true} 
 							on:click={() => {
 								console.log('[FilterBar] Location filter clear clicked');
 								console.log('[FilterBar] isPermalinkMode:', isPermalinkMode);
@@ -289,7 +290,61 @@
 							</span>
 						</button>
 						{#if !isManual3x3Mode && originalGalleryLat && originalGalleryLon}
-							<div class="original-gps-coords">
+							<div class="original-gps-coords" 
+								on:click={() => {
+									console.log('[FilterBar] Original GPS coords clicked - updating current GPS');
+									
+									// Location-Filter löschen
+									filterStore.clearLocationFilter();
+									
+									// GPS-Daten aus localStorage löschen, um Überschreiben zu verhindern
+									filterStore.clearGpsData();
+									
+									// Aktuelle GPS-Koordinaten vom Browser anfordern und setzen
+									if (navigator.geolocation) {
+										navigator.geolocation.getCurrentPosition(
+											(position) => {
+												const { latitude, longitude } = position.coords;
+												console.log('[FilterBar] Got fresh GPS coordinates:', { latitude, longitude });
+												
+												// GPS-Status und Koordinaten aktualisieren
+												filterStore.updateGpsStatus(true, { lat: latitude, lon: longitude });
+												
+												// Galerie neu laden
+												resetGallery();
+												
+												// Rufe Callback auf um Galerie neu zu laden
+												if (onLocationFilterClear) {
+													console.log('[FilterBar] Calling onLocationFilterClear callback');
+													onLocationFilterClear();
+												} else {
+													console.log('[FilterBar] No onLocationFilterClear callback provided');
+												}
+											},
+											(error) => {
+												console.warn('[FilterBar] Failed to get fresh GPS:', error);
+												// Fallback: Verwende vorhandene Koordinaten
+												if (userLat && userLon) {
+													filterStore.updateGpsStatus(true, { lat: userLat, lon: userLon });
+												}
+												resetGallery();
+											},
+											{
+												enableHighAccuracy: true,
+												timeout: 10000,
+												maximumAge: 0 // Immer frische Daten anfordern
+											}
+										);
+									} else {
+										// Fallback wenn Geolocation nicht verfügbar
+										if (userLat && userLon) {
+											filterStore.updateGpsStatus(true, { lat: userLat, lon: userLon });
+										}
+										resetGallery();
+									}
+								}}
+								title="Aktuelle GPS-Koordinaten aktualisieren"
+							>
 								{formatCoordinates(originalGalleryLat, originalGalleryLon)}
 							</div>
 						{/if}
@@ -447,6 +502,15 @@
 
 	.location-icon {
 		font-size: 18px;
+	}
+
+	.location-name {
+		cursor: pointer;
+		transition: color 0.2s ease;
+	}
+
+	.location-name:hover {
+		color: var(--culoca-orange, #ee7221);
 	}
 
 
@@ -621,8 +685,17 @@
 	
 
 
-	/* Ursprüngliche GPS-Koordinaten in Orange */
+	/* Ursprüngliche GPS-Koordinaten in Orange - Klickbar */
 	.original-gps-coords {
 		color: #ee7221; /* Culoca Orange */
+		cursor: pointer;
+		transition: color 0.2s ease;
+		padding: 4px;
+		border-radius: 4px;
+	}
+
+	.original-gps-coords:hover {
+		color: #d65a1a; /* Dunkleres Orange beim Hover */
+		background: var(--bg-hover, rgba(238, 114, 33, 0.1));
 	}
 </style> 

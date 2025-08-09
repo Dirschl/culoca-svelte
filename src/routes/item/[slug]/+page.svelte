@@ -17,6 +17,9 @@
     
     // Prüfe, ob es sich um einen Bot handelt
     const userAgent = navigator.userAgent.toLowerCase();
+    console.log('[Item Detail] User-Agent:', navigator.userAgent);
+    console.log('[Item Detail] User-Agent (lowercase):', userAgent);
+    
     const isBot = userAgent.includes('bot') || 
                   userAgent.includes('crawler') || 
                   userAgent.includes('spider') || 
@@ -25,6 +28,8 @@
                   userAgent.includes('bingbot') ||
                   userAgent.includes('slurp') ||
                   userAgent.includes('duckduckbot');
+    
+    console.log('[Item Detail] Bot detection result:', isBot);
     
     // Nur für echte User umleiten, nicht für Bots
     if (!isBot) {
@@ -170,6 +175,12 @@
     });
     goto('/');
   }
+  
+  // Funktion zum Zurücksetzen auf aktuelle GPS-Koordinaten
+  function clearLocationFilter() {
+    filterStore.clearLocationFilter();
+    console.log('[Item Detail] Location filter cleared, returning to current GPS coordinates');
+  }
 
   // Radius initial setzen - URL-Parameter haben Vorrang
   let radius = 1000;
@@ -277,6 +288,18 @@
         imageLat: image?.lat,
         imageLon: image?.lon
       });
+      
+      // Additional debug: Check localStorage
+      const storedFilters = localStorage.getItem('culoca-filters');
+      console.log('[Item Detail] Stored filters from localStorage:', storedFilters);
+      if (storedFilters) {
+        try {
+          const parsed = JSON.parse(storedFilters);
+          console.log('[Item Detail] Parsed stored filters:', parsed);
+        } catch (e) {
+          console.log('[Item Detail] Failed to parse stored filters:', e);
+        }
+      }
       
       console.log('[Item Detail] Logging view with visitor ID:', visitorId, 'GPS:', visitorLat, visitorLon);
       

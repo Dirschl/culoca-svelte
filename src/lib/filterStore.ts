@@ -103,6 +103,46 @@ function createFilterStore() {
 			});
 		},
 
+		// Clear GPS data from localStorage and store
+		clearGpsData: () => {
+			update(state => {
+				const newState = { 
+					...state, 
+					lastGpsPosition: null,
+					gpsAvailable: false
+				};
+				
+				// Clear GPS data from localStorage
+				if (browser) {
+					try {
+						// Clear culoca-filters GPS data
+						const stored = localStorage.getItem('culoca-filters');
+						if (stored) {
+							const parsed = JSON.parse(stored);
+							delete parsed.lastGpsPosition;
+							delete parsed.gpsAvailable;
+							localStorage.setItem('culoca-filters', JSON.stringify(parsed));
+						}
+						
+						// Clear userGps data (used by main page)
+						localStorage.removeItem('userGps');
+						localStorage.removeItem('userLat');
+						localStorage.removeItem('userLon');
+						localStorage.removeItem('gpsAllowed');
+						
+						// Clear lastKnownPosition data (used by FilterBar)
+						localStorage.removeItem('lastKnownPosition');
+						
+						console.log('[filterStore] Cleared all GPS data from localStorage');
+					} catch (error) {
+						console.warn('Failed to clear GPS data from localStorage:', error);
+					}
+				}
+				
+				return newState;
+			});
+		},
+
 		// Clear all filters (but keep referrer account)
 		clearFilters: () => {
 			update(state => {
@@ -136,6 +176,8 @@ function createFilterStore() {
 				return newState;
 			});
 		},
+
+
 
 		// Clear referrer account (remove customer branding)
 		clearReferrerAccount: () => {
@@ -345,6 +387,8 @@ export function getEffectiveGpsPosition() {
 	// 4. Kein Wert verfügbar
 	return null;
 }
+
+
 
 // Export the store
 export const filterStore = createFilterStore();
