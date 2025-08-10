@@ -80,9 +80,10 @@
   export let data: any;
   let image = data?.image ?? null;
   let error = data?.error ?? '';
-  let nearby = data?.nearby ?? [];
+  let nearby: any[] = []; // Will be loaded client-side
   let loading = !image;
   let profile = null;
+  let metaTags = data?.metaTags ?? null;
 
   // SEO/Meta: Slug statt ID verwenden - reaktiv auf URL-Parameter
   let itemSlug: string = '';
@@ -91,6 +92,78 @@
   // Dynamisches Favicon aktualisieren
   $: if (image && browser) {
     updateFavicon();
+  }
+
+  // Load nearby items client-side to prevent Google from "stealing" nearby titles/descriptions
+  $: if (image && browser && image.slug) {
+    loadNearbyItems();
+  }
+
+  async function loadNearbyItems() {
+    try {
+      const response = await fetch(`/api/nearby/${image.slug}`);
+      if (response.ok) {
+        const data = await response.json();
+        nearby = data.nearby || [];
+      }
+    } catch (error) {
+      console.error('Failed to load nearby items:', error);
+    }
+  }
+
+  // SEO-optimized meta tags to prevent Google from "stealing" nearby image titles/descriptions
+  $: if (image && browser) {
+    // Update document title and meta tags
+    document.title = image.title || image.original_name || 'Bild';
+    
+    // Update or create meta tags
+    const updateMetaTag = (name: string, content: string) => {
+      let meta = document.querySelector(`meta[name="${name}"]`) as HTMLMetaElement;
+      if (!meta) {
+        meta = document.createElement('meta');
+        meta.name = name;
+        document.head.appendChild(meta);
+      }
+      meta.content = content;
+    };
+
+    const updateOGTag = (property: string, content: string) => {
+      let meta = document.querySelector(`meta[property="${property}"]`) as HTMLMetaElement;
+      if (!meta) {
+        meta = document.createElement('meta');
+        meta.setAttribute('property', property);
+        document.head.appendChild(meta);
+      }
+      meta.content = content;
+    };
+
+    // Basic meta tags
+    updateMetaTag('description', image.description || image.caption || `Bild von ${image.title || image.original_name || 'unbekannt'}`);
+    updateMetaTag('author', image.full_name || 'Johann Dirschl');
+    updateMetaTag('robots', 'max-image-preview:large');
+
+    // Open Graph tags
+    updateOGTag('og:title', image.title || image.original_name || 'Bild');
+    updateOGTag('og:description', image.description || image.caption || `Bild von ${image.title || image.original_name || 'unbekannt'}`);
+    updateOGTag('og:image', `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${image.path_2048 || image.path_512}`);
+    updateOGTag('og:image:alt', image.description || image.caption || `Bild von ${image.title || image.original_name || 'unbekannt'}`);
+    updateOGTag('og:type', 'website');
+    updateOGTag('og:url', window.location.href);
+
+    // Twitter Card tags
+    updateMetaTag('twitter:card', 'summary_large_image');
+    updateMetaTag('twitter:title', image.title || image.original_name || 'Bild');
+    updateMetaTag('twitter:description', image.description || image.caption || `Bild von ${image.title || image.original_name || 'unbekannt'}`);
+    updateMetaTag('twitter:image', `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${image.path_2048 || image.path_512}`);
+
+    // Canonical URL
+    let canonical = document.querySelector('link[rel="canonical"]') as HTMLLinkElement;
+    if (!canonical) {
+      canonical = document.createElement('link');
+      canonical.rel = 'canonical';
+      document.head.appendChild(canonical);
+    }
+    canonical.href = window.location.href;
   }
 
   function updateFavicon() {
@@ -1095,13 +1168,22 @@
       <div class="error">❌ Fehler: {error}</div>
     {:else if image}
     <div class="passepartout-container">
-      <a href="/" class="image-link">
-        <img
-          src={imageSource}
-          alt={image.title || image.original_name || `Image ${image.id}`} 
-          class="main-image"
-        />
-      </a>
+      <figure>
+        <a href="/" class="image-link">
+          <img
+            src={imageSource}
+            alt={image.description || image.caption || `Bild von ${image.title || image.original_name || 'unbekannt'}`}
+            class="main-image"
+            width={image.width || 0}
+            height={image.height || 0}
+            loading="eager"
+            fetchpriority="high"
+          />
+        </a>
+        {#if image.caption}
+          <figcaption>{image.caption}</figcaption>
+        {/if}
+      </figure>
       <div class="passepartout-info">
         <h1 class="title" class:editable={isCreator} class:editing={editingTitle}>
           {#if editingTitle}
@@ -1233,16 +1315,18 @@
         <input id="radius" type="range" min="50" max="2000" step="50" value={radius} on:input={onRadiusInput} on:change={onRadiusChange} class:limit-reached={isAtItemLimit}>
       </div>
     {/if}
-    <NearbyGallery
-      nearby={visibleNearby}
-      isCreator={isCreator}
-      userLat={image?.lat}
-      userLon={image?.lon}
-      getDistanceFromLatLonInMeters={getDistanceFromLatLonInMeters}
-      onGalleryToggle={handleNearbyGalleryToggle}
-      getGalleryStatus={getNearbyGalleryStatus}
-      layout={galleryLayout}
-    />
+    <section class="nearby" data-nosnippet>
+      <NearbyGallery
+        nearby={visibleNearby}
+        isCreator={isCreator}
+        userLat={image?.lat}
+        userLon={image?.lon}
+        getDistanceFromLatLonInMeters={getDistanceFromLatLonInMeters}
+        onGalleryToggle={handleNearbyGalleryToggle}
+        getGalleryStatus={getNearbyGalleryStatus}
+        layout={galleryLayout}
+      />
+    </section>
     
     <!-- SEO-optimiert: Serverseitig gerenderte Links für Google -->
     {#if nearby && nearby.length > 0}
@@ -1261,6 +1345,8 @@
         </ul>
       </div>
     {/if}
+
+
     
     <div class="meta-section single-exif">
       <!-- Column 1: Keywords -->
