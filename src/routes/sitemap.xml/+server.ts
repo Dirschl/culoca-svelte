@@ -87,31 +87,18 @@ export const GET: RequestHandler = async () => {
       xml += '  </url>\n';
     }
 
+    // SEO-Update: Force Google to re-index all items by setting lastmod to today
+    const today = new Date().toISOString().split('T')[0];
+    console.log(`[Sitemap] SEO-Update: Setting lastmod to ${today} for all items to force Google re-indexing`);
+
     // Add item pages with optimized data (following Google's current guidelines)
     for (const item of allItems) {
       xml += '  <url>\n';
       xml += `    <loc>${baseUrl}/item/${item.slug}</loc>\n`;
       
-      // Add lastmod using created_at as fallback if updated_at is not available
-      // Use date only (no time) to avoid micro-updates as per Google guidelines
-      let lastmod = null;
-      if (item.updated_at && item.updated_at !== null) {
-        try {
-          lastmod = new Date(item.updated_at).toISOString().split('T')[0];
-        } catch (error) {
-          console.log('[Sitemap] Invalid updated_at for item:', item.slug, item.updated_at);
-        }
-      } else if (item.created_at && item.created_at !== null) {
-        try {
-          lastmod = new Date(item.created_at).toISOString().split('T')[0];
-        } catch (error) {
-          console.log('[Sitemap] Invalid created_at for item:', item.slug, item.created_at);
-        }
-      }
-      
-      if (lastmod) {
-        xml += `    <lastmod>${lastmod}</lastmod>\n`;
-      }
+      // SEO-Update: Force Google to re-index by setting lastmod to today
+      // This ensures Google picks up the new SEO structure (1 page = 1 hero image)
+      xml += `    <lastmod>${today}</lastmod>\n`;
       
       // Add minimal image data (Google's current recommendation)
       if (item.path_2048 || item.path_512) {
@@ -130,11 +117,12 @@ export const GET: RequestHandler = async () => {
     xml += '</urlset>';
 
     console.log(`[Sitemap] Generated sitemap with ${staticPages.length} static pages and ${allItems.length} items`);
+    console.log(`[Sitemap] SEO-Update: All items marked with lastmod=${today} to force Google re-indexing`);
 
     return new Response(xml, {
       headers: {
         'Content-Type': 'application/xml',
-        'Cache-Control': 'public, max-age=3600' // Cache for 1 hour
+        'Cache-Control': 'public, max-age=300' // Cache for 5 minutes during SEO update
       }
     });
 
