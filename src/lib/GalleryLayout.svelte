@@ -414,7 +414,7 @@
                 <img 
                   class="justified-pic" 
                   src={item.src} 
-                  alt={item.title || `Bild ${item.id}`} 
+                  alt="" 
                   loading="lazy"
                 />
                 {#if showDistance && userLat !== null && userLon !== null && item.lat && item.lon}
@@ -504,7 +504,7 @@
         >
           <img 
             src={item.src}
-            alt={item.title || `Bild ${item.id}`} 
+            alt="" 
             loading="lazy"
           />
           {#if showDistance && userLat !== null && userLon !== null && item.lat && item.lon}
