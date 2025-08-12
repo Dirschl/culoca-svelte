@@ -4,7 +4,7 @@
   <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
   <meta name="googlebot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
   <meta name="bingbot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
-  <link rel="canonical" href="https://culoca.com/see-you-local-system-faq" />
+  <link rel="canonical" href="https://culoca.com/web" />
   
   <!-- Favicon für /web Seite -->
   <link rel="icon" type="image/svg+xml" href="/culoca-icon.svg">
@@ -14,7 +14,7 @@
   <!-- Open Graph -->
   <meta property="og:title" content="Culoca - See You Local - Entdecke deine Umgebung" />
   <meta property="og:description" content="Alles, was du über Culoca wissen willst: Schnapp dir dein Handy, erkunde deine Umgebung, teile Momente und sammle lokale Schätze. FAQ für Entdecker!" />
-  <meta property="og:url" content="https://culoca.com/see-you-local-system-faq" />
+  <meta property="og:url" content="https://culoca.com/web" />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="DIRSCHL.com GmbH" />
   <meta property="og:locale" content="de_DE" />
@@ -27,7 +27,7 @@
     "@type": "WebPage",
     "name": "Culoca - See You Local - Entdecke deine Umgebung",
     "description": "Alles, was du über Culoca wissen willst: Schnapp dir dein Handy, erkunde deine Umgebung, teile Momente und sammle lokale Schätze. FAQ für Entdecker!",
-    "url": "https://culoca.com/see-you-local-system-faq",
+    "url": "https://culoca.com/web",
     "inLanguage": "de",
     "publisher": {
       "@type": "Organization",
