@@ -34,9 +34,9 @@
       });
       goto('/');
     } else {
-      // Not a valid accountname - redirect to web page instead of showing error
-      // This handles cases like 'see-you-local-system-faq' which is a web page, not an accountname
-      goto(`/web/${accountname}`);
+      // Not a valid accountname - redirect to main page
+      // This prevents infinite loops and handles invalid accountnames gracefully
+      goto('/');
     }
   });
 </script>
