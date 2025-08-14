@@ -3,11 +3,12 @@
   import { onMount } from 'svelte';
 
   onMount(() => {
-    goto('/see-you-local-system-faq', { replaceState: true });
+    // Redirect to main page instead of non-existent accountname
+    goto('/', { replaceState: true });
   });
 </script>
 
 <!-- Temporary content while redirecting -->
 <div style="text-align: center; padding: 2rem;">
-  <p>Weiterleitung...</p>
+  <p>Weiterleitung zur Hauptseite...</p>
 </div>
