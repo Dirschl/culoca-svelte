@@ -7,7 +7,13 @@ export const GET = async ({ params }) => {
   console.log('🔍 Favicon API called with slug:', slug);
 
   if (!slug) {
-    throw error(400, 'Missing slug');
+    return new Response(null, {
+      status: 400,
+      headers: {
+        'Content-Type': 'text/plain',
+        'Cache-Control': 'public, max-age=3600'
+      }
+    });
   }
 
   try {
@@ -23,7 +29,13 @@ export const GET = async ({ params }) => {
 
     if (dbError || !item) {
       console.log('🔍 Item not found for slug:', slug);
-      throw error(404, 'Bild nicht gefunden');
+      return new Response(null, {
+        status: 404,
+        headers: {
+          'Content-Type': 'text/plain',
+          'Cache-Control': 'public, max-age=3600'
+        }
+      });
     }
 
     // 2. Verwende 64px-Bild falls verfügbar, sonst 512px
@@ -32,7 +44,13 @@ export const GET = async ({ params }) => {
     
     if (!imagePath) {
       console.log('🔍 No image path available');
-      throw error(404, 'Kein Bild verfügbar');
+      return new Response(null, {
+        status: 404,
+        headers: {
+          'Content-Type': 'text/plain',
+          'Cache-Control': 'public, max-age=3600'
+        }
+      });
     }
 
     // 3. Generiere die URL für das Bild
@@ -49,7 +67,13 @@ export const GET = async ({ params }) => {
     
     if (!response.ok) {
       console.log('🔍 Failed to fetch image from Supabase');
-      throw error(404, 'Bild nicht gefunden');
+      return new Response(null, {
+        status: 404,
+        headers: {
+          'Content-Type': 'text/plain',
+          'Cache-Control': 'public, max-age=3600'
+        }
+      });
     }
 
     const imageBuffer = await response.arrayBuffer();
@@ -70,11 +94,12 @@ export const GET = async ({ params }) => {
   } catch (err) {
     console.error('Favicon generation error:', err);
     
-    // Fallback: Redirect to default favicon
+    // Fallback: Return 404 instead of redirect to prevent 500 errors
     return new Response(null, {
-      status: 302,
+      status: 404,
       headers: {
-        'Location': '/culoca-icon.png'
+        'Content-Type': 'text/plain',
+        'Cache-Control': 'public, max-age=3600'
       }
     });
   }

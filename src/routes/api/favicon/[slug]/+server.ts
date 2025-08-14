@@ -90,12 +90,14 @@ export const GET = async ({ params }) => {
         throw new Error('Empty PNG buffer generated');
       }
       
-      // Create response with minimal headers to avoid issues
+      // Create response with proper headers for favicon
       const response = new Response(pngBuffer, {
         status: 200,
         headers: {
           'Content-Type': 'image/png',
-          'Cache-Control': 'public, max-age=3600'
+          'Cache-Control': 'public, max-age=3600, s-maxage=86400',
+          'Content-Disposition': 'inline',
+          'Access-Control-Allow-Origin': '*'
         }
       });
       
@@ -110,12 +112,14 @@ export const GET = async ({ params }) => {
         throw new Error('Empty image buffer');
       }
       
-      // Fallback: Original JPEG zurückgeben mit minimalen Headern
+      // Fallback: Original JPEG zurückgeben mit proper headers
       const response = new Response(imageBuffer, {
         status: 200,
         headers: {
           'Content-Type': 'image/jpeg',
-          'Cache-Control': 'public, max-age=3600'
+          'Cache-Control': 'public, max-age=3600, s-maxage=86400',
+          'Content-Disposition': 'inline',
+          'Access-Control-Allow-Origin': '*'
         }
       });
       
