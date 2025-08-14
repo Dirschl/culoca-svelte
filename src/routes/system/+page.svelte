@@ -3,8 +3,8 @@
   import { onMount } from 'svelte';
 
   onMount(() => {
-    // Redirect to main page instead of non-existent accountname
-    goto('/', { replaceState: true });
+    // Redirect to the web page - this is the correct behavior
+    goto('/see-you-local-system-faq', { replaceState: true });
   });
 </script>
 
