@@ -43,14 +43,17 @@ export const load: PageServerLoad = async ({ params, url, depends }) => {
       .eq('slug', slug)
       .or('is_private.eq.false,is_private.is.null');
     
+    console.log('🔍 [DetailPage] Database query result:', { slug, image, error });
+    
     // Wenn nicht gefunden, versuche Umleitung von altem Slug zu neuem
     if (!image || image.length === 0) {
-      // Item not found with original slug (debug removed)
+      console.log('🔍 [DetailPage] No image found in database for slug:', slug);
     }
     
     // Supabase query result (debug removed)
     
     const img = Array.isArray(image) ? image[0] : image;
+    console.log('🔍 [DetailPage] Processed image object:', img);
     
     // Processed image (debug removed)
 
