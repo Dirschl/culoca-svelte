@@ -64,12 +64,24 @@ export const load: PageServerLoad = async ({ params, url, depends }) => {
     }
     if (!img) {
       console.log('🔍 [DetailPage] No image found for slug:', slug);
-      // Throw 410 Gone for non-existent slugs (Google indexed wrong URLs)
-      // This helps Google understand these URLs are permanently gone
-      throw error(410, {
-        message: 'Diese URL existiert nicht mehr - falsch indexiert von Google',
-        slug: slug
-      });
+      
+      // Check if this is a database error or truly non-existent slug
+      if (error) {
+        // Database error - use 404 (temporary problem)
+        console.log('🔍 [DetailPage] Database error, using 404:', error);
+        throw error(404, {
+          message: 'Temporär nicht verfügbar - Datenbankfehler',
+          slug: slug,
+          dbError: error.message
+        });
+      } else {
+        // Slug truly doesn't exist in database - use 410 (permanently gone)
+        console.log('🔍 [DetailPage] Slug truly doesn\'t exist, using 410 Gone');
+        throw error(410, {
+          message: 'Diese URL existiert nicht mehr - falsch indexiert von Google',
+          slug: slug
+        });
+      }
     }
 
     // Successfully loaded image (debug removed)
