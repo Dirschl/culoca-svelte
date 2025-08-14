@@ -5,7 +5,13 @@ export const GET = async ({ params }) => {
   const { slug } = params;
 
   if (!slug) {
-    throw error(400, 'Missing slug');
+    return new Response(null, {
+      status: 400,
+      headers: {
+        'Content-Type': 'text/plain',
+        'Cache-Control': 'public, max-age=3600'
+      }
+    });
   }
 
   // Vercel-spezifische Optimierungen
@@ -66,10 +72,11 @@ export const GET = async ({ params }) => {
     try {
       const sharp = (await import('sharp')).default;
       
-      // Vercel-optimierte Sharp-Konfiguration
+      // Vercel-optimierte Sharp-Konfiguration mit zusätzlichen Sicherheitsmaßnahmen
       const pngBuffer = await sharp(imageBuffer, { 
         failOnError: false,
-        limitInputPixels: false 
+        limitInputPixels: false,
+        pages: -1 // Process all pages
       })
         .resize(512, 512, { fit: 'cover' })
         .png({ quality: 90 })
@@ -111,11 +118,12 @@ export const GET = async ({ params }) => {
   } catch (err) {
     console.error('Favicon generation error:', err);
     
-    // Fallback: Redirect to default favicon
+    // Fallback: Return 404 instead of redirect to prevent 500 errors
     return new Response(null, {
-      status: 302,
+      status: 404,
       headers: {
-        'Location': '/culoca-icon.png'
+        'Content-Type': 'text/plain',
+        'Cache-Control': 'public, max-age=3600'
       }
     });
   }
