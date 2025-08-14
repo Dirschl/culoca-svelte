@@ -7,6 +7,16 @@ Disallow: /admin/
 Disallow: /api/
 Disallow: /auth/
 
+# Disallow old incorrect URLs with wrong city spellings
+# These URLs return 410 Gone status and should not be indexed
+Disallow: /item/*altotting*
+Disallow: /item/*muhldorf*
+Disallow: /item/*toging*
+Disallow: /item/*neuotting*
+Disallow: /item/*wohrsee*
+Disallow: /item/*badhoring*
+Disallow: /item/*sigrun*
+
 # Sitemap location
 Sitemap: https://culoca.com/sitemap.xml
 
