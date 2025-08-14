@@ -64,6 +64,8 @@ export const load: PageServerLoad = async ({ params, url, depends }) => {
     }
     if (!img) {
       console.log('🔍 [DetailPage] No image found for slug:', slug);
+      console.log('🔍 [DetailPage] Error object:', error);
+      console.log('🔍 [DetailPage] Image array:', image);
       
       // Check if this is a database error or truly non-existent slug
       if (error) {
