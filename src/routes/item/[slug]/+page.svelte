@@ -31,32 +31,8 @@
     
     console.log('[Item Detail] Bot detection result:', isBot);
     
-    // Nur für echte User umleiten, nicht für Bots
-    if (!isBot) {
-      // Städtenamen-Mappings
-      const cityMappings = {
-        'altotting': 'altoetting',
-        'muhldorf': 'muehldorf', 
-        'toging': 'toeging',
-        'neuotting': 'neuoetting',
-        'wohrsee': 'woehrsee',
-        'sigrun': 'sigruen',
-        'badhoring': 'badhoering'
-      };
-
-      // Prüfe, ob der Slug einen der alten Städtenamen enthält
-      for (const [oldCity, newCity] of Object.entries(cityMappings)) {
-        if (currentSlug.includes(oldCity)) {
-          const newSlug = currentSlug.replace(oldCity, newCity);
-          console.log('🔍 [Client] City redirect:', oldCity, '->', newCity);
-          console.log('🔍 [Client] Redirecting:', currentSlug, '->', newSlug);
-          goto(`/item/${newSlug}`, { replaceState: true });
-          break;
-        }
-      }
-    } else {
-      console.log('🔍 [Client] Bot detected, skipping redirects');
-    }
+    // Entfernt: Keine client-seitigen Slug-Übersetzungen mehr
+    // Alle Slugs werden direkt verwendet, keine Umleitungen
   }
 
   // Detail-Komponenten
