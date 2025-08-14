@@ -3,8 +3,8 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
 
-  export let error: any;
-  export let status: number;
+  export let error: any = null;
+  export let status: number = 404;
 
   onMount(() => {
     // Bei 404 zur System-Seite weiterleiten
@@ -13,21 +13,37 @@
         goto('/system');
       }, 3000); // 3 Sekunden warten
     }
+    // Bei 410 (Gone) - keine automatische Weiterleitung, da URL permanent weg ist
   });
 </script>
 
 <svelte:head>
-  <title>Seite nicht gefunden - Culoca</title>
+  <title>{status === 410 ? 'URL nicht mehr verfügbar - Culoca' : 'Seite nicht gefunden - Culoca'}</title>
   <meta name="robots" content="noindex, nofollow" />
+  {#if status === 410}
+    <meta name="googlebot" content="noindex, nofollow" />
+    <meta name="bingbot" content="noindex, nofollow" />
+  {/if}
 </svelte:head>
 
 <div class="error-page">
   <div class="error-content">
-    <h1>404 - Seite nicht gefunden</h1>
-    <p>
-      Die angeforderte Seite existiert nicht oder wurde verschoben. 
-      Du wirst in 3 Sekunden zur System-Übersicht weitergeleitet.
-    </p>
+    {#if status === 410}
+      <h1>410 - URL nicht mehr verfügbar</h1>
+      <p>
+        Diese URL existiert nicht mehr aufgrund von Korrekturen in der Schreibweise von Ortsnamen.
+        Die Seite wurde dauerhaft entfernt.
+      </p>
+      {#if error?.slug}
+        <p><strong>Betroffener Slug:</strong> {error.slug}</p>
+      {/if}
+    {:else}
+      <h1>404 - Seite nicht gefunden</h1>
+      <p>
+        Die angeforderte Seite existiert nicht oder wurde verschoben. 
+        Du wirst in 3 Sekunden zur System-Übersicht weitergeleitet.
+      </p>
+    {/if}
     
     <div class="error-actions">
       <a href="/" class="btn primary">Zurück zur Galerie</a>

@@ -1,6 +1,6 @@
 import type { PageServerLoad } from './$types';
 import { createClient } from '@supabase/supabase-js';
-import { redirect } from '@sveltejs/kit';
+import { redirect, error } from '@sveltejs/kit';
 
 const supabase = createClient(
   (process.env.PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL || import.meta.env.PUBLIC_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL) as string,
@@ -34,6 +34,35 @@ function getRedirectSlug(slug: string): string | null {
   return null;
 }
 
+// Funktion zur Prüfung auf bekannte falsche Slugs
+function isKnownIncorrectSlug(slug: string): boolean {
+  const incorrectWords = [
+    'altotting',
+    'muhldorf',
+    'toging',
+    'neuotting',
+    'wohrsee',
+    'badhoring',
+    'sigrun'
+  ];
+  
+  // Prüfe, ob der Slug einen der falschen Wörter enthält (case-insensitive)
+  const slugLower = slug.toLowerCase();
+  const hasIncorrectWord = incorrectWords.some(word => slugLower.includes(word.toLowerCase()));
+  
+  // Debug logging
+  if (hasIncorrectWord) {
+    console.log('🔍 [DetailPage] Incorrect word found in slug:', slug);
+    incorrectWords.forEach(word => {
+      if (slugLower.includes(word.toLowerCase())) {
+        console.log(`🔍 [DetailPage] Found incorrect word: "${word}" in slug`);
+      }
+    });
+  }
+  
+  return hasIncorrectWord;
+}
+
 function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371000;
   const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -53,11 +82,28 @@ export const load: PageServerLoad = async ({ params, url, depends }) => {
   
   // Load function called (debug removed)
   
+  // Prüfe auf bekannte falsche Slugs VOR allem anderen
+  if (isKnownIncorrectSlug(slug)) {
+    console.log('🔍 [DetailPage] Known incorrect slug detected:', slug);
+    console.log('🔍 [DetailPage] Slug contains incorrect pattern, returning 410 Gone');
+    // Return 410 Gone with special headers to help Google understand this URL is permanently gone
+    throw error(410, {
+      message: 'Diese URL existiert nicht mehr aufgrund von Korrekturen in der Schreibweise.',
+      slug: slug
+    });
+  } else {
+    console.log('🔍 [DetailPage] Slug passed incorrect pattern check:', slug);
+  }
+  
   // Prüfe auf Städtenamen-Umleitung VOR der Datenbank-Abfrage
   const redirectSlug = getRedirectSlug(slug);
   if (redirectSlug) {
     // Found city redirect (debug removed)
-    throw redirect(301, `/item/${redirectSlug}`);
+    // Add additional headers for better SEO handling of redirects
+    const response = redirect(301, `/item/${redirectSlug}`);
+    response.headers.set('X-Robots-Tag', 'noindex, nofollow');
+    response.headers.set('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
+    return response;
   }
   
   try {

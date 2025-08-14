@@ -16,6 +16,16 @@ export const GET: RequestHandler = async () => {
       '/impressum'
     ];
 
+    // City mappings for redirects (same as in +page.server.ts)
+    const cityMappings = {
+      'altotting': 'altoetting',
+      'muhldorf': 'muehldorf', 
+      'toging': 'toeging',
+      'neuotting': 'neuoetting',
+      'wohrsee': 'woehrsee',
+      'badhoring': 'badhöring'
+    };
+
     // Fetch all items in batches to bypass limits
     let allItems: any[] = [];
     
@@ -112,6 +122,35 @@ export const GET: RequestHandler = async () => {
       }
       
       xml += '  </url>\n';
+    }
+
+    // Add explicit "gone" entries for old incorrect URLs to help Google understand they're removed
+    console.log('[Sitemap] Adding explicit "gone" entries for old URLs...');
+    
+    // Get all items that might have old incorrect versions
+    const itemsWithOldVersions = allItems.filter(item => {
+      return Object.keys(cityMappings).some(oldCity => 
+        item.slug.includes(cityMappings[oldCity as keyof typeof cityMappings])
+      );
+    });
+    
+    for (const item of itemsWithOldVersions) {
+      // For each item, create the old incorrect URL version
+      for (const [oldCity, newCity] of Object.entries(cityMappings)) {
+        if (item.slug.includes(newCity)) {
+          // Create the old incorrect URL
+          const oldSlug = item.slug.replace(newCity, oldCity);
+          const oldUrl = `${baseUrl}/item/${oldSlug}`;
+          
+          // Add as "gone" entry with very old lastmod
+          xml += '  <url>\n';
+          xml += `    <loc>${oldUrl}</loc>\n`;
+          xml += `    <lastmod>2020-01-01</lastmod>\n`; // Very old date to signal it's gone
+          xml += '  </url>\n';
+          
+          console.log(`[Sitemap] Added "gone" entry: ${oldUrl}`);
+        }
+      }
     }
 
     xml += '</urlset>';
