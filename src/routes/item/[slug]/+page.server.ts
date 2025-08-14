@@ -64,11 +64,11 @@ export const load: PageServerLoad = async ({ params, url, depends }) => {
     }
     if (!img) {
       console.log('🔍 [DetailPage] No image found for slug:', slug);
-      return {
-        image: null,
-        error: 'Bild nicht gefunden',
-        nearby: []
-      };
+      // Throw 404 error instead of returning null image
+      throw error(404, {
+        message: 'Bild nicht gefunden',
+        slug: slug
+      });
     }
 
     // Successfully loaded image (debug removed)
