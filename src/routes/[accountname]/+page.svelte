@@ -16,12 +16,16 @@
       goto('/');
       return;
     }
+
+    // First check if this is actually a valid accountname in the database
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('*')
       .eq('accountname', accountname.toLowerCase())
       .single();
+
     if (profile) {
+      // Valid accountname found - set user filter and redirect to main page
       filterStore.setUserFilter({
         userId: profile.id,
         username: profile.full_name || profile.accountname || profile.id,
@@ -30,9 +34,9 @@
       });
       goto('/');
     } else {
-      error = 'Profil nicht gefunden.';
-      loading = false;
-      goto('/');
+      // Not a valid accountname - redirect to web page instead of showing error
+      // This handles cases like 'see-you-local-system-faq' which is a web page, not an accountname
+      goto(`/web/${accountname}`);
     }
   });
 </script>
