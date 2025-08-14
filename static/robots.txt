@@ -15,7 +15,6 @@ Disallow: /item/*toging*
 Disallow: /item/*neuotting*
 Disallow: /item/*wohrsee*
 Disallow: /item/*badhoring*
-Disallow: /item/*sigrun*
 
 # Sitemap location
 Sitemap: https://culoca.com/sitemap.xml
