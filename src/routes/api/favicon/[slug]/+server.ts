@@ -85,34 +85,41 @@ export const GET = async ({ params }) => {
       const processingTime = Date.now() - startTime;
       console.log(`Favicon generated in ${processingTime}ms for slug: ${slug}`);
       
-      return new Response(pngBuffer, {
+      // Validate buffer before creating response
+      if (!pngBuffer || pngBuffer.length === 0) {
+        throw new Error('Empty PNG buffer generated');
+      }
+      
+      // Create response with minimal headers to avoid issues
+      const response = new Response(pngBuffer, {
         status: 200,
         headers: {
           'Content-Type': 'image/png',
-          'Cache-Control': 'public, max-age=3600, s-maxage=86400', // 1 Stunde Browser, 24 Stunden CDN
-          'Content-Disposition': 'inline',
-          'Access-Control-Allow-Origin': '*',
-          'X-Favicon-Source': `Item: ${item.title || item.original_name || item.id}`, // Debug-Header
-          'X-Processing-Time': `${processingTime}ms`
+          'Cache-Control': 'public, max-age=3600'
         }
       });
+      
+      return response;
     } catch (sharpError) {
       console.error('Sharp conversion error:', sharpError);
       const processingTime = Date.now() - startTime;
       console.log(`Favicon fallback in ${processingTime}ms for slug: ${slug}`);
       
-      // Fallback: Original JPEG zurückgeben
-      return new Response(imageBuffer, {
+      // Validate imageBuffer before fallback
+      if (!imageBuffer || imageBuffer.byteLength === 0) {
+        throw new Error('Empty image buffer');
+      }
+      
+      // Fallback: Original JPEG zurückgeben mit minimalen Headern
+      const response = new Response(imageBuffer, {
         status: 200,
         headers: {
           'Content-Type': 'image/jpeg',
-          'Cache-Control': 'public, max-age=3600, s-maxage=86400',
-          'Content-Disposition': 'inline',
-          'Access-Control-Allow-Origin': '*',
-          'X-Favicon-Source': `Item: ${item.title || item.original_name || item.id}`,
-          'X-Processing-Time': `${processingTime}ms`
+          'Cache-Control': 'public, max-age=3600'
         }
       });
+      
+      return response;
     }
 
   } catch (err) {
