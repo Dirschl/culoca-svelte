@@ -7,10 +7,10 @@
   export let status: number = 404;
 
   onMount(() => {
-    // Bei 404 zur Web-Seite weiterleiten
+    // Bei 404 zur Hauptseite weiterleiten
     if (status === 404) {
       setTimeout(() => {
-        goto('/web');
+        goto('/');
       }, 3000); // 3 Sekunden warten
     }
     // Bei 410 (Gone) - keine automatische Weiterleitung, da URL permanent weg ist
@@ -41,13 +41,13 @@
       <h1>404 - Seite nicht gefunden</h1>
       <p>
         Die angeforderte Seite existiert nicht oder wurde verschoben. 
-        Du wirst in 3 Sekunden zur System-Übersicht weitergeleitet.
+        Du wirst in 3 Sekunden zur Hauptseite weitergeleitet, wo du Bilder sehen und suchen kannst.
       </p>
     {/if}
     
     <div class="error-actions">
       <a href="/" class="btn primary">Zurück zur Galerie</a>
-      <a href="/system" class="btn secondary">System-Übersicht</a>
+      <a href="/web" class="btn secondary">Web-Übersicht</a>
     </div>
 
     <div class="error-details">
