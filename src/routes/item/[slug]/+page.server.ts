@@ -37,13 +37,13 @@ export const load: PageServerLoad = async ({ params, url, depends }) => {
   
   try {
     // Erst versuchen, das Item mit dem ursprünglichen Slug zu finden
-    let { data: image, error } = await supabase
+    let { data: image, error: dbError } = await supabase
       .from('items')
       .select('*')
       .eq('slug', slug)
       .or('is_private.eq.false,is_private.is.null');
     
-    console.log('🔍 [DetailPage] Database query result:', { slug, image, error });
+    console.log('🔍 [DetailPage] Database query result:', { slug, image, dbError });
     
     // Wenn nicht gefunden, versuche Umleitung von altem Slug zu neuem
     if (!image || image.length === 0) {
@@ -57,27 +57,27 @@ export const load: PageServerLoad = async ({ params, url, depends }) => {
     
     // Processed image (debug removed)
 
-    if (error) {
-      console.error('🔍 [DetailPage] Supabase error:', error);
+    if (dbError) {
+      console.error('🔍 [DetailPage] Supabase error:', dbError);
       return {
         image: null,
-        error: error.message,
+        error: dbError.message,
         nearby: []
       };
     }
     if (!img) {
       console.log('🔍 [DetailPage] No image found for slug:', slug);
-      console.log('🔍 [DetailPage] Error object:', error);
+      console.log('🔍 [DetailPage] Error object:', dbError);
       console.log('🔍 [DetailPage] Image array:', image);
       
       // Check if this is a database error or truly non-existent slug
-      if (error) {
+      if (dbError) {
         // Database error - use 404 (temporary problem)
-        console.log('🔍 [DetailPage] Database error, using 404:', error);
+        console.log('🔍 [DetailPage] Database error, using 404:', dbError);
         throw error(404, {
           message: 'Temporär nicht verfügbar - Datenbankfehler',
           slug: slug,
-          dbError: error.message
+          dbError: dbError.message
         });
       } else {
         // Slug truly doesn't exist in database - use 410 (permanently gone)
