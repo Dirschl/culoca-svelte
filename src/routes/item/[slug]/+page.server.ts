@@ -112,10 +112,8 @@ export const load: PageServerLoad = async ({ params, url, depends }) => {
       nearby
     };
   } catch (err) {
-    return {
-      image: null,
-      error: 'Failed to load image',
-      nearby: []
-    };
+    console.error('🔍 [DetailPage] Unexpected error:', err);
+    // Re-throw the error instead of returning null image
+    throw err;
   }
 }; 
