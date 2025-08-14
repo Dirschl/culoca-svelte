@@ -53,6 +53,19 @@
   // Scroll to top state
   let showScrollToTop = false;
 
+  // Helper function for formatting time
+  function formatTimeCreated(value: any): string {
+    if (!value) return '';
+    if (typeof value === 'string') {
+      // Format: "150629" -> "15:06:29"
+      if (value.length === 6 && /^\d{6}$/.test(value)) {
+        return `${value.slice(0, 2)}:${value.slice(2, 4)}:${value.slice(4, 6)}`;
+      }
+      return value;
+    }
+    return String(value);
+  }
+
   export let data: any;
   let image = data?.image ?? null;
   let error = data?.error ?? '';
