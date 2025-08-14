@@ -64,9 +64,10 @@ export const load: PageServerLoad = async ({ params, url, depends }) => {
     }
     if (!img) {
       console.log('🔍 [DetailPage] No image found for slug:', slug);
-      // Throw 404 error instead of returning null image
-      throw error(404, {
-        message: 'Bild nicht gefunden',
+      // Throw 410 Gone for non-existent slugs (Google indexed wrong URLs)
+      // This helps Google understand these URLs are permanently gone
+      throw error(410, {
+        message: 'Diese URL existiert nicht mehr - falsch indexiert von Google',
         slug: slug
       });
     }
