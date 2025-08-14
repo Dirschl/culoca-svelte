@@ -10,57 +10,8 @@ const supabase = createClient(
   }
 );
 
-// Funktion zur Umleitung spezifischer Städtenamen
-function getRedirectSlug(slug: string): string | null {
-  const cityMappings = {
-    'altotting': 'altoetting',
-    'muhldorf': 'muehldorf', 
-    'toging': 'toeging',
-    'neuotting': 'neuoetting',
-    'wohrsee': 'woehrsee',
-    'badhoring': 'badhöring'
-  };
-
-  // Prüfe, ob der Slug einen der alten Städtenamen enthält
-  for (const [oldCity, newCity] of Object.entries(cityMappings)) {
-    if (slug.includes(oldCity)) {
-      const newSlug = slug.replace(oldCity, newCity);
-      console.log('🔍 [DetailPage] City redirect:', oldCity, '->', newCity);
-      console.log('🔍 [DetailPage] Slug redirect:', slug, '->', newSlug);
-      return newSlug;
-    }
-  }
-  
-  return null;
-}
-
-// Funktion zur Prüfung auf bekannte falsche Slugs
-function isKnownIncorrectSlug(slug: string): boolean {
-  const incorrectWords = [
-    'altotting',
-    'muhldorf',
-    'toging',
-    'neuotting',
-    'wohrsee',
-    'badhoring'
-  ];
-  
-  // Prüfe, ob der Slug einen der falschen Wörter enthält (case-insensitive)
-  const slugLower = slug.toLowerCase();
-  const hasIncorrectWord = incorrectWords.some(word => slugLower.includes(word.toLowerCase()));
-  
-  // Debug logging
-  if (hasIncorrectWord) {
-    console.log('🔍 [DetailPage] Incorrect word found in slug:', slug);
-    incorrectWords.forEach(word => {
-      if (slugLower.includes(word.toLowerCase())) {
-        console.log(`🔍 [DetailPage] Found incorrect word: "${word}" in slug`);
-      }
-    });
-  }
-  
-  return hasIncorrectWord;
-}
+// Entfernt: Keine Slug-Übersetzungen oder -Überprüfungen mehr
+// Datenbank-Slugs sind IMMER korrekt und dürfen nicht geändert werden
 
 function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371000;
@@ -81,31 +32,8 @@ export const load: PageServerLoad = async ({ params, url, depends }) => {
   
   // Load function called (debug removed)
   
-  // Prüfe auf bekannte falsche Slugs VOR allem anderen
-  // Diese Logik ist nur für Google-URLs gedacht, die falsch indexiert wurden
-  // Datenbank-Slugs sind IMMER korrekt und dürfen nicht geändert werden
-  if (isKnownIncorrectSlug(slug)) {
-    console.log('🔍 [DetailPage] Known incorrect slug detected (Google indexed wrong):', slug);
-    console.log('🔍 [DetailPage] Returning 410 Gone for incorrectly indexed URL');
-    // Return 410 Gone with special headers to help Google understand this URL is permanently gone
-    throw error(410, {
-      message: 'Diese URL existiert nicht mehr aufgrund von Korrekturen in der Schreibweise.',
-      slug: slug
-    });
-  } else {
-    console.log('🔍 [DetailPage] Slug passed incorrect pattern check (valid DB slug):', slug);
-  }
-  
-  // Prüfe auf Städtenamen-Umleitung VOR der Datenbank-Abfrage
-  const redirectSlug = getRedirectSlug(slug);
-  if (redirectSlug) {
-    // Found city redirect (debug removed)
-    // Add additional headers for better SEO handling of redirects
-    const response = redirect(301, `/item/${redirectSlug}`);
-    response.headers.set('X-Robots-Tag', 'noindex, nofollow');
-    response.headers.set('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
-    return response;
-  }
+  // Entfernt: Keine Slug-Überprüfungen oder -Umleitungen mehr
+  // Alle Slugs werden direkt in der Datenbank gesucht
   
   try {
     // Erst versuchen, das Item mit dem ursprünglichen Slug zu finden
