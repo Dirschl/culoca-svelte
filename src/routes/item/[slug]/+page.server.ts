@@ -42,8 +42,7 @@ function isKnownIncorrectSlug(slug: string): boolean {
     'toging',
     'neuotting',
     'wohrsee',
-    'badhoring',
-    'sigrun'
+    'badhoring'
   ];
   
   // Prüfe, ob der Slug einen der falschen Wörter enthält (case-insensitive)
