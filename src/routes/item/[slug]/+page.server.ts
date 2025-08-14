@@ -82,16 +82,18 @@ export const load: PageServerLoad = async ({ params, url, depends }) => {
   // Load function called (debug removed)
   
   // Prüfe auf bekannte falsche Slugs VOR allem anderen
+  // Diese Logik ist nur für Google-URLs gedacht, die falsch indexiert wurden
+  // Datenbank-Slugs sind IMMER korrekt und dürfen nicht geändert werden
   if (isKnownIncorrectSlug(slug)) {
-    console.log('🔍 [DetailPage] Known incorrect slug detected:', slug);
-    console.log('🔍 [DetailPage] Slug contains incorrect pattern, returning 410 Gone');
+    console.log('🔍 [DetailPage] Known incorrect slug detected (Google indexed wrong):', slug);
+    console.log('🔍 [DetailPage] Returning 410 Gone for incorrectly indexed URL');
     // Return 410 Gone with special headers to help Google understand this URL is permanently gone
     throw error(410, {
       message: 'Diese URL existiert nicht mehr aufgrund von Korrekturen in der Schreibweise.',
       slug: slug
     });
   } else {
-    console.log('🔍 [DetailPage] Slug passed incorrect pattern check:', slug);
+    console.log('🔍 [DetailPage] Slug passed incorrect pattern check (valid DB slug):', slug);
   }
   
   // Prüfe auf Städtenamen-Umleitung VOR der Datenbank-Abfrage
