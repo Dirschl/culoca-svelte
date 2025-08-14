@@ -7,10 +7,10 @@
   export let status: number = 404;
 
   onMount(() => {
-    // Bei 404 zur System-Seite weiterleiten
+    // Bei 404 zur Web-Seite weiterleiten
     if (status === 404) {
       setTimeout(() => {
-        goto('/system');
+        goto('/web');
       }, 3000); // 3 Sekunden warten
     }
     // Bei 410 (Gone) - keine automatische Weiterleitung, da URL permanent weg ist
