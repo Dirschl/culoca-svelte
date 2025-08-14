@@ -32,8 +32,14 @@ export const GET = async ({ params }) => {
 
     // 2. Wenn kein 512px-Bild vorhanden ist, verwende das Standard-Favicon
     if (!item.path_512) {
-      // Redirect to default favicon
-      throw error(404, 'Kein 512px-Bild verfügbar');
+      // Return 404 instead of throwing error to prevent 500
+      return new Response(null, {
+        status: 404,
+        headers: {
+          'Content-Type': 'text/plain',
+          'Cache-Control': 'public, max-age=3600'
+        }
+      });
     }
 
     // 3. Generiere die URL für das 512px-Bild
@@ -44,7 +50,14 @@ export const GET = async ({ params }) => {
     const response = await fetch(imageUrl);
     
     if (!response.ok) {
-      throw error(404, 'Bild nicht gefunden');
+      // Return 404 instead of throwing error to prevent 500
+      return new Response(null, {
+        status: 404,
+        headers: {
+          'Content-Type': 'text/plain',
+          'Cache-Control': 'public, max-age=3600'
+        }
+      });
     }
 
     const imageBuffer = await response.arrayBuffer();
