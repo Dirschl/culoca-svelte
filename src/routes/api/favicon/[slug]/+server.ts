@@ -20,7 +20,14 @@ export const GET = async ({ params }) => {
       .single();
 
     if (dbError || !item) {
-      throw error(404, 'Bild nicht gefunden');
+      // Return 404 instead of throwing error to prevent 500
+      return new Response(null, {
+        status: 404,
+        headers: {
+          'Content-Type': 'text/plain',
+          'Cache-Control': 'public, max-age=3600'
+        }
+      });
     }
 
     // 2. Wenn kein 512px-Bild vorhanden ist, verwende das Standard-Favicon
