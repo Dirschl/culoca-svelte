@@ -308,6 +308,10 @@ function handleScroll(event: Event) {
             <div class="load-more-trigger" on:click={() => fetchImages(true)} style="text-align:center;margin:1rem 0;cursor:pointer;">
               Lade mehr
             </div>
+            <!-- Versteckter Link für Bots - führt zur nächsten Seite -->
+            <a href="/?page={currentPage + 1}" rel="next" class="newsflash-bot-link" aria-hidden="true" tabindex="-1">
+              Lade mehr
+            </a>
           {/if}
         </div>
       {:else if layout === 'grid'}
@@ -330,18 +334,22 @@ function handleScroll(event: Event) {
             <div class="load-more-trigger" on:click={() => fetchImages(true)} style="text-align:center;margin:1rem 0;cursor:pointer;">
               Lade mehr
             </div>
+            <!-- Versteckter Link für Bots - führt zur nächsten Seite -->
+            <a href="/?page={currentPage + 1}" rel="next" class="newsflash-bot-link" aria-hidden="true" tabindex="-1">
+              Lade mehr
+            </a>
           {/if}
         </div>
       {/if}
       {#if initialItems && initialItems.length === 50}
-        <!-- SEO-Paginierung für Bots - versteckt für normale Benutzer -->
-        <div class="newsflash-pagination-ssr" style="display: none;">
+        <!-- SEO-Paginierung für Bots - komplett versteckt für normale Benutzer -->
+        <div class="newsflash-pagination-ssr" aria-hidden="true">
           {#if currentPage > 1}
-            <a href="/?page={currentPage - 1}" rel="prev" class="pagination-link">← Vorherige Seite</a>
+            <a href="/?page={currentPage - 1}" rel="prev" class="pagination-link" tabindex="-1">← Vorherige Seite</a>
           {/if}
           <span class="pagination-info">Seite {currentPage} von {totalPages}</span>
           {#if currentPage < totalPages}
-            <a href="/?page={currentPage + 1}" rel="next" class="pagination-link">Weitere Bilder →</a>
+            <a href="/?page={currentPage + 1}" rel="next" class="pagination-link" tabindex="-1">Weitere Bilder →</a>
           {/if}
         </div>
       {/if}
@@ -390,6 +398,56 @@ function handleScroll(event: Event) {
   font-size: 0.95rem;
   padding: 0.5rem 0;
 }
+
+/* SEO-Paginierung für Bots - komplett versteckt für normale Benutzer, aber sichtbar für Bots */
+.newsflash-pagination-ssr {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Nur für Screen Reader und Bots sichtbar - NICHT für normale Benutzer */
+@media (prefers-reduced-motion: no-preference) {
+  .newsflash-pagination-ssr {
+    position: absolute;
+    left: -9999px;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+
+/* Versteckter Link für Bots - komplett unsichtbar für normale Benutzer */
+.newsflash-bot-link {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+}
+  
+  .pagination-link:hover {
+    background: var(--bg-secondary);
+  }
+  
+  .pagination-info {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+  }
 .newsflash-info {
   color: #4fa3f7;
   font-size: 0.9rem;
