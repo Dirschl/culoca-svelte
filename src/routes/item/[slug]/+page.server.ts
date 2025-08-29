@@ -109,6 +109,7 @@ export const load: PageServerLoad = async ({ params, url, depends }) => {
     // Nearby items are now loaded client-side to prevent Google from "stealing" nearby titles/descriptions
     // This prevents SEO issues where Google assigns nearby image titles to the main image
     let nearby: any[] = [];
+    
     return {
       image: { ...img, profile, full_name },
       error: null,

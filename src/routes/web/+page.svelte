@@ -1099,6 +1099,7 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
             <button class="tab-button" class:active={activeTab === 'formatted'} on:click={() => activeTab = 'formatted'}>Formatiert</button>
             <button class="tab-button" class:active={activeTab === 'meta'} on:click={() => activeTab = 'meta'}>Meta-Tags</button>
             <button class="tab-button" class:active={activeTab === 'raw'} on:click={() => activeTab = 'raw'}>Raw HTML</button>
+            <button class="tab-button" class:active={activeTab === 'botview'} on:click={() => activeTab = 'botview'}>Bot View</button>
           </div>
           
           {#if activeTab === 'prompt'}
@@ -1769,6 +1770,217 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
                     <li>URL: {testUrl}</li>
                     <li>Bot-Modus: {isBotMode ? 'Aktiv' : 'Inaktiv'}</li>
                     <li>User-Agent: {navigator.userAgent}</li>
+                  </ul>
+                </div>
+              {/if}
+            </div>
+          {:else if activeTab === 'botview'}
+            <div class="bot-view-section">
+              <h5>🤖 Bot View - Wie Google & Bots die Seite sehen:</h5>
+              <div class="bot-view-info">
+                <p><strong>URL:</strong> {testUrl}</p>
+                <p><strong>Bot-Modus:</strong> {isBotMode ? '✅ Aktiv (Googlebot Simulation)' : '❌ Inaktiv (Normaler Browser)'}</p>
+                <p><strong>User-Agent:</strong> <code>{navigator.userAgent}</code></p>
+                <p><strong>Content-Type:</strong> {headData?.responseInfo?.contentType || 'Unbekannt'}</p>
+                <p><strong>Hinweis:</strong> Diese Vorschau zeigt, wie Suchmaschinen und Bots den Inhalt der Seite interpretieren würden.</p>
+              </div>
+              
+              {#if headData && headData.rawHtml}
+                {#if headData.responseInfo?.contentType?.includes('xml')}
+                  <!-- XML Content (Sitemap, RSS, etc.) -->
+                  <div class="bot-view-container">
+                    <div class="bot-view-header">
+                      <div class="bot-view-controls">
+                        <button 
+                          class="bot-view-btn" 
+                          on:click={() => {
+                            const iframe = document.querySelector('.bot-view-iframe');
+                            if (iframe) {
+                              iframe.src = iframe.src;
+                            }
+                          }}
+                          title="Vorschau neu laden"
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+                            <path d="M21 3v5h-5"/>
+                            <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+                            <path d="M3 21v-5h5"/>
+                          </svg>
+                          Neu laden
+                        </button>
+                        <button 
+                          class="bot-view-btn" 
+                          on:click={() => {
+                            const iframe = document.querySelector('.bot-view-iframe');
+                            if (iframe) {
+                              iframe.style.height = iframe.style.height === '600px' ? '400px' : '600px';
+                            }
+                          }}
+                          title="Höhe anpassen"
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M8 3H5a2 2 0 0 0-2 2v3"/>
+                            <path d="M21 8V5a2 2 0 0 0-2-2h-3"/>
+                            <path d="M3 16v3a2 2 0 0 0 2 2h3"/>
+                            <path d="M16 21h3a2 2 0 0 0 2-2v-3"/>
+                          </svg>
+                          Höhe
+                        </button>
+                      </div>
+                      <div class="bot-view-status">
+                        <span class="status-good">✅ XML Bot View verfügbar</span>
+                      </div>
+                    </div>
+                    
+                    <div class="bot-view-frame-container">
+                      <iframe 
+                        class="bot-view-iframe"
+                        srcdoc={`<!DOCTYPE html><html><head><title>XML Preview</title><style>body{font-family:monospace;padding:20px;background:#f5f5f5;margin:0;}pre{background:white;padding:20px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);overflow-x:auto;white-space:pre-wrap;word-wrap:break-word;}</style></head><body><pre>${headData.rawHtml.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre></body></html>`}
+                        title="XML Bot View Vorschau"
+                        style="width: 100%; height: 600px; border: 1px solid var(--border-color); border-radius: 8px; background: white;"
+                        sandbox="allow-same-origin allow-scripts"
+                      ></iframe>
+                    </div>
+                    
+                    <div class="bot-view-details">
+                      <h6>📊 XML Bot View Details:</h6>
+                      <div class="bot-view-stats">
+                        <div class="bot-stat">
+                          <strong>Content-Type:</strong> {headData.responseInfo?.contentType || 'Unbekannt'}
+                        </div>
+                        <div class="bot-stat">
+                          <strong>Server:</strong> {headData.responseInfo?.server || 'Unbekannt'}
+                        </div>
+                        <div class="bot-stat">
+                          <strong>Status:</strong> {headData.responseInfo?.status || 'Unbekannt'} {headData.responseInfo?.statusText || ''}
+                        </div>
+                        <div class="bot-stat">
+                          <strong>XML-Länge:</strong> {headData.rawHtml.length.toLocaleString()} Zeichen
+                        </div>
+                        <div class="bot-stat">
+                          <strong>URLs in Sitemap:</strong> {(headData.rawHtml.match(/<url>/g) || []).length} gefunden
+                        </div>
+                        <div class="bot-stat">
+                          <strong>Images in Sitemap:</strong> {(headData.rawHtml.match(/<image:image>/g) || []).length} gefunden
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                {:else}
+                  <!-- HTML Content -->
+                  <div class="bot-view-container">
+                    <div class="bot-view-header">
+                      <div class="bot-view-controls">
+                        <button 
+                          class="bot-view-btn" 
+                          on:click={() => {
+                            const iframe = document.querySelector('.bot-view-iframe');
+                            if (iframe) {
+                              iframe.src = iframe.src;
+                            }
+                          }}
+                          title="Vorschau neu laden"
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+                            <path d="M21 3v5h-5"/>
+                            <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+                            <path d="M3 21v-5h5"/>
+                          </svg>
+                          Neu laden
+                        </button>
+                        <button 
+                          class="bot-view-btn" 
+                          on:click={() => {
+                            const iframe = document.querySelector('.bot-view-iframe');
+                            if (iframe) {
+                              iframe.style.width = iframe.style.width === '100%' ? '375px' : '100%';
+                            }
+                          }}
+                          title="Mobile/Desktop Ansicht wechseln"
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
+                            <line x1="12" y1="18" x2="12.01" y2="18"/>
+                          </svg>
+                          Mobile/Desktop
+                        </button>
+                        <button 
+                          class="bot-view-btn" 
+                          on:click={() => {
+                            const iframe = document.querySelector('.bot-view-iframe');
+                            if (iframe) {
+                              iframe.style.height = iframe.style.height === '600px' ? '400px' : '600px';
+                            }
+                          }}
+                          title="Höhe anpassen"
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M8 3H5a2 2 0 0 0-2 2v3"/>
+                            <path d="M21 8V5a2 2 0 0 0-2-2h-3"/>
+                            <path d="M3 16v3a2 2 0 0 0 2 2h3"/>
+                            <path d="M16 21h3a2 2 0 0 0 2-2v-3"/>
+                          </svg>
+                          Höhe
+                        </button>
+                      </div>
+                      <div class="bot-view-status">
+                        <span class="status-good">✅ HTML Bot View verfügbar</span>
+                      </div>
+                    </div>
+                    
+                    <div class="bot-view-frame-container">
+                      <iframe 
+                        class="bot-view-iframe"
+                        srcdoc={headData.rawHtml}
+                        title="HTML Bot View Vorschau"
+                        style="width: 100%; height: 600px; border: 1px solid var(--border-color); border-radius: 8px; background: white;"
+                        sandbox="allow-same-origin allow-scripts"
+                      ></iframe>
+                    </div>
+                    
+                    <div class="bot-view-details">
+                      <h6>📊 HTML Bot View Details:</h6>
+                      <div class="bot-view-stats">
+                        <div class="bot-stat">
+                          <strong>Title:</strong> {headData.title || 'Kein Title gefunden'}
+                        </div>
+                        <div class="bot-stat">
+                          <strong>Description:</strong> {headData.metaTags?.find(tag => tag.name === 'description' || tag.property === 'og:description')?.content || 'Keine Description gefunden'}
+                        </div>
+                        <div class="bot-stat">
+                          <strong>Meta Tags:</strong> {headData.metaTags?.length || 0} gefunden
+                        </div>
+                        <div class="bot-stat">
+                          <strong>JSON-LD:</strong> {headData.jsonLdData?.length || 0} Schema(s) gefunden
+                        </div>
+                        <div class="bot-stat">
+                          <strong>Favicons:</strong> {headData.faviconInfo?.count || 0} gefunden
+                        </div>
+                        <div class="bot-stat">
+                          <strong>Open Graph:</strong> {headData.metaTags?.filter(tag => tag.property?.startsWith('og:')).length || 0} Tags gefunden
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                {/if}
+              {:else}
+                <div class="bot-view-error">
+                  <p>❌ Bot View nicht verfügbar</p>
+                  <p>Mögliche Ursachen:</p>
+                  <ul>
+                    <li>Die Seite konnte nicht geladen werden</li>
+                    <li>Kein Content verfügbar</li>
+                    <li>CORS-Beschränkungen verhindern die Vorschau</li>
+                    <li>Die URL ist nicht erreichbar</li>
+                  </ul>
+                  <p><strong>Debug-Info:</strong></p>
+                  <ul>
+                    <li>URL: {testUrl}</li>
+                    <li>Bot-Modus: {isBotMode ? 'Aktiv' : 'Inaktiv'}</li>
+                    <li>Content verfügbar: {headData?.rawHtml ? 'Ja' : 'Nein'}</li>
+                    <li>Content-Type: {headData?.responseInfo?.contentType || 'Unbekannt'}</li>
                   </ul>
                 </div>
               {/if}
@@ -2957,6 +3169,155 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
     word-wrap: break-word !important;
     overflow-wrap: break-word !important;
     max-width: 100% !important;
+  }
+
+  /* Bot View Tab Styles */
+  .bot-view-section {
+    margin-top: 1rem;
+  }
+
+  .bot-view-section h5 {
+    margin: 0 0 1rem 0;
+    color: var(--text-primary);
+    font-size: 1.1rem;
+  }
+
+  .bot-view-info {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .bot-view-info p {
+    margin: 0.5rem 0;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+  }
+
+  .bot-view-info code {
+    background: var(--bg-primary);
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    color: var(--text-primary);
+  }
+
+  .bot-view-container {
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--bg-tertiary);
+  }
+
+  .bot-view-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .bot-view-controls {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .bot-view-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.2s ease;
+  }
+
+  .bot-view-btn:hover {
+    background: var(--bg-secondary);
+    border-color: var(--accent-color);
+    color: var(--accent-color);
+  }
+
+  .bot-view-btn svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .bot-view-status {
+    font-size: 0.9rem;
+  }
+
+  .bot-view-frame-container {
+    padding: 1rem;
+    background: var(--bg-primary);
+    display: flex;
+    justify-content: center;
+  }
+
+  .bot-view-iframe {
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+
+  .bot-view-details {
+    padding: 1rem;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border-color);
+  }
+
+  .bot-view-details h6 {
+    margin: 0 0 1rem 0;
+    color: var(--text-primary);
+    font-size: 1rem;
+  }
+
+  .bot-view-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+  }
+
+  .bot-stat {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 0.75rem;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+  }
+
+  .bot-stat strong {
+    color: var(--text-primary);
+    display: block;
+    margin-bottom: 0.25rem;
+  }
+
+  .bot-view-error {
+    background: #fee;
+    border: 1px solid #fcc;
+    border-radius: 8px;
+    padding: 1.5rem;
+    color: #c33;
+  }
+
+  .bot-view-error p {
+    margin: 0.5rem 0;
+  }
+
+  .bot-view-error ul {
+    margin: 0.5rem 0;
+    padding-left: 1.5rem;
+  }
+
+  .bot-view-error li {
+    margin: 0.25rem 0;
   }
 
 

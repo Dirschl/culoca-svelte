@@ -46,7 +46,9 @@
   import ImageMapSection from '$lib/detail/ImageMapSection.svelte';
   import RadiusControl from '$lib/detail/RadiusControl.svelte';
   import MapPickerOverlay from '$lib/detail/MapPickerOverlay.svelte';
+  import ItemRightsManager from '$lib/ItemRightsManager.svelte';
   let showMapPicker = false;
+  let showRightsManager = false;
   import { useJustifiedLayout } from '$lib/galleryStore';
   import FloatingActionButtons from '$lib/FloatingActionButtons.svelte';
 
@@ -1595,6 +1597,32 @@
         }
       }}
     />
+
+    <!-- Item Rights Manager Overlay -->
+    {#if showRightsManager && image}
+      <div class="rights-overlay">
+        <div class="rights-modal">
+          <div class="rights-header">
+            <h2>Rechte verwalten</h2>
+            <button 
+              class="close-btn" 
+              on:click={() => { showRightsManager = false; }}
+              aria-label="Schließen"
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 6L6 18M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
+          <div class="rights-content">
+            <ItemRightsManager 
+              itemId={image.id} 
+              itemTitle={image.title || image.original_name || 'Unbekanntes Item'} 
+            />
+          </div>
+        </div>
+      </div>
+    {/if}
   {:else}
     <div class="error">❌ Bild nicht gefunden</div>
   {/if}
@@ -1614,6 +1642,23 @@
       <rect x="15" y="15" width="6" height="6"/>
     </svg>
   </button>
+
+  <!-- Rechte verwalten FAB - nur für Ersteller sichtbar -->
+  {#if isCreator}
+    <button 
+      class="fab-button rights-manager"
+      on:click={() => showRightsManager = true}
+      title="Rechte verwalten"
+      aria-label="Rechte verwalten"
+    >
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+        <circle cx="12" cy="7" r="4"/>
+        <path d="M12 11v4"/>
+        <path d="M12 19h.01"/>
+      </svg>
+    </button>
+  {/if}
 
   <!-- Scroll to Top / Fullscreen FAB - ersetzt sich gegenseitig -->
   {#if showScrollToTop}
@@ -2525,5 +2570,86 @@
   }
   .radius-control input[type="range"].limit-reached {
     accent-color: var(--culoca-orange);
+  }
+
+  /* Rights Manager Overlay Styles */
+  .rights-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    backdrop-filter: blur(5px);
+  }
+
+  .rights-modal {
+    background: var(--bg-primary);
+    border-radius: 12px;
+    max-width: 90vw;
+    max-height: 90vh;
+    width: 800px;
+    overflow: hidden;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  }
+
+  .rights-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+  }
+
+  .rights-header h2 {
+    margin: 0;
+    color: var(--text-primary);
+    font-size: 1.5rem;
+  }
+
+  .close-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 4px;
+    transition: all 0.2s;
+  }
+
+  .close-btn:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+  }
+
+  .rights-content {
+    padding: 0;
+    max-height: calc(90vh - 80px);
+    overflow-y: auto;
+  }
+
+  /* FAB Position für Rights Manager */
+  .fab-button.rights-manager {
+    bottom: 12rem; /* Über dem Gallery Back FAB */
+  }
+
+  @media (max-width: 768px) {
+    .rights-modal {
+      width: 95vw;
+      max-height: 95vh;
+    }
+
+    .rights-content {
+      max-height: calc(95vh - 80px);
+    }
+
+    .fab-button.rights-manager {
+      bottom: 10rem;
+    }
   }
 </style> 
