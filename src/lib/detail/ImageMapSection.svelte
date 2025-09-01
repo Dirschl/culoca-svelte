@@ -638,4 +638,45 @@
     background: #ee7221;
     border-color: #ee7221;
   }
+
+  /* Dark Mode Styles */
+  :global(html.dark) .map-modal-content-fullscreen {
+    background: #18181b;
+  }
+  :global(html.dark) .map-search-input {
+    background: #23232a;
+    color: #fff;
+    border: 1px solid #444;
+  }
+  :global(html.dark) .map-search-results {
+    background: #23232a;
+    color: #fff;
+  }
+  :global(html.dark) .map-search-result {
+    color: #fff;
+    border-bottom: 1px solid #444;
+  }
+  :global(html.dark) .map-search-result:hover {
+    background: var(--accent-color);
+    color: #fff;
+  }
+  :global(html.dark) .map-picker-container-fullscreen {
+    background: #23232a;
+  }
+  :global(html.dark) .map-coords-fullscreen {
+    color: #fff;
+  }
+  :global(html.dark) .map-cancel-btn, :global(html.dark) .map-confirm-btn {
+    color: #fff;
+    background: #23232a;
+    border: 1px solid #444;
+  }
+  :global(html.dark) .map-cancel-btn:hover {
+    background: #333;
+  }
+  :global(html.dark) .map-confirm-btn {
+    background: #ee7221;
+    border-color: #ee7221;
+    color: #fff;
+  }
 </style> 
