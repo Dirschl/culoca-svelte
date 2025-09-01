@@ -2322,4 +2322,44 @@
   .type-description {
     font-style: italic;
   }
+
+  /* Dark Mode Styles */
+  :global(html.dark) .search-results {
+    background-color: #23232a;
+    border: 1px solid #444;
+  }
+  :global(html.dark) .search-result {
+    color: #fff;
+    border-bottom: 1px solid #444;
+  }
+  :global(html.dark) .search-result:hover {
+    background-color: #333;
+  }
+  :global(html.dark) .result-name {
+    color: #fff;
+  }
+  :global(html.dark) .result-type {
+    color: #ccc;
+  }
+  :global(html.dark) .map-modal-footer {
+    background-color: #18181b;
+    border-top: 1px solid #444;
+  }
+  :global(html.dark) .map-modal-footer p {
+    color: #ccc;
+  }
+  :global(html.dark) .map-cancel-btn {
+    background-color: #444;
+    color: #fff;
+  }
+  :global(html.dark) .map-cancel-btn:hover {
+    background-color: #555;
+  }
+  :global(html.dark) .map-confirm-btn {
+    background-color: var(--accent-color);
+    color: #fff;
+  }
+  :global(html.dark) .map-confirm-btn:hover {
+    background-color: #ee7221;
+  }
 </style> 

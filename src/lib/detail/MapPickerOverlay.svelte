@@ -344,6 +344,14 @@
     background: #23232a;
     color: #fff;
   }
+  :global(html.dark) .map-search-result {
+    color: #fff;
+    border-bottom: 1px solid #444;
+  }
+  :global(html.dark) .map-search-result:hover {
+    background: var(--accent-color);
+    color: #fff;
+  }
   :global(html.dark) .map-picker-container-fullscreen {
     background: #23232a;
   }
