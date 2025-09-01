@@ -2328,6 +2328,16 @@
     background-color: #1a1a1a !important;
     border: 1px solid #444;
   }
+  /* Override Svelte generated classes for dark mode */
+  :global(html.dark) .search-results[class*="s-"] {
+    background-color: #1a1a1a !important;
+    border: 1px solid #444;
+  }
+  /* Universal override for any Svelte generated classes */
+  :global(html.dark) div[class*="search-results"] {
+    background-color: #1a1a1a !important;
+    border: 1px solid #444;
+  }
   :global(html.dark) .search-result {
     color: #fff;
     border-bottom: 1px solid #444;
