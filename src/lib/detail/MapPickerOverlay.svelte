@@ -359,6 +359,17 @@
   :global(html.dark) .map-search-results * {
     background: #1a1a1a !important;
   }
+  /* Override any hover/active states */
+  :global(html.dark) .map-search-result:hover,
+  :global(html.dark) .map-search-result:active,
+  :global(html.dark) .map-search-result:focus,
+  :global(html.dark) .map-search-result.selected,
+  :global(html.dark) .map-search-result[class*="hover"],
+  :global(html.dark) .map-search-result[class*="active"],
+  :global(html.dark) .map-search-result[class*="selected"] {
+    background: var(--accent-color) !important;
+    color: #fff !important;
+  }
   :global(html.dark) .map-search-result {
     color: #fff;
     border-bottom: 1px solid #444;
@@ -366,6 +377,12 @@
   :global(html.dark) .map-search-result:hover {
     background: var(--accent-color);
     color: #fff;
+  }
+  :global(html.dark) .map-search-result:active,
+  :global(html.dark) .map-search-result:focus,
+  :global(html.dark) .map-search-result.selected {
+    background: var(--accent-color) !important;
+    color: #fff !important;
   }
   :global(html.dark) .map-picker-container-fullscreen {
     background: #1a1a1a;
