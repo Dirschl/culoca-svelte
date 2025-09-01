@@ -2325,7 +2325,7 @@
 
   /* Dark Mode Styles */
   :global(html.dark) .search-results {
-    background-color: #23232a;
+    background-color: #1a1a1a !important;
     border: 1px solid #444;
   }
   :global(html.dark) .search-result {
@@ -2342,7 +2342,7 @@
     color: #ccc;
   }
   :global(html.dark) .map-modal-footer {
-    background-color: #18181b;
+    background-color: #1a1a1a;
     border-top: 1px solid #444;
   }
   :global(html.dark) .map-modal-footer p {

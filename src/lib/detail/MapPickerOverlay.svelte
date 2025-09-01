@@ -333,15 +333,15 @@
     margin-right: 1rem;
   }
   :global(html.dark) .map-modal-content-fullscreen {
-    background: #18181b;
+    background: #1a1a1a;
   }
   :global(html.dark) .map-search-input {
-    background: #23232a;
+    background: #1a1a1a;
     color: #fff;
     border: 1px solid #444;
   }
   :global(html.dark) .map-search-results {
-    background: #23232a;
+    background: #1a1a1a !important;
     color: #fff;
   }
   :global(html.dark) .map-search-result {
@@ -353,14 +353,14 @@
     color: #fff;
   }
   :global(html.dark) .map-picker-container-fullscreen {
-    background: #23232a;
+    background: #1a1a1a;
   }
   :global(html.dark) .map-coords-fullscreen {
     color: #fff;
   }
   :global(html.dark) .map-cancel-btn, :global(html.dark) .map-confirm-btn {
     color: #fff;
-    background: #23232a;
+    background: #1a1a1a;
     border: 1px solid #444;
   }
   :global(html.dark) .map-cancel-btn:hover {
