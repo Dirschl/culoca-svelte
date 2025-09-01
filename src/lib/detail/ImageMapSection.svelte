@@ -3,7 +3,12 @@
   import { goto } from '$app/navigation';
   export let image: any;
   export let isCreator: boolean = false;
+  export let hasEditRights: boolean = false; // New prop for unified rights
   export let nearby: any[] = [];
+  
+  // Combined edit permission check
+  $: canEdit = isCreator || hasEditRights;
+  
   let mapType: 'standard' | 'hybrid' = 'standard';
   // Beim Laden: mapType aus localStorage lesen
   if (typeof window !== 'undefined') {
@@ -329,7 +334,7 @@
   {#if image.lat && image.lon}
     <div class="map-wrapper">
       <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.7rem;">
-        {#if isCreator}
+        {#if canEdit}
           <button class="map-pin-btn" on:click={() => dispatch('openMapPicker', [image.lat, image.lon])} title="GPS ändern">
             <!-- Culoca O SVG -->
             <svg width="28" height="34" viewBox="0 0 83.86 100.88" fill="none" xmlns="http://www.w3.org/2000/svg" class="culoca-o-edit">

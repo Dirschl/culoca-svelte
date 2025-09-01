@@ -46,9 +46,10 @@
   import ImageMapSection from '$lib/detail/ImageMapSection.svelte';
   import RadiusControl from '$lib/detail/RadiusControl.svelte';
   import MapPickerOverlay from '$lib/detail/MapPickerOverlay.svelte';
-  import ItemRightsManager from '$lib/ItemRightsManager.svelte';
-  let showMapPicker = false;
-  let showRightsManager = false;
+import ItemRightsManager from '$lib/ItemRightsManager.svelte';
+import { unifiedRightsStore } from '$lib/unifiedRightsStore';
+let showMapPicker = false;
+let showRightsManager = false;
   import { useJustifiedLayout } from '$lib/galleryStore';
   import FloatingActionButtons from '$lib/FloatingActionButtons.svelte';
 
@@ -214,6 +215,18 @@
       sessionUserId: $sessionStore.userId
     });
   }
+
+  // Load unified rights when image is available
+  $: if (image && browser && image.id) {
+    unifiedRightsStore.loadRights(image.id);
+  }
+
+  // Cleanup rights store when component is destroyed
+  onMount(() => {
+    return () => {
+      unifiedRightsStore.reset();
+    };
+  });
 
   let imageSource = '';
   $: imageSource = image ? (() => {
@@ -572,7 +585,7 @@
   // User-Initialisierung (wie im Backup)
   // --- Title ---
   function startEditTitle() {
-    if (currentUser && image && image.profile_id === currentUser.id) {
+    if (currentUser && image && (isCreator || $unifiedRightsStore.rights?.edit)) {
       editingTitle = true;
       titleEditValue = image.title || '';
       setTimeout(() => {
@@ -586,7 +599,7 @@
     }
   }
   async function saveTitle() {
-    if (!editingTitle || !currentUser || !image || image.profile_id !== currentUser.id) return;
+    if (!editingTitle || !currentUser || !image || !(isCreator || $unifiedRightsStore.rights?.edit)) return;
     const newTitle = titleEditValue.trim();
     if (newTitle.length > 60) return;
     try {
@@ -607,7 +620,7 @@
   }
   // --- Description ---
   function startEditDescription() {
-    if (currentUser && image && image.profile_id === currentUser.id) {
+    if (currentUser && image && (isCreator || $unifiedRightsStore.rights?.edit)) {
       editingDescription = true;
       descriptionEditValue = image.description || '';
       setTimeout(() => {
@@ -621,7 +634,7 @@
     }
   }
   async function saveDescription() {
-    if (!editingDescription || !currentUser || !image || image.profile_id !== currentUser.id) return;
+    if (!editingDescription || !currentUser || !image || !(isCreator || $unifiedRightsStore.rights?.edit)) return;
     const newDescription = descriptionEditValue.trim();
     if (newDescription.length > 160) return;
     try {
@@ -642,7 +655,7 @@
   }
   // --- Caption ---
   function startEditCaption() {
-    if (currentUser && image && image.profile_id === currentUser.id) {
+    if (currentUser && image && (isCreator || $unifiedRightsStore.rights?.edit)) {
       editingCaption = true;
       captionEditValue = image.caption || '';
       setTimeout(() => {
@@ -656,7 +669,7 @@
     }
   }
   async function saveCaption() {
-    if (!editingCaption || !currentUser || !image || image.profile_id !== currentUser.id) return;
+    if (!editingCaption || !currentUser || !image || !(isCreator || $unifiedRightsStore.rights?.edit)) return;
     const newCaption = captionEditValue.trim();
     if (newCaption.length > 300) return;
     try {
@@ -683,7 +696,7 @@
   }
   // --- Keywords ---
   function startEditKeywords() {
-    if (currentUser && image && image.profile_id === currentUser.id) {
+    if (currentUser && image && (isCreator || $unifiedRightsStore.rights?.edit)) {
       editingKeywords = true;
       keywordsEditValue = (image.keywords || []).join(', ');
       setTimeout(() => {
@@ -697,7 +710,7 @@
     }
   }
   async function saveKeywords() {
-    if (!editingKeywords || !currentUser || !image || image.profile_id !== currentUser.id) return;
+    if (!editingKeywords || !currentUser || !image || !(isCreator || $unifiedRightsStore.rights?.edit)) return;
     const newKeywords = keywordsEditValue.trim();
     
     // Verbesserte Keywords-Verarbeitung
@@ -730,7 +743,7 @@
   }
   // --- Filename ---
   function startEditFilename() {
-    if (currentUser && image && image.profile_id === currentUser.id) {
+    if (currentUser && image && (isCreator || $unifiedRightsStore.rights?.edit)) {
       editingFilename = true;
       filenameEditValue = image.original_name || '';
       setTimeout(() => {
@@ -744,9 +757,9 @@
     }
   }
   async function saveFilename() {
-    if (!editingFilename || !currentUser || !image || image.profile_id !== currentUser.id) return;
+    if (!editingFilename || !currentUser || !image || !(isCreator || $unifiedRightsStore.rights?.edit)) return;
     const newFilename = filenameEditValue.trim();
-    if (newFilename.length > 200) return;
+    if (newFilename.length > 255) return;
     try {
       const res = await authFetch(`/api/item/${image.id}`, {
         method: 'PATCH',
@@ -765,7 +778,7 @@
   }
   // --- Slug ---
   function startEditSlug() {
-    if (currentUser && image && image.profile_id === currentUser.id) {
+    if (currentUser && image && (isCreator || $unifiedRightsStore.rights?.edit)) {
       editingSlug = true;
       slugEditValue = image.slug || '';
       setTimeout(() => {
@@ -779,39 +792,19 @@
     }
   }
   async function saveSlug() {
-    if (!editingSlug || !currentUser || !image || image.profile_id !== currentUser.id) return;
-    const newSlug = slugEditValue.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
-    if (newSlug.length < 3 || newSlug.length > 100) {
-      console.error('Slug validation failed:', { length: newSlug.length, slug: newSlug });
-      return;
-    }
+    if (!editingSlug || !currentUser || !image || !(isCreator || $unifiedRightsStore.rights?.edit)) return;
+    const newSlug = slugEditValue.trim();
+    if (newSlug.length > 255) return;
     try {
-      console.log('Saving slug:', { oldSlug: image.slug, newSlug });
       const res = await authFetch(`/api/item/${image.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ slug: newSlug })
       });
-      if (!res.ok) {
-        const errorText = await res.text();
-        console.error('Failed to save slug:', { status: res.status, error: errorText });
-        
-        // Spezielle Behandlung für Slug-Konflikte
-        if (res.status === 409) {
-          alert('Dieser Slug existiert bereits. Bitte wählen Sie einen anderen Slug.');
-        } else {
-          alert('Fehler beim Speichern des Slugs. Bitte versuchen Sie es erneut.');
-        }
-        return;
-      }
+      if (!res.ok) return;
       image.slug = newSlug;
       editingSlug = false;
-      // Redirect to new slug URL
-      goto(`/item/${newSlug}`, { replaceState: true });
-    } catch (err) { 
-      console.error('Failed to save slug:', err); 
-      editingSlug = false;
-    }
+    } catch (err) { console.error('Failed to save slug:', err); }
   }
   function cancelEditSlug() { editingSlug = false; slugEditValue = image.slug || ''; }
   function handleSlugKeydown(event: KeyboardEvent) {
@@ -1176,7 +1169,7 @@
         {/if}
       </figure>
       <div class="passepartout-info">
-        <h1 class="title" class:editable={isCreator} class:editing={editingTitle}>
+        <h1 class="title" class:editable={isCreator || $unifiedRightsStore.rights?.edit} class:editing={editingTitle}>
           {#if editingTitle}
             <div class="title-edit-container">
               <input
@@ -1204,8 +1197,8 @@
             </span>
           {/if}
         </h1>
-        {#if isCreator}
-          <p class="caption" class:editable={isCreator} class:editing={editingCaption}>
+        {#if isCreator || $unifiedRightsStore.rights?.edit}
+          <p class="caption" class:editable={isCreator || $unifiedRightsStore.rights?.edit} class:editing={editingCaption}>
             {#if editingCaption}
               <div class="caption-edit-container">
                 <textarea
@@ -1244,7 +1237,7 @@
             </span>
           </p>
         {/if}
-        <p class="description" class:editable={isCreator} class:editing={editingDescription}>
+        <p class="description" class:editable={isCreator || $unifiedRightsStore.rights?.edit} class:editing={editingDescription}>
           {#if editingDescription}
             <div class="description-edit-container">
               <textarea
@@ -1342,7 +1335,7 @@
     <div class="meta-section single-exif">
       <!-- Column 1: Keywords -->
       <div class="keywords-column">
-        <h2 class="keywords-title" class:editable={isCreator} class:editing={editingKeywords} on:click={startEditKeywords}>
+        <h2 class="keywords-title" class:editable={isCreator || $unifiedRightsStore.rights?.edit} class:editing={editingKeywords} on:click={startEditKeywords}>
           Keywords
         </h2>
         {#if editingKeywords}
@@ -1376,7 +1369,7 @@
           {/if}
         {/if}
         <h2>File Details</h2>
-        <div class="filename" class:editable={isCreator} class:editing={editingFilename}>
+        <div class="filename" class:editable={isCreator || $unifiedRightsStore.rights?.edit} class:editing={editingFilename}>
           {#if editingFilename}
             <div class="filename-edit-container">
               <input
@@ -1401,7 +1394,7 @@
         </div>
         <div class="filename">{browser ? window.location.href : ''}</div>
         {#if image.slug}
-          <div class="filename" class:editable={isCreator} class:editing={editingSlug}>
+          <div class="filename" class:editable={isCreator || $unifiedRightsStore.rights?.edit} class:editing={editingSlug}>
             {#if editingSlug}
               <div class="filename-edit-container">
                 <input
@@ -1578,7 +1571,7 @@
         {/if}
       </div>
     </div>
-    <ImageMapSection {image} nearby={filteredNearby} isCreator={isCreator} on:openMapPicker={() => { showMapPicker = true; }} />
+            <ImageMapSection {image} nearby={filteredNearby} isCreator={isCreator} hasEditRights={$unifiedRightsStore.rights?.edit} on:openMapPicker={() => { showMapPicker = true; }} />
     <MapPickerOverlay
       visible={showMapPicker}
       lat={image?.lat}
@@ -1587,13 +1580,22 @@
       onCancel={() => { showMapPicker = false; }}
       onSave={async (lat, lon) => {
         showMapPicker = false;
-        if (image && image.id) {
-          await fetch(`/api/item/${image.id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ lat, lon })
-          });
-          window.location.reload();
+        if (image && image.id && (isCreator || $unifiedRightsStore.rights?.edit)) {
+          try {
+            const res = await authFetch(`/api/item/${image.id}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ lat, lon })
+            });
+            if (res.ok) {
+              image.lat = lat;
+              image.lon = lon;
+            } else {
+              console.error('Failed to save coordinates');
+            }
+          } catch (err) {
+            console.error('Error saving coordinates:', err);
+          }
         }
       }}
     />

@@ -345,8 +345,8 @@
   <title>Mein Profil - Culoca</title>
   
   <!-- Strukturierte Daten (JSON-LD) für bessere SEO -->
-  <script type="application/ld+json">
-  {JSON.stringify({
+  {@html `<script type="application/ld+json">
+  ${JSON.stringify({
     "@context": "https://schema.org",
     "@type": "WebPage",
     "name": "Mein Profil - Culoca",
@@ -358,8 +358,8 @@
       "name": "Culoca",
       "url": "https://culoca.com"
     }
-  })}
-  </script>
+  }, null, 2)}
+  </script>`}
 </svelte:head>
 
 <div class="profile-page">

@@ -36,7 +36,7 @@ export const GET: RequestHandler = async ({ params, request }) => {
     // Prüfen, ob der Benutzer der Ersteller des Items ist
     const { data: item, error: itemError } = await supabase
       .from('items')
-      .select('user_id, title')
+      .select('profile_id, title')
       .eq('id', itemId)
       .single();
 
@@ -52,9 +52,9 @@ export const GET: RequestHandler = async ({ params, request }) => {
       return json({ error: 'Item nicht gefunden' }, { status: 404 });
     }
 
-    console.log('🔍 Item found:', { itemId, itemUserId: item.user_id, currentUserId: userId });
+    console.log('🔍 Item found:', { itemId, itemProfileId: item.profile_id, currentUserId: userId });
 
-    if (item.user_id !== userId) {
+    if (item.profile_id !== userId) {
       return json({ error: 'Keine Berechtigung für dieses Item' }, { status: 403 });
     }
 
@@ -124,7 +124,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
     // Prüfen, ob der Benutzer der Ersteller des Items ist
     const { data: item, error: itemError } = await supabase
       .from('items')
-      .select('user_id, title')
+      .select('profile_id, title')
       .eq('id', itemId)
       .single();
 
@@ -140,7 +140,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
       return json({ error: 'Item nicht gefunden' }, { status: 404 });
     }
 
-    if (item.user_id !== userId) {
+    if (item.profile_id !== userId) {
       return json({ error: 'Keine Berechtigung für dieses Item' }, { status: 403 });
     }
 
@@ -155,38 +155,89 @@ export const POST: RequestHandler = async ({ params, request }) => {
       return json({ error: 'Benutzer nicht gefunden' }, { status: 404 });
     }
 
-    // Rechte erstellen oder aktualisieren (UPSERT)
+    // Rechte erstellen oder aktualisieren (INSERT oder UPDATE)
     try {
-      const { data, error } = await supabase
+      console.log('🔍 Attempting to save item rights:', {
+        item_id: itemId,
+        target_user_id: targetUserId,
+        rights: rights
+      });
+      
+      // Erst prüfen, ob der Eintrag bereits existiert
+      const { data: existingRight, error: checkError } = await supabase
         .from('item_rights')
-        .upsert({
-          item_id: itemId,
-          target_user_id: targetUserId,
-          rights: rights
-        })
-        .select()
+        .select('id')
+        .eq('item_id', itemId)
+        .eq('target_user_id', targetUserId)
         .single();
 
+      let data, error;
+
+      if (checkError && checkError.code === 'PGRST116') {
+        // Eintrag existiert nicht - INSERT
+        console.log('🔍 No existing item right found, creating new one');
+        const { data: insertData, error: insertError } = await supabase
+          .from('item_rights')
+          .insert({
+            item_id: itemId,
+            target_user_id: targetUserId,
+            rights: rights
+          })
+          .select()
+          .single();
+        
+        data = insertData;
+        error = insertError;
+      } else if (checkError) {
+        // Anderer Fehler beim Prüfen
+        console.error('❌ Error checking existing item rights:', checkError);
+        error = checkError;
+      } else {
+        // Eintrag existiert - UPDATE
+        console.log('🔍 Existing item right found, updating');
+        const { data: updateData, error: updateError } = await supabase
+          .from('item_rights')
+          .update({
+            rights: rights,
+            updated_at: new Date().toISOString()
+          })
+          .eq('item_id', itemId)
+          .eq('target_user_id', targetUserId)
+          .select()
+          .single();
+        
+        data = updateData;
+        error = updateError;
+      }
+
       if (error) {
+        console.error('❌ Supabase error details:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
+        
         if (error.code === '42P01') { // relation does not exist
           return json({ error: 'Rechteverwaltung ist noch nicht verfügbar. Bitte führen Sie zuerst die Datenbank-Migration aus.' }, { status: 503 });
         } else if (error.code === '42501') { // RLS policy violation
           console.error('RLS policy violation:', error);
           return json({ error: 'Berechtigungsfehler. RLS-Policies müssen angepasst werden.' }, { status: 403 });
         } else {
-          console.error('Error upserting item rights:', error);
-          return json({ error: 'Fehler beim Speichern der Rechte' }, { status: 500 });
+          console.error('Error saving item rights:', error);
+          return json({ error: 'Fehler beim Speichern der Rechte', details: error.message }, { status: 500 });
         }
       }
 
+      console.log('✅ Item rights saved successfully:', data);
       return json({ 
         success: true, 
         itemRight: data,
         targetUser: targetUser
       });
     } catch (error) {
-      console.error('Error in item rights upsert:', error);
-      return json({ error: 'Fehler beim Speichern der Rechte' }, { status: 500 });
+      console.error('❌ Exception in item rights save:', error);
+      return json({ error: 'Fehler beim Speichern der Rechte', details: error instanceof Error ? error.message : String(error) }, { status: 500 });
     }
   } catch (error) {
     console.error('Error in POST /api/item-rights:', error);
@@ -231,7 +282,7 @@ export const DELETE: RequestHandler = async ({ params, request }) => {
     // Prüfen, ob der Benutzer der Ersteller des Items ist
     const { data: item, error: itemError } = await supabase
       .from('items')
-      .select('user_id')
+      .select('profile_id')
       .eq('id', itemId)
       .single();
 
@@ -239,7 +290,7 @@ export const DELETE: RequestHandler = async ({ params, request }) => {
       return json({ error: 'Item nicht gefunden' }, { status: 404 });
     }
 
-    if (item.user_id !== userId) {
+    if (item.profile_id !== userId) {
       return json({ error: 'Keine Berechtigung für dieses Item' }, { status: 403 });
     }
 

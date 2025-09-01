@@ -21,6 +21,8 @@
   };
 
   let searchTimeout: NodeJS.Timeout;
+  let editingRights: any = null;
+  let editRights: any = { download: false, edit: false, delete: false };
 
   onMount(() => {
     loadExistingRights();
@@ -161,6 +163,51 @@
     }
   }
 
+  function startEditRights(right: any) {
+    editingRights = right;
+    editRights = { ...right.rights };
+  }
+
+  function cancelEditRights() {
+    editingRights = null;
+    editRights = { download: false, edit: false, delete: false };
+  }
+
+  async function saveEditRights() {
+    if (!editingRights) return;
+
+    try {
+      loading = true;
+      const response = await authFetch(`/api/item-rights/${itemId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          targetUserId: editingRights.target_user_id,
+          rights: editRights
+        })
+      });
+
+      if (response.ok) {
+        message = 'Rechte erfolgreich aktualisiert!';
+        messageType = 'success';
+        editingRights = null;
+        editRights = { download: false, edit: false, delete: false };
+        await loadExistingRights();
+      } else {
+        const errorData = await response.json();
+        const errorMessage = errorData.error + (errorData.details ? `: ${errorData.details}` : '');
+        message = errorMessage || 'Fehler beim Aktualisieren';
+        messageType = 'error';
+      }
+    } catch (error) {
+      console.error('Error updating rights:', error);
+      message = 'Fehler beim Aktualisieren der Rechte';
+      messageType = 'error';
+    } finally {
+      loading = false;
+    }
+  }
+
   function getRightsText(rightsObj: any): string {
     const rightsList = [];
     if (rightsObj.download) rightsList.push('Download');
@@ -268,25 +315,77 @@
       <div class="rights-list">
         {#each existingRights as right}
           <div class="right-item">
-                                    <div class="user-info">
-                          <div class="user-name">{right.userName || `Benutzer ID: ${right.target_user_id}`}</div>
-                          <div class="user-email">{right.userEmail || 'Keine E-Mail verfügbar'}</div>
-                        </div>
-            
-            <div class="rights-info">
-              <div class="rights-text"><strong>Rechte:</strong> {getRightsText(right.rights)}</div>
-              <div class="rights-date">
-                Erstellt: {new Date(right.created_at).toLocaleDateString('de-DE')}
+            {#if editingRights === right}
+              <!-- Edit Mode -->
+              <div class="user-info">
+                <div class="user-name">{right.userName || `Benutzer ID: ${right.target_user_id}`}</div>
+                <div class="user-email">{right.userEmail || 'Keine E-Mail verfügbar'}</div>
               </div>
-            </div>
-            
-                                    <button
-                          class="delete-btn"
-                          on:click={() => deleteRights(right.target_user_id)}
-                          disabled={loading}
-                        >
-                          Löschen
-                        </button>
+              
+              <div class="rights-edit">
+                <div class="rights-checkboxes">
+                  <label class="right-checkbox">
+                    <input type="checkbox" bind:checked={editRights.download}>
+                    <span class="checkbox-label">Download</span>
+                  </label>
+                  <label class="right-checkbox">
+                    <input type="checkbox" bind:checked={editRights.edit}>
+                    <span class="checkbox-label">Bearbeiten</span>
+                  </label>
+                  <label class="right-checkbox">
+                    <input type="checkbox" bind:checked={editRights.delete}>
+                    <span class="checkbox-label">Löschen</span>
+                  </label>
+                </div>
+              </div>
+              
+              <div class="edit-buttons">
+                <button 
+                  class="save-btn" 
+                  on:click={saveEditRights}
+                  disabled={loading}
+                >
+                  {loading ? 'Speichere...' : 'Speichern'}
+                </button>
+                <button 
+                  class="cancel-btn" 
+                  on:click={cancelEditRights}
+                  disabled={loading}
+                >
+                  Abbrechen
+                </button>
+              </div>
+            {:else}
+              <!-- View Mode -->
+              <div class="user-info">
+                <div class="user-name">{right.userName || `Benutzer ID: ${right.target_user_id}`}</div>
+                <div class="user-email">{right.userEmail || 'Keine E-Mail verfügbar'}</div>
+              </div>
+              
+              <div class="rights-info">
+                <div class="rights-text">{getRightsText(right.rights)}</div>
+                <div class="rights-date">
+                  Erstellt: {new Date(right.created_at).toLocaleDateString('de-DE')}
+                </div>
+              </div>
+              
+              <div class="action-buttons">
+                <button 
+                  class="edit-btn" 
+                  on:click={() => startEditRights(right)}
+                  disabled={loading}
+                >
+                  Bearbeiten
+                </button>
+                <button
+                  class="delete-btn"
+                  on:click={() => deleteRights(right.target_user_id)}
+                  disabled={loading}
+                >
+                  Löschen
+                </button>
+              </div>
+            {/if}
           </div>
         {/each}
       </div>
@@ -535,6 +634,63 @@
     cursor: not-allowed;
   }
 
+  .edit-btn {
+    background: #007bff;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background 0.2s;
+    margin-right: 0.5rem;
+  }
+
+  .edit-btn:hover:not(:disabled) {
+    background: #0056b3;
+  }
+
+  .edit-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .cancel-btn {
+    background: #6c757d;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background 0.2s;
+    margin-left: 0.5rem;
+  }
+
+  .cancel-btn:hover:not(:disabled) {
+    background: #545b62;
+  }
+
+  .cancel-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .action-buttons {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .edit-buttons {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .rights-edit {
+    flex: 1;
+    margin: 0 1rem;
+  }
+
   @media (max-width: 768px) {
     .right-item {
       flex-direction: column;
@@ -544,6 +700,16 @@
 
     .rights-info {
       margin: 0;
+    }
+
+    .rights-edit {
+      margin: 0;
+    }
+
+    .action-buttons,
+    .edit-buttons {
+      width: 100%;
+      justify-content: flex-start;
     }
 
     .delete-btn {

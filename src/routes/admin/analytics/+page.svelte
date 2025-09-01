@@ -10,6 +10,7 @@
   import { goto } from '$app/navigation';
   import { darkMode } from '$lib/darkMode';
   import InfoPageLayout from '$lib/InfoPageLayout.svelte';
+  import DownloadStats from '$lib/DownloadStats.svelte';
 
   let isLoading = true;
   let isAdmin = false;
@@ -26,6 +27,7 @@
   let botViews = 0; // Added for bot views
   let searchEngineViews = 0; // Added for search engine visitors
   let functionAvailable = false; // Track if SQL function is available
+  let selectedItemId: string | null = null; // For item-specific download stats
 
   onMount(async () => {
     // Wait for authentication to be ready
@@ -275,6 +277,21 @@
   function getItemUrl(itemId: string): string {
     return `/item/${itemId}`;
   }
+
+  function showItemDownloadStats(itemId: string) {
+    selectedItemId = itemId;
+    // Scroll to download stats
+    setTimeout(() => {
+      const downloadStatsElement = document.querySelector('.download-stats');
+      if (downloadStatsElement) {
+        downloadStatsElement.scrollIntoView({ behavior: 'smooth' });
+      }
+    }, 100);
+  }
+
+  function showAllDownloadStats() {
+    selectedItemId = null;
+  }
 </script>
 
 {#if isLoading}
@@ -478,9 +495,18 @@
                   <td>{formatNumber(item.views_today)}</td>
                   <td>{formatNumber(item.views_this_week)}</td>
                   <td>
-                    <a href={`/item/${item.item_slug}`} class="admin-action-btn admin-action-btn-primary" target="_blank">
-                      👁️ Ansehen
-                    </a>
+                    <div style="display: flex; gap: 0.5rem;">
+                      <a href={`/item/${item.item_slug}`} class="admin-action-btn admin-action-btn-primary" target="_blank">
+                        👁️ Ansehen
+                      </a>
+                      <button 
+                        class="admin-action-btn admin-action-btn-primary" 
+                        on:click={() => showItemDownloadStats(item.item_id)}
+                        title="Download-Statistiken anzeigen"
+                      >
+                        📥 Downloads
+                      </button>
+                    </div>
                   </td>
                 </tr>
               {/each}
@@ -493,6 +519,24 @@
             <p class="admin-empty-description">Noch keine Items wurden angesehen.</p>
           </div>
         {/if}
+      </div>
+
+      <!-- Download Statistics -->
+      <div style="margin-top: 2rem;">
+        {#if selectedItemId}
+          <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+            <button 
+              class="admin-action-btn admin-action-btn-primary" 
+              on:click={showAllDownloadStats}
+            >
+              ← Zurück zu allen Downloads
+            </button>
+            <span style="color: var(--text-secondary);">
+              Zeige Download-Statistiken für Item: {selectedItemId.slice(0, 8)}...
+            </span>
+          </div>
+        {/if}
+        <DownloadStats itemId={selectedItemId} />
       </div>
     </div>
   </InfoPageLayout>
