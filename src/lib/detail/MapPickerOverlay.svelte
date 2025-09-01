@@ -253,6 +253,7 @@
     cursor: pointer;
     border-bottom: 1px solid #e5e7eb;
     font-size: 1rem;
+    background-color: #1a1a1a;
   }
   .map-search-result:last-child {
     border-bottom: none;
