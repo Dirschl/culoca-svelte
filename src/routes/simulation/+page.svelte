@@ -1043,8 +1043,8 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   
   <!-- Strukturierte Daten (JSON-LD) für bessere SEO -->
-  <script type="application/ld+json">
-  {JSON.stringify({
+  {@html `<script type="application/ld+json">
+  ${JSON.stringify({
     "@context": "https://schema.org",
     "@type": "WebPage",
     "name": "Simulation - Culoca",
@@ -1056,8 +1056,8 @@
       "name": "Culoca",
       "url": "https://culoca.com"
     }
-  })}
-  </script>
+  }, null, 2)}
+  </script>`}
 </svelte:head>
 
 <FloatingActionButtons

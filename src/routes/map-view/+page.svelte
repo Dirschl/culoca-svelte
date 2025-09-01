@@ -59,8 +59,8 @@
   <meta property="og:locale" content="de_DE" />
   
   <!-- Strukturierte Daten (JSON-LD) für bessere SEO -->
-  <script type="application/ld+json">
-  {JSON.stringify({
+  {@html `<script type="application/ld+json">
+  ${JSON.stringify({
     "@context": "https://schema.org",
     "@type": "WebPage",
     "name": "CULOCA - Map View",
@@ -72,8 +72,8 @@
       "name": "Culoca",
       "url": "https://culoca.com"
     }
-  })}
-  </script>
+  }, null, 2)}
+  </script>`}
 </svelte:head>
 
 <div class="map-view-container">

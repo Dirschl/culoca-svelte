@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { unifiedRightsStore } from '$lib/unifiedRightsStore';
+  
   export let image: any;
   export let isCreator: boolean;
   export let onSetLocationFilter: () => void;
@@ -8,6 +10,32 @@
   export let onToggleGallery: () => void;
   export let darkMode: boolean = false;
   export let rotating: boolean = false;
+
+  // Subscribe to unified rights store
+  $: rights = $unifiedRightsStore.rights;
+  $: loading = $unifiedRightsStore.loading;
+  $: error = $unifiedRightsStore.error;
+  $: isOwner = $unifiedRightsStore.isOwner;
+
+  // Debug logging
+  $: {
+    console.log('🔍 [ImageControlsSection] Rights updated:', {
+      rights,
+      loading,
+      error,
+      isOwner,
+      isCreator,
+      imageId: image?.id
+    });
+    
+    if (rights) {
+      console.log('🔍 [ImageControlsSection] Button visibility decisions:', {
+        deleteButton: rights.delete || isCreator,
+        downloadButton: rights.download || rights.download_original || isCreator,
+        galleryButton: rights.edit || isCreator
+      });
+    }
+  }
 </script>
 
 <div class="controls-section" class:dark={darkMode}>
@@ -33,28 +61,34 @@
           <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
         </svg>
       </button>
-      {#if isCreator}
-        <button class="square-btn delete-btn" on:click={onDeleteImage} title="Bild löschen">
+      
+      {#if rights?.delete || isCreator}
+        <button class="square-btn delete-btn" on:click={onDeleteImage} title="Bild löschen" disabled={loading}>
           <svg width="35" height="35" viewBox="0 0 24 24" fill="currentColor">
             <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
           </svg>
         </button>
       {/if}
-      {#if isCreator}
-        <button class="square-btn download-btn" data-download-id={image.id} on:click={() => onDownloadOriginal(image.id, image.original_name)} title="Original herunterladen" disabled={rotating}>
+      
+      {#if rights?.download || rights?.download_original || isCreator}
+        <button class="square-btn download-btn" data-download-id={image.id} on:click={() => onDownloadOriginal(image.id, image.original_name)} title="Original herunterladen" disabled={rotating || loading}>
           <svg width="35" height="35" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 6v7m0 0l-3-3m3 3l3-3M6 18h12"/>
           </svg>
         </button>
-        <!-- Rotate button auskommentiert - gefährlich -->
-        <!--
-        <button class="square-btn rotate-btn" on:click={rotateImage} title="Bild 90° nach links drehen" disabled={rotating}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/>
-          </svg>
-        </button>
-        -->
-        <button class="square-btn gallery-toggle-btn" on:click={onToggleGallery} title="Aus Galerie entfernen/hinzufügen" class:active={image.gallery ?? true}>
+      {/if}
+      
+      <!-- Rotate button auskommentiert - gefährlich -->
+      <!--
+      <button class="square-btn rotate-btn" on:click={rotateImage} title="Bild 90° nach links drehen" disabled={rotating}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/>
+        </svg>
+      </button>
+      -->
+      
+      {#if rights?.edit || isCreator}
+        <button class="square-btn gallery-toggle-btn" on:click={onToggleGallery} title="Aus Galerie entfernen/hinzufügen" class:active={image.gallery ?? true} disabled={loading}>
           {#if image.gallery ?? true}
             <svg width="25" height="25" viewBox="0 0 24 24" fill="currentColor">
               <rect x="3" y="3" width="4" height="4"/>
@@ -165,15 +199,6 @@
     color: white;
     border-color: #28a745;
   }
-  .rotate-btn {
-    background: var(--bg-secondary);
-    color: var(--text-primary);
-  }
-  .rotate-btn:hover {
-    background: #ffc107;
-    color: #212529;
-    border-color: #ffc107;
-  }
   .gallery-toggle-btn {
     background: var(--bg-secondary);
     color: var(--text-primary);
@@ -183,11 +208,13 @@
     border-color: var(--text-primary);
   }
   .gallery-toggle-btn.active {
-    color: var(--text-primary);
-    border-color: var(--border-color);
+    background: #007bff;
+    color: white;
+    border-color: #007bff;
   }
   .gallery-toggle-btn.active:hover {
-    background: var(--bg-secondary);
+    background: #0056b3;
+    border-color: #0056b3;
   }
   .radius-control {
     width: 100%;
