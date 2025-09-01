@@ -662,6 +662,11 @@
     background: #1a1a1a !important;
     color: #fff;
   }
+  /* Force override for any background color */
+  :global(html.dark) .map-search-results,
+  :global(html.dark) .map-search-results * {
+    background: #1a1a1a !important;
+  }
   :global(html.dark) .map-search-result {
     color: #fff;
     border-bottom: 1px solid #444;
