@@ -1039,12 +1039,50 @@ let showRightsManager = false;
   <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
   <meta name="googlebot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
   <meta name="bingbot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+  
+  <!-- Enhanced image SEO meta tags -->
+  {#if image?.path_2048}
+    <meta name="image" content="https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/{image.path_2048}">
+    <meta property="og:image:width" content="{image.width || 2048}">
+    <meta property="og:image:height" content="{image.height || 2048}">
+    <meta name="twitter:image:width" content="{image.width || 2048}">
+    <meta name="twitter:image:height" content="{image.height || 2048}">
+  {/if}
   <meta name="author" content="culoca.com">
   <link rel="canonical" href={`https://culoca.com/item/${itemSlug}`}> <!-- Slug statt ID -->
   
   <!-- Dynamisches Favicon für bessere SEO - korrektes API verwenden -->
   <link rel="icon" type="image/png" href={`/api/favicon/${itemSlug}`} sizes="32x32 48x48 96x96 192x192 512x512"> 
-  <link rel="apple-touch-icon" href={`/api/favicon/${itemSlug}`} sizes="180x180"> 
+  <link rel="apple-touch-icon" href={`/api/favicon/${itemSlug}`} sizes="180x180">
+  
+  <!-- Structured Data for Images (JSON-LD) -->
+  {#if image}
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "ImageObject",
+      "name": "{image.title || image.original_name || 'Bild'}",
+      "description": "{image.description || image.caption || 'Bild von Culoca'}",
+      "url": "https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/{image.path_2048 || image.path_512}",
+      "contentUrl": "https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/{image.path_2048 || image.path_512}",
+      "width": {image.width || 2048},
+      "height": {image.height || 2048},
+      "encodingFormat": "image/jpeg",
+      "author": {
+        "@type": "Person",
+        "name": "{image.full_name || 'Culoca User'}"
+      },
+      "dateCreated": "{image.created_at}",
+      "dateModified": "{image.updated_at || image.created_at}",
+      "keywords": "{image.keywords || ''}",
+      "geo": {
+        "@type": "GeoCoordinates",
+        "latitude": {image.lat || 0},
+        "longitude": {image.lon || 0}
+      }
+    }
+    </script>
+  {/if} 
   <meta name="image" content={`https://culoca.com/api/favicon/${itemSlug}`}> 
   <meta property="og:image:alt" content={image?.title || `Item ${itemSlug}`}> 
   <meta name="twitter:image:alt" content={image?.title || `Item ${itemSlug}`}>

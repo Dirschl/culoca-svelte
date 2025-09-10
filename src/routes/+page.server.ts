@@ -1,10 +1,27 @@
 import type { PageServerLoad } from './$types';
 import { createClient } from '@supabase/supabase-js';
 
-export const load: PageServerLoad = async ({ url }) => {
+export const load: PageServerLoad = async ({ url, request }) => {
   // Get page parameter for pagination
   const page = parseInt(url.searchParams.get('page') || '1');
   const itemsPerPage = 50;
+  
+  // Bot detection for enhanced SEO
+  const userAgent = request.headers.get('user-agent') || '';
+  const isBot = userAgent.toLowerCase().includes('googlebot') ||
+                userAgent.toLowerCase().includes('bingbot') ||
+                userAgent.toLowerCase().includes('slurp') ||
+                userAgent.toLowerCase().includes('duckduckbot') ||
+                userAgent.toLowerCase().includes('facebookexternalhit') ||
+                userAgent.toLowerCase().includes('twitterbot') ||
+                userAgent.toLowerCase().includes('linkedinbot') ||
+                userAgent.toLowerCase().includes('yandexbot') ||
+                userAgent.toLowerCase().includes('baiduspider') ||
+                userAgent.toLowerCase().includes('rogerbot') ||
+                userAgent.toLowerCase().includes('dotbot') ||
+                userAgent.toLowerCase().includes('ia_archiver') ||
+                userAgent.toLowerCase().includes('google-inspectiontool') ||
+                userAgent.toLowerCase().includes('inspectiontool');
 
   // Supabase client für serverseitige Daten
   const supabaseUrl = (process.env.PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL || import.meta.env.PUBLIC_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL) as string;
@@ -33,6 +50,7 @@ export const load: PageServerLoad = async ({ url }) => {
         lat: item.lat,
         lon: item.lon,
         path_512: item.path_512,
+        path_2048: item.path_2048, // Add 2048px path for better SEO
         title: item.title,
         description: item.description,
         original_name: item.original_name,
@@ -75,6 +93,7 @@ export const load: PageServerLoad = async ({ url }) => {
   };
 
   console.log('[Server] Loading page data with SSR newsflash items:', newsFlashItems.length);
+  console.log('[Server] Bot detection:', { isBot, userAgent: userAgent.substring(0, 100) });
   
   return {
     seo,
@@ -82,6 +101,8 @@ export const load: PageServerLoad = async ({ url }) => {
     page,
     totalPages: Math.ceil(totalCount / itemsPerPage),
     totalCount,
-    dbConnectionOk: true
+    dbConnectionOk: true,
+    isBot,
+    userAgent: userAgent.substring(0, 100) // For debugging
   };
 };

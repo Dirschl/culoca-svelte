@@ -195,7 +195,7 @@
   let scrollTimeout: number | null = null;
   
   // Bot-Erkennung als globale Variable
-  let isBot = false;
+  let isBot = data.isBot || false;
 
 
 
@@ -2100,6 +2100,15 @@
                 />
   {/if}
   <WelcomeSection />
+  
+  <!-- Bot-friendly pagination links (only visible to bots) -->
+  {#if browser && isBot}
+    <div class="bot-pagination" style="display: none;">
+      {#each Array.from({length: Math.ceil(data.totalCount / 50)}, (_, i) => i + 1) as pageNum}
+        <a href="/?page={pageNum}" rel="next">Page {pageNum}</a>
+      {/each}
+    </div>
+  {/if}
   
   <!-- Autoguide Bar - nur im mobilen 3x3-Modus -->
   {#if isLoggedIn && autoguide && isManual3x3Mode}
