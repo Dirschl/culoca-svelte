@@ -103,14 +103,22 @@ export const GET: RequestHandler = async () => {
       // This ensures Google picks up the new SEO structure (1 page = 1 hero image)
       xml += `    <lastmod>${today}</lastmod>\n`;
       
-      // Add minimal image data (Google's current recommendation)
+      // Add enhanced image data for better SEO
       if (item.path_2048 || item.path_512) {
         xml += '    <image:image>\n';
         // Use 2048px if available, otherwise fallback to 512px
         const imagePath = item.path_2048 || item.path_512;
         const imageBucket = item.path_2048 ? 'images-2048' : 'images-512';
         xml += `      <image:loc>https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/${imageBucket}/${imagePath}</image:loc>\n`;
-        // Removed image:title and image:caption as per Google's current guidelines
+        
+        // Add title and caption for better image SEO (Google now supports this again)
+        if (item.title) {
+          xml += `      <image:title><![CDATA[${item.title}]]></image:title>\n`;
+        }
+        if (item.description) {
+          xml += `      <image:caption><![CDATA[${item.description}]]></image:caption>\n`;
+        }
+        
         xml += '    </image:image>\n';
       }
       
