@@ -205,6 +205,9 @@ let showRightsManager = false;
     : null;
   $: isCreator = !!currentUser && (currentUser.id === image?.profile_id || currentUser.id === '0ceb2320-0553-463b-971a-a0eef5ecdf09');
   
+  // Admin-Berechtigung prüfen
+  $: isAdmin = $sessionStore.permissions?.admin || false;
+  
   // Debug: Log creator status
   $: if (image && currentUser) {
     console.log('[DetailPage] Creator Debug:', {
@@ -1328,7 +1331,7 @@ let showRightsManager = false;
               <span class="limit-indicator">(max. 300)</span>
             {/if}
           {/if}
-          {#if typeof hiddenItems !== 'undefined' && hiddenItems.length > 0}
+          {#if typeof hiddenItems !== 'undefined' && hiddenItems.length > 0 && isAdmin}
             <span class="hidden-count" class:active={showHiddenItems} on:click={toggleHiddenItems} on:keydown={(e) => handleKey(e, toggleHiddenItems)}>
               + {hiddenItems.length} ausgeblendet
             </span>
