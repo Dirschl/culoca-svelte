@@ -208,6 +208,9 @@ let showRightsManager = false;
   // Admin-Berechtigung prüfen
   $: isAdmin = $sessionStore.permissions?.admin || false;
   
+  // Prüfen ob ausgeblendete Items vom aktuellen Benutzer stammen
+  $: hasOwnHiddenItems = hiddenItems.some(item => item.profile_id === currentUser?.id);
+  
   // Debug: Log creator status
   $: if (image && currentUser) {
     console.log('[DetailPage] Creator Debug:', {
@@ -1331,7 +1334,7 @@ let showRightsManager = false;
               <span class="limit-indicator">(max. 300)</span>
             {/if}
           {/if}
-          {#if typeof hiddenItems !== 'undefined' && hiddenItems.length > 0 && isAdmin}
+          {#if typeof hiddenItems !== 'undefined' && hiddenItems.length > 0 && (isAdmin || hasOwnHiddenItems)}
             <span class="hidden-count" class:active={showHiddenItems} on:click={toggleHiddenItems} on:keydown={(e) => handleKey(e, toggleHiddenItems)}>
               + {hiddenItems.length} ausgeblendet
             </span>
