@@ -245,11 +245,24 @@
       // Start position monitoring for dynamic loading
       startPositionMonitoring();
     }
+    
+    // Listen for GPS position updates from main page
+    const handleGPSUpdate = (event: CustomEvent) => {
+      console.log('[MobileGallery] Received GPS update event:', event.detail);
+      const { lat, lon } = event.detail;
+      if (lat && lon) {
+        updateGPSPosition(lat, lon);
+      }
+    };
+    
+    window.addEventListener('gpsPositionUpdate', handleGPSUpdate as EventListener);
+    
     return () => {
       stopContinuousRotation();
       if (loadCheckInterval) {
         clearInterval(loadCheckInterval);
       }
+      window.removeEventListener('gpsPositionUpdate', handleGPSUpdate as EventListener);
     };
   });
 
