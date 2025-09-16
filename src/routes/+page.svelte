@@ -1016,7 +1016,7 @@
             }
             
             // Clientseitige Sortierung für bereits geladene Items
-            // updateGPSPosition(userLat!, userLon!); // Entfernt
+            updateGPSPosition(userLat!, userLon!);
             console.log('[GPS-Simulation] Updated GPS position for client-side sorting');
           }, 100); // Kürzerer Debounce für Simulation
         }
@@ -1346,7 +1346,7 @@
         }
         
         // Clientseitige Sortierung für bereits geladene Items (unabhängig vom Modus)
-        // updateGPSPosition(effectiveLat, effectiveLon); // Entfernt
+        updateGPSPosition(effectiveLat, effectiveLon);
         console.log('[GPS-Trigger] Updated GPS position for client-side sorting');
       }, 200); // 200ms Debounce
     }
@@ -1986,6 +1986,19 @@
       initializeGPS();
     } else {
       gpsStatus = 'unavailable';
+    }
+  }
+
+  // Funktion zum Aktualisieren der GPS-Position für mobile Galerie
+  function updateGPSPosition(lat: number, lon: number) {
+    console.log('[GPS-Update] Updating GPS position for mobile gallery:', { lat, lon });
+    
+    // Dispatch custom event für mobile Galerie
+    if (browser) {
+      const event = new CustomEvent('gpsPositionUpdate', {
+        detail: { lat, lon }
+      });
+      window.dispatchEvent(event);
     }
   }
 
