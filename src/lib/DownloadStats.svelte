@@ -5,6 +5,7 @@
   export let itemId: string | null = null; // null = all items, specific UUID = single item
 
   let downloadStats: any[] = [];
+  let downloadHistory: any[] = [];
   let loading = false;
   let error = '';
 
@@ -23,6 +24,7 @@
       if (response.ok) {
         const data = await response.json();
         downloadStats = data.downloadStats || [];
+        downloadHistory = data.downloadHistory || [];
       } else {
         const errorData = await response.json();
         error = errorData.error || 'Fehler beim Laden der Statistiken';
@@ -37,6 +39,35 @@
 
   function formatNumber(num: number): string {
     return num.toLocaleString('de-DE');
+  }
+
+  function formatDate(dateString: string): string {
+    const date = new Date(dateString);
+    return date.toLocaleString('de-DE', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  }
+
+  function getDownloadTypeLabel(type: string): string {
+    switch (type) {
+      case 'full_resolution': return 'Vollauflösung';
+      case 'preview': return 'Vorschau';
+      case 'purchased': return 'Gekauft';
+      default: return type;
+    }
+  }
+
+  function getDownloadSourceLabel(source: string): string {
+    switch (source) {
+      case 'rights': return 'Berechtigung';
+      case 'purchase': return 'Kauf';
+      case 'owner': return 'Eigentümer';
+      default: return source;
+    }
   }
 
   function getTotalStats() {
@@ -150,6 +181,67 @@
         </table>
       </div>
     </div>
+
+    <!-- Download History -->
+    {#if downloadHistory.length > 0}
+      <div class="download-history">
+        <h4>Download-Historie (nach Datum sortiert)</h4>
+        <div class="history-table">
+          <table>
+            <thead>
+              <tr>
+                {#if !itemId}
+                  <th>Item</th>
+                {/if}
+                <th>Benutzer</th>
+                <th>Download-Typ</th>
+                <th>Quelle</th>
+                <th>Datum</th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each downloadHistory as history}
+                <tr>
+                  {#if !itemId}
+                    <td class="item-info">
+                      {#if history.items}
+                        <a href={`/item/${history.items.slug}`} class="item-link" target="_blank">
+                          {history.items.title || 'Unbenannt'}
+                        </a>
+                        <div class="item-id">ID: {history.item_id.slice(0, 8)}...</div>
+                      {:else}
+                        <span class="item-id">ID: {history.item_id.slice(0, 8)}...</span>
+                      {/if}
+                    </td>
+                  {/if}
+                  <td class="user-info">
+                    <div class="user-name">
+                      {history.profiles?.full_name || 'Unbekannt'}
+                    </div>
+                    <div class="user-account">
+                      @{history.profiles?.accountname || 'unbekannt'}
+                    </div>
+                  </td>
+                  <td>
+                    <span class="download-type download-type-{history.download_type}">
+                      {getDownloadTypeLabel(history.download_type)}
+                    </span>
+                  </td>
+                  <td>
+                    <span class="download-source download-source-{history.download_source}">
+                      {getDownloadSourceLabel(history.download_source)}
+                    </span>
+                  </td>
+                  <td class="download-date">
+                    {formatDate(history.created_at)}
+                  </td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    {/if}
   {/if}
 </div>
 
@@ -259,17 +351,112 @@
     font-size: 0.9rem;
   }
 
+  /* Download History Styles */
+  .download-history {
+    margin-top: 2rem;
+    background: var(--bg-primary);
+    padding: 1.5rem;
+    border-radius: 8px;
+  }
+
+  .history-table {
+    overflow-x: auto;
+  }
+
+  .user-info {
+    min-width: 150px;
+  }
+
+  .user-name {
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+
+  .user-account {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    font-style: italic;
+  }
+
+  .item-info {
+    min-width: 200px;
+  }
+
+  .item-link {
+    color: var(--primary-color);
+    text-decoration: none;
+    font-weight: 500;
+  }
+
+  .item-link:hover {
+    text-decoration: underline;
+  }
+
+  .download-type {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 500;
+  }
+
+  .download-type-full_resolution {
+    background: var(--success-bg);
+    color: var(--success-color);
+  }
+
+  .download-type-preview {
+    background: var(--warning-bg);
+    color: var(--warning-color);
+  }
+
+  .download-type-purchased {
+    background: var(--info-bg);
+    color: var(--info-color);
+  }
+
+  .download-source {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 500;
+  }
+
+  .download-source-rights {
+    background: var(--primary-bg);
+    color: var(--primary-color);
+  }
+
+  .download-source-purchase {
+    background: var(--success-bg);
+    color: var(--success-color);
+  }
+
+  .download-source-owner {
+    background: var(--info-bg);
+    color: var(--info-color);
+  }
+
+  .download-date {
+    font-family: monospace;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+  }
+
   @media (max-width: 768px) {
     .stats-grid {
       grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     }
 
-    .stats-table {
+    .stats-table, .history-table {
       font-size: 0.9rem;
     }
 
     th, td {
       padding: 0.5rem;
+    }
+
+    .user-info, .item-info {
+      min-width: auto;
     }
   }
 </style>
