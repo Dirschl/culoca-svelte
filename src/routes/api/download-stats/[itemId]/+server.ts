@@ -82,9 +82,57 @@ export const GET: RequestHandler = async ({ params, request }) => {
       return json({ error: 'Fehler beim Abrufen der Download-Statistiken', details: error.message }, { status: 500 });
     }
     
+    // Get detailed download history with user information
+    let downloadHistory: any[] = [];
+    if (itemId && itemId !== 'all') {
+      const { data: history, error: historyError } = await supabase
+        .from('item_downloads')
+        .select(`
+          id,
+          download_type,
+          download_source,
+          created_at,
+          user_id,
+          profiles!inner(full_name, accountname)
+        `)
+        .eq('item_id', itemId)
+        .order('created_at', { ascending: false });
+      
+      if (historyError) {
+        console.error('Error getting download history:', historyError);
+      } else {
+        downloadHistory = history || [];
+      }
+    } else {
+      // For 'all' stats, get recent downloads across all items
+      const { data: history, error: historyError } = await supabase
+        .from('item_downloads')
+        .select(`
+          id,
+          download_type,
+          download_source,
+          created_at,
+          user_id,
+          item_id,
+          profiles!inner(full_name, accountname),
+          items!inner(title, slug)
+        `)
+        .order('created_at', { ascending: false })
+        .limit(100); // Limit to last 100 downloads
+      
+      if (historyError) {
+        console.error('Error getting download history:', historyError);
+      } else {
+        downloadHistory = history || [];
+      }
+    }
+    
     console.log('✅ Download stats fetched:', downloadStats?.length || 0, 'records');
+    console.log('✅ Download history fetched:', downloadHistory?.length || 0, 'records');
+    
     return json({ 
       downloadStats: downloadStats || [],
+      downloadHistory: downloadHistory || [],
       itemId: itemId === 'all' ? null : itemId
     });
   } catch (error) {
