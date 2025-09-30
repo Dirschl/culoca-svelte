@@ -2301,10 +2301,10 @@ let showRightsManager = false;
     font-weight: 500;
   }
   .char-count.valid {
-    color: #28a745;
+    color: var(--success-color);
   }
   .char-count.too-many {
-    color: #dc3545;
+    color: var(--error-color);
   }
   .map-pin-btn {
     display: block;

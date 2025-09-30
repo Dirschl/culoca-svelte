@@ -25,6 +25,7 @@
       <ul>
         <li><a href="/system">System</a></li>
         <li><a href="/license">Lizenz</a></li>
+        <li><a href="/web/google">Google Earth KML</a></li>
         <li><a href="/impressum">Impressum</a></li>
         <li><a href="/datenschutz">Datenschutz</a></li>
       </ul>

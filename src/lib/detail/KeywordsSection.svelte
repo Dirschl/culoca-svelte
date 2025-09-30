@@ -82,37 +82,29 @@
     flex-direction: column;
     gap: 0.3rem;
     margin-bottom: 0.5rem;
-    background: #fff;
+    background: var(--bg-secondary);
     border-radius: 6px;
-  }
-  :global(body[data-theme='dark']) .keywords-edit-container {
-    background: #222;
   }
   .keywords-edit-input {
     font-size: 1rem;
     padding: 0.4rem 0.7rem;
     border-radius: 6px;
-    border: 1px solid #ccc;
+    border: 1px solid var(--border-color);
     min-height: 80px;
     resize: vertical;
-    color: #222;
-    background: #fff;
-  }
-  :global(body[data-theme='dark']) .keywords-edit-input {
-    color: #fff;
-    background: #222;
-    border: 1px solid #444;
+    color: var(--text-primary);
+    background: var(--bg-secondary);
   }
   .char-count {
     font-size: 0.95rem;
-    color: #888;
+    color: var(--text-muted);
     align-self: flex-end;
   }
   .char-count.valid {
     color: var(--accent-color);
   }
   .char-count.too-many {
-    color: #dc2626;
+    color: var(--error-color);
     font-weight: 600;
   }
   .keywords {
