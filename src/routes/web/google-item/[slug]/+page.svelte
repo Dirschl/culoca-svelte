@@ -22,7 +22,7 @@
         <img 
           src="https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/{item.path_2048}" 
           alt={item.title || 'Culoca Item'}
-          style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);"
+          style="max-width: 100%; max-height: 800px; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);"
         />
       </a>
     </div>
@@ -44,23 +44,16 @@
 
   <!-- Description -->
   {#if item.description}
-    <p style="color: #555; font-size: 16px; line-height: 1.6; margin-bottom: 30px; text-align: left; max-width: 600px; margin-left: auto; margin-right: auto;">
+    <p style="color: #555; font-size: 16px; line-height: 1.6; margin-bottom: 30px; text-align: left; padding: 0 20px;">
       {item.description}
     </p>
   {/if}
 
-  <!-- Metadaten -->
-  <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 30px; text-align: left; max-width: 600px; margin-left: auto; margin-right: auto;">
-    <p style="margin: 5px 0; color: #666; font-size: 14px;">
-      <strong>Koordinaten:</strong> {item.lat}, {item.lon}
-    </p>
-    <p style="margin: 5px 0; color: #666; font-size: 14px;">
-      <strong>Erstellt von:</strong> {item.creator}
-    </p>
-    <p style="margin: 5px 0; color: #666; font-size: 14px;">
-      <strong>Erstellt:</strong> {new Date(item.created_at).toLocaleDateString('de-DE')}
-    </p>
-  </div>
+  <!-- Dezenter Hinweis unter dem Bild -->
+  <p style="color: #999; font-size: 12px; margin-bottom: 30px; font-style: italic;">
+    {item.creator} • {new Date(item.created_at).toLocaleDateString('de-DE')}
+  </p>
+
 
   <!-- Culoca Button -->
   <div style="margin-top: 30px;">
