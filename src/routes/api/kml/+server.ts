@@ -82,13 +82,25 @@ export const GET: RequestHandler = async () => {
 };
 
 function generateKML(items: any[]): string {
-  let kml = `<?xml version="1.0" encoding="UTF-8"?>
+  let   kml = `<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
   <Document>
     <name>Culoca GPS Items</name>
     <description>Alle öffentlichen GPS-Items von Culoca</description>
     <open>1</open>
     
+    <!-- Globaler BalloonStyle -->
+    <Style id="culoca-balloon">
+      <BalloonStyle>
+        <bgColor>ffffffff</bgColor>
+        <textColor>ff000000</textColor>
+        <text><![CDATA[
+          <div style="font-family:system-ui,sans-serif;font-size:14px;padding:10px;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,0.15);">
+            $[description]
+          </div>
+        ]]></text>
+      </BalloonStyle>
+    </Style>
     
     <Folder>
       <name>📸 Culoca Items (${items.length})</name>
@@ -124,20 +136,24 @@ function generatePlacemark(item: any): string {
     ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/${item.path_64}`
     : 'https://culoca.com/culoca-icon.png';
   
-  // Einfache Beschreibung für den Placemark (BalloonStyle wird für die detaillierte Anzeige verwendet)
-  const descriptionHtml = `<![CDATA[
-    <div style="font-family: Arial, sans-serif;">
-      <h3 style="color: #ff6600;">${title}</h3>
-      ${description ? `<p>${description}</p>` : ''}
-      <p><strong>📍 Koordinaten:</strong> ${lat}, ${lon}</p>
-      <p><a href="${itemUrl}" target="_blank" style="color: #ff6600; font-weight: bold;">Auf Culoca ansehen →</a></p>
+  // Detaillierte Beschreibung für den Balloon
+  const balloonContent = `<![CDATA[
+    <div style="font-family: Arial, sans-serif; max-width: 450px;">
+      <h3 style="color: #000; margin-bottom: 10px;">${title}</h3>
+      ${description ? `<p style="margin-bottom: 10px;">${description}</p>` : ''}
+      ${caption && caption !== title ? `<p style="color: #666; font-style: italic; font-size: 0.9em; margin-bottom: 10px;">${caption}</p>` : ''}
+      <p style="font-size: 0.8em; color: #666;"><strong>Koordinaten:</strong> ${lat}, ${lon}</p>
+      <p style="font-size: 0.8em; color: #666;"><strong>Erstellt von:</strong> ${item.profiles?.full_name || 'Unbekannt'}</p>
+      <p style="font-size: 0.8em; color: #666;"><strong>Erstellt:</strong> ${new Date(item.created_at).toLocaleDateString('de-DE')}</p>
+      <p style="margin-top: 15px;"><a href="${itemUrl}" target="_blank" style="background: #ff6600; color: white; padding: 8px 12px; text-decoration: none; border-radius: 4px; font-weight: bold;">Auf Culoca ansehen</a></p>
+      ${item.path_512 ? `<div style="margin-top: 15px; text-align: center;"><img src="https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${item.path_512}" style="max-width: 100%; height: auto; border: 2px solid #fff; border-radius: 12px; display: block; margin: 0 auto; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" alt="${title}" /></div>` : ''}
     </div>
   ]]>`;
 
   return `
     <Placemark>
       <name>${title}</name>
-      <description>${descriptionHtml}</description>
+      <description>${balloonContent}</description>
       <Point>
         <coordinates>${lon},${lat},0</coordinates>
       </Point>
@@ -152,24 +168,8 @@ function generatePlacemark(item: any): string {
         <LabelStyle>
           <scale>0</scale>
         </LabelStyle>
-        <BalloonStyle>
-          <bgColor>ffffffff</bgColor>
-          <textColor>ff000000</textColor>
-          <displayMode>default</displayMode>
-                 <text><![CDATA[
-                   <div style="font-family: Arial, sans-serif; width: 350px; max-width: 350px;">
-                     <h3 style="color: #000; margin-bottom: 10px;">${title}</h3>
-                     ${description ? `<p style="margin-bottom: 10px;">${description}</p>` : ''}
-                     ${caption && caption !== title ? `<p style="color: #666; font-style: italic; font-size: 0.9em; margin-bottom: 10px;">${caption}</p>` : ''}
-                     <p style="font-size: 0.8em; color: #666;"><strong>Koordinaten:</strong> ${lat}, ${lon}</p>
-                     <p style="font-size: 0.8em; color: #666;"><strong>Erstellt von:</strong> ${item.profiles?.full_name || 'Unbekannt'}</p>
-                     <p style="font-size: 0.8em; color: #666;"><strong>Erstellt:</strong> ${new Date(item.created_at).toLocaleDateString('de-DE')}</p>
-                     <p style="margin-top: 15px;"><a href="${itemUrl}" target="_blank" style="background: #ff6600; color: white; padding: 8px 12px; text-decoration: none; border-radius: 4px; font-weight: bold;">Auf Culoca ansehen</a></p>
-                     ${item.path_512 ? `<p style="margin-top: 15px; margin-left: 0; margin-right: 0; padding-left: 0; padding-right: 0;"><img src="https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${item.path_512}" style="width: 100%; height: auto; border:2px solid #fff; border-radius: 4px; display: block;" alt="${title}" /></p>` : ''}
-                   </div>
-                 ]]></text>
-        </BalloonStyle>
       </Style>
+      <styleUrl>#culoca-balloon</styleUrl>
     </Placemark>
     `;
 }
