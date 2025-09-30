@@ -1561,7 +1561,7 @@
   .upload-text {
     font-size: 18px;
     margin-bottom: 8px;
-    color: var(--text-color);
+    color: var(--text-primary);
   }
 
   .upload-hint {
@@ -1653,7 +1653,7 @@
   .image-name {
     font-weight: 600;
     margin-bottom: 16px;
-    color: var(--text-color);
+    color: var(--text-primary);
     word-break: break-all;
   }
 
@@ -1669,7 +1669,7 @@
     padding: 0;
     margin-bottom: 4px;
     font-weight: 500;
-    color: var(--text-color);
+    color: var(--text-primary);
     cursor: pointer;
     font-size: 14px;
     text-align: left;
@@ -1684,7 +1684,7 @@
     display: block;
     margin-bottom: 4px;
     font-weight: 500;
-    color: var(--text-color);
+    color: var(--text-primary);
   }
 
   .title-header {
@@ -1702,18 +1702,18 @@
   .input-group textarea {
     width: 100%;
     padding: 8px 12px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--border-color);
     border-radius: 6px;
     font-size: 14px;
-    background-color: var(--bg-primary);
-    color: var(--text-color);
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
   }
 
   .input-group input.error,
   .input-group textarea.error {
     border-color: #dc3545;
-    background-color: var(--bg-primary);
-    color: var(--text-color);
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
   }
 
   .char-counter {
@@ -1868,7 +1868,7 @@
 
   .map-modal-header h3 {
     margin: 0;
-    color: var(--text-color);
+    color: var(--text-primary);
   }
 
   /* Search Styles */
@@ -1914,7 +1914,7 @@
     border-radius: 6px;
     font-size: 14px;
     background-color: var(--bg-primary);
-    color: var(--text-color);
+    color: var(--text-primary);
   }
 
   .search-input:focus {
@@ -1958,7 +1958,7 @@
 
   .result-name {
     font-weight: 500;
-    color: var(--text-color);
+    color: var(--text-primary);
     font-size: 14px;
   }
 
@@ -2303,7 +2303,7 @@
     border: 1px solid #ddd;
     border-radius: 8px;
     background: var(--bg-primary);
-    color: var(--text-color);
+    color: var(--text-primary);
     font-size: 1rem;
     transition: border-color 0.2s;
   }

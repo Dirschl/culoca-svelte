@@ -168,17 +168,17 @@
   padding: 0.3rem 0.5rem;
   border-radius: 4px;
   width: 100%;
-  color: #222;
-  background: #fff;
-  border: 1px solid #ccc;
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
 }
 
 .char-count {
   font-size: 0.9rem;
-  color: #888;
+  color: var(--text-muted);
   margin-left: 0.5rem;
 }
 .char-count.valid {
-  color: #22a722;
+  color: var(--success-color);
 }
 </style> 

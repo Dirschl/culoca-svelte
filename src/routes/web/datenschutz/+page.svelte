@@ -5,9 +5,9 @@
 <svelte:head>
   <title>Datenschutzerklärung der DIRSCHL.com GmbH für culoca.com</title>
   <meta name="description" content="Datenschutzerklärung der DIRSCHL.com GmbH - Informationen zur Verarbeitung personenbezogener Daten gemäß DSGVO. Auskunft, Löschung und Datenübertragbarkeit." />
-  <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
-  <meta name="googlebot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
-  <meta name="bingbot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="googlebot" content="noindex, nofollow" />
+  <meta name="bingbot" content="noindex, nofollow" />
   <link rel="canonical" href="https://culoca.com/web/datenschutz" />
   
   <!-- Favicon -->

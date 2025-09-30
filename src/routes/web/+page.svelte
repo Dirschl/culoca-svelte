@@ -1,6 +1,7 @@
 <svelte:head>
-  <title>Culoca - See You Local - Entdecke deine Umgebung</title>
-  <meta name="description" content="Alles, was du über Culoca wissen willst: Schnapp dir dein Handy, erkunde deine Umgebung, teile Momente und sammle lokale Schätze. FAQ für Entdecker!" />
+  <title>Galeriemodus, Mobile Ansicht, Items und Nearby Galerie in Culoca - FAQ</title>
+  <meta name="description" content="Vollständige Anleitung zu Culoca: Galeriemodus, mobile Ansicht, GPS-Items, Nearby-Funktion, Upload, Account-System und alle Features. FAQ für neue Nutzer und Entdecker." />
+  <meta name="keywords" content="Culoca FAQ, Galeriemodus, Mobile Ansicht, GPS Items, Nearby Galerie, Upload Anleitung, Account System, GPS Fotos, lokale Entdeckungen, Reverse Social Media, Culoca Tutorial, Features, Funktionen, Hilfe, Anleitung" />
   <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
   <meta name="googlebot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
   <meta name="bingbot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
@@ -12,8 +13,8 @@
   <link rel="apple-touch-icon" href="/culoca-icon.png" sizes="180x180">
   
   <!-- Open Graph -->
-  <meta property="og:title" content="Culoca - See You Local - Entdecke deine Umgebung" />
-  <meta property="og:description" content="Alles, was du über Culoca wissen willst: Schnapp dir dein Handy, erkunde deine Umgebung, teile Momente und sammle lokale Schätze. FAQ für Entdecker!" />
+  <meta property="og:title" content="Galeriemodus, Mobile Ansicht, Items und Nearby Galerie in Culoca - FAQ" />
+  <meta property="og:description" content="Vollständige Anleitung zu Culoca: Galeriemodus, mobile Ansicht, GPS-Items, Nearby-Funktion, Upload, Account-System und alle Features. FAQ für neue Nutzer und Entdecker." />
   <meta property="og:url" content="https://culoca.com/web" />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="DIRSCHL.com GmbH" />
@@ -24,15 +25,50 @@
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
-    "@type": "WebPage",
-    "name": "Culoca - See You Local - Entdecke deine Umgebung",
-    "description": "Alles, was du über Culoca wissen willst: Schnapp dir dein Handy, erkunde deine Umgebung, teile Momente und sammle lokale Schätze. FAQ für Entdecker!",
+    "@type": "FAQPage",
+    "name": "Galeriemodus, Mobile Ansicht, Items und Nearby Galerie in Culoca - FAQ",
+    "description": "Vollständige Anleitung zu Culoca: Galeriemodus, mobile Ansicht, GPS-Items, Nearby-Funktion, Upload, Account-System und alle Features. FAQ für neue Nutzer und Entdecker.",
     "url": "https://culoca.com/web",
     "inLanguage": "de",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "Was ist der Galeriemodus in Culoca?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Der Galeriemodus zeigt alle verfügbaren GPS-Items in einer übersichtlichen Galerie-Ansicht an. Nutzer können zwischen verschiedenen Ansichten wechseln und Items nach Entfernung, Datum oder Typ filtern."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Wie funktioniert die Mobile Ansicht?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Die mobile Ansicht ist optimiert für Smartphones und Tablets. Sie bietet Touch-Navigation, GPS-Integration und eine benutzerfreundliche Oberfläche für das Entdecken lokaler Inhalte unterwegs."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Was sind GPS Items in Culoca?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "GPS Items sind Fotos, Videos oder andere Inhalte, die an spezifischen geografischen Koordinaten verankert sind. Sie können von Nutzern entdeckt werden, die sich in der Nähe befinden."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Wie funktioniert die Nearby Galerie?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Die Nearby Galerie zeigt alle GPS-Items in der Umgebung des Nutzers an, sortiert nach Entfernung. So können lokale Entdeckungen und versteckte Orte einfach gefunden werden."
+        }
+      }
+    ],
     "publisher": {
       "@type": "Organization",
       "name": "DIRSCHL.com GmbH",
       "url": "https://culoca.com",
+      "logo": "https://culoca.com/culoca-icon.png",
       "address": {
         "@type": "PostalAddress",
         "streetAddress": "Waldberg 84",
@@ -45,6 +81,23 @@
         "telephone": "+49-179-9766666",
         "email": "johann.dirschl@gmx.de"
       }
+    },
+    "breadcrumb": {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Startseite",
+          "item": "https://culoca.com"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "FAQ & Anleitung",
+          "item": "https://culoca.com/web"
+        }
+      ]
     }
   }
   </script>
@@ -736,14 +789,16 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
     {/if}
   </svelte:fragment>
 
-  <h1 class="main-title">Culoca - See You Local, Entdecke deine Umgebung</h1>
+  <h1 class="main-title">Culoca FAQ: Galeriemodus, Mobile Ansicht, GPS Items und Nearby Galerie</h1>
   
+  <h2>Was ist Culoca? - Reverse Social Media mit GPS-Items</h2>
   <p>
-    Culoca verwaltet Items die an GPS Koordinaten gebunden sind. In Verdingung mit deiner eigenen Position lässt sich so eine neue Art von sozialen Medien schaffen. Wir nennen es Reverse Social Media, denn hier macht nicht ein Content um berühmt zu werden, sondern viele um nur Dich zu erreichen. Du stehst im Mittelpunkt aller Informationen und Culoca zeigt dir diese an. Wir starten mit einer kleinen Region zwischen München, Oberösterreich und dem Bayerischen Wald und hoffen auf viele neue Culoca User, die das System aktiv mit Material versorgen.
+    Culoca verwaltet <strong>GPS Items</strong> die an geografischen Koordinaten gebunden sind. In Verbindung mit deiner eigenen Position lässt sich so eine neue Art von sozialen Medien schaffen. Wir nennen es <strong>Reverse Social Media</strong>, denn hier macht nicht ein Content um berühmt zu werden, sondern viele um nur Dich zu erreichen. Du stehst im Mittelpunkt aller Informationen und Culoca zeigt dir diese in der <strong>Nearby Galerie</strong> an.
   </p>
   
+  <h2>Galeriemodus und Mobile Ansicht</h2>
   <p>
-    Du kannst ganz einfach neue Bilder hochladen und so deien Region in das System integrieren. Du hast deine Daten immer dabei und kannst später neue Funktionen wie Shop, Chat etc... teilnehmen. Das System ist aktuell kostenfrei und du kannst dich mit Google, Facebook oder Email im System registrieren um selbst Content erstellen zu können.
+    Der <strong>Galeriemodus</strong> bietet verschiedene Ansichten für deine Entdeckungen. Die <strong>Mobile Ansicht</strong> ist speziell für Smartphones optimiert und ermöglicht es dir, unterwegs lokale GPS-Items zu entdecken. Du kannst ganz einfach neue Bilder hochladen und so deine Region in das System integrieren. Das System ist aktuell kostenfrei und du kannst dich mit Google, Facebook oder Email registrieren.
   </p>
 
   <hr class="section-divider" />
@@ -765,6 +820,22 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
     <p>
       Default, 2 GPS Koordinaten untereinander: Die Standard-Galerie zeigt ALLE Fotos nach Entfernung an. Es ist eine statische Liste in der du endlos scrollen kannst. Ideal für zu Hause oder im Hotel, wenn du deine Umgebung kennenlernenn wilst.
     </p>
+    
+    <div class="kml-integration">
+      <h3>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px;">
+          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+          <circle cx="12" cy="10" r="3"/>
+        </svg>
+        Google Earth Integration
+      </h3>
+      <p>
+        Alle Culoca GPS-Items können auch in Google Earth betrachtet werden. Lade die KML-Datei herunter und erkunde deine Umgebung in Google Earth mit allen Culoca-Inhalten.
+      </p>
+      <a href="/web/google" class="kml-link">
+        🗺️ Google Earth KML Download
+      </a>
+    </div>
     
     {#if stats.latestItems.length > 0}
     <div class="latest-items">
@@ -3348,5 +3419,44 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
     .items-grid {
       grid-template-columns: repeat(2, 1fr);
     }
+  }
+
+  /* KML Integration Styles */
+  .kml-integration {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 1.5rem;
+    border-radius: 12px;
+    margin: 1.5rem 0;
+  }
+
+  .kml-integration h3 {
+    color: white;
+    margin: 0 0 1rem 0;
+    display: flex;
+    align-items: center;
+  }
+
+  .kml-integration p {
+    color: rgba(255, 255, 255, 0.9);
+    margin: 0 0 1rem 0;
+  }
+
+  .kml-link {
+    display: inline-block;
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    padding: 0.75rem 1.5rem;
+    text-decoration: none;
+    border-radius: 8px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+  }
+
+  .kml-link:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
   }
 </style> 
