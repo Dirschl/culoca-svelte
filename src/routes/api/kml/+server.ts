@@ -24,7 +24,7 @@ export const GET: RequestHandler = async () => {
     while (hasMore) {
       const { data: items, error } = await supabase
         .from('items')
-        .select('id, title, description, caption, slug, lat, lon, path_512, created_at')
+        .select('id, title, description, caption, slug, lat, lon, path_64, path_512, created_at')
         .not('lat', 'is', null)
         .not('lon', 'is', null)
         .eq('is_private', false)
@@ -85,14 +85,6 @@ function generateKML(items: any[]): string {
     <description>Alle öffentlichen GPS-Items von Culoca</description>
     <open>1</open>
     
-    <Style id="culoca-style">
-      <IconStyle>
-        <Icon>
-          <href>https://culoca.com/culoca-icon.png</href>
-        </Icon>
-        <scale>1.0</scale>
-      </IconStyle>
-    </Style>
     
     <Folder>
       <name>📸 Culoca Items (${items.length})</name>
@@ -123,6 +115,11 @@ function generatePlacemark(item: any): string {
   const lat = parseFloat(item.lat).toFixed(6);
   const lon = parseFloat(item.lon).toFixed(6);
   
+  // 64px Bild als Icon verwenden, Fallback auf Standard-Icon
+  const iconUrl = item.path_64 
+    ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/${item.path_64}`
+    : 'https://culoca.com/culoca-icon.png';
+  
   let descriptionHtml = `<![CDATA[
     <div style="font-family: Arial, sans-serif; max-width: 400px;">
       <h3>${title}</h3>`;
@@ -143,7 +140,7 @@ function generatePlacemark(item: any): string {
       <p><strong>📅 Erstellt:</strong> ${new Date(item.created_at).toLocaleDateString('de-DE')}</p>
   `;
   
-  // Bild hinzufügen falls vorhanden - korrekte Supabase URL
+  // 512px Bild hinzufügen falls vorhanden
   if (item.path_512) {
     const imageUrl = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${item.path_512}`;
     descriptionHtml += `<p><strong>🖼️ Bild:</strong></p><img src="${imageUrl}" style="max-width: 300px; height: auto; border-radius: 8px;" alt="${title}" /></p>`;
@@ -158,7 +155,18 @@ function generatePlacemark(item: any): string {
       <Point>
         <coordinates>${lon},${lat},0</coordinates>
       </Point>
-      <styleUrl>#culoca-style</styleUrl>
+      <Style>
+        <IconStyle>
+          <Icon>
+            <href>${iconUrl}</href>
+          </Icon>
+          <scale>1.0</scale>
+          <hotSpot x="0.5" y="0.5" xunits="fraction" yunits="fraction"/>
+        </IconStyle>
+        <LabelStyle>
+          <scale>0</scale>
+        </LabelStyle>
+      </Style>
     </Placemark>
     `;
 }
