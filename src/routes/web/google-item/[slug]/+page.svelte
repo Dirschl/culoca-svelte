@@ -17,15 +17,20 @@
   
   <!-- Hauptbild zentriert -->
   {#if item.path_2048}
-    <div style="margin-bottom: 30px;">
+    <div style="margin-bottom: 15px; text-align: center;">
       <a href={item.culoca_url} target="_blank" style="text-decoration: none;">
         <img 
           src="https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/{item.path_2048}" 
           alt={item.title || 'Culoca Item'}
-          style="max-width: 100%; max-height: 800px; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);"
+          style="max-width: 100%; max-height: 800px; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: block; margin: 0 auto;"
         />
       </a>
     </div>
+    
+    <!-- Dezenter Hinweis direkt unter dem Bild -->
+    <p style="color: #999; font-size: 12px; margin-bottom: 30px; font-style: italic; text-align: center;">
+      {item.creator} • {new Date(item.created_at).toLocaleDateString('de-DE')}
+    </p>
   {/if}
 
   <!-- Titel -->
@@ -48,11 +53,6 @@
       {item.description}
     </p>
   {/if}
-
-  <!-- Dezenter Hinweis unter dem Bild -->
-  <p style="color: #999; font-size: 12px; margin-bottom: 30px; font-style: italic;">
-    {item.creator} • {new Date(item.created_at).toLocaleDateString('de-DE')}
-  </p>
 
 
   <!-- Culoca Button -->
