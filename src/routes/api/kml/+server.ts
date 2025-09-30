@@ -23,8 +23,8 @@ export const GET: RequestHandler = async () => {
       <open>1</open>
       
       <Placemark>
-        <name>Brandmühle Wegkreuz</name>
-        <description>Historisches Wegkreuz bei der Brandmühle</description>
+        <name>Reischach Kirche</name>
+        <description>Pfarrkirche St. Michael in Reischach</description>
         <Point>
           <coordinates>12.5683,48.1351,0</coordinates>
         </Point>
@@ -32,19 +32,37 @@ export const GET: RequestHandler = async () => {
       </Placemark>
       
       <Placemark>
-        <name>Reischach Kirche</name>
-        <description>Pfarrkirche St. Michael in Reischach</description>
+        <name>Waldberg 84</name>
+        <description>DIRSCHL.com GmbH Standort</description>
         <Point>
-          <coordinates>12.5702,48.1365,0</coordinates>
+          <coordinates>12.5700,48.1360,0</coordinates>
         </Point>
         <styleUrl>#culoca-style</styleUrl>
       </Placemark>
       
       <Placemark>
-        <name>Waldberg Aussicht</name>
-        <description>Schöne Aussicht vom Waldberg</description>
+        <name>Brandmühle Wegkreuz</name>
+        <description>Historisches Wegkreuz bei der Brandmühle</description>
         <Point>
           <coordinates>12.5750,48.1400,0</coordinates>
+        </Point>
+        <styleUrl>#culoca-style</styleUrl>
+      </Placemark>
+      
+      <Placemark>
+        <name>Burghausen Burg</name>
+        <description>Längste Burg der Welt</description>
+        <Point>
+          <coordinates>12.8300,48.1600,0</coordinates>
+        </Point>
+        <styleUrl>#culoca-style</styleUrl>
+      </Placemark>
+      
+      <Placemark>
+        <name>Altötting Kapelle</name>
+        <description>Wallfahrtsort Altötting</description>
+        <Point>
+          <coordinates>12.6800,48.2300,0</coordinates>
         </Point>
         <styleUrl>#culoca-style</styleUrl>
       </Placemark>
