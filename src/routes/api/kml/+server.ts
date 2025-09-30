@@ -28,6 +28,7 @@ export const GET: RequestHandler = async () => {
         .not('lat', 'is', null)
         .not('lon', 'is', null)
         .eq('is_private', false)
+        .eq('gallery', true)
         .range(offset, offset + pageSize - 1)
         .order('created_at', { ascending: false });
 
@@ -115,7 +116,7 @@ function generatePlacemark(item: any): string {
   const lat = parseFloat(item.lat).toFixed(6);
   const lon = parseFloat(item.lon).toFixed(6);
   
-  // 64px Bild als Icon verwenden, Fallback auf Standard-Icon
+  // 64px Bild als Icon verwenden (auf 32x32px skaliert), Fallback auf Standard-Icon
   const iconUrl = item.path_64 
     ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/${item.path_64}`
     : 'https://culoca.com/culoca-icon.png';
@@ -124,12 +125,7 @@ function generatePlacemark(item: any): string {
     <div style="font-family: Arial, sans-serif; max-width: 400px;">
       <h3>${title}</h3>`;
   
-  // Caption nur hinzufügen wenn vorhanden und verschieden vom Titel
-  if (caption && caption !== title) {
-    descriptionHtml += `<p><em>${caption}</em></p>`;
-  }
-  
-  // Description nur hinzufügen wenn vorhanden
+  // Description nur hinzufügen wenn vorhanden (Caption wird nicht angezeigt)
   if (description) {
     descriptionHtml += `<p>${description}</p>`;
   }
@@ -140,10 +136,10 @@ function generatePlacemark(item: any): string {
       <p><strong>📅 Erstellt:</strong> ${new Date(item.created_at).toLocaleDateString('de-DE')}</p>
   `;
   
-  // 512px Bild hinzufügen falls vorhanden
-  if (item.path_512) {
-    const imageUrl = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${item.path_512}`;
-    descriptionHtml += `<p><strong>🖼️ Bild:</strong></p><img src="${imageUrl}" style="max-width: 300px; height: auto; border-radius: 8px;" alt="${title}" /></p>`;
+  // 64px Bild direkt in der Beschreibung anzeigen (kleiner)
+  if (item.path_64) {
+    const imageUrl = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/${item.path_64}`;
+    descriptionHtml += `<p><img src="${imageUrl}" style="width: 64px; height: 64px; border-radius: 8px; margin-top: 10px;" alt="${title}" /></p>`;
   }
   
   descriptionHtml += `</div>]]>`;
@@ -160,7 +156,7 @@ function generatePlacemark(item: any): string {
           <Icon>
             <href>${iconUrl}</href>
           </Icon>
-          <scale>1.0</scale>
+          <scale>0.5</scale>
           <hotSpot x="0.5" y="0.5" xunits="fraction" yunits="fraction"/>
         </IconStyle>
         <LabelStyle>
