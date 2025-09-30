@@ -113,7 +113,7 @@ function generatePlacemark(item: any): string {
   const description = escapeXml(item.description || '');
   const caption = escapeXml(item.caption || '');
   const slug = item.slug || item.id;
-  const itemUrl = `https://culoca.com/item/${slug}`;
+  const itemUrl = `https://culoca.com/web/google-item/${slug}`;
   
   // Koordinaten mit voller Präzision
   const lat = parseFloat(item.lat).toFixed(6);
