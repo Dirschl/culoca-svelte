@@ -999,10 +999,10 @@ let showRightsManager = false;
   <!-- Enhanced image SEO meta tags -->
   {#if image?.path_2048}
     <meta name="image" content="https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/{image.path_2048}">
-    <meta property="og:image:width" content="{image.width || 2048}">
-    <meta property="og:image:height" content="{image.height || 2048}">
-    <meta name="twitter:image:width" content="{image.width || 2048}">
-    <meta name="twitter:image:height" content="{image.height || 2048}">
+    <meta property="og:image:width" content={image.width || 2048}>
+    <meta property="og:image:height" content={image.height || 2048}>
+    <meta name="twitter:image:width" content={image.width || 2048}>
+    <meta name="twitter:image:height" content={image.height || 2048}>
   {/if}
   <meta name="author" content={image?.full_name || 'culoca.com'}>
   <link rel="canonical" href={`https://culoca.com/item/${itemSlug}`}>
