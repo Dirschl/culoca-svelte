@@ -165,7 +165,7 @@ function generatePlacemark(item: any): string {
                      <p style="font-size: 0.8em; color: #666;"><strong>Erstellt von:</strong> ${item.profiles?.full_name || 'Unbekannt'}</p>
                      <p style="font-size: 0.8em; color: #666;"><strong>Erstellt:</strong> ${new Date(item.created_at).toLocaleDateString('de-DE')}</p>
                      <p style="margin-top: 15px;"><a href="${itemUrl}" target="_blank" style="background: #ff6600; color: white; padding: 8px 12px; text-decoration: none; border-radius: 4px; font-weight: bold;">Auf Culoca ansehen</a></p>
-                     ${item.path_512 ? `<p style="margin-top: 15px; margin-left: 0; margin-right: 0;"><img src="https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${item.path_512}" style="width: 100%; height: auto; border:2px solid #fff; display: block;" alt="${title}" /></p>` : ''}
+                     ${item.path_512 ? `<p style="margin-top: 15px; margin-left: 0; margin-right: 0; padding-left: 0; padding-right: 0;"><img src="https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${item.path_512}" style="width: 100%; height: auto; border:2px solid #fff; border-radius: 4px; display: block;" alt="${title}" /></p>` : ''}
                    </div>
                  ]]></text>
         </BalloonStyle>
