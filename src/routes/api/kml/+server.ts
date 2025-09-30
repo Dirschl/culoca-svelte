@@ -92,7 +92,7 @@ function generateKML(items: any[]): string {
     
     <Folder>
       <name>📸 Culoca Items (${items.length})</name>
-      <description style="color: #999; font-size: 12px;">GPS-gebundene Fotos und Bilder</description>
+      <description style="color: #999; font-size: 12px;">Aktualisiert: ${new Date().toLocaleDateString('de-DE')} • ${items.length} öffentliche GPS-Items</description>
       <open>1</open>
       `;
 
