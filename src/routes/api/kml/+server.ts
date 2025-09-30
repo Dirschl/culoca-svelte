@@ -155,8 +155,9 @@ function generatePlacemark(item: any): string {
         <BalloonStyle>
           <bgColor>ffffffff</bgColor>
           <textColor>ff000000</textColor>
+          <displayMode>default</displayMode>
           <text><![CDATA[
-            <div style="font-family: Arial, sans-serif; max-width: 800px;">
+            <div style="font-family: Arial, sans-serif; width: 800px; max-width: 800px;">
               <h3 style="color: #000; margin-bottom: 10px;">${title}</h3>
               ${description ? `<p style="margin-bottom: 10px;">${description}</p>` : ''}
               ${caption && caption !== title ? `<p style="color: #666; font-style: italic; font-size: 0.9em; margin-bottom: 10px;">${caption}</p>` : ''}
