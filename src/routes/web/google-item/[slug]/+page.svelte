@@ -10,6 +10,11 @@
   <title>{item.title || 'Culoca Item'} - Google Earth View</title>
   <meta name="description" content="Culoca Item: {item.description || item.title || 'GPS-gebundenes Foto'}">
   <meta name="robots" content="noindex, nofollow">
+  <style>
+    .culoca-image {
+      max-height: 800px !important;
+    }
+  </style>
 </svelte:head>
 
 <!-- Google Earth optimierte Seite - nur HTML, kein CSS/JavaScript -->
@@ -22,14 +27,15 @@
         <img 
           src="https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/{item.path_2048}" 
           alt={item.title || 'Culoca Item'}
-          style="max-width: 100%; max-height: 800px; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: block; margin: 0 auto;"
+          class="culoca-image"
+          style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: block; margin: 0 auto;"
         />
       </a>
     </div>
     
     <!-- Dezenter Hinweis direkt unter dem Bild -->
     <p style="color: #999; font-size: 12px; margin-bottom: 30px; font-style: italic; text-align: center;">
-      {item.creator} • {new Date(item.created_at).toLocaleDateString('de-DE')}
+      {new Date(item.created_at).toLocaleDateString('de-DE')}, {item.creator}
     </p>
   {/if}
 
