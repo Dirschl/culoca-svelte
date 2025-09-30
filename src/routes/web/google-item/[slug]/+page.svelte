@@ -13,7 +13,7 @@
 </svelte:head>
 
 <!-- Google Earth optimierte Seite - nur HTML, kein CSS/JavaScript -->
-<div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; text-align: center; background: white; min-height: 100vh;">
+<div style="font-family: Arial, sans-serif; width: 100%; margin: 0 auto; padding: 20px; text-align: center; background: white; min-height: 100vh;">
   
   <!-- Hauptbild zentriert -->
   {#if item.path_2048}
@@ -86,14 +86,5 @@
     </a>
   </div>
 
-  <!-- Zurück zu Google Earth Link -->
-  <div style="margin-top: 20px;">
-    <a 
-      href="javascript:history.back()" 
-      style="color: #666; text-decoration: none; font-size: 14px;"
-    >
-      ← Zurück zu Google Earth
-    </a>
-  </div>
 
 </div>
