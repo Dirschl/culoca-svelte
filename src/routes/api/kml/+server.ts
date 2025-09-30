@@ -160,10 +160,10 @@ function generatePlacemark(item: any): string {
               <h3 style="color: #000; margin-bottom: 10px;">${title}</h3>
               ${description ? `<p style="margin-bottom: 10px;">${description}</p>` : ''}
               ${caption && caption !== title ? `<p style="color: #666; font-style: italic; font-size: 0.9em; margin-bottom: 10px;">${caption}</p>` : ''}
-              <p style="font-size: 0.8em; color: #666;"><strong>📍 Koordinaten:</strong> ${lat}, ${lon}</p>
-              <p style="font-size: 0.8em; color: #666;"><strong>👤 Erstellt von:</strong> ${item.profiles?.full_name || 'Unbekannt'}</p>
-              <p style="font-size: 0.8em; color: #666;"><strong>📅 Erstellt:</strong> ${new Date(item.created_at).toLocaleDateString('de-DE')}</p>
-              <p style="margin-top: 15px;"><a href="${itemUrl}" target="_blank">🔗 Auf Culoca ansehen</a></p>
+              <p style="font-size: 0.8em; color: #666;"><strong>Koordinaten:</strong> ${lat}, ${lon}</p>
+              <p style="font-size: 0.8em; color: #666;"><strong>Erstellt von:</strong> ${item.profiles?.full_name || 'Unbekannt'}</p>
+              <p style="font-size: 0.8em; color: #666;"><strong>Erstellt:</strong> ${new Date(item.created_at).toLocaleDateString('de-DE')}</p>
+              <p style="margin-top: 15px;"><a href="${itemUrl}" target="_blank" style="background: #ff6600; color: white; padding: 8px 12px; text-decoration: none; border-radius: 4px; font-weight: bold;">Auf Culoca ansehen</a></p>
               ${item.path_512 ? `<p style="margin-top: 15px;"><img src="https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${item.path_512}" style="width: 100%; height: auto;" alt="${title}" /></p>` : ''}
             </div>
           ]]></text>
