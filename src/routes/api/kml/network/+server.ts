@@ -7,12 +7,12 @@ export const GET: RequestHandler = async () => {
 <kml xmlns="http://www.opengis.net/kml/2.2">
   <Document>
     <name>Culoca GPS Items (Live)</name>
-    <description>Live-Updates aller Culoca GPS-Items - wird automatisch aktualisiert</description>
+    <description>Network Link für automatische Updates aller Culoca GPS-Items</description>
     <open>1</open>
     
     <NetworkLink>
       <name>Culoca Items - Live Feed</name>
-      <description>Alle öffentlichen GPS-Items von Culoca mit Live-Updates</description>
+      <description>Lädt alle öffentlichen GPS-Items von Culoca mit 5-Minuten Auto-Update</description>
       <Link>
         <href>https://culoca.com/api/kml</href>
         <refreshMode>onInterval</refreshMode>
@@ -36,7 +36,7 @@ export const GET: RequestHandler = async () => {
     
     <Folder>
       <name>ℹ️ Informationen</name>
-      <description>Über diesen Network Link</description>
+      <description>Über Culoca und diesen Network Link</description>
       <open>0</open>
       <Placemark>
         <name>Culoca Network Link</name>
@@ -44,9 +44,15 @@ export const GET: RequestHandler = async () => {
           <![CDATA[
           <h3>Live Culoca GPS-Items</h3>
           <p>Dieser Network Link lädt automatisch alle öffentlichen Culoca GPS-Items.</p>
-          <p><strong>Auto-Update:</strong> Alle 5 Minuten</strong></p>
-          <p><strong>Website:</strong> <a href="https://culoca.com">https://culoca.com</a></p>
+          <p><strong>Auto-Update:</strong> Alle 5 Minuten</p>
+          <p><strong>App-Seite:</strong> <a href="https://culoca.com">https://culoca.com</a></p>
           <p><strong>KML Download:</strong> <a href="https://culoca.com/web/google">https://culoca.com/web/google</a></p>
+          <hr>
+          <p><strong>Herausgeber:</strong></p>
+          <p>DIRSCHL.com GmbH<br>
+          Waldberg 84<br>
+          84571 Reischach<br>
+          <a href="https://dirschl.com">https://dirschl.com</a></p>
           <p><strong>Letzte Aktualisierung:</strong> ${new Date().toISOString()}</p>
           ]]>
         </description>
