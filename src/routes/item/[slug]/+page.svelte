@@ -104,59 +104,7 @@ let showRightsManager = false;
   }
 
   // SEO-optimized meta tags to prevent Google from "stealing" nearby image titles/descriptions
-  $: if (image && browser) {
-    // Update document title and meta tags
-    document.title = image.title || image.original_name || 'Bild';
-    
-    // Update or create meta tags
-    const updateMetaTag = (name: string, content: string) => {
-      let meta = document.querySelector(`meta[name="${name}"]`) as HTMLMetaElement;
-      if (!meta) {
-        meta = document.createElement('meta');
-        meta.name = name;
-        document.head.appendChild(meta);
-      }
-      meta.content = content;
-    };
-
-    const updateOGTag = (property: string, content: string) => {
-      let meta = document.querySelector(`meta[property="${property}"]`) as HTMLMetaElement;
-      if (!meta) {
-        meta = document.createElement('meta');
-        meta.setAttribute('property', property);
-        document.head.appendChild(meta);
-      }
-      meta.content = content;
-    };
-
-    // Basic meta tags
-    updateMetaTag('description', image.description || image.caption || `Bild von ${image.title || image.original_name || 'unbekannt'}`);
-    updateMetaTag('author', image.full_name || 'Johann Dirschl');
-    updateMetaTag('robots', 'max-image-preview:large');
-
-    // Open Graph tags
-    updateOGTag('og:title', image.title || image.original_name || 'Bild');
-    updateOGTag('og:description', image.description || image.caption || `Bild von ${image.title || image.original_name || 'unbekannt'}`);
-    updateOGTag('og:image', `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${image.path_2048 || image.path_512}`);
-    updateOGTag('og:image:alt', image.description || image.caption || `Bild von ${image.title || image.original_name || 'unbekannt'}`);
-    updateOGTag('og:type', 'website');
-    updateOGTag('og:url', window.location.href);
-
-    // Twitter Card tags
-    updateMetaTag('twitter:card', 'summary_large_image');
-    updateMetaTag('twitter:title', image.title || image.original_name || 'Bild');
-    updateMetaTag('twitter:description', image.description || image.caption || `Bild von ${image.title || image.original_name || 'unbekannt'}`);
-    updateMetaTag('twitter:image', `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${image.path_2048 || image.path_512}`);
-
-    // Canonical URL
-    let canonical = document.querySelector('link[rel="canonical"]') as HTMLLinkElement;
-    if (!canonical) {
-      canonical = document.createElement('link');
-      canonical.rel = 'canonical';
-      document.head.appendChild(canonical);
-    }
-    canonical.href = window.location.href;
-  }
+  // REMOVED: Dynamic meta tag updates to prevent conflicts with static meta tags in svelte:head
 
   function updateFavicon() {
     if (!image) return;
@@ -1030,18 +978,20 @@ let showRightsManager = false;
 
 <svelte:head>
   <title>{image?.title || `Item ${itemSlug} - culoca.com`}</title>
-  <meta name="description" content={image?.description || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
+  <meta name="description" content={image?.description || image?.caption || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
   <meta property="og:type" content="article">
   <meta property="og:title" content={image?.title || `Item ${itemSlug} - culoca.com`}>
-  <meta property="og:description" content={image?.description || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
+  <meta property="og:description" content={image?.description || image?.caption || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
   <meta property="og:url" content={`https://culoca.com/item/${itemSlug}`}> 
-  <meta property="og:image" content={`https://culoca.com/api/og-image/${itemSlug}`}> <!-- Slug statt ID -->
+  <meta property="og:image" content={`https://culoca.com/api/og-image/${itemSlug}`}>
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content={image?.title || `Item ${itemSlug}`}>
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content={image?.title || `Item ${itemSlug} - culoca.com`}>
-  <meta name="twitter:description" content={image?.description || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
-  <meta name="twitter:image" content={`https://culoca.com/api/og-image/${itemSlug}`}> <!-- Slug statt ID -->
+  <meta name="twitter:description" content={image?.description || image?.caption || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
+  <meta name="twitter:image" content={`https://culoca.com/api/og-image/${itemSlug}`}>
+  <meta name="twitter:image:alt" content={image?.title || `Item ${itemSlug}`}>
   <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
   <meta name="googlebot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
   <meta name="bingbot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
@@ -1054,64 +1004,12 @@ let showRightsManager = false;
     <meta name="twitter:image:width" content="{image.width || 2048}">
     <meta name="twitter:image:height" content="{image.height || 2048}">
   {/if}
-  <meta name="author" content="culoca.com">
-  <link rel="canonical" href={`https://culoca.com/item/${itemSlug}`}> <!-- Slug statt ID -->
+  <meta name="author" content={image?.full_name || 'culoca.com'}>
+  <link rel="canonical" href={`https://culoca.com/item/${itemSlug}`}>
   
-  <!-- Dynamisches Favicon für bessere SEO - korrektes API verwenden -->
+  <!-- Dynamisches Favicon für bessere SEO -->
   <link rel="icon" type="image/png" href={`/api/favicon/${itemSlug}`} sizes="32x32 48x48 96x96 192x192 512x512"> 
   <link rel="apple-touch-icon" href={`/api/favicon/${itemSlug}`} sizes="180x180">
-  
-  <!-- Structured Data for Images (JSON-LD) -->
-  {#if image}
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "ImageObject",
-      "name": "{image.title || image.original_name || 'Bild'}",
-      "description": "{image.description || image.caption || 'Bild von Culoca'}",
-      "url": "https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/{image.path_2048 || image.path_512}",
-      "contentUrl": "https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/{image.path_2048 || image.path_512}",
-      "width": {image.width || 2048},
-      "height": {image.height || 2048},
-      "encodingFormat": "image/jpeg",
-      "author": {
-        "@type": "Person",
-        "name": "{image.full_name || 'Culoca User'}"
-      },
-      "dateCreated": "{image.created_at}",
-      "dateModified": "{image.updated_at || image.created_at}",
-      "keywords": "{image.keywords || ''}",
-      "geo": {
-        "@type": "GeoCoordinates",
-        "latitude": {image.lat || 0},
-        "longitude": {image.lon || 0}
-      }
-    }
-    </script>
-  {/if} 
-  <meta name="image" content={`https://culoca.com/api/favicon/${itemSlug}`}> 
-  <meta property="og:image:alt" content={image?.title || `Item ${itemSlug}`}> 
-  <meta name="twitter:image:alt" content={image?.title || `Item ${itemSlug}`}>
-  <meta name="debug-test" content="true">
-  {#if image}
-    <link rel="icon" type="image/png" href={`/api/favicon/${itemSlug}`} sizes="32x32 48x48 96x96 192x192 512x512">
-    
-
-    <link rel="apple-touch-icon" href={`/api/favicon/${itemSlug}`} sizes="180x180">
-    <!-- Zusätzliche Meta-Tags für bessere SEO -->
-    <meta name="image" content={`https://culoca.com/api/favicon/${itemSlug}`}>
-    <meta property="og:image:alt" content={image?.title || `Bild ${itemSlug}`}>
-    <meta name="twitter:image:alt" content={image?.title || `Bild ${itemSlug}`}>
-  {:else}
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-  {/if}
-  
-  {#if !image}
-    <title>Item {itemSlug} - culoca.com</title>
-    <meta property="og:title" content="Item {itemSlug} - culoca.com">
-    <meta property="twitter:title" content="Item {itemSlug} - culoca.com">
-  {/if}
-  <meta name="debug-test" content="true">
   
   <!-- Strukturierte Daten (JSON-LD) für bessere SEO - Optimiert nach Google-Richtlinien -->
   {#if image}
