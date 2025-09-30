@@ -15,19 +15,42 @@ export const GET: RequestHandler = async () => {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Items aus der Datenbank laden
-    const { data: items, error } = await supabase
-      .from('items')
-      .select('id, title, description, slug, lat, lon, path_512, created_at')
-      .not('lat', 'is', null)
-      .not('lon', 'is', null)
-      .eq('is_private', false)
-      .limit(1000);
+    // Items aus der Datenbank laden mit Pagination (alle 4000+ Items)
+    let allItems: any[] = [];
+    let offset = 0;
+    const pageSize = 1000;
+    let hasMore = true;
 
-    if (error) {
-      console.error('Database error:', error);
-      return new Response('Database error', { status: 500 });
+    while (hasMore) {
+      const { data: items, error } = await supabase
+        .from('items')
+        .select('id, title, description, caption, slug, lat, lon, path_512, created_at')
+        .not('lat', 'is', null)
+        .not('lon', 'is', null)
+        .eq('is_private', false)
+        .range(offset, offset + pageSize - 1)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Database error:', error);
+        return new Response('Database error', { status: 500 });
+      }
+
+      if (!items || items.length === 0) {
+        hasMore = false;
+      } else {
+        allItems.push(...items);
+        offset += pageSize;
+        console.log(`Loaded ${allItems.length} items so far...`);
+        
+        // Wenn weniger als pageSize Items zurückkommen, sind wir am Ende
+        if (items.length < pageSize) {
+          hasMore = false;
+        }
+      }
     }
+
+    const items = allItems;
 
     if (!items || items.length === 0) {
       console.log('No items found');
@@ -92,6 +115,7 @@ function generateKML(items: any[]): string {
 function generatePlacemark(item: any): string {
   const title = escapeXml(item.title || 'Ohne Titel');
   const description = escapeXml(item.description || '');
+  const caption = escapeXml(item.caption || '');
   const slug = item.slug || item.id;
   const itemUrl = `https://culoca.com/item/${slug}`;
   
@@ -101,17 +125,28 @@ function generatePlacemark(item: any): string {
   
   let descriptionHtml = `<![CDATA[
     <div style="font-family: Arial, sans-serif; max-width: 400px;">
-      <h3>${title}</h3>
-      <p>${description}</p>
+      <h3>${title}</h3>`;
+  
+  // Caption nur hinzufügen wenn vorhanden und verschieden vom Titel
+  if (caption && caption !== title) {
+    descriptionHtml += `<p><em>${caption}</em></p>`;
+  }
+  
+  // Description nur hinzufügen wenn vorhanden
+  if (description) {
+    descriptionHtml += `<p>${description}</p>`;
+  }
+  
+  descriptionHtml += `
       <p><strong>📍 Koordinaten:</strong> ${lat}, ${lon}</p>
-      <p><strong>🔗 Link:</strong> <a href="${itemUrl}" target="_blank">${itemUrl}</a></p>
+      <p><strong>🔗 Link:</strong> <a href="${itemUrl}" target="_blank">Auf Culoca ansehen</a></p>
       <p><strong>📅 Erstellt:</strong> ${new Date(item.created_at).toLocaleDateString('de-DE')}</p>
   `;
   
-  // Bild hinzufügen falls vorhanden
+  // Bild hinzufügen falls vorhanden - korrekte Supabase URL
   if (item.path_512) {
-    const imageUrl = `https://culoca.com/storage/v1/object/public/512px/${item.path_512}`;
-    descriptionHtml += `<p><strong>🖼️ Bild:</strong></p><img src="${imageUrl}" style="max-width: 300px; height: auto;" alt="${title}" /></p>`;
+    const imageUrl = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${item.path_512}`;
+    descriptionHtml += `<p><strong>🖼️ Bild:</strong></p><img src="${imageUrl}" style="max-width: 300px; height: auto; border-radius: 8px;" alt="${title}" /></p>`;
   }
   
   descriptionHtml += `</div>]]>`;
