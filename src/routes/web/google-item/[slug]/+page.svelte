@@ -17,12 +17,12 @@
   
   <!-- Hauptbild zentriert -->
   {#if item.path_2048}
-    <div style="margin-bottom: 15px; text-align: center; max-height: 800px; overflow: hidden;">
+    <div style="margin-bottom: 15px; text-align: center;">
       <a href={item.culoca_url} target="_blank" style="text-decoration: none;">
         <img 
           src="https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/{item.path_2048}" 
           alt={item.title || 'Culoca Item'}
-          style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: block; margin: 0 auto;"
+          style="max-height: 800px; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: block; margin: 0 auto;"
         />
       </a>
     </div>
