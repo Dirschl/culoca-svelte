@@ -28,7 +28,7 @@
     </div>
     
     <!-- Dezenter Hinweis direkt unter dem Bild -->
-    <p style="color: #999; font-size: 12px; margin-bottom: 30px; font-style: italic; text-align: center;">
+    <p style="color: #999; font-size: 12px; margin-bottom: 15px; font-style: italic; text-align: center;">
       {new Date(item.created_at).toLocaleDateString('de-DE')}, {item.creator}
     </p>
   {/if}
