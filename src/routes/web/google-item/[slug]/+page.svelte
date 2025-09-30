@@ -10,11 +10,6 @@
   <title>{item.title || 'Culoca Item'} - Google Earth View</title>
   <meta name="description" content="Culoca Item: {item.description || item.title || 'GPS-gebundenes Foto'}">
   <meta name="robots" content="noindex, nofollow">
-  <style>
-    .culoca-image {
-      max-height: 800px !important;
-    }
-  </style>
 </svelte:head>
 
 <!-- Google Earth optimierte Seite - nur HTML, kein CSS/JavaScript -->
@@ -22,12 +17,11 @@
   
   <!-- Hauptbild zentriert -->
   {#if item.path_2048}
-    <div style="margin-bottom: 15px; text-align: center;">
+    <div style="margin-bottom: 15px; text-align: center; max-height: 800px; overflow: hidden;">
       <a href={item.culoca_url} target="_blank" style="text-decoration: none;">
         <img 
           src="https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/{item.path_2048}" 
           alt={item.title || 'Culoca Item'}
-          class="culoca-image"
           style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: block; margin: 0 auto;"
         />
       </a>
@@ -48,14 +42,14 @@
 
   <!-- Caption (falls vorhanden und verschieden vom Titel) -->
   {#if item.caption && item.caption !== item.title}
-    <p style="color: #666; font-style: italic; font-size: 18px; margin-bottom: 20px;">
+    <p style="color: #666; font-style: italic; font-size: 18px; margin-bottom: 20px; text-align: center;">
       {item.caption}
     </p>
   {/if}
 
   <!-- Description -->
   {#if item.description}
-    <p style="color: #555; font-size: 16px; line-height: 1.6; margin-bottom: 30px; text-align: left; padding: 0 20px;">
+    <p style="color: #555; font-size: 16px; line-height: 1.6; margin-bottom: 30px; text-align: center; padding: 0 20px;">
       {item.description}
     </p>
   {/if}
