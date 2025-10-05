@@ -1211,7 +1211,7 @@ let showRightsManager = false;
                 {#if image.description}
                   {image.description}
                 {:else}
-                  <span class="placeholder">Entdecke dieses faszinierende Bild auf culoca.com - Deiner Plattform für regionalen Content. Dieses Foto zeigt die Schönheit der lokalen Umgebung und lädt dazu ein, die eigene Region mit neuen Augen zu sehen. Teil der culoca-Community, die regionale Schätze sammelt und teilt.</span>
+                  <span class="placeholder">Keine Beschreibung verfügbar</span>
                 {/if}
               </span>
             {/if}
