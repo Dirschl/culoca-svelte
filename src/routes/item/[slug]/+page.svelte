@@ -979,6 +979,15 @@ let showRightsManager = false;
 <svelte:head>
   <title>{image?.title || `Item ${itemSlug} - culoca.com`}</title>
   <meta name="description" content={image?.description || image?.caption || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
+  
+  <link rel="canonical" href={`https://culoca.com/item/${itemSlug}`}>
+  
+  <!-- Robots -->
+  <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+  <meta name="googlebot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+  <meta name="bingbot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+  
+  <!-- Open Graph -->
   <meta property="og:type" content="article">
   <meta property="og:title" content={image?.title || `Item ${itemSlug} - culoca.com`}>
   <meta property="og:description" content={image?.description || image?.caption || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
@@ -987,25 +996,15 @@ let showRightsManager = false;
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content={image?.title || `Item ${itemSlug}`}>
+  
+  <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content={image?.title || `Item ${itemSlug} - culoca.com`}>
   <meta name="twitter:description" content={image?.description || image?.caption || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
   <meta name="twitter:image" content={`https://culoca.com/api/og-image/${itemSlug}`}>
   <meta name="twitter:image:alt" content={image?.title || `Item ${itemSlug}`}>
-  <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
-  <meta name="googlebot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
-  <meta name="bingbot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
   
-  <!-- Enhanced image SEO meta tags -->
-  {#if image?.path_2048}
-    <meta name="image" content="https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/{image.path_2048}">
-    <meta property="og:image:width" content={image.width || 2048}>
-    <meta property="og:image:height" content={image.height || 2048}>
-    <meta name="twitter:image:width" content={image.width || 2048}>
-    <meta name="twitter:image:height" content={image.height || 2048}>
-  {/if}
   <meta name="author" content={image?.full_name || 'culoca.com'}>
-  <link rel="canonical" href={`https://culoca.com/item/${itemSlug}`}>
   
   <!-- Dynamisches Favicon für bessere SEO -->
   <link rel="icon" type="image/png" href={`/api/favicon/${itemSlug}`} sizes="32x32 48x48 96x96 192x192 512x512"> 
@@ -1034,13 +1033,14 @@ let showRightsManager = false;
       "@context": "https://schema.org",
       "@type": "ImageObject",
       "url": itemUrl,
+      "mainEntityOfPage": itemUrl,
       "contentUrl": imageSource,
       "thumbnailUrl": thumbnailUrl,
       "name": itemName,
       "description": image.description || '',
       "inLanguage": "de",
-      "width": { "@type": "QuantitativeValue", "value": image.width || 0, "unitCode": "PX" },
-      "height": { "@type": "QuantitativeValue", "value": image.height || 0, "unitCode": "PX" },
+      "width": image.width || 0,
+      "height": image.height || 0,
       "encodingFormat": "image/jpeg",
       "license": "https://culoca.com/web/license",
       "creditText": creatorName,
@@ -1049,6 +1049,7 @@ let showRightsManager = false;
       "caption": caption,
       "keywords": keywordsCsv,
       "representativeOfPage": true,
+      "isFamilyFriendly": true,
       ...(sha256 ? { "sha256": sha256 } : {}),
       "creator": {
         "@type": "Person",
