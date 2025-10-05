@@ -96,26 +96,48 @@
       <div class="option-card">
         <h3>📍 Direkt in Google Earth öffnen</h3>
         <p>Öffnet die Culoca-Items sofort in Google Earth (empfohlen)</p>
-        <a href="/api/kml/network" class="download-button primary" target="_blank">
+        <a href="/api/kml/network" class="download-button primary" target="_blank" rel="nofollow">
           🌍 In Google Earth öffnen
         </a>
         <p class="option-note">Kleines Starter-File mit Live-Updates</p>
       </div>
       
       <div class="option-card">
-        <h3>📥 KML-Datei herunterladen</h3>
-        <p>Lade die komplette KML-Datei herunter</p>
-        <a href="/api/kml" class="download-button secondary" download="culoca-items.kml">
-          📥 KML herunterladen
+        <h3>📱 Für Mobile Geräte (KMZ)</h3>
+        <p>Optimiert für Smartphones und Tablets</p>
+        <a href="/api/kmz" class="download-button secondary" download="culoca-items.kmz" rel="nofollow">
+          📱 KMZ für Mobile herunterladen
         </a>
-        <p class="option-note">Statische Datei mit allen aktuellen Items</p>
+        <p class="option-note">Funktioniert auf allen Geräten mit Popup-Support</p>
+      </div>
+      
+      <div class="option-card">
+        <h3>💻 KML-Datei herunterladen</h3>
+        <p>Für Desktop Google Earth mit großen Bildern</p>
+        <a href="/api/kml" class="download-button secondary" download="culoca-items.kml" rel="nofollow">
+          💻 KML herunterladen
+        </a>
+        <p class="option-note">Statische Datei mit 512px Bildern</p>
       </div>
     </div>
     
     <div class="download-info">
       <strong>Live-Updates:</strong> Network Link aktualisiert sich alle 5 Minuten<br>
-      <strong>Format:</strong> KML (Keyhole Markup Language)<br>
+      <strong>Format:</strong> KML (Keyhole Markup Language) / KMZ (komprimiert)<br>
       <strong>Kompatibilität:</strong> Google Earth, Google Maps, QGIS, ArcGIS
+    </div>
+    
+    <div class="mobile-instructions">
+      <h3>📱 So verwendest du KMZ auf dem Handy:</h3>
+      <ol>
+        <li><strong>KMZ herunterladen:</strong> Klicke auf "KMZ für Mobile herunterladen"</li>
+        <li><strong>Google Earth App öffnen:</strong> Installiere die Google Earth App falls noch nicht vorhanden</li>
+        <li><strong>Datei importieren:</strong> In Google Earth → Menü → "Projekte" → "Importieren" → KMZ-Datei auswählen</li>
+        <li><strong>Items erkunden:</strong> Tippe auf die Marker um Popups mit Infos und Culoca-Links zu öffnen</li>
+      </ol>
+      <p class="mobile-note">
+        <strong>💡 Tipp:</strong> KMZ funktioniert auch offline - alle Daten sind in der Datei enthalten!
+      </p>
     </div>
   </div>
 
@@ -224,22 +246,6 @@
     </p>
   </div>
 
-  <div class="cta-section">
-    <h2>🎯 Jetzt entdecken!</h2>
-    <p>
-      Öffne alle Culoca GPS-Items direkt in Google Earth oder lade die KML-Datei herunter. 
-      Entdecke deine Umgebung aus einer neuen Perspektive!
-    </p>
-    
-    <div class="cta-buttons">
-      <a href="/api/kml/network" class="download-button large primary" target="_blank">
-        🌍 In Google Earth öffnen
-      </a>
-      <a href="/api/kml" class="download-button large secondary" download="culoca-items.kml">
-        📥 KML herunterladen
-      </a>
-    </div>
-  </div>
 </InfoPageLayout>
 
 <style>
@@ -282,7 +288,7 @@
   
   .download-options {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
     gap: 1.5rem;
     margin: 1.5rem 0;
   }
@@ -333,12 +339,6 @@
     background: rgba(255, 255, 255, 0.3);
   }
   
-  .cta-buttons {
-    display: flex;
-    gap: 1rem;
-    justify-content: center;
-    flex-wrap: wrap;
-  }
   
   .download-info {
     background: rgba(255, 255, 255, 0.1);
@@ -381,14 +381,6 @@
     margin: 0.5rem 0;
   }
   
-  .cta-section {
-    background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
-    color: white;
-    padding: 2rem;
-    border-radius: 12px;
-    margin: 2rem 0;
-    text-align: center;
-  }
   
   .technical-section ul {
     background: var(--bg-secondary);
@@ -401,6 +393,38 @@
     margin: 0.5rem 0;
   }
   
+  .mobile-instructions {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 1.5rem;
+    border-radius: 12px;
+    margin: 2rem 0;
+    text-align: left;
+  }
+  
+  .mobile-instructions h3 {
+    margin-top: 0;
+    color: #fff;
+    font-size: 1.2rem;
+  }
+  
+  .mobile-instructions ol {
+    margin: 1rem 0;
+    padding-left: 1.5rem;
+  }
+  
+  .mobile-instructions li {
+    margin: 0.8rem 0;
+    line-height: 1.5;
+  }
+  
+  .mobile-note {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 1rem;
+    border-radius: 8px;
+    margin-top: 1rem;
+    font-style: italic;
+  }
+
   @media (max-width: 768px) {
     .download-button {
       font-size: 1rem;
@@ -421,14 +445,5 @@
       gap: 1rem;
     }
     
-    .cta-buttons {
-      flex-direction: column;
-      align-items: center;
-    }
-    
-    .cta-buttons .download-button {
-      width: 100%;
-      max-width: 300px;
-    }
   }
 </style>

@@ -1,6 +1,7 @@
 import type { RequestHandler } from './$types';
 import { createClient } from '@supabase/supabase-js';
 import { env } from '$env/dynamic/private';
+import JSZip from 'jszip';
 
 export const GET: RequestHandler = async () => {
   try {
@@ -15,7 +16,7 @@ export const GET: RequestHandler = async () => {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Items aus der Datenbank laden mit Pagination (alle 4000+ Items)
+    // Items aus der Datenbank laden (alle 4000+ Items)
     let allItems: any[] = [];
     let offset = 0;
     const pageSize = 1000;
@@ -45,9 +46,8 @@ export const GET: RequestHandler = async () => {
       } else {
         allItems.push(...items);
         offset += pageSize;
-        console.log(`Loaded ${allItems.length} items so far...`);
+        console.log(`Loaded ${allItems.length} items for KMZ generation...`);
         
-        // Wenn weniger als pageSize Items zurückkommen, sind wir am Ende
         if (items.length < pageSize) {
           hasMore = false;
         }
@@ -61,36 +61,49 @@ export const GET: RequestHandler = async () => {
       return new Response('No items found', { status: 404 });
     }
 
-    console.log(`Found ${items.length} items for KML generation`);
+    console.log(`Found ${items.length} items for KMZ generation`);
 
-    const kmlContent = generateKML(items);
+    // KMZ erstellen
+    const kmzContent = await generateKMZ(items);
 
     const headers: Record<string, string> = {
-      'Content-Type': 'application/vnd.google-earth.kml+xml',
+      'Content-Type': 'application/vnd.google-earth.kmz',
       'Cache-Control': 'no-cache, no-store, must-revalidate',
       'X-Robots-Tag': 'noindex, nofollow, nosnippet, noarchive'
     };
 
-    // Für direktes Öffnen in Google Earth: inline statt attachment
-    headers['Content-Disposition'] = 'inline; filename="culoca-items.kml"';
+    headers['Content-Disposition'] = 'inline; filename="culoca-items.kmz"';
 
-    return new Response(kmlContent, { headers });
+    return new Response(kmzContent, { headers });
 
   } catch (error) {
-    console.error('Error generating KML:', error);
-    return new Response('Error generating KML', { status: 500 });
+    console.error('Error generating KMZ:', error);
+    return new Response('Error generating KMZ', { status: 500 });
   }
 };
 
-function generateKML(items: any[]): string {
-  let   kml = `<?xml version="1.0" encoding="UTF-8"?>
+async function generateKMZ(items: any[]): Promise<Uint8Array> {
+  const zip = new JSZip();
+  
+  // KML-Inhalt generieren (ohne Bild-Downloads)
+  const kmlContent = await generateKMLWithImages(items, zip);
+  zip.file('doc.kml', kmlContent);
+  
+  console.log('KMZ generated with external image links');
+  
+  // KMZ als ZIP generieren
+  const kmzBuffer = await zip.generateAsync({ type: 'uint8array' });
+  return kmzBuffer;
+}
+
+async function generateKMLWithImages(items: any[], zip: JSZip): Promise<string> {
+  let kml = `<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
   <Document>
     <name>Culoca GPS Items</name>
-    <description>Alle öffentlichen GPS-Items von Culoca</description>
+    <description>Alle öffentlichen GPS-Items von Culoca (Mobile-optimiert)</description>
     <open>1</open>
     
-    <!-- Globaler BalloonStyle -->
     <Style id="culoca-balloon">
       <BalloonStyle>
         <bgColor>ffffffff</bgColor>
@@ -109,9 +122,9 @@ function generateKML(items: any[]): string {
       <open>1</open>
       `;
 
-  items.forEach(item => {
-    kml += generatePlacemark(item);
-  });
+  for (const item of items) {
+    kml += await generatePlacemarkWithImage(item, zip);
+  }
 
   kml += `
     </Folder>
@@ -121,25 +134,25 @@ function generateKML(items: any[]): string {
   return kml;
 }
 
-function generatePlacemark(item: any): string {
+async function generatePlacemarkWithImage(item: any, zip: JSZip): Promise<string> {
   const title = escapeXml(item.title || 'Ohne Titel');
   const description = escapeXml(item.description || '');
   const caption = escapeXml(item.caption || '');
   const slug = item.slug || item.id;
-  const itemUrl = `https://culoca.com/web/google-item/${slug}`;
+  const itemUrl = `https://culoca.com/item/${slug}`;
   
   // Koordinaten mit voller Präzision
   const lat = parseFloat(item.lat).toFixed(6);
   const lon = parseFloat(item.lon).toFixed(6);
   
-  // 64px Bild als Icon verwenden (auf 32x32px skaliert), Fallback auf Standard-Icon
+  // 64px Bild als Icon verwenden (externer Link wie in KML)
   const iconUrl = item.path_64 
     ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/${item.path_64}`
     : 'https://culoca.com/culoca-icon.png';
   
-  // Detaillierte Beschreibung für den Balloon
+  // Mobile-optimierte Beschreibung für den Balloon (ohne Bilder im Popup)
   const balloonContent = `<![CDATA[
-    <div style="font-family: Arial, sans-serif; width: 400px;">
+    <div style="font-family: Arial, sans-serif; width: 350px;">
       <h3 style="color: #000; margin-bottom: 10px;">${title}</h3>
       ${description ? `<p style="margin-bottom: 10px;">${description}</p>` : ''}
       ${caption && caption !== title ? `<p style="color: #666; font-style: italic; font-size: 0.9em; margin-bottom: 10px;">${caption}</p>` : ''}
@@ -147,7 +160,6 @@ function generatePlacemark(item: any): string {
       <p style="font-size: 0.8em; color: #666;"><strong>Erstellt von:</strong> ${item.profiles?.full_name || 'Unbekannt'}</p>
       <p style="font-size: 0.8em; color: #666;"><strong>Erstellt:</strong> ${new Date(item.created_at).toLocaleDateString('de-DE')}</p>
       <p style="margin-top: 15px;"><a href="${itemUrl}" target="_blank" style="background: #ff6600; color: white; padding: 8px 12px; text-decoration: none; border-radius: 4px; font-weight: bold;">Auf Culoca ansehen</a></p>
-      ${item.path_512 ? `<div style="margin-top: 15px; text-align: center;"><img src="https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${item.path_512}" style="max-width: 100%; height: auto; border: 2px solid #fff; border-radius: 12px; display: block; margin: 0 auto; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" alt="${title}" /></div>` : ''}
     </div>
   ]]>`;
 
