@@ -590,7 +590,7 @@ let showRightsManager = false;
   async function saveDescription() {
     if (!editingDescription || !currentUser || !image || !(isCreator || $unifiedRightsStore.rights?.edit)) return;
     const newDescription = descriptionEditValue.trim();
-    if (newDescription.length > 160) return;
+    if (newDescription.length > 200) return;
     try {
       const res = await authFetch(`/api/item/${image.id}`, {
         method: 'PATCH',
@@ -977,6 +977,10 @@ let showRightsManager = false;
 </script>
 
 <svelte:head>
+  <!-- Grundlegendes -->
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  
   <title>{image?.title || `Item ${itemSlug} - culoca.com`}</title>
   <meta name="description" content={image?.description || image?.caption || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
   
@@ -1186,20 +1190,20 @@ let showRightsManager = false;
               <textarea
                 id="description-edit-input"
                 bind:value={descriptionEditValue}
-                maxlength="160"
+                maxlength="200"
                 on:keydown={handleDescriptionKeydown}
                 on:blur={saveDescription}
                 class="description-edit-input"
-                class:valid={descriptionEditValue.length >= 140}
-                placeholder="Beschreibung eingeben..."
-                rows="3"
+                class:valid={descriptionEditValue.length >= 120}
+                placeholder="Ausführliche Beschreibung eingeben (120-200 Zeichen ideal)..."
+                rows="4"
                 autocomplete="off"
                 autocorrect="off"
                 autocapitalize="sentences"
                 inputmode="text"
               ></textarea>
-              <span class="char-count" class:valid={descriptionEditValue.length >= 140}>
-                {descriptionEditValue.length}/160
+              <span class="char-count" class:valid={descriptionEditValue.length >= 120}>
+                {descriptionEditValue.length}/200
               </span>
             </div>
                       {:else}
@@ -1207,7 +1211,7 @@ let showRightsManager = false;
                 {#if image.description}
                   {image.description}
                 {:else}
-                  <span class="placeholder">Keine Beschreibung verfügbar</span>
+                  <span class="placeholder">Entdecke dieses faszinierende Bild auf culoca.com - Deiner Plattform für regionalen Content. Dieses Foto zeigt die Schönheit der lokalen Umgebung und lädt dazu ein, die eigene Region mit neuen Augen zu sehen. Teil der culoca-Community, die regionale Schätze sammelt und teilt.</span>
                 {/if}
               </span>
             {/if}
