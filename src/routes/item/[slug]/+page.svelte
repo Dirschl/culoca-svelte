@@ -590,7 +590,7 @@ let showRightsManager = false;
   async function saveDescription() {
     if (!editingDescription || !currentUser || !image || !(isCreator || $unifiedRightsStore.rights?.edit)) return;
     const newDescription = descriptionEditValue.trim();
-    if (newDescription.length > 200) return;
+    if (newDescription.length > 160) return;
     try {
       const res = await authFetch(`/api/item/${image.id}`, {
         method: 'PATCH',
@@ -1190,20 +1190,20 @@ let showRightsManager = false;
               <textarea
                 id="description-edit-input"
                 bind:value={descriptionEditValue}
-                maxlength="200"
+                maxlength="160"
                 on:keydown={handleDescriptionKeydown}
                 on:blur={saveDescription}
                 class="description-edit-input"
-                class:valid={descriptionEditValue.length >= 120}
-                placeholder="Ausführliche Beschreibung eingeben (120-200 Zeichen ideal)..."
-                rows="4"
+                class:valid={descriptionEditValue.length >= 140}
+                placeholder="Beschreibung eingeben..."
+                rows="3"
                 autocomplete="off"
                 autocorrect="off"
                 autocapitalize="sentences"
                 inputmode="text"
               ></textarea>
-              <span class="char-count" class:valid={descriptionEditValue.length >= 120}>
-                {descriptionEditValue.length}/200
+              <span class="char-count" class:valid={descriptionEditValue.length >= 140}>
+                {descriptionEditValue.length}/160
               </span>
             </div>
                       {:else}
