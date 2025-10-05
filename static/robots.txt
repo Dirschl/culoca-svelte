@@ -6,9 +6,42 @@ Disallow: /login
 Disallow: /admin/
 Disallow: /api/
 Disallow: /auth/
+Disallow: /simulation/
 
-# Entfernt: Keine Disallow-Regeln für falsche Slugs mehr
-# Alle Datenbank-Slugs sind korrekt
+# Spezifische API-Endpunkte explizit blockieren
+Disallow: /api/admin/
+Disallow: /api/upload/
+Disallow: /api/download/
+Disallow: /api/delete/
+Disallow: /api/test-*
+Disallow: /api/check-*
+Disallow: /api/fix-*
+Disallow: /api/install-*
+Disallow: /api/update-*
+Disallow: /api/cleanup-*
+Disallow: /api/generate-*
+Disallow: /api/rotate-*
+Disallow: /api/save-*
+Disallow: /api/setup-*
+Disallow: /api/log-*
+Disallow: /api/search-*
+Disallow: /api/user-*
+Disallow: /api/item-rights/
+Disallow: /api/profile-rights/
+Disallow: /api/unified-rights/
+Disallow: /api/ai-analyze/
+Disallow: /api/tracks/
+Disallow: /api/kml/
+Disallow: /api/kmz/
+Disallow: /api/og-image/
+Disallow: /api/favicon/
+Disallow: /api/nearby/
+Disallow: /api/gallery-items-*
+Disallow: /api/items-server-sorted/
+Disallow: /api/newsflash-items/
+Disallow: /api/install-map-functions/
+Disallow: /api/test-exec-sql/
+Disallow: /api/test-simple/
 
 # Sitemap location
 Sitemap: https://culoca.com/sitemap.xml

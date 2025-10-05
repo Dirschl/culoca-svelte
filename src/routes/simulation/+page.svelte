@@ -1039,6 +1039,7 @@
 
 <svelte:head>
   <title>Simulation - Culoca</title>
+  <meta name="robots" content="noindex, nofollow, nosnippet, noarchive" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   

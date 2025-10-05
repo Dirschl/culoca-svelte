@@ -1017,7 +1017,7 @@ let showRightsManager = false;
       (image.title || image.original_name || `Bild ${image.id}`).substring(0, 107) + '...' : 
       (image.title || image.original_name || `Bild ${image.id}`)}
     {@const itemUrl = `https://culoca.com/item/${image.slug}`}
-    {@const thumbnailUrl = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${image.path_512 || image.path_2048}`}
+    {@const thumbnailUrl = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${image.path_2048 || image.path_512}`}
     {@const uploadDate = image.created_at ? new Date(image.created_at).toISOString() : null}
     {@const dateModified = image.updated_at ? new Date(image.updated_at).toISOString() : 
       (image.created_at ? new Date(image.created_at).toISOString() : null)}
