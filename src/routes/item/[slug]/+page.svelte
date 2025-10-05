@@ -977,10 +977,6 @@ let showRightsManager = false;
 </script>
 
 <svelte:head>
-  <!-- Grundlegendes -->
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  
   <title>{image?.title || `Item ${itemSlug} - culoca.com`}</title>
   <meta name="description" content={image?.description || image?.caption || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
   
@@ -993,6 +989,7 @@ let showRightsManager = false;
   
   <!-- Open Graph -->
   <meta property="og:type" content="article">
+  <meta property="og:locale" content="de_DE">
   <meta property="og:title" content={image?.title || `Item ${itemSlug} - culoca.com`}>
   <meta property="og:description" content={image?.description || image?.caption || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
   <meta property="og:url" content={`https://culoca.com/item/${itemSlug}`}> 
