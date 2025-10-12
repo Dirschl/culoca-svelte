@@ -24,6 +24,9 @@
     welcomeContent = initialWelcomeContent;
     console.log('[WelcomeSection] Using server-side content:', welcomeContent);
   }
+  
+  // Debug featured items
+  $: console.log('[WelcomeSection] Featured items:', featuredItems);
 
   onMount(() => {
     mounted = true;
@@ -81,6 +84,9 @@
       
       <!-- H1 für SEO -->
       <h1 class="main-heading">Entdecke deine Umgebung mit GPS & Fotos</h1>
+      
+      <!-- Debug -->
+      <p style="color: white; font-size: 0.8rem;">Debug: {featuredItems?.length || 0} featured items</p>
       
       {#if featuredItems && featuredItems.length > 0}
         <p class="featured-intro">Entdecke zufällige Locations und teile was dir gefällt</p>
