@@ -94,7 +94,7 @@
           {#each featuredItems as item}
             <a href={`/item/${item.slug}`} class="featured-item">
               <div class="featured-image">
-                {@const imageUrl = item.path_2048_og 
+                {@const imageUrl = item.path_2048_og && item.path_2048_og.includes('.jpg')
                   ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048-og/${item.path_2048_og}`
                   : `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${item.path_2048_og}`}
                 <img 
