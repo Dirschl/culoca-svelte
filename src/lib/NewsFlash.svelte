@@ -617,14 +617,13 @@ function handleScroll(event: Event) {
   /* Sichtbar für Bots, klein und unauffällig für Benutzer */
   display: block;
   font-size: 0.7rem;
-  text-align: center;
   width: 100%;
   max-width: 100%;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  padding: 0;
+  padding: 0 4px;
   margin: 0;
   color: var(--text-secondary);
   text-decoration: none;
@@ -634,7 +633,7 @@ function handleScroll(event: Event) {
 }
 
 .newsflash-link:hover {
-  color: var(--accent-color);
+  color: #ee7221;
 }
 .newsflash-thumb:focus, .newsflash-thumb:hover {
   outline: none !important;
