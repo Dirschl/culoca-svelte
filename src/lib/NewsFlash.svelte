@@ -584,6 +584,8 @@ function handleScroll(event: Event) {
   flex-shrink: 0;
   scroll-snap-align: start;
   min-width: 0;
+  max-width: max-content;
+  width: max-content;
   vertical-align: top;
 }
 
