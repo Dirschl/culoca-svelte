@@ -89,17 +89,19 @@
             <a href={`/item/${item.slug}`} class="featured-item">
               <div class="featured-image">
                 <img 
-                  src={`https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${item.path_512}`}
+                  src={`https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048-og/${item.path_2048_og}`}
                   alt={item.title}
                   loading="lazy"
                 />
-                <svg class="featured-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
-                  <circle cx="12" cy="10" r="3"/>
-                </svg>
               </div>
               <div class="featured-content">
-                <h3 class="featured-title">{item.title}</h3>
+                <div class="featured-header">
+                  <svg class="featured-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                    <circle cx="12" cy="10" r="3"/>
+                  </svg>
+                  <h3 class="featured-title">{item.title}</h3>
+                </div>
                 {#if item.description}
                   <p class="featured-description">{item.description.substring(0, 120)}{item.description.length > 120 ? '...' : ''}</p>
                 {/if}
@@ -262,9 +264,8 @@
   }
 
   .featured-image {
-    position: relative;
     width: 100%;
-    aspect-ratio: 16/9;
+    aspect-ratio: 1200/630;
     overflow: hidden;
     background: #222;
   }
@@ -272,15 +273,8 @@
   .featured-image img {
     width: 100%;
     height: 100%;
-    object-fit: cover;
-  }
-
-  .featured-icon {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    color: white;
-    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+    object-fit: contain;
+    background: #222;
   }
 
   .featured-content {
@@ -288,11 +282,24 @@
     color: white;
   }
 
+  .featured-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .featured-icon {
+    flex-shrink: 0;
+    color: #ee7221;
+  }
+
   .featured-title {
     font-size: 1rem;
     font-weight: 600;
-    margin: 0 0 0.5rem 0;
+    margin: 0;
     color: white;
+    flex: 1;
   }
 
   .featured-description {

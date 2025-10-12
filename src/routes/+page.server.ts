@@ -102,12 +102,12 @@ export const load: PageServerLoad = async ({ url, request }) => {
     
     if (error) {
       console.error('[Server] Error with RPC, falling back to direct query:', error);
-      // Fallback: Direkte Query mit ORDER BY random()
+      // Fallback: Direkte Query
       const { data: fallbackData, error: fallbackError } = await supabase
         .from('items')
-        .select('id, title, slug, description, path_512, width, height')
+        .select('id, title, slug, description, path_2048_og, width, height')
         .not('slug', 'is', null)
-        .not('path_512', 'is', null)
+        .not('path_2048_og', 'is', null)
         .eq('is_private', false)
         .limit(3);
       
@@ -117,7 +117,7 @@ export const load: PageServerLoad = async ({ url, request }) => {
           slug: item.slug,
           title: item.title || 'Unbenanntes Item',
           description: item.description || '',
-          path_512: item.path_512,
+          path_2048_og: item.path_2048_og,
           width: item.width,
           height: item.height
         }));
@@ -128,7 +128,7 @@ export const load: PageServerLoad = async ({ url, request }) => {
         slug: item.slug,
         title: item.title || 'Unbenanntes Item',
         description: item.description || '',
-        path_512: item.path_512,
+        path_2048_og: item.path_2048_og,
         width: item.width,
         height: item.height
       }));
