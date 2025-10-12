@@ -290,6 +290,14 @@
         showImageCaptions = data?.show_image_captions ?? true;
         newsFlashMode = data?.newsflash_mode ?? 'alle';
         
+        // Also check localStorage for immediate updates
+        if (browser && typeof localStorage !== 'undefined') {
+          const storedCaptions = localStorage.getItem('showImageCaptions');
+          if (storedCaptions !== null) {
+            showImageCaptions = storedCaptions === 'true';
+          }
+        }
+        
         console.log('[Settings] Loaded user settings:', {
           showDistance,
           showCompass,
@@ -973,6 +981,16 @@
       handleScrollForAudioguide();
     };
     window.addEventListener('scroll', onScrollForAudioguide);
+    
+    // Listen for localStorage changes (e.g., from Settings page)
+    const onStorageChange = (e: StorageEvent) => {
+      if (e.key === 'showImageCaptions' && e.newValue !== null) {
+        showImageCaptions = e.newValue === 'true';
+        console.log('[Storage] showImageCaptions changed to:', showImageCaptions);
+      }
+    };
+    window.addEventListener('storage', onStorageChange);
+    
     isInIframe = window.self !== window.top;
     
     // Event-Listener für FilterBar Events
@@ -2104,6 +2122,7 @@
                   limit={15}
                   showToggles={false}
                   showDistance={showDistance}
+                  showImageCaptions={showImageCaptions}
                   userLat={effectiveLat}
                   userLon={effectiveLon}
                   getDistanceFromLatLonInMeters={getDistanceFromLatLonInMeters}

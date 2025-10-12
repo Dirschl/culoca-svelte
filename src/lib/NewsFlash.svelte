@@ -12,6 +12,7 @@ export let layout: 'justified' | 'grid' | 'strip' = 'strip';
 export let limit: number = 15;
 export let showToggles: boolean = true;
 export let showDistance: boolean = false;
+export let showImageCaptions: boolean = true;
 export let userLat: number | null = null;
 export let userLon: number | null = null;
 export let getDistanceFromLatLonInMeters: ((lat1: number, lon1: number, lat2: number, lon2: number) => string) | null = null;

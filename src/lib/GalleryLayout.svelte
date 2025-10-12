@@ -227,6 +227,9 @@
 
   .justified-pic-wrapper {
     position: absolute;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
   }
 
   .justified-pic-container {
@@ -418,7 +421,7 @@
     <div class="justified-wrapper">
       <div 
         class="justified-gallery" 
-        style="height: {isInitialized ? layoutResult.containerHeight + (showImageCaptions ? items.length * 20 : 0) : 'auto'}px;"
+        style="height: {isInitialized ? layoutResult.containerHeight + (showImageCaptions ? boxes.length * 20 : 0) : 'auto'}px;"
       >
         {#if isInitialized && boxes.length > 0}
           {#each items as item, index}
