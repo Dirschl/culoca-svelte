@@ -51,6 +51,8 @@ $: if (initialItems && initialItems.length > 0 && (images.length === 0 || curren
     lat: item.lat,
     lon: item.lon,
     path_512: item.path_512,
+    width_512: item.width_512,
+    height_512: item.height_512,
     title: item.title,
     description: item.description,
     original_name: item.original_name
@@ -92,6 +94,8 @@ async function loadNewsFlashImagesDirectFromDB(): Promise<NewsFlashImage[]> {
       lat: item.lat,
       lon: item.lon,
       path_512: item.path_512!,
+      width_512: item.width_512,
+      height_512: item.height_512,
       title: item.title,
       description: item.description,
       original_name: item.original_name
@@ -298,9 +302,10 @@ function handleScroll(event: Event) {
         <div class="newsflash-strip" tabindex="0" on:scroll={handleScroll} bind:this={stripContainer}>
           <div class="newsflash-time">{lastUpdate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} {displayedImageCount}/{$galleryStats.totalCount}</div>
           {#each images as img (img.id)}
-            <div class="newsflash-item">
+            {@const displayWidth = img.width_512 && img.height_512 ? Math.round(140 * img.width_512 / img.height_512) : 140}
+            <div class="newsflash-item" style="width:{displayWidth}px;">
               <a href={`/item/${img.slug}`} class="newsflash-thumb" tabindex="0" role="button" aria-label={img.title || img.original_name || 'Bild'} title={img.title || img.original_name || 'Bild'}>
-                <img src={"https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/" + img.path_512} alt={img.title || img.original_name || 'Bild'} loading="lazy" />
+                <img src={"https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/" + img.path_512} alt={img.title || img.original_name || 'Bild'} width={displayWidth} height="140" loading="lazy" />
                 {#if showDistance && userLat !== null && userLon !== null && img.lat && img.lon && getDistanceFromLatLonInMeters}
                   <div class="gallery-distance">
                     {getDistanceFromLatLonInMeters(userLat, userLon, img.lat, img.lon)}
