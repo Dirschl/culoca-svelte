@@ -225,16 +225,8 @@
     overflow: hidden;
   }
 
-  .justified-pic-wrapper {
-    position: absolute;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-
   .justified-pic-container {
-    position: relative;
-    display: block;
+    position: absolute;
     cursor: pointer;
     overflow: hidden;
     transition: box-shadow 0.3s ease, background-color 0.3s ease;
@@ -327,28 +319,35 @@
     transform: scale(1.04);
   }
 
-  .grid-item-wrapper {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-
-  .gallery-caption-link {
-    display: block;
+  .gallery-caption-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
     font-size: 0.75rem;
-    padding: 0 4px;
-    margin: 0;
-    color: var(--text-secondary);
-    text-decoration: none;
-    transition: color 0.2s;
+    padding: 4px 6px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    text-align: left;
+    pointer-events: none;
+    backdrop-filter: blur(4px);
   }
 
-  .gallery-caption-link:hover {
-    color: #ee7221;
+  .gallery-distance-topright {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: rgba(24, 24, 40, 0.85);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    z-index: 2;
+    pointer-events: none;
+    backdrop-filter: blur(4px);
   }
 
 
@@ -421,41 +420,42 @@
     <div class="justified-wrapper">
       <div 
         class="justified-gallery" 
-        style="height: {isInitialized ? layoutResult.containerHeight + (showImageCaptions ? boxes.length * 20 : 0) : 'auto'}px;"
+        style="height: {isInitialized ? layoutResult.containerHeight : 'auto'}px;"
       >
         {#if isInitialized && boxes.length > 0}
           {#each items as item, index}
             {#if boxes[index]}
-              <div 
-                class="justified-pic-wrapper"
-                style="left:{boxes[index].left}px; top:{boxes[index].top}px; width:{boxes[index].width}px; height:{boxes[index].height + (showImageCaptions ? 18 : 0)}px;"
+              <a 
+                href={`/item/${item.slug}`}
+                class="justified-pic-container" 
+                role="button" 
+                tabindex="0" 
+                aria-label="View image {item.id}" 
+                style="left:{boxes[index].left}px; top:{boxes[index].top}px; width:{boxes[index].width}px; height:{boxes[index].height}px;"
+                title={item.title || ''}
+                on:click|preventDefault={async (e) => {
+                  if (forceReload) {
+                    // Force full page reload for detail page navigation
+                    window.location.href = `/item/${item.slug}`;
+                  } else {
+                    // Use SvelteKit navigation for main page navigation
+                    await goto(`/item/${item.slug}`, { invalidateAll: true });
+                  }
+                }}
               >
-                <a 
-                  href={`/item/${item.slug}`}
-                  class="justified-pic-container" 
-                  role="button" 
-                  tabindex="0" 
-                  aria-label="View image {item.id}" 
-                  style="width:{boxes[index].width}px; height:{boxes[index].height}px;"
-                  title={item.title || ''}
-                  on:click|preventDefault={async (e) => {
-                    if (forceReload) {
-                      // Force full page reload for detail page navigation
-                      window.location.href = `/item/${item.slug}`;
-                    } else {
-                      // Use SvelteKit navigation for main page navigation
-                      await goto(`/item/${item.slug}`, { invalidateAll: true });
-                    }
-                  }}
-                >
-                  <img 
-                    class="justified-pic" 
-                    src={item.src} 
-                    alt="" 
-                    loading="lazy"
-                  />
+                <img 
+                  class="justified-pic" 
+                  src={item.src} 
+                  alt="" 
+                  loading="lazy"
+                />
+                {#if showImageCaptions && item.title}
+                  <div class="gallery-caption-overlay">
+                    {item.title}
+                  </div>
+                {/if}
                 {#if showDistance && userLat !== null && userLon !== null && item.lat && item.lon}
-                  <div class="gallery-distance">
+                  <div class="gallery-distance-topright">
                     {#if item.distance !== undefined && item.distance !== null}
                       <!-- Use API distance when available (prioritized) -->
                       {#if item.distance < 1000}
@@ -508,17 +508,6 @@
                   </button>
                 {/if}
               </a>
-              {#if showImageCaptions}
-                <a 
-                  href={`/item/${item.slug}`}
-                  class="gallery-caption-link"
-                  style="width:{boxes[index].width}px;"
-                  title={item.title || ''}
-                >
-                  {item.title || ''}
-                </a>
-              {/if}
-            </div>
             {/if}
           {/each}
         {:else}
@@ -532,32 +521,36 @@
     <!-- Grid Layout -->
     <div class="grid-layout">
       {#each items as item}
-        <div class="grid-item-wrapper">
-          <a 
-            href={`/item/${item.slug}`}
-            class="grid-item" 
-            tabindex="0" 
-            role="button" 
-            aria-label="View image {item.slug}"
-            title={item.title || ''}
-            on:click|preventDefault={async (e) => {
-              console.log('🔍 [GalleryLayout] Clicked item slug:', item.slug);
-              if (forceReload) {
-                // Force full page reload for detail page navigation
-                window.location.href = `/item/${item.slug}`;
-              } else {
-                // Use SvelteKit navigation for main page navigation
-                await goto(`/item/${item.slug}`, { invalidateAll: true });
-              }
-            }}
-          >
-            <img 
-              src={item.src}
-              alt="" 
-              loading="lazy"
-            />
+        <a 
+          href={`/item/${item.slug}`}
+          class="grid-item" 
+          tabindex="0" 
+          role="button" 
+          aria-label="View image {item.slug}"
+          title={item.title || ''}
+          on:click|preventDefault={async (e) => {
+            console.log('🔍 [GalleryLayout] Clicked item slug:', item.slug);
+            if (forceReload) {
+              // Force full page reload for detail page navigation
+              window.location.href = `/item/${item.slug}`;
+            } else {
+              // Use SvelteKit navigation for main page navigation
+              await goto(`/item/${item.slug}`, { invalidateAll: true });
+            }
+          }}
+        >
+          <img 
+            src={item.src}
+            alt="" 
+            loading="lazy"
+          />
+          {#if showImageCaptions && item.title}
+            <div class="gallery-caption-overlay">
+              {item.title}
+            </div>
+          {/if}
           {#if showDistance && userLat !== null && userLon !== null && item.lat && item.lon}
-            <div class="gallery-distance">
+            <div class="gallery-distance-topright">
               {#if item.distance !== undefined && item.distance !== null}
                 <!-- Use API distance when available (prioritized) -->
                 {#if item.distance < 1000}
@@ -599,17 +592,7 @@
               {/if}
             </button>
           {/if}
-          </a>
-          {#if showImageCaptions}
-            <a 
-              href={`/item/${item.slug}`}
-              class="gallery-caption-link"
-              title={item.title || ''}
-            >
-              {item.title || ''}
-            </a>
-          {/if}
-        </div>
+        </a>
       {/each}
     </div>
   {/if}
