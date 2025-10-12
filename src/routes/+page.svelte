@@ -145,6 +145,7 @@
   $: userLon = $filterStore.lastGpsPosition?.lon ?? null;
   let showDistance = true;
   let showCompass = false;
+  let showImageCaptions = true;
   let isLoggedIn = false;
   let newsFlashMode: 'alle' | 'eigene' | 'aus' = 'alle';
   let profileAvatar: string | null = null;
@@ -286,6 +287,7 @@
         showDistance = data?.show_distance ?? true;
         showCompass = data?.show_compass ?? false;
         autoguide = data?.autoguide ?? false;
+        showImageCaptions = data?.show_image_captions ?? true;
         newsFlashMode = data?.newsflash_mode ?? 'alle';
         
         console.log('[Settings] Loaded user settings:', {
@@ -2165,6 +2167,7 @@
       useJustifiedLayout={$useJustifiedLayout}
       showDistance={showDistance}
       showCompass={showCompass}
+      showImageCaptions={showImageCaptions}
       getDistanceFromLatLonInMeters={getDistanceFromLatLonInMeters}
       filterStore={filterStore}
       sessionStore={sessionStore}
@@ -2186,6 +2189,7 @@
       useJustifiedLayout={$useJustifiedLayout}
       showDistance={showDistance}
       showCompass={showCompass}
+      showImageCaptions={showImageCaptions}
       userLat={userLat}
       userLon={userLon}
       originalGalleryLat={originalGalleryLat}

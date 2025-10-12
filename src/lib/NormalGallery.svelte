@@ -8,6 +8,7 @@
   export let useJustifiedLayout = true;
   export let showDistance = true;
   export let showCompass = false;
+  export let showImageCaptions = true;
   export let userLat: number | null = null;
   export let userLon: number | null = null;
   export let originalGalleryLat: number | null = null;
@@ -114,15 +115,16 @@
 </script>
 
 {#if $galleryItems.length > 0}
-<GalleryLayout
+  <GalleryLayout
     items={$galleryItems}
-  layout={useJustifiedLayout ? 'justified' : 'grid'}
+    layout={useJustifiedLayout ? 'justified' : 'grid'}
     {showDistance}
     {showCompass}
+    {showImageCaptions}
     {userLat}
     {userLon}
     {getDistanceFromLatLonInMeters}
-/>
+  />
 {:else if $isGalleryLoading}
   <div class="loading-container">
     <div class="spinner"></div>
