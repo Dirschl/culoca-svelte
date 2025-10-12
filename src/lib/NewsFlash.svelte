@@ -617,29 +617,31 @@ function handleScroll(event: Event) {
   bottom: 0;
   left: 0;
   right: 0;
-  background: var(--bg-overlay, rgba(0, 0, 0, 0.7));
-  color: var(--text-overlay, white);
+  background: var(--bg-overlay);
+  color: var(--text-overlay);
   font-size: 0.7rem;
   padding: 4px 6px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   pointer-events: none;
-  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(var(--overlay-blur));
+  backdrop-filter: blur(var(--overlay-blur));
 }
 
 .newsflash-distance-topright {
   position: absolute;
   top: 0;
   right: 0;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  border-color: var(--border-color);
+  background: var(--bg-overlay);
+  color: var(--text-overlay);
   padding: 0 4px;
   font-size: 12.5px;
   font-weight: 600;
   z-index: 2;
   pointer-events: none;
+  -webkit-backdrop-filter: blur(var(--overlay-blur));
+  backdrop-filter: blur(var(--overlay-blur));
 }
 .newsflash-thumb:focus, .newsflash-thumb:hover {
   outline: none !important;

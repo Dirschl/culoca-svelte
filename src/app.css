@@ -86,8 +86,9 @@ html[data-theme="dark"] {
   --warning-color: #ff9800;
   --culoca-orange: #ee7221;
   --passepartout-bg: #e6e7eb;
-  --bg-overlay: rgba(255, 255, 255, 0.9);
+  --bg-overlay: rgba(255, 255, 255, 0.6);
   --text-overlay: #333333;
+  --overlay-blur: 4px;
 }
 
 /* Dark Mode Colors */
@@ -108,8 +109,9 @@ html[data-theme="dark"] {
   --warning-color: #ff9800;
   --culoca-orange: #ee7221;
   --passepartout-bg: #1a1a1a;
-  --bg-overlay: rgba(0, 0, 0, 0.75);
+  --bg-overlay: rgba(0, 0, 0, 0.6);
   --text-overlay: white;
+  --overlay-blur: 4px;
 }
 
 /* Global Styles */
