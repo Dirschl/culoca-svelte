@@ -68,6 +68,28 @@ export const load: PageServerLoad = async ({ url, request }) => {
     console.error('[Server] Error loading newsflash items:', error);
   }
 
+  // Welcome-Content serverseitig laden für Bots
+  let welcomeContent: any = {};
+  try {
+    const { data, error } = await supabase
+      .from('welcome_content')
+      .select('*')
+      .eq('is_active', true)
+      .order('id');
+    
+    if (!error && data) {
+      const content = data || [];
+      welcomeContent = {
+        greeting: content.find(item => item.section_key === 'greeting'),
+        gps: content.find(item => item.section_key === 'gps_feature'),
+        discover: content.find(item => item.section_key === 'discover')
+      };
+      console.log('[Server] Loaded welcome content for SSR:', Object.keys(welcomeContent));
+    }
+  } catch (error) {
+    console.error('[Server] Error loading welcome content:', error);
+  }
+
   // SEO-Daten serverseitig laden
   const seo = {
     title: 'Culoca - Entdecke die Welt durch Fotos',
@@ -98,6 +120,7 @@ export const load: PageServerLoad = async ({ url, request }) => {
   return {
     seo,
     newsFlashItems,
+    welcomeContent,
     page,
     totalPages: Math.ceil(totalCount / itemsPerPage),
     totalCount,

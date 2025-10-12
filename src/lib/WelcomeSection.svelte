@@ -8,6 +8,9 @@
 
   const CREATOR_ID = '0ceb2320-0553-463b-971a-a0eef5ecdf09';
 
+  // Props from server-side load
+  export let initialWelcomeContent: any = {};
+
   let mounted = false;
   let showEditor = false;
   let welcomeContent: any = {};
@@ -15,9 +18,19 @@
   let currentUserId = '';
   let isLoggedIn = false;
 
+  // Initialize with server-side data if available
+  $: if (initialWelcomeContent && Object.keys(initialWelcomeContent).length > 0) {
+    welcomeContent = initialWelcomeContent;
+    console.log('[WelcomeSection] Using server-side content:', welcomeContent);
+  }
+
   onMount(() => {
     mounted = true;
-    loadWelcomeContent();
+    // Only load from client if no server data was provided
+    if (!initialWelcomeContent || Object.keys(initialWelcomeContent).length === 0) {
+      console.log('[WelcomeSection] No server data, loading from client');
+      loadWelcomeContent();
+    }
   });
 
   // Subscribe to session changes
@@ -25,7 +38,7 @@
     const session = get(sessionStore);
     isLoggedIn = session.isAuthenticated;
     currentUserId = session.userId || '';
-    userName = session.user?.user_metadata?.name || session.user?.user_metadata?.full_name || 'Fotograf';
+    userName = session.user?.user_metadata?.name || session.user?.user_metadata?.full_name || '';
   }
 
   async function loadWelcomeContent() {

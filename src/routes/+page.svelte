@@ -2112,7 +2112,7 @@
                   on:click={() => console.log('[Page] NewsFlash clicked, data:', data.newsFlashItems?.length || 0)}
                 />
   {/if}
-  <WelcomeSection />
+  <WelcomeSection initialWelcomeContent={data.welcomeContent || {}} />
   
   <!-- Bot-friendly pagination links (only visible to bots) -->
   {#if browser && isBot}
