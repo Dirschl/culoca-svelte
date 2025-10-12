@@ -292,14 +292,19 @@ function handleScroll(event: Event) {
         <div class="newsflash-strip" tabindex="0" on:scroll={handleScroll} bind:this={stripContainer}>
           <div class="newsflash-time">{lastUpdate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} {displayedImageCount}/{$galleryStats.totalCount}</div>
           {#each images as img (img.id)}
-            <a href={`/item/${img.slug}`} class="newsflash-thumb" tabindex="0" role="button" aria-label={img.title || img.original_name || 'Bild'} title={img.title || img.original_name || 'Bild'}>
-              <img src={"https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/" + img.path_512} alt={img.title || img.original_name || 'Bild'} />
-              {#if showDistance && userLat !== null && userLon !== null && img.lat && img.lon && getDistanceFromLatLonInMeters}
-                <div class="gallery-distance">
-                  {getDistanceFromLatLonInMeters(userLat, userLon, img.lat, img.lon)}
-                </div>
-              {/if}
-            </a>
+            <div class="newsflash-item">
+              <a href={`/item/${img.slug}`} class="newsflash-thumb" tabindex="0" role="button" aria-label={img.title || img.original_name || 'Bild'} title={img.title || img.original_name || 'Bild'}>
+                <img src={"https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/" + img.path_512} alt={img.title || img.original_name || 'Bild'} />
+                {#if showDistance && userLat !== null && userLon !== null && img.lat && img.lon && getDistanceFromLatLonInMeters}
+                  <div class="gallery-distance">
+                    {getDistanceFromLatLonInMeters(userLat, userLon, img.lat, img.lon)}
+                  </div>
+                {/if}
+              </a>
+              <a href={`/item/${img.slug}`} class="newsflash-link">
+                {img.title || img.original_name || 'Bild ansehen'}
+              </a>
+            </div>
           {/each}
           {#if loadingMore}
             <div class="newsflash-loading-more">Lade mehr...</div>
@@ -318,14 +323,19 @@ function handleScroll(event: Event) {
         <div class="newsflash-grid" tabindex="0" on:scroll={handleScroll} bind:this={gridContainer}>
           <div class="newsflash-time">{lastUpdate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} {displayedImageCount}/{$galleryStats.totalCount}</div>
           {#each images as img (img.id)}
-            <a href={`/item/${img.slug}`} class="newsflash-thumb" tabindex="0" role="button" aria-label={img.title || img.original_name || 'Bild'} title={img.title || img.original_name || 'Bild'}>
-              <img src={"https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/" + img.path_512} alt={img.title || img.original_name || 'Bild'} />
-              {#if showDistance && userLat !== null && userLon !== null && img.lat && img.lon && getDistanceFromLatLonInMeters}
-                <div class="gallery-distance">
-                  {getDistanceFromLatLonInMeters(userLat, userLon, img.lat, img.lon)}
-                </div>
-              {/if}
-            </a>
+            <div class="newsflash-item">
+              <a href={`/item/${img.slug}`} class="newsflash-thumb" tabindex="0" role="button" aria-label={img.title || img.original_name || 'Bild'} title={img.title || img.original_name || 'Bild'}>
+                <img src={"https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/" + img.path_512} alt={img.title || img.original_name || 'Bild'} />
+                {#if showDistance && userLat !== null && userLon !== null && img.lat && img.lon && getDistanceFromLatLonInMeters}
+                  <div class="gallery-distance">
+                    {getDistanceFromLatLonInMeters(userLat, userLon, img.lat, img.lon)}
+                  </div>
+                {/if}
+              </a>
+              <a href={`/item/${img.slug}`} class="newsflash-link">
+                {img.title || img.original_name || 'Bild ansehen'}
+              </a>
+            </div>
           {/each}
           {#if loadingMore}
             <div class="newsflash-loading-more">Lade mehr...</div>
@@ -500,6 +510,15 @@ function handleScroll(event: Event) {
     height: 80px;
   }
 }
+.newsflash-grid .newsflash-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  scroll-snap-align: start;
+}
+
 .newsflash-grid .newsflash-thumb {
   width: 128px;
   height: 128px;
@@ -514,8 +533,8 @@ function handleScroll(event: Event) {
   transition: box-shadow 0.2s, transform 0.2s;
   position: relative;
   flex-shrink: 0;
-  scroll-snap-align: start;
 }
+
 .newsflash-grid .newsflash-thumb:focus, .newsflash-grid .newsflash-thumb:hover {
   outline: none !important;
   border: none !important;
@@ -534,6 +553,15 @@ function handleScroll(event: Event) {
 .newsflash-grid .newsflash-thumb:hover img {
   transform: scale(1.04);
 }
+.newsflash-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  scroll-snap-align: start;
+}
+
 .newsflash-thumb {
   height: 140px;
   min-width: 0;
@@ -545,13 +573,25 @@ function handleScroll(event: Event) {
   border: none;
   transition: border 0.2s;
   flex-shrink: 0;
-  scroll-snap-align: start;
   margin: 0;
   padding: 0;
   overflow: hidden;
   position: relative;
   text-decoration: none;
   color: inherit;
+}
+
+.newsflash-link {
+  /* Versteckt für normale Benutzer, aber sichtbar für Bots und Screen Reader */
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
 }
 .newsflash-thumb:focus, .newsflash-thumb:hover {
   outline: none !important;
