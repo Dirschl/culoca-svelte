@@ -595,7 +595,6 @@ function handleScroll(event: Event) {
 }
 
 .newsflash-thumb {
-  height: 140px;
   width: auto;
   min-width: 0;
   background: #222;
@@ -640,7 +639,6 @@ function handleScroll(event: Event) {
   border: none !important;
 }
 .newsflash-thumb img {
-  height: 140px;
   width: auto;
   object-fit: contain;
   display: block;
