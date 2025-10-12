@@ -38,6 +38,8 @@ let usedInitialItems = false; // NEU: Merker, ob SSR-Items verwendet wurden
 // Container references for auto-scroll
 let stripContainer: HTMLElement;
 let gridContainer: HTMLElement;
+let isScrolling = false;
+let scrollTimeout: any = null;
 
 // Track last page to detect changes
 let lastLoadedPage = currentPage;
@@ -267,6 +269,13 @@ function handleScroll(event: Event) {
   const scrollWidth = target.scrollWidth;
   const clientWidth = target.clientWidth;
   
+  // Show time indicator while scrolling
+  isScrolling = true;
+  if (scrollTimeout) clearTimeout(scrollTimeout);
+  scrollTimeout = setTimeout(() => {
+    isScrolling = false;
+  }, 1500);
+  
   // Wenn der User fast am Ende ist (80% der Scroll-Breite), lade mehr Bilder
   if (scrollLeft + clientWidth >= scrollWidth * 0.8 && hasMoreImages && !loadingMore) {
     console.log('NewsFlash: Near end of scroll, loading more images');
@@ -301,7 +310,9 @@ function handleScroll(event: Event) {
     {:else}
       {#if layout === 'strip' || layout === 'justified'}
         <div class="newsflash-strip" tabindex="0" on:scroll={handleScroll} bind:this={stripContainer}>
-          <div class="newsflash-time">{lastUpdate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} {displayedImageCount}/{$galleryStats.totalCount}</div>
+          {#if isScrolling}
+            <div class="newsflash-time">{lastUpdate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} {displayedImageCount}/{$galleryStats.totalCount}</div>
+          {/if}
           {#each images as img (img.id)}
             {@const displayWidth = img.width && img.height ? Math.round(140 * img.width / img.height) : 140}
             <a href={`/item/${img.slug}`} class="newsflash-thumb" tabindex="0" role="button" aria-label={img.title || img.original_name || 'Bild'} title={img.title || img.original_name || 'Bild'} style="width:{displayWidth}px;">
@@ -332,7 +343,9 @@ function handleScroll(event: Event) {
         </div>
       {:else if layout === 'grid'}
         <div class="newsflash-grid" tabindex="0" on:scroll={handleScroll} bind:this={gridContainer}>
-          <div class="newsflash-time">{lastUpdate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} {displayedImageCount}/{$galleryStats.totalCount}</div>
+          {#if isScrolling}
+            <div class="newsflash-time">{lastUpdate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} {displayedImageCount}/{$galleryStats.totalCount}</div>
+          {/if}
           {#each images as img (img.id)}
             <a href={`/item/${img.slug}`} class="newsflash-thumb" tabindex="0" role="button" aria-label={img.title || img.original_name || 'Bild'} title={img.title || img.original_name || 'Bild'}>
               <img src={"https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/" + img.path_512} alt={img.title || img.original_name || 'Bild'} />
@@ -604,8 +617,8 @@ function handleScroll(event: Event) {
   bottom: 0;
   left: 0;
   right: 0;
-  background: rgba(0, 0, 0, 0.7);
-  color: white;
+  background: var(--bg-overlay, rgba(0, 0, 0, 0.7));
+  color: var(--text-overlay, white);
   font-size: 0.7rem;
   padding: 4px 6px;
   overflow: hidden;
@@ -617,17 +630,15 @@ function handleScroll(event: Event) {
 
 .newsflash-distance-topright {
   position: absolute;
-  top: 4px;
-  right: 4px;
-  background: rgba(24, 24, 40, 0.85);
+  top: 0;
+  right: 0;
+  background: rgba(58, 119, 119, 0.85);
   color: white;
-  padding: 3px 6px;
-  border-radius: 3px;
+  padding: 2px 4px;
   font-size: 0.7rem;
   font-weight: 600;
   z-index: 2;
   pointer-events: none;
-  backdrop-filter: blur(4px);
 }
 .newsflash-thumb:focus, .newsflash-thumb:hover {
   outline: none !important;
