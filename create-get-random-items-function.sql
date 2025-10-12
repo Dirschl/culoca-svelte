@@ -1,15 +1,14 @@
 -- Create function to get random items for homepage featured section
 -- This function uses ORDER BY RANDOM() for true randomness across the entire database
 
+-- Funktion zum Abrufen zufälliger Items für die Welcome Section
+-- Die og:image wird über /api/og-image/[slug] generiert, daher brauchen wir keine Pfade
 CREATE OR REPLACE FUNCTION get_random_items(item_limit INTEGER DEFAULT 3)
 RETURNS TABLE (
   id UUID,
   slug TEXT,
   title TEXT,
-  description TEXT,
-  path_2048_og TEXT,
-  width INTEGER,
-  height INTEGER
+  description TEXT
 ) 
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -20,13 +19,9 @@ BEGIN
     i.id,
     i.slug,
     i.title,
-    i.description,
-    i.path_2048_og,
-    i.width,
-    i.height
+    i.description
   FROM items i
   WHERE i.slug IS NOT NULL
-    AND i.path_2048_og IS NOT NULL
     AND i.is_private = false
   ORDER BY RANDOM()
   LIMIT item_limit;
