@@ -324,8 +324,8 @@
     bottom: 0;
     left: 0;
     right: 0;
-    background: rgba(0, 0, 0, 0.7);
-    color: white;
+    background: var(--bg-overlay, rgba(0, 0, 0, 0.7));
+    color: var(--text-overlay, white);
     font-size: 0.75rem;
     padding: 4px 6px;
     overflow: hidden;
@@ -337,17 +337,16 @@
 
   .gallery-distance-topright {
     position: absolute;
-    top: 8px;
-    right: 8px;
-    background: rgba(24, 24, 40, 0.85);
-    color: white;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 0.75rem;
+    top: 0;
+    right: 0;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border-color: var(--border-color);
+    padding: 0 4px;
+    font-size: 12.5px;
     font-weight: 600;
     z-index: 2;
     pointer-events: none;
-    backdrop-filter: blur(4px);
   }
 
 
