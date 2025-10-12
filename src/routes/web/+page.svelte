@@ -137,44 +137,7 @@
   // Bot-Test Feature
   let isBotMode = false;
   let originalUserAgent = '';
-  
-  // Check URL for bot_mode parameter on mount
-  if (browser) {
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('bot_mode') === 'true') {
-      isBotMode = true;
-    }
-  }
-  
-  // Watch for bot mode changes and update URL
-  $: if (browser && isBotMode) {
-    const url = new URL(window.location.href);
-    url.searchParams.set('bot_mode', 'true');
-    window.history.replaceState({}, '', url.toString());
-    
-    // Set Googlebot user agent
-    if (!originalUserAgent) {
-      originalUserAgent = navigator.userAgent;
-    }
-    Object.defineProperty(navigator, 'userAgent', {
-      value: 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
-      configurable: true
-    });
-    console.log('🤖 Bot-Modus persistent aktiv');
-  } else if (browser && !isBotMode) {
-    const url = new URL(window.location.href);
-    url.searchParams.delete('bot_mode');
-    window.history.replaceState({}, '', url.toString());
-    
-    // Restore original user agent
-    if (originalUserAgent) {
-      Object.defineProperty(navigator, 'userAgent', {
-        value: originalUserAgent,
-        configurable: true
-      });
-      originalUserAgent = '';
-    }
-  }
+  let botModeInitialized = false;
   
   // Editierbare SEO-Textfelder
   let editableTitle = '';
@@ -592,8 +555,16 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
     testUrl = 'https://culoca.com/item/nachts-in-mitterskirchen-herbstbild-rottal-inn-johann-dirschl';
     await fetchHeadData();
     
-    // Add click interceptor for bot mode
+    // Check URL for bot_mode parameter
     if (browser) {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('bot_mode') === 'true') {
+        isBotMode = true;
+        console.log('🤖 Bot-Modus aus URL-Parameter aktiviert');
+      }
+      botModeInitialized = true;
+      
+      // Add click interceptor for bot mode
       document.addEventListener('click', (e) => {
         if (!isBotMode) return;
         
@@ -601,18 +572,67 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
         const link = target.closest('a');
         
         if (link && link.href) {
-          // Only intercept internal links
-          const url = new URL(link.href);
-          if (url.origin === window.location.origin) {
-            // Add bot_mode parameter
-            url.searchParams.set('bot_mode', 'true');
-            link.href = url.toString();
-            console.log('🤖 Link updated with bot_mode:', link.href);
+          try {
+            // Only intercept internal links
+            const url = new URL(link.href);
+            if (url.origin === window.location.origin && !url.searchParams.has('bot_mode')) {
+              // Add bot_mode parameter
+              url.searchParams.set('bot_mode', 'true');
+              link.href = url.toString();
+              console.log('🤖 Link updated with bot_mode:', link.href);
+            }
+          } catch (err) {
+            // Invalid URL, skip
           }
         }
       }, true); // Use capture phase
     }
   });
+  
+  // Watch for bot mode changes and update URL/User-Agent
+  $: if (browser && botModeInitialized) {
+    if (isBotMode) {
+      const url = new URL(window.location.href);
+      if (!url.searchParams.has('bot_mode')) {
+        url.searchParams.set('bot_mode', 'true');
+        window.history.replaceState({}, '', url.toString());
+      }
+      
+      // Set Googlebot user agent
+      if (!originalUserAgent) {
+        originalUserAgent = navigator.userAgent;
+      }
+      try {
+        Object.defineProperty(navigator, 'userAgent', {
+          value: 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
+          configurable: true
+        });
+        console.log('🤖 Bot-Modus aktiviert - User-Agent:', navigator.userAgent);
+      } catch (err) {
+        console.warn('Konnte User-Agent nicht ändern:', err);
+      }
+    } else {
+      const url = new URL(window.location.href);
+      if (url.searchParams.has('bot_mode')) {
+        url.searchParams.delete('bot_mode');
+        window.history.replaceState({}, '', url.toString());
+      }
+      
+      // Restore original user agent
+      if (originalUserAgent) {
+        try {
+          Object.defineProperty(navigator, 'userAgent', {
+            value: originalUserAgent,
+            configurable: true
+          });
+          console.log('👤 Bot-Modus deaktiviert - User-Agent wiederhergestellt');
+          originalUserAgent = '';
+        } catch (err) {
+          console.warn('Konnte User-Agent nicht wiederherstellen:', err);
+        }
+      }
+    }
+  }
 
   onMount(async () => {
     if (browser) {
