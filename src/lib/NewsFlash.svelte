@@ -38,9 +38,12 @@ let usedInitialItems = false; // NEU: Merker, ob SSR-Items verwendet wurden
 let stripContainer: HTMLElement;
 let gridContainer: HTMLElement;
 
-// NEU: Verwende initialItems wenn verfügbar (für SEO)
-$: if (initialItems && initialItems.length > 0 && images.length === 0 && !usedInitialItems) {
-  console.log('[NewsFlash] Using server-side initial items:', initialItems.length);
+// Track last page to detect changes
+let lastLoadedPage = currentPage;
+
+// NEU: Verwende initialItems wenn verfügbar (für SEO) oder wenn Seite gewechselt wurde
+$: if (initialItems && initialItems.length > 0 && (images.length === 0 || currentPage !== lastLoadedPage)) {
+  console.log('[NewsFlash] Using server-side initial items:', initialItems.length, 'Page:', currentPage);
   console.log('[NewsFlash] First item:', initialItems[0]);
   images = initialItems.map(item => ({
     id: item.id,
@@ -55,8 +58,10 @@ $: if (initialItems && initialItems.length > 0 && images.length === 0 && !usedIn
   loading = false;
   lastImageId = images[0]?.id || null;
   usedInitialItems = true;
-  currentOffset = initialItems.length; // NEU: Offset für Nachladen setzen
-  console.log('[NewsFlash] Server-side items loaded:', images.length);
+  lastLoadedPage = currentPage;
+  currentOffset = (currentPage - 1) * limit + initialItems.length; // Correct offset calculation
+  hasMoreImages = currentPage < totalPages;
+  console.log('[NewsFlash] Server-side items loaded:', images.length, 'Page:', currentPage, 'Total pages:', totalPages, 'Has more:', hasMoreImages);
 }
 
 // Direct database query for NewsFlash images (bypasses API limitations)
