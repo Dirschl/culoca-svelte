@@ -300,7 +300,7 @@ function handleScroll(event: Event) {
           {#each images as img (img.id)}
             <div class="newsflash-item">
               <a href={`/item/${img.slug}`} class="newsflash-thumb" tabindex="0" role="button" aria-label={img.title || img.original_name || 'Bild'} title={img.title || img.original_name || 'Bild'}>
-                <img src={"https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/" + img.path_512} alt={img.title || img.original_name || 'Bild'} />
+                <img src={"https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/" + img.path_512} alt={img.title || img.original_name || 'Bild'} loading="lazy" />
                 {#if showDistance && userLat !== null && userLon !== null && img.lat && img.lon && getDistanceFromLatLonInMeters}
                   <div class="gallery-distance">
                     {getDistanceFromLatLonInMeters(userLat, userLon, img.lat, img.lon)}
@@ -579,21 +579,20 @@ function handleScroll(event: Event) {
 .newsflash-item {
   display: inline-flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   gap: 2px;
   flex-shrink: 0;
   scroll-snap-align: start;
   min-width: 0;
-  max-width: min-content;
+  vertical-align: top;
 }
 
 .newsflash-thumb {
   height: 140px;
+  width: auto;
   min-width: 0;
   background: #222;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
+  display: inline-block;
   cursor: pointer;
   border: none;
   transition: border 0.2s;
@@ -604,6 +603,7 @@ function handleScroll(event: Event) {
   position: relative;
   text-decoration: none;
   color: inherit;
+  vertical-align: bottom;
 }
 
 .newsflash-link {
