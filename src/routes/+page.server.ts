@@ -111,33 +111,38 @@ export const load: PageServerLoad = async ({ url, request }) => {
     if (error) {
       console.error('[Server] Error with RPC, using direct query with RANDOM():', error);
       // Fallback: Direkte Query mit zufälligen IDs
-      // Erst Gesamt-Count holen
+      // Erst Gesamt-Count holen (ohne path_2048_og Filter)
       const { count } = await supabase
         .from('items')
         .select('*', { count: 'exact', head: true })
         .not('slug', 'is', null)
-        .not('path_2048_og', 'is', null)
         .eq('is_private', false);
+      
+      console.log('[Server] Total public items count:', count);
       
       if (count && count > 3) {
         // Generiere 3 zufällige Offsets
         const randomOffsets = Array.from({ length: 3 }, () => 
           Math.floor(Math.random() * Math.max(1, count - 1))
-        );
+        ).sort((a, b) => a - b); // Sortiere für bessere Performance
+        
+        console.log('[Server] Random offsets:', randomOffsets);
         
         // Lade Items an den zufälligen Positionen
         const promises = randomOffsets.map(offset => 
           supabase
             .from('items')
-            .select('id, title, slug, description, path_2048_og, width, height')
+            .select('id, title, slug, description, path_2048_og, path_512, width, height')
             .not('slug', 'is', null)
-            .not('path_2048_og', 'is', null)
             .eq('is_private', false)
+            .order('created_at', { ascending: false })
             .range(offset, offset)
             .single()
         );
         
         const results = await Promise.all(promises);
+        console.log('[Server] Query results:', results.map(r => ({ error: r.error, hasData: !!r.data })));
+        
         const fallbackData = results
           .filter(r => !r.error && r.data)
           .map(r => r.data);
@@ -148,11 +153,11 @@ export const load: PageServerLoad = async ({ url, request }) => {
             slug: item.slug,
             title: item.title || 'Unbenanntes Item',
             description: item.description || '',
-            path_2048_og: item.path_2048_og,
+            path_2048_og: item.path_2048_og || item.path_512, // Fallback to path_512
             width: item.width,
             height: item.height
           }));
-          console.log('[Server] Using fallback with random offsets:', featuredItems.length);
+          console.log('[Server] Fallback featured items:', featuredItems);
         }
       }
     } else if (data && data.length > 0) {
