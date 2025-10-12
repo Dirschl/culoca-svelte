@@ -186,8 +186,18 @@ let showRightsManager = false;
       }
     }
     
+    // Listen for localStorage changes
+    const onStorageChange = (e: StorageEvent) => {
+      if (e.key === 'showImageCaptions' && e.newValue !== null) {
+        showImageCaptions = e.newValue === 'true';
+        console.log('[Item][Storage] showImageCaptions changed to:', showImageCaptions);
+      }
+    };
+    window.addEventListener('storage', onStorageChange);
+    
     return () => {
       unifiedRightsStore.reset();
+      window.removeEventListener('storage', onStorageChange);
     };
   });
 
