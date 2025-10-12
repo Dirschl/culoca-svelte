@@ -564,11 +564,12 @@ function handleScroll(event: Event) {
 .newsflash-item {
   display: inline-flex;
   flex-direction: column;
-  align-items: stretch;
+  align-items: center;
   gap: 2px;
   flex-shrink: 0;
   scroll-snap-align: start;
   min-width: 0;
+  max-width: min-content;
 }
 
 .newsflash-thumb {
@@ -595,6 +596,7 @@ function handleScroll(event: Event) {
   display: block;
   font-size: 0.7rem;
   text-align: center;
+  width: 100%;
   max-width: 100%;
   min-width: 0;
   overflow: hidden;
@@ -606,6 +608,7 @@ function handleScroll(event: Event) {
   text-decoration: none;
   transition: color 0.2s;
   flex-shrink: 1;
+  box-sizing: border-box;
 }
 
 .newsflash-link:hover {
