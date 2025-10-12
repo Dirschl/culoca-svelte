@@ -519,6 +519,10 @@ function handleScroll(event: Event) {
   scroll-snap-align: start;
 }
 
+.newsflash-grid .newsflash-link {
+  max-width: 128px;
+}
+
 .newsflash-grid .newsflash-thumb {
   width: 128px;
   height: 128px;
@@ -582,16 +586,23 @@ function handleScroll(event: Event) {
 }
 
 .newsflash-link {
-  /* Minimal sichtbar für Bots und Screen Reader, aber unauffällig für normale Benutzer */
+  /* Sichtbar für Bots, klein und unauffällig für Benutzer */
   display: block;
-  font-size: 0.001px;
-  line-height: 0;
-  color: transparent;
+  font-size: 0.7rem;
+  text-align: center;
+  max-width: 140px;
   overflow: hidden;
-  height: 0;
-  margin: 0;
-  padding: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 2px 4px;
+  margin-top: 2px;
+  color: var(--text-secondary);
   text-decoration: none;
+  transition: color 0.2s;
+}
+
+.newsflash-link:hover {
+  color: var(--accent-color);
 }
 .newsflash-thumb:focus, .newsflash-thumb:hover {
   outline: none !important;
