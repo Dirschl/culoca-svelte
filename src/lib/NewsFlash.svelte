@@ -304,19 +304,19 @@ function handleScroll(event: Event) {
           <div class="newsflash-time">{lastUpdate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} {displayedImageCount}/{$galleryStats.totalCount}</div>
           {#each images as img (img.id)}
             {@const displayWidth = img.width && img.height ? Math.round(140 * img.width / img.height) : 140}
-            <div class="newsflash-item" style="width:{displayWidth}px;">
-              <a href={`/item/${img.slug}`} class="newsflash-thumb" tabindex="0" role="button" aria-label={img.title || img.original_name || 'Bild'} title={img.title || img.original_name || 'Bild'}>
-                <img src={"https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/" + img.path_512} alt={img.title || img.original_name || 'Bild'} width={displayWidth} height="140" loading="lazy" />
-                {#if showDistance && userLat !== null && userLon !== null && img.lat && img.lon && getDistanceFromLatLonInMeters}
-                  <div class="gallery-distance">
-                    {getDistanceFromLatLonInMeters(userLat, userLon, img.lat, img.lon)}
-                  </div>
-                {/if}
-              </a>
-              <a href={`/item/${img.slug}`} class="newsflash-link" title={img.title || img.original_name || 'Bild'}>
-                {img.title || img.original_name || 'Bild ansehen'}
-              </a>
-            </div>
+            <a href={`/item/${img.slug}`} class="newsflash-thumb" tabindex="0" role="button" aria-label={img.title || img.original_name || 'Bild'} title={img.title || img.original_name || 'Bild'} style="width:{displayWidth}px;">
+              <img src={"https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/" + img.path_512} alt={img.title || img.original_name || 'Bild'} width={displayWidth} height="140" loading="lazy" />
+              {#if showImageCaptions && (img.title || img.original_name)}
+                <div class="newsflash-caption-overlay">
+                  {img.title || img.original_name}
+                </div>
+              {/if}
+              {#if showDistance && userLat !== null && userLon !== null && img.lat && img.lon && getDistanceFromLatLonInMeters}
+                <div class="newsflash-distance-topright">
+                  {getDistanceFromLatLonInMeters(userLat, userLon, img.lat, img.lon)}
+                </div>
+              {/if}
+            </a>
           {/each}
           {#if loadingMore}
             <div class="newsflash-loading-more">Lade mehr...</div>
@@ -334,19 +334,19 @@ function handleScroll(event: Event) {
         <div class="newsflash-grid" tabindex="0" on:scroll={handleScroll} bind:this={gridContainer}>
           <div class="newsflash-time">{lastUpdate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} {displayedImageCount}/{$galleryStats.totalCount}</div>
           {#each images as img (img.id)}
-            <div class="newsflash-item">
-              <a href={`/item/${img.slug}`} class="newsflash-thumb" tabindex="0" role="button" aria-label={img.title || img.original_name || 'Bild'} title={img.title || img.original_name || 'Bild'}>
-                <img src={"https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/" + img.path_512} alt={img.title || img.original_name || 'Bild'} />
-                {#if showDistance && userLat !== null && userLon !== null && img.lat && img.lon && getDistanceFromLatLonInMeters}
-                  <div class="gallery-distance">
-                    {getDistanceFromLatLonInMeters(userLat, userLon, img.lat, img.lon)}
-                  </div>
-                {/if}
-              </a>
-              <a href={`/item/${img.slug}`} class="newsflash-link" title={img.title || img.original_name || 'Bild'}>
-                {img.title || img.original_name || 'Bild ansehen'}
-              </a>
-            </div>
+            <a href={`/item/${img.slug}`} class="newsflash-thumb" tabindex="0" role="button" aria-label={img.title || img.original_name || 'Bild'} title={img.title || img.original_name || 'Bild'}>
+              <img src={"https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/" + img.path_512} alt={img.title || img.original_name || 'Bild'} />
+              {#if showImageCaptions && (img.title || img.original_name)}
+                <div class="newsflash-caption-overlay">
+                  {img.title || img.original_name}
+                </div>
+              {/if}
+              {#if showDistance && userLat !== null && userLon !== null && img.lat && img.lon && getDistanceFromLatLonInMeters}
+                <div class="newsflash-distance-topright">
+                  {getDistanceFromLatLonInMeters(userLat, userLon, img.lat, img.lon)}
+                </div>
+              {/if}
+            </a>
           {/each}
           {#if loadingMore}
             <div class="newsflash-loading-more">Lade mehr...</div>
@@ -582,22 +582,7 @@ function handleScroll(event: Event) {
 .newsflash-grid .newsflash-thumb:hover img {
   transform: scale(1.04);
 }
-.newsflash-item {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 2px;
-  flex-shrink: 0;
-  scroll-snap-align: start;
-  min-width: 0;
-  max-width: max-content;
-  width: max-content;
-  vertical-align: top;
-}
-
 .newsflash-thumb {
-  width: auto;
-  min-width: 0;
   background: #222;
   display: inline-block;
   cursor: pointer;
@@ -611,29 +596,38 @@ function handleScroll(event: Event) {
   text-decoration: none;
   color: inherit;
   vertical-align: bottom;
+  height: 140px;
 }
 
-.newsflash-link {
-  /* Sichtbar für Bots, klein und unauffällig für Benutzer */
-  display: block;
+.newsflash-caption-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
   font-size: 0.7rem;
-  width: 100%;
-  max-width: 100%;
-  min-width: 0;
+  padding: 4px 6px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  padding: 0 4px;
-  margin: 0;
-  color: var(--text-secondary);
-  text-decoration: none;
-  transition: color 0.2s;
-  flex-shrink: 1;
-  box-sizing: border-box;
+  pointer-events: none;
+  backdrop-filter: blur(4px);
 }
 
-.newsflash-link:hover {
-  color: #ee7221;
+.newsflash-distance-topright {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: rgba(24, 24, 40, 0.85);
+  color: white;
+  padding: 3px 6px;
+  border-radius: 3px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  z-index: 2;
+  pointer-events: none;
+  backdrop-filter: blur(4px);
 }
 .newsflash-thumb:focus, .newsflash-thumb:hover {
   outline: none !important;
