@@ -109,9 +109,8 @@ export const load: PageServerLoad = async ({ url, request }) => {
     });
     
     if (error) {
-      console.error('[Server] Error with RPC, using direct query with RANDOM():', error);
-      // Fallback: Direkte Query mit zufälligen IDs
-      // Erst Gesamt-Count holen (ohne path_2048_og Filter)
+      console.error('[Server] Error with RPC, using direct query with random offsets:', error);
+      // Fallback: Direkte Query mit zufälligen Offsets
       const { count } = await supabase
         .from('items')
         .select('*', { count: 'exact', head: true })
@@ -128,11 +127,11 @@ export const load: PageServerLoad = async ({ url, request }) => {
         
         console.log('[Server] Random offsets:', randomOffsets);
         
-        // Lade Items an den zufälligen Positionen
+        // Lade Items an den zufälligen Positionen (slug ist alles was wir brauchen, Rest kommt von og-image API)
         const promises = randomOffsets.map(offset => 
           supabase
             .from('items')
-            .select('id, title, slug, description, path_2048_og, path_512, width, height')
+            .select('id, title, slug, description')
             .not('slug', 'is', null)
             .eq('is_private', false)
             .order('created_at', { ascending: false })
@@ -152,10 +151,7 @@ export const load: PageServerLoad = async ({ url, request }) => {
             id: item.id,
             slug: item.slug,
             title: item.title || 'Unbenanntes Item',
-            description: item.description || '',
-            path_2048_og: item.path_2048_og || item.path_512, // Fallback to path_512
-            width: item.width,
-            height: item.height
+            description: item.description || ''
           }));
           console.log('[Server] Fallback featured items:', featuredItems);
         }
@@ -165,10 +161,7 @@ export const load: PageServerLoad = async ({ url, request }) => {
         id: item.id,
         slug: item.slug,
         title: item.title || 'Unbenanntes Item',
-        description: item.description || '',
-        path_2048_og: item.path_2048_og,
-        width: item.width,
-        height: item.height
+        description: item.description || ''
       }));
       console.log('[Server] Loaded featured items for SEO:', featuredItems.length);
     }

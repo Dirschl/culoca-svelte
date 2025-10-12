@@ -85,20 +85,14 @@
       <!-- H1 für SEO -->
       <h1 class="main-heading">Entdecke deine Umgebung mit GPS & Fotos</h1>
       
-      <!-- Debug -->
-      <p style="color: white; font-size: 0.8rem;">Debug: {featuredItems?.length || 0} featured items</p>
-      
       {#if featuredItems && featuredItems.length > 0}
         <p class="featured-intro">Entdecke zufällige Locations und teile was dir gefällt</p>
         <div class="featured-items">
           {#each featuredItems as item}
             <a href={`/item/${item.slug}`} class="featured-item">
               <div class="featured-image">
-                {@const imageUrl = item.path_2048_og && item.path_2048_og.includes('.jpg')
-                  ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048-og/${item.path_2048_og}`
-                  : `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${item.path_2048_og}`}
                 <img 
-                  src={imageUrl}
+                  src={`/api/og-image/${item.slug}`}
                   alt={item.title}
                   loading="lazy"
                 />
