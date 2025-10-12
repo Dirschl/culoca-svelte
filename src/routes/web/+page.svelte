@@ -573,13 +573,21 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
         
         if (link && link.href) {
           try {
-            // Only intercept internal links
+            // Only intercept internal links that stay on /web page
             const url = new URL(link.href);
-            if (url.origin === window.location.origin && !url.searchParams.has('bot_mode')) {
-              // Add bot_mode parameter
+            if (url.origin === window.location.origin && 
+                url.pathname === '/web' && 
+                !url.searchParams.has('bot_mode')) {
+              // Add bot_mode parameter only to /web navigation
               url.searchParams.set('bot_mode', 'true');
               link.href = url.toString();
-              console.log('🤖 Link updated with bot_mode:', link.href);
+              console.log('🤖 /web Link updated with bot_mode:', link.href);
+            } else if (url.origin === window.location.origin && url.pathname !== '/web') {
+              // For navigation to other pages (item pages, etc), redirect to /web with new testUrl
+              e.preventDefault();
+              testUrl = url.toString();
+              fetchHeadData();
+              console.log('🤖 Testing new URL in bot mode:', testUrl);
             }
           } catch (err) {
             // Invalid URL, skip
