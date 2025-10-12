@@ -10,6 +10,7 @@
 
   // Props from server-side load
   export let initialWelcomeContent: any = {};
+  export let featuredItems: any[] = [];
 
   let mounted = false;
   let showEditor = false;
@@ -80,6 +81,33 @@
       
       <!-- H1 für SEO -->
       <h1 class="main-heading">Entdecke deine Umgebung mit GPS & Fotos</h1>
+      
+      {#if featuredItems && featuredItems.length > 0}
+        <p class="featured-intro">Entdecke zufällige Locations und teile was dir gefällt</p>
+        <div class="featured-items">
+          {#each featuredItems as item}
+            <a href={`/item/${item.slug}`} class="featured-item">
+              <div class="featured-image">
+                <img 
+                  src={`https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${item.path_512}`}
+                  alt={item.title}
+                  loading="lazy"
+                />
+                <svg class="featured-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                  <circle cx="12" cy="10" r="3"/>
+                </svg>
+              </div>
+              <div class="featured-content">
+                <h3 class="featured-title">{item.title}</h3>
+                {#if item.description}
+                  <p class="featured-description">{item.description.substring(0, 120)}{item.description.length > 120 ? '...' : ''}</p>
+                {/if}
+              </div>
+            </a>
+          {/each}
+        </div>
+      {/if}
       
       <div class="welcome-grid">
         <div class="welcome-column">
@@ -199,9 +227,79 @@
   .main-heading {
     font-size: 2rem;
     font-weight: 800;
-    margin: 0 0 1.5rem 0;
+    margin: 0 0 1rem 0;
     color: white;
     text-align: center;
+  }
+
+  .featured-intro {
+    text-align: center;
+    font-size: 1.1rem;
+    color: rgba(255, 255, 255, 0.9);
+    margin: 0 0 1.5rem 0;
+  }
+
+  .featured-items {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .featured-item {
+    display: flex;
+    flex-direction: column;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    overflow: hidden;
+    text-decoration: none;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+
+  .featured-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  }
+
+  .featured-image {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16/9;
+    overflow: hidden;
+    background: #222;
+  }
+
+  .featured-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .featured-icon {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    color: white;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+  }
+
+  .featured-content {
+    padding: 1rem;
+    color: white;
+  }
+
+  .featured-title {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0 0 0.5rem 0;
+    color: white;
+  }
+
+  .featured-description {
+    font-size: 0.85rem;
+    line-height: 1.4;
+    color: rgba(255, 255, 255, 0.85);
+    margin: 0;
   }
 
   .welcome-column h2 {
@@ -270,6 +368,11 @@
   @media (max-width: 768px) {
     .welcome-section {
       padding: 1.5rem 1rem;
+    }
+
+    .featured-items {
+      grid-template-columns: 1fr;
+      gap: 1rem;
     }
 
     .welcome-grid {

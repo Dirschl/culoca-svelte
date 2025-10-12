@@ -92,6 +92,36 @@ export const load: PageServerLoad = async ({ url, request }) => {
     console.error('[Server] Error loading welcome content:', error);
   }
 
+  // 3 zufällige Items für WelcomeSection laden (für SEO)
+  let featuredItems: any[] = [];
+  try {
+    const { data, error } = await supabase
+      .from('items')
+      .select('id, title, slug, description, path_512, width, height')
+      .not('slug', 'is', null)
+      .not('path_512', 'is', null)
+      .eq('is_private', false)
+      .order('created_at', { ascending: false })
+      .limit(100);
+    
+    if (!error && data && data.length > 0) {
+      // Mische die Items und wähle 3 zufällige aus
+      const shuffled = data.sort(() => 0.5 - Math.random());
+      featuredItems = shuffled.slice(0, 3).map(item => ({
+        id: item.id,
+        slug: item.slug,
+        title: item.title || 'Unbenanntes Item',
+        description: item.description || '',
+        path_512: item.path_512,
+        width: item.width,
+        height: item.height
+      }));
+      console.log('[Server] Loaded featured items for SEO:', featuredItems.length);
+    }
+  } catch (error) {
+    console.error('[Server] Error loading featured items:', error);
+  }
+
   // SEO-Daten serverseitig laden
   const seo = {
     title: 'Culoca - Entdecke die Welt durch Fotos',
@@ -123,6 +153,7 @@ export const load: PageServerLoad = async ({ url, request }) => {
     seo,
     newsFlashItems,
     welcomeContent,
+    featuredItems,
     page,
     totalPages: Math.ceil(totalCount / itemsPerPage),
     totalCount,
