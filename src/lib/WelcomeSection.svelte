@@ -52,7 +52,7 @@
   }
 </script>
 
-{#if $welcomeVisible && !isWelcomeDismissed() && mounted}
+{#if $welcomeVisible && !isWelcomeDismissed()}
   <div class="welcome-section">
     <div class="welcome-content">
       <!-- Edit Button for Creator -->
@@ -64,9 +64,13 @@
           Bearbeiten
         </button>
       {/if}
+      
+      <!-- H1 für SEO -->
+      <h1 class="main-heading">Entdecke deine Umgebung mit GPS & Fotos</h1>
+      
       <div class="welcome-grid">
         <div class="welcome-column">
-          <h3>{@html (welcomeContent.greeting?.title || 'Hallo {userName}! 👋').replace('{userName}', userName)}</h3>
+          <h2>{@html (welcomeContent.greeting?.title || 'Hallo {userName}! 👋').replace('{userName}', userName)}</h2>
           {#if welcomeContent.greeting?.content}
             <div class="dynamic-content">{@html welcomeContent.greeting.content.replace('{userName}', userName)}</div>
           {:else}
@@ -75,7 +79,7 @@
           {/if}
         </div>
         <div class="welcome-column">
-          <h3>{@html (welcomeContent.gps?.title || 'GPS zeigt dir was du willst').replace('{userName}', userName)}</h3>
+          <h2>{@html (welcomeContent.gps?.title || 'GPS zeigt dir was du willst').replace('{userName}', userName)}</h2>
           {#if welcomeContent.gps?.content}
             <div class="dynamic-content">{@html welcomeContent.gps.content.replace('{userName}', userName)}</div>
           {:else}
@@ -84,7 +88,7 @@
           {/if}
         </div>
         <div class="welcome-column">
-          <h3>{@html (welcomeContent.discover?.title || 'Entdecke deine Region').replace('{userName}', userName)}</h3>
+          <h2>{@html (welcomeContent.discover?.title || 'Entdecke deine Region').replace('{userName}', userName)}</h2>
           {#if welcomeContent.discover?.content}
             <div class="dynamic-content">{@html welcomeContent.discover.content.replace('{userName}', userName)}</div>
           {:else}
@@ -179,7 +183,15 @@
     /* text-align: center; */
   }
 
-  .welcome-column h3 {
+  .main-heading {
+    font-size: 2rem;
+    font-weight: 800;
+    margin: 0 0 1.5rem 0;
+    color: white;
+    text-align: center;
+  }
+
+  .welcome-column h2 {
     font-size: 1.4rem;
     font-weight: 700;
     margin: 0 0 0.75rem 0;
@@ -258,7 +270,11 @@
       text-align: center;
     }
 
-    .welcome-column h3 {
+    .main-heading {
+      font-size: 1.5rem;
+    }
+
+    .welcome-column h2 {
       font-size: 1.2rem;
     }
 
@@ -276,7 +292,11 @@
 
 
 
-    .welcome-column h3 {
+    .main-heading {
+      font-size: 1.3rem;
+    }
+
+    .welcome-column h2 {
       font-size: 1.1rem;
     }
 
