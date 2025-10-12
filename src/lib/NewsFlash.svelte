@@ -497,6 +497,9 @@ function handleScroll(event: Event) {
   display: none; /* Chrome, Safari and Opera */
 }
 @media (max-width: 768px) {
+  .newsflash-grid .newsflash-item {
+    width: 100px;
+  }
   .newsflash-grid .newsflash-thumb,
   .newsflash-grid .newsflash-thumb img {
     width: 100px;
@@ -504,6 +507,9 @@ function handleScroll(event: Event) {
   }
 }
 @media (max-width: 480px) {
+  .newsflash-grid .newsflash-item {
+    width: 80px;
+  }
   .newsflash-grid .newsflash-thumb,
   .newsflash-grid .newsflash-thumb img {
     width: 80px;
@@ -511,16 +517,13 @@ function handleScroll(event: Event) {
   }
 }
 .newsflash-grid .newsflash-item {
-  display: flex;
+  display: inline-flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   flex-shrink: 0;
   scroll-snap-align: start;
-}
-
-.newsflash-grid .newsflash-link {
-  max-width: 128px;
+  width: 128px;
 }
 
 .newsflash-grid .newsflash-thumb {
@@ -558,10 +561,10 @@ function handleScroll(event: Event) {
   transform: scale(1.04);
 }
 .newsflash-item {
-  display: flex;
+  display: inline-flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   flex-shrink: 0;
   scroll-snap-align: start;
 }
@@ -590,12 +593,12 @@ function handleScroll(event: Event) {
   display: block;
   font-size: 0.7rem;
   text-align: center;
-  max-width: 140px;
+  width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  padding: 2px 4px;
-  margin-top: 2px;
+  padding: 0;
+  margin: 0;
   color: var(--text-secondary);
   text-decoration: none;
   transition: color 0.2s;
