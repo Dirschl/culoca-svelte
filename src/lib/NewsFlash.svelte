@@ -582,16 +582,16 @@ function handleScroll(event: Event) {
 }
 
 .newsflash-link {
-  /* Versteckt für normale Benutzer, aber sichtbar für Bots und Screen Reader */
-  position: absolute;
-  left: -9999px;
-  width: 1px;
-  height: 1px;
+  /* Minimal sichtbar für Bots und Screen Reader, aber unauffällig für normale Benutzer */
+  display: block;
+  font-size: 0.001px;
+  line-height: 0;
+  color: transparent;
   overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  opacity: 0;
-  pointer-events: none;
+  height: 0;
+  margin: 0;
+  padding: 0;
+  text-decoration: none;
 }
 .newsflash-thumb:focus, .newsflash-thumb:hover {
   outline: none !important;
