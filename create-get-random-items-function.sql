@@ -7,7 +7,7 @@ RETURNS TABLE (
   slug TEXT,
   title TEXT,
   description TEXT,
-  path_512 TEXT,
+  path_2048_og TEXT,
   width INTEGER,
   height INTEGER
 ) 
@@ -21,12 +21,12 @@ BEGIN
     i.slug,
     i.title,
     i.description,
-    i.path_512,
+    i.path_2048_og,
     i.width,
     i.height
   FROM items i
   WHERE i.slug IS NOT NULL
-    AND i.path_512 IS NOT NULL
+    AND i.path_2048_og IS NOT NULL
     AND i.is_private = false
   ORDER BY RANDOM()
   LIMIT item_limit;
