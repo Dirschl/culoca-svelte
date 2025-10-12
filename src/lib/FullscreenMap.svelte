@@ -411,7 +411,16 @@
     }
     
     map = leaflet.map(mapEl, {
-      zoomControl: false // We'll add custom controls
+      zoomControl: false, // We'll add custom controls
+      dragging: true,
+      touchZoom: true,
+      doubleClickZoom: true,
+      scrollWheelZoom: true,
+      boxZoom: true,
+      keyboard: true,
+      tap: true, // Wichtig für iOS!
+      tapTolerance: 15, // Erhöht für besseres Touch-Handling auf iOS
+      bounceAtZoomLimits: true
     }).setView([initialLat, initialLon], initialZoom);
     
     // Create different tile layers
@@ -459,6 +468,28 @@
     
     // Add cluster group to map
     map.addLayer(markerClusterGroup);
+    
+    // iOS-spezifische Touch-Fixes
+    if (isIOS && map) {
+      // Stelle sicher, dass Leaflet Touch-Handler aktiviert sind
+      const mapContainer = map.getContainer();
+      mapContainer.style.touchAction = 'pan-x pan-y pinch-zoom';
+      mapContainer.style.webkitTouchCallout = 'none';
+      mapContainer.style.webkitUserSelect = 'none';
+      
+      // Force enable touch handlers
+      if (map.dragging) {
+        map.dragging.enable();
+      }
+      if (map.touchZoom) {
+        map.touchZoom.enable();
+      }
+      if (map.tap) {
+        map.tap.enable();
+      }
+      
+      console.log('[FullscreenMap] iOS touch handlers enabled');
+    }
     
     // Add user marker if position available and no location filter is active
     const currentFilters = get(filterStore);
@@ -1507,6 +1538,11 @@
     left: -60%;
     transform-origin: center center;
     overflow: hidden;
+    /* iOS Touch-Fixes */
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: pan-x pan-y pinch-zoom;
   }
   
   /* Logo - exact same positioning as main page */
