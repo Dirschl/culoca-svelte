@@ -307,7 +307,7 @@ function handleScroll(event: Event) {
                   </div>
                 {/if}
               </a>
-              <a href={`/item/${img.slug}`} class="newsflash-link" title={img.title || img.original_name || 'Bild'} style="max-width:140px;">
+              <a href={`/item/${img.slug}`} class="newsflash-link" title={img.title || img.original_name || 'Bild'}>
                 {img.title || img.original_name || 'Bild ansehen'}
               </a>
             </div>
@@ -337,7 +337,7 @@ function handleScroll(event: Event) {
                   </div>
                 {/if}
               </a>
-              <a href={`/item/${img.slug}`} class="newsflash-link" title={img.title || img.original_name || 'Bild'} style="max-width:128px;">
+              <a href={`/item/${img.slug}`} class="newsflash-link" title={img.title || img.original_name || 'Bild'}>
                 {img.title || img.original_name || 'Bild ansehen'}
               </a>
             </div>
