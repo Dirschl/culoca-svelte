@@ -269,12 +269,6 @@ function handleScroll(event: Event) {
   }
 }
 
-// Truncate text for display - works without CSS
-function truncateText(text: string, maxLength: number = 20): string {
-  if (!text) return '';
-  if (text.length <= maxLength) return text;
-  return text.substring(0, maxLength - 3) + '...';
-}
 </script>
 
 {#if mode !== 'aus'}
@@ -313,8 +307,8 @@ function truncateText(text: string, maxLength: number = 20): string {
                   </div>
                 {/if}
               </a>
-              <a href={`/item/${img.slug}`} class="newsflash-link" title={img.title || img.original_name || 'Bild'}>
-                {truncateText(img.title || img.original_name || 'Bild ansehen', 20)}
+              <a href={`/item/${img.slug}`} class="newsflash-link" title={img.title || img.original_name || 'Bild'} style="max-width:140px;">
+                {img.title || img.original_name || 'Bild ansehen'}
               </a>
             </div>
           {/each}
@@ -343,8 +337,8 @@ function truncateText(text: string, maxLength: number = 20): string {
                   </div>
                 {/if}
               </a>
-              <a href={`/item/${img.slug}`} class="newsflash-link" title={img.title || img.original_name || 'Bild'}>
-                {truncateText(img.title || img.original_name || 'Bild ansehen', 15)}
+              <a href={`/item/${img.slug}`} class="newsflash-link" title={img.title || img.original_name || 'Bild'} style="max-width:128px;">
+                {img.title || img.original_name || 'Bild ansehen'}
               </a>
             </div>
           {/each}
