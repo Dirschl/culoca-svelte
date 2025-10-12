@@ -519,11 +519,12 @@ function handleScroll(event: Event) {
 .newsflash-grid .newsflash-item {
   display: inline-flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   gap: 2px;
   flex-shrink: 0;
   scroll-snap-align: start;
   width: 128px;
+  min-width: 0;
 }
 
 .newsflash-grid .newsflash-thumb {
@@ -563,10 +564,11 @@ function handleScroll(event: Event) {
 .newsflash-item {
   display: inline-flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   gap: 2px;
   flex-shrink: 0;
   scroll-snap-align: start;
+  min-width: 0;
 }
 
 .newsflash-thumb {
@@ -593,7 +595,8 @@ function handleScroll(event: Event) {
   display: block;
   font-size: 0.7rem;
   text-align: center;
-  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -602,6 +605,7 @@ function handleScroll(event: Event) {
   color: var(--text-secondary);
   text-decoration: none;
   transition: color 0.2s;
+  flex-shrink: 1;
 }
 
 .newsflash-link:hover {
