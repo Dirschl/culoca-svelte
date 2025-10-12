@@ -632,10 +632,11 @@ function handleScroll(event: Event) {
   position: absolute;
   top: 0;
   right: 0;
-  background: rgba(58, 119, 119, 0.85);
-  color: white;
-  padding: 2px 4px;
-  font-size: 0.7rem;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border-color: var(--border-color);
+  padding: 0 4px;
+  font-size: 12.5px;
   font-weight: 600;
   z-index: 2;
   pointer-events: none;
