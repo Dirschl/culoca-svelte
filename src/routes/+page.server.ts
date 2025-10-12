@@ -1,6 +1,10 @@
 import type { PageServerLoad } from './$types';
 import { createClient } from '@supabase/supabase-js';
 
+// Disable caching for this page to ensure fresh data
+export const csr = true;
+export const ssr = true;
+
 export const load: PageServerLoad = async ({ url, request }) => {
   // Get page parameter for pagination
   const page = parseInt(url.searchParams.get('page') || '1');
@@ -96,31 +100,60 @@ export const load: PageServerLoad = async ({ url, request }) => {
   let featuredItems: any[] = [];
   try {
     // Verwende SQL RANDOM() für echte Zufälligkeit über gesamte Sammlung
+    // Füge einen Timestamp hinzu um Caching zu vermeiden
+    const timestamp = Date.now();
+    console.log('[Server] Requesting random items at:', timestamp);
+    
     const { data, error } = await supabase.rpc('get_random_items', {
       item_limit: 3
     });
     
     if (error) {
-      console.error('[Server] Error with RPC, falling back to direct query:', error);
-      // Fallback: Direkte Query
-      const { data: fallbackData, error: fallbackError } = await supabase
+      console.error('[Server] Error with RPC, using direct query with RANDOM():', error);
+      // Fallback: Direkte Query mit zufälligen IDs
+      // Erst Gesamt-Count holen
+      const { count } = await supabase
         .from('items')
-        .select('id, title, slug, description, path_2048_og, width, height')
+        .select('*', { count: 'exact', head: true })
         .not('slug', 'is', null)
         .not('path_2048_og', 'is', null)
-        .eq('is_private', false)
-        .limit(3);
+        .eq('is_private', false);
       
-      if (!fallbackError && fallbackData) {
-        featuredItems = fallbackData.map(item => ({
-          id: item.id,
-          slug: item.slug,
-          title: item.title || 'Unbenanntes Item',
-          description: item.description || '',
-          path_2048_og: item.path_2048_og,
-          width: item.width,
-          height: item.height
-        }));
+      if (count && count > 3) {
+        // Generiere 3 zufällige Offsets
+        const randomOffsets = Array.from({ length: 3 }, () => 
+          Math.floor(Math.random() * Math.max(1, count - 1))
+        );
+        
+        // Lade Items an den zufälligen Positionen
+        const promises = randomOffsets.map(offset => 
+          supabase
+            .from('items')
+            .select('id, title, slug, description, path_2048_og, width, height')
+            .not('slug', 'is', null)
+            .not('path_2048_og', 'is', null)
+            .eq('is_private', false)
+            .range(offset, offset)
+            .single()
+        );
+        
+        const results = await Promise.all(promises);
+        const fallbackData = results
+          .filter(r => !r.error && r.data)
+          .map(r => r.data);
+      
+        if (fallbackData.length > 0) {
+          featuredItems = fallbackData.map(item => ({
+            id: item.id,
+            slug: item.slug,
+            title: item.title || 'Unbenanntes Item',
+            description: item.description || '',
+            path_2048_og: item.path_2048_og,
+            width: item.width,
+            height: item.height
+          }));
+          console.log('[Server] Using fallback with random offsets:', featuredItems.length);
+        }
       }
     } else if (data && data.length > 0) {
       featuredItems = data.map((item: any) => ({
