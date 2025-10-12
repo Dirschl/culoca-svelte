@@ -310,13 +310,12 @@ function handleScroll(event: Event) {
             <div class="newsflash-loading-more">Lade mehr...</div>
           {/if}
           {#if hasMoreImages && !loadingMore}
-            <div class="load-more-trigger" on:click={() => fetchImages(true)} style="text-align:center;margin:1rem 0;cursor:pointer;">
-              Lade mehr
+            <!-- Sichtbarer Link für Bots und Benutzer -->
+            <div class="newsflash-load-more">
+              <a href="/?page={currentPage + 1}" rel="next" class="newsflash-more-link">
+                Weitere Bilder laden (Seite {currentPage + 1})
+              </a>
             </div>
-            <!-- Versteckter Link für Bots - führt zur nächsten Seite -->
-            <a href="/?page={currentPage + 1}" rel="next" class="newsflash-bot-link" aria-hidden="true" tabindex="-1">
-              Lade mehr
-            </a>
           {/if}
         </div>
       {:else if layout === 'grid'}
@@ -341,13 +340,12 @@ function handleScroll(event: Event) {
             <div class="newsflash-loading-more">Lade mehr...</div>
           {/if}
           {#if hasMoreImages && !loadingMore}
-            <div class="load-more-trigger" on:click={() => fetchImages(true)} style="text-align:center;margin:1rem 0;cursor:pointer;">
-              Lade mehr
+            <!-- Sichtbarer Link für Bots und Benutzer -->
+            <div class="newsflash-load-more">
+              <a href="/?page={currentPage + 1}" rel="next" class="newsflash-more-link">
+                Weitere Bilder laden (Seite {currentPage + 1})
+              </a>
             </div>
-            <!-- Versteckter Link für Bots - führt zur nächsten Seite -->
-            <a href="/?page={currentPage + 1}" rel="next" class="newsflash-bot-link" aria-hidden="true" tabindex="-1">
-              Lade mehr
-            </a>
           {/if}
         </div>
       {/if}
@@ -437,17 +435,28 @@ function handleScroll(event: Event) {
   }
 }
 
-/* Versteckter Link für Bots - komplett unsichtbar für normale Benutzer */
-.newsflash-bot-link {
-  position: absolute;
-  left: -9999px;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
+.newsflash-load-more {
+  display: flex;
+  justify-content: center;
+  padding: 1rem;
+  flex-shrink: 0;
+}
+
+.newsflash-more-link {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  text-decoration: none;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  transition: background 0.2s, color 0.2s;
   white-space: nowrap;
-  opacity: 0;
-  pointer-events: none;
+}
+
+.newsflash-more-link:hover {
+  background: var(--accent-color);
+  color: white;
 }
   
   .pagination-link:hover {
