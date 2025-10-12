@@ -30,6 +30,7 @@
   let autoguide = false;
   let newsFlashMode: 'aus' | 'eigene' | 'alle' = 'alle';
   let showWelcome = true;
+  let showImageCaptions = true;
 
   
   // Upload Einstellungen
@@ -127,6 +128,7 @@
         autoguide = data.autoguide ?? false;
         newsFlashMode = data.newsflash_mode ?? 'alle';
         showWelcome = data.show_welcome ?? true;
+        showImageCaptions = data.show_image_captions ?? true;
 
         saveOriginals = data.save_originals ?? true;
       }
@@ -160,6 +162,7 @@
         show_compass: showCompass,
         autoguide: autoguide,
         show_welcome: showWelcome,
+        show_image_captions: showImageCaptions,
 
         avatar_url: profile?.avatar_url,
         newsflash_mode: newsFlashMode,
@@ -180,6 +183,7 @@
         localStorage.setItem('showDistance', showDistance ? 'true' : 'false');
         localStorage.setItem('showCompass', showCompass ? 'true' : 'false');
         localStorage.setItem('autoguide', autoguide ? 'true' : 'false');
+        localStorage.setItem('showImageCaptions', showImageCaptions ? 'true' : 'false');
     
         localStorage.setItem('newsFlashMode', newsFlashMode);
         localStorage.setItem('saveOriginals', saveOriginals ? 'true' : 'false');
@@ -414,6 +418,20 @@
                 <span class="toggle-slider"></span>
               </label>
               <span class="setting-status">{showDistance ? 'Aktiviert' : 'Deaktiviert'}</span>
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-info">
+              <label class="setting-label" for="captions-toggle">Bildunterschriften anzeigen</label>
+              <p class="setting-description">Zeigt den Titel als klickbaren Link unter jedem Bild in den Galerien</p>
+            </div>
+            <div class="setting-control">
+              <label class="toggle-switch" for="captions-toggle">
+                <input type="checkbox" id="captions-toggle" bind:checked={showImageCaptions} />
+                <span class="toggle-slider"></span>
+              </label>
+              <span class="setting-status">{showImageCaptions ? 'Aktiviert' : 'Deaktiviert'}</span>
             </div>
           </div>
 

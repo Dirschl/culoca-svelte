@@ -4,6 +4,7 @@
   export let nearby: any[] = [];
   export let layout: 'justified' | 'grid' = 'justified';
   export let gap: number = 2;
+  export let showImageCaptions: boolean = true;
   export let userLat: number | null = null;
   export let userLon: number | null = null;
   export let getDistanceFromLatLonInMeters: ((lat1: number, lon1: number, lat2: number, lon2: number) => string) | null = null;
@@ -19,6 +20,7 @@
     {layout}
     {gap}
     showDistance={true}
+    {showImageCaptions}
     {userLat}
     {userLon}
     {getDistanceFromLatLonInMeters}

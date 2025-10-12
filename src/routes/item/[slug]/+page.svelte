@@ -76,6 +76,7 @@ let showRightsManager = false;
   let loading = !image;
   let profile = null;
   let metaTags = data?.metaTags ?? null;
+  let showImageCaptions = true; // Default to true
 
   // SEO/Meta: Slug statt ID verwenden - reaktiv auf URL-Parameter
   let itemSlug: string = '';
@@ -177,6 +178,14 @@ let showRightsManager = false;
 
   // Cleanup rights store when component is destroyed
   onMount(() => {
+    // Load showImageCaptions from localStorage
+    if (browser && typeof localStorage !== 'undefined') {
+      const stored = localStorage.getItem('showImageCaptions');
+      if (stored !== null) {
+        showImageCaptions = stored === 'true';
+      }
+    }
+    
     return () => {
       unifiedRightsStore.reset();
     };
@@ -1247,6 +1256,7 @@ let showRightsManager = false;
       <NearbyGallery
         nearby={visibleNearby}
         isCreator={isCreator}
+        showImageCaptions={showImageCaptions}
         userLat={image?.lat}
         userLon={image?.lon}
         getDistanceFromLatLonInMeters={getDistanceFromLatLonInMeters}

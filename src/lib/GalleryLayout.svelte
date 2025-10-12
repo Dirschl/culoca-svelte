@@ -34,6 +34,7 @@
   export let targetRowHeight = 200;
   export let gap = 2;
   export let showDistance: boolean = false;
+  export let showImageCaptions: boolean = true;
   export let userLat: number | null = null;
   export let userLon: number | null = null;
   export let getDistanceFromLatLonInMeters: ((lat1: number, lon1: number, lat2: number, lon2: number) => string) | null = null;
@@ -224,8 +225,13 @@
     overflow: hidden;
   }
 
-  .justified-pic-container {
+  .justified-pic-wrapper {
     position: absolute;
+  }
+
+  .justified-pic-container {
+    position: relative;
+    display: block;
     cursor: pointer;
     overflow: hidden;
     transition: box-shadow 0.3s ease, background-color 0.3s ease;
@@ -318,6 +324,30 @@
     transform: scale(1.04);
   }
 
+  .grid-item-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .gallery-caption-link {
+    display: block;
+    font-size: 0.75rem;
+    padding: 0 4px;
+    margin: 0;
+    color: var(--text-secondary);
+    text-decoration: none;
+    transition: color 0.2s;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: left;
+  }
+
+  .gallery-caption-link:hover {
+    color: #ee7221;
+  }
+
 
 
   /* Empty state */
@@ -388,35 +418,39 @@
     <div class="justified-wrapper">
       <div 
         class="justified-gallery" 
-        style="height: {isInitialized ? layoutResult.containerHeight : 'auto'}px;"
+        style="height: {isInitialized ? layoutResult.containerHeight + (showImageCaptions ? items.length * 20 : 0) : 'auto'}px;"
       >
         {#if isInitialized && boxes.length > 0}
           {#each items as item, index}
             {#if boxes[index]}
-              <a 
-                href={`/item/${item.slug}`}
-                class="justified-pic-container" 
-                role="button" 
-                tabindex="0" 
-                aria-label="View image {item.id}" 
-                style="left:{boxes[index].left}px; top:{boxes[index].top}px; width:{boxes[index].width}px; height:{boxes[index].height}px;"
-                title={item.title || ''}
-                on:click|preventDefault={async (e) => {
-                  if (forceReload) {
-                    // Force full page reload for detail page navigation
-                    window.location.href = `/item/${item.slug}`;
-                  } else {
-                    // Use SvelteKit navigation for main page navigation
-                    await goto(`/item/${item.slug}`, { invalidateAll: true });
-                  }
-                }}
+              <div 
+                class="justified-pic-wrapper"
+                style="left:{boxes[index].left}px; top:{boxes[index].top}px; width:{boxes[index].width}px; height:{boxes[index].height + (showImageCaptions ? 18 : 0)}px;"
               >
-                <img 
-                  class="justified-pic" 
-                  src={item.src} 
-                  alt="" 
-                  loading="lazy"
-                />
+                <a 
+                  href={`/item/${item.slug}`}
+                  class="justified-pic-container" 
+                  role="button" 
+                  tabindex="0" 
+                  aria-label="View image {item.id}" 
+                  style="width:{boxes[index].width}px; height:{boxes[index].height}px;"
+                  title={item.title || ''}
+                  on:click|preventDefault={async (e) => {
+                    if (forceReload) {
+                      // Force full page reload for detail page navigation
+                      window.location.href = `/item/${item.slug}`;
+                    } else {
+                      // Use SvelteKit navigation for main page navigation
+                      await goto(`/item/${item.slug}`, { invalidateAll: true });
+                    }
+                  }}
+                >
+                  <img 
+                    class="justified-pic" 
+                    src={item.src} 
+                    alt="" 
+                    loading="lazy"
+                  />
                 {#if showDistance && userLat !== null && userLon !== null && item.lat && item.lon}
                   <div class="gallery-distance">
                     {#if item.distance !== undefined && item.distance !== null}
@@ -471,6 +505,17 @@
                   </button>
                 {/if}
               </a>
+              {#if showImageCaptions}
+                <a 
+                  href={`/item/${item.slug}`}
+                  class="gallery-caption-link"
+                  style="width:{boxes[index].width}px;"
+                  title={item.title || ''}
+                >
+                  {item.title || ''}
+                </a>
+              {/if}
+            </div>
             {/if}
           {/each}
         {:else}
@@ -484,29 +529,30 @@
     <!-- Grid Layout -->
     <div class="grid-layout">
       {#each items as item}
-        <a 
-          href={`/item/${item.slug}`}
-          class="grid-item" 
-          tabindex="0" 
-          role="button" 
-          aria-label="View image {item.slug}"
-          title={item.title || ''}
-          on:click|preventDefault={async (e) => {
-            console.log('🔍 [GalleryLayout] Clicked item slug:', item.slug);
-            if (forceReload) {
-              // Force full page reload for detail page navigation
-              window.location.href = `/item/${item.slug}`;
-            } else {
-              // Use SvelteKit navigation for main page navigation
-              await goto(`/item/${item.slug}`, { invalidateAll: true });
-            }
-          }}
-        >
-          <img 
-            src={item.src}
-            alt="" 
-            loading="lazy"
-          />
+        <div class="grid-item-wrapper">
+          <a 
+            href={`/item/${item.slug}`}
+            class="grid-item" 
+            tabindex="0" 
+            role="button" 
+            aria-label="View image {item.slug}"
+            title={item.title || ''}
+            on:click|preventDefault={async (e) => {
+              console.log('🔍 [GalleryLayout] Clicked item slug:', item.slug);
+              if (forceReload) {
+                // Force full page reload for detail page navigation
+                window.location.href = `/item/${item.slug}`;
+              } else {
+                // Use SvelteKit navigation for main page navigation
+                await goto(`/item/${item.slug}`, { invalidateAll: true });
+              }
+            }}
+          >
+            <img 
+              src={item.src}
+              alt="" 
+              loading="lazy"
+            />
           {#if showDistance && userLat !== null && userLon !== null && item.lat && item.lon}
             <div class="gallery-distance">
               {#if item.distance !== undefined && item.distance !== null}
@@ -550,7 +596,17 @@
               {/if}
             </button>
           {/if}
-        </a>
+          </a>
+          {#if showImageCaptions}
+            <a 
+              href={`/item/${item.slug}`}
+              class="gallery-caption-link"
+              title={item.title || ''}
+            >
+              {item.title || ''}
+            </a>
+          {/if}
+        </div>
       {/each}
     </div>
   {/if}

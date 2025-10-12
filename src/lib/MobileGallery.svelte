@@ -12,6 +12,7 @@
   export let useJustifiedLayout: boolean = true;
   export let showDistance: boolean = true;
   export let showCompass: boolean = false;
+  export let showImageCaptions: boolean = true;
   export let getDistanceFromLatLonInMeters: any;
   export let filterStore: any;
   export let sessionStore: any;
@@ -312,6 +313,7 @@
   gap={2}
   targetRowHeight={220}
   showDistance={showDistance}
+  showImageCaptions={showImageCaptions}
   showCompass={showCompass}
   userLat={userLat}
   userLon={userLon}
