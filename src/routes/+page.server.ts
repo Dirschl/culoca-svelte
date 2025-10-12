@@ -51,8 +51,8 @@ export const load: PageServerLoad = async ({ url, request }) => {
         lon: item.lon,
         path_512: item.path_512,
         path_2048: item.path_2048, // Add 2048px path for better SEO
-        width_512: item.width_512,
-        height_512: item.height_512,
+        width: item.width,
+        height: item.height,
         title: item.title,
         description: item.description,
         original_name: item.original_name,
