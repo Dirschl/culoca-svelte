@@ -572,25 +572,31 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
         const link = target.closest('a');
         
         if (link && link.href) {
-          try {
-            // Only intercept internal links that stay on /web page
-            const url = new URL(link.href);
-            if (url.origin === window.location.origin && 
-                url.pathname === '/web' && 
-                !url.searchParams.has('bot_mode')) {
-              // Add bot_mode parameter only to /web navigation
-              url.searchParams.set('bot_mode', 'true');
-              link.href = url.toString();
-              console.log('🤖 /web Link updated with bot_mode:', link.href);
-            } else if (url.origin === window.location.origin && url.pathname !== '/web') {
-              // For navigation to other pages (item pages, etc), redirect to /web with new testUrl
-              e.preventDefault();
-              testUrl = url.toString();
-              fetchHeadData();
-              console.log('🤖 Testing new URL in bot mode:', testUrl);
+          // Check if the link is inside the results section (not in the /web page navigation)
+          const isInResults = link.closest('.seo-section, .items-grid, .item-card-link, pre, code');
+          
+          if (isInResults) {
+            // This is a link in the test results - intercept and test it
+            e.preventDefault();
+            const linkUrl = link.href;
+            console.log('🤖 Bot-Modus: Link in Ergebnissen geklickt, teste neue URL:', linkUrl);
+            testUrl = linkUrl;
+            fetchHeadData();
+          } else {
+            // This is a navigation link on /web itself
+            try {
+              const url = new URL(link.href);
+              if (url.origin === window.location.origin && 
+                  url.pathname === '/web' && 
+                  !url.searchParams.has('bot_mode')) {
+                // Add bot_mode parameter only to /web navigation
+                url.searchParams.set('bot_mode', 'true');
+                link.href = url.toString();
+                console.log('🤖 /web Link updated with bot_mode:', link.href);
+              }
+            } catch (err) {
+              // Invalid URL, skip
             }
-          } catch (err) {
-            // Invalid URL, skip
           }
         }
       }, true); // Use capture phase
