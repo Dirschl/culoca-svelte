@@ -58,6 +58,11 @@
   let shareDescription = 'Map View Snippet - CULOCA.com';
   let shareScreenshot: string | null = null;
   
+  // Manual coordinate input fallback
+  let showManualInput = false;
+  let manualLat = '';
+  let manualLon = '';
+  
   // Previous position for movement tracking
   let previousPosition: { lat: number; lon: number; timestamp: number } | null = null;
   let positionWatchId: number | null = null;
@@ -745,6 +750,42 @@
   }
   
   function closeMap() {
+    dispatch('close');
+  }
+  
+  function toggleManualInput() {
+    showManualInput = !showManualInput;
+    if (showManualInput && userLat && userLon) {
+      // Pre-fill with current position if available
+      manualLat = userLat.toFixed(6);
+      manualLon = userLon.toFixed(6);
+    }
+  }
+  
+  function submitManualCoordinates() {
+    const lat = parseFloat(manualLat);
+    const lon = parseFloat(manualLon);
+    
+    // Validate coordinates
+    if (isNaN(lat) || isNaN(lon)) {
+      alert('Bitte gültige Koordinaten eingeben');
+      return;
+    }
+    
+    if (lat < -90 || lat > 90) {
+      alert('Breitengrad muss zwischen -90 und 90 liegen');
+      return;
+    }
+    
+    if (lon < -180 || lon > 180) {
+      alert('Längengrad muss zwischen -180 und 180 liegen');
+      return;
+    }
+    
+    // Dispatch location selected event
+    dispatch('locationSelected', { lat, lon });
+    
+    // Close the map
     dispatch('close');
   }
   
@@ -1492,6 +1533,18 @@
         <line x1="12" y1="2" x2="12" y2="15"/>
       </svg>
     </button>
+    <!-- Manual Input FAB -->
+    <button 
+      class="manual-input-fab"
+      on:click={toggleManualInput}
+      title="Koordinaten manuell eingeben"
+    >
+      <!-- Edit/Input Icon -->
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+      </svg>
+    </button>
     <!-- Grid FAB -->
     <button 
       class="grid-fab"
@@ -1507,6 +1560,47 @@
       </svg>
     </button>
   </div>
+  
+  <!-- Manual Coordinate Input Overlay -->
+  {#if showManualInput}
+    <div class="manual-input-overlay">
+      <div class="manual-input-panel">
+        <h3>Koordinaten manuell eingeben</h3>
+        <p class="manual-input-hint">Geben Sie GPS-Koordinaten im Dezimalformat ein</p>
+        
+        <div class="input-group">
+          <label for="manual-lat">Breitengrad (Latitude)</label>
+          <input
+            id="manual-lat"
+            type="number"
+            step="0.000001"
+            min="-90"
+            max="90"
+            bind:value={manualLat}
+            placeholder="z.B. 52.520008"
+          />
+        </div>
+        
+        <div class="input-group">
+          <label for="manual-lon">Längengrad (Longitude)</label>
+          <input
+            id="manual-lon"
+            type="number"
+            step="0.000001"
+            min="-180"
+            max="180"
+            bind:value={manualLon}
+            placeholder="z.B. 13.404954"
+          />
+        </div>
+        
+        <div class="button-group">
+          <button class="btn-cancel" on:click={toggleManualInput}>Abbrechen</button>
+          <button class="btn-submit" on:click={submitManualCoordinates}>Übernehmen</button>
+        </div>
+      </div>
+    </div>
+  {/if}
   <TrackModal bind:isOpen={showTrackModal} />
   <ShareMapModal 
     bind:showModal={showShareModal}
@@ -1579,6 +1673,7 @@
   .auto-rotate-fab,
   .marker-center-fab,
   .share-fab,
+  .manual-input-fab,
   .grid-fab,
   .track,
   .track-list {
@@ -1604,6 +1699,7 @@
   .auto-rotate-fab:hover,
   .marker-center-fab:hover,
   .share-fab:hover,
+  .manual-input-fab:hover,
   .grid-fab:hover,
   .track:hover,
   .track-list:hover {
@@ -1615,6 +1711,7 @@
   .display-toggle-fab:active,
   .auto-rotate-fab:active,
   .marker-center-fab:active,
+  .manual-input-fab:active,
   .grid-fab:active,
   .track:active,
   .track-list:active {
@@ -1635,6 +1732,7 @@
     .display-toggle-fab,
     .auto-rotate-fab,
     .marker-center-fab,
+    .manual-input-fab,
     .grid-fab,
     .track,
     .track-list {
@@ -1646,12 +1744,125 @@
     .display-toggle-fab svg,
     .auto-rotate-fab svg,
     .marker-center-fab svg,
+    .manual-input-fab svg,
     .grid-fab svg,
     .track svg,
     .track-list svg {
       width: 36px;
       height: 36px;
     }
+  }
+  
+  /* Manual Input Overlay Styles */
+  .manual-input-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10002;
+    padding: 1rem;
+  }
+  
+  .manual-input-panel {
+    background: var(--bg-secondary);
+    border-radius: 16px;
+    padding: 2rem;
+    max-width: 500px;
+    width: 100%;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  }
+  
+  .manual-input-panel h3 {
+    margin: 0 0 0.5rem 0;
+    color: var(--text-primary);
+    font-size: 1.5rem;
+  }
+  
+  .manual-input-hint {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin: 0 0 1.5rem 0;
+  }
+  
+  .input-group {
+    margin-bottom: 1.5rem;
+  }
+  
+  .input-group label {
+    display: block;
+    color: var(--text-primary);
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    font-size: 0.95rem;
+  }
+  
+  .input-group input {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 1rem;
+    transition: border-color 0.2s ease;
+  }
+  
+  .input-group input:focus {
+    outline: none;
+    border-color: #ee7221;
+  }
+  
+  .input-group input::placeholder {
+    color: var(--text-secondary);
+    opacity: 0.6;
+  }
+  
+  .button-group {
+    display: flex;
+    gap: 1rem;
+    margin-top: 2rem;
+  }
+  
+  .btn-cancel,
+  .btn-submit {
+    flex: 1;
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  
+  .btn-cancel {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+  }
+  
+  .btn-cancel:hover {
+    background: var(--bg-primary);
+  }
+  
+  .btn-submit {
+    background: #ee7221;
+    color: white;
+  }
+  
+  .btn-submit:hover {
+    background: #d66419;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(238, 114, 33, 0.3);
+  }
+  
+  .btn-submit:active {
+    transform: translateY(0);
   }
   
   /* Global styles for map markers */
