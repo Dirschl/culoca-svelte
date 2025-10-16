@@ -1131,15 +1131,11 @@
     }
     
     if (isBot) {
-      console.log('[App-Start] Bot detected - using fixed GPS coordinates');
-      userLat = 48.4167; // Pfarrkirchen Latitude
-      userLon = 12.9333; // Pfarrkirchen Longitude
-      gpsStatus = 'active'; // Setze direkt auf active für Bots
-      
-      // Auch den filterStore für Bots setzen
-      filterStore.updateGpsStatus(true, { lat: 48.4167, lon: 12.9333 });
-      
-      console.log('[Bot] Using fixed GPS coordinates for SEO:', userLat, userLon);
+      // Bots sollen KEINE GPS-Daten bekommen, um Indexierung nicht zu stören
+      console.log('[App-Start] Bot detected - skipping GPS initialization');
+      gpsStatus = 'none'; // Kein GPS für Bots
+      // WICHTIG: Keine GPS-Koordinaten setzen, keine filterStore-Updates
+      // Bots sollen nur serverseitig gerenderten Newsflash sehen
     } else {
       // Normale User: Lade gespeicherte GPS-Daten zuerst
       console.log('[App-Start] Normal user - loading saved GPS data first');
