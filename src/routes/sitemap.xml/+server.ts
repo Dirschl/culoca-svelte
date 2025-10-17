@@ -9,11 +9,15 @@ export const GET: RequestHandler = async () => {
     const baseUrl = 'https://culoca.com';
 
     // Static pages (nur öffentliche, wichtige Seiten - Login entfernt da nicht indexiert werden soll)
+    // Mit priority und changefreq für bessere Indexierung
     const staticPages = [
-      '',
-      '/map-view',
-      '/datenschutz',
-      '/impressum'
+      { url: '', priority: '1.0', changefreq: 'daily' },  // Startseite - höchste Priorität
+      { url: '/map-view', priority: '0.8', changefreq: 'daily' },
+      { url: '/bulk-upload', priority: '0.7', changefreq: 'weekly' },
+      { url: '/search', priority: '0.8', changefreq: 'daily' },
+      { url: '/web', priority: '0.6', changefreq: 'monthly' },
+      { url: '/datenschutz', priority: '0.3', changefreq: 'yearly' },
+      { url: '/impressum', priority: '0.3', changefreq: 'yearly' }
     ];
 
     // Entfernt: Keine Slug-Mappings mehr
@@ -80,28 +84,27 @@ export const GET: RequestHandler = async () => {
     let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
     xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n';
 
-    // Add static pages with lastmod (removed changefreq and priority as per Google guidelines)
+    // Add static pages with lastmod, priority und changefreq
     for (const page of staticPages) {
       xml += '  <url>\n';
-      xml += `    <loc>${baseUrl}${page}</loc>\n`;
+      xml += `    <loc>${baseUrl}${page.url}</loc>\n`;
       // Add lastmod for static pages (date only, no seconds to avoid micro-updates)
       const currentDate = new Date().toISOString().split('T')[0];
       xml += `    <lastmod>${currentDate}</lastmod>\n`;
+      xml += `    <priority>${page.priority}</priority>\n`;
+      xml += `    <changefreq>${page.changefreq}</changefreq>\n`;
       xml += '  </url>\n';
     }
-
-    // SEO-Update: Force Google to re-index all items by setting lastmod to today
-    const today = new Date().toISOString().split('T')[0];
-    console.log(`[Sitemap] SEO-Update: Setting lastmod to ${today} for all items to force Google re-indexing`);
 
     // Add item pages with optimized data (following Google's current guidelines)
     for (const item of allItems) {
       xml += '  <url>\n';
       xml += `    <loc>${baseUrl}/item/${item.slug}</loc>\n`;
       
-      // SEO-Update: Force Google to re-index by setting lastmod to today
-      // This ensures Google picks up the new SEO structure (1 page = 1 hero image)
-      xml += `    <lastmod>${today}</lastmod>\n`;
+      // Verwende tatsächliches Änderungsdatum für bessere Crawl-Effizienz
+      const lastModDate = item.updated_at || item.created_at;
+      const formattedDate = lastModDate ? new Date(lastModDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+      xml += `    <lastmod>${formattedDate}</lastmod>\n`;
       
       // Add enhanced image data for better SEO
       if (item.path_2048 || item.path_512) {
@@ -131,12 +134,12 @@ export const GET: RequestHandler = async () => {
     xml += '</urlset>';
 
     console.log(`[Sitemap] Generated sitemap with ${staticPages.length} static pages and ${allItems.length} items`);
-    console.log(`[Sitemap] SEO-Update: All items marked with lastmod=${today} to force Google re-indexing`);
+    console.log(`[Sitemap] Items use their actual updated_at/created_at dates for better crawl efficiency`);
 
     return new Response(xml, {
       headers: {
         'Content-Type': 'application/xml',
-        'Cache-Control': 'public, max-age=300' // Cache for 5 minutes during SEO update
+        'Cache-Control': 'public, max-age=3600' // Cache for 1 hour for better performance
       }
     });
 
