@@ -165,16 +165,24 @@ ${context}
 
 Anforderungen:
 1. Beschreibung: 100-160 Zeichen, beschreibe sichtbare Elemente, Stimmung, Beleuchtung
-2. Schlüsselwörter: 40-50 Begriffe, getrennt durch Kommas. Berücksichtige:
-   - Orte/Ortsnamen
-   - Visuelle Elemente (Farben, Objekte, Architektur)
-   - Stimmung/Atmosphäre
-   - Fotografie-Stil/Technik
-   - Geografische Region
+2. Schlüsselwörter: GENAU 30-50 Begriffe sind zwingend erforderlich! Getrennt durch Kommas. Berücksichtige ALLE diese Kategorien:
+   - Orte/Ortsnamen (Stadt, Landkreis, Region, Bundesland, Land)
+   - Geografische Merkmale (Fluss, Berg, Tal, Wiese, Wald, etc.)
+   - Visuelle Elemente (Farben, Objekte, Architektur, Natur)
+   - Stimmung/Atmosphäre (abendlich, morgendlich, winterlich, sonnig, etc.)
+   - Fotografie-Stil/Technik (Luftaufnahme, Makro, Landschaft, etc.)
+   - Personen/Aktivitäten (wenn sichtbar)
+   - Jahreszeit/Zeit (wenn erkennbar)
+   - Wetter/Merkmal (Schnee, Regen, Sonne, Nebel, etc.)
+
+WICHTIG: 
+- Zähle die Keywords und stelle sicher, dass es MINIMUM 30 sind
+- Je mehr relevante Keywords, desto besser
+- Nutze sowohl spezifische als auch allgemeine Begriffe
 
 Format:
 DESCRIPTION: [Deine Beschreibung hier]
-KEYWORDS: [schlüsselwort1, schlüsselwort2, schlüsselwort3, ...]
+KEYWORDS: [schlüsselwort1, schlüsselwort2, schlüsselwort3, ..., schlüsselwort30, schlüsselwort31, ...]
 
 WICHTIG: Antworte nur auf Deutsch.`;
   }
