@@ -43,68 +43,100 @@ class AIImageAnalyzer {
       console.log('🤖 Building prompt for Gemini API...');
       const prompt = this.buildPrompt(request.userTitle, request.originalTitle);
       
-      console.log('🤖 Calling Gemini API:', {
-        baseUrl: this.baseUrl,
-        hasApiKey: !!this.apiKey,
-        promptLength: prompt.length,
-        imageBase64Length: request.imageBase64.length
-      });
+      // Try multiple models in order of preference
+      const models = [
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-vision:generateContent',
+        'https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent',
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent',
+        'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent',
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent'
+      ];
       
-      const response = await fetch(`${this.baseUrl}?key=${this.apiKey}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              {
-                text: prompt
-              },
-              {
-                inline_data: {
-                  mime_type: 'image/jpeg',
-                  data: request.imageBase64
-                }
+      let lastError: Error | null = null;
+      
+      for (const modelUrl of models) {
+        try {
+          console.log(`🤖 Trying Gemini API with model: ${modelUrl}`);
+          console.log('🤖 Calling Gemini API:', {
+            baseUrl: modelUrl,
+            hasApiKey: !!this.apiKey,
+            promptLength: prompt.length,
+            imageBase64Length: request.imageBase64.length
+          });
+          
+          const response = await fetch(`${modelUrl}?key=${this.apiKey}`, {
+                    method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              contents: [{
+                parts: [
+                  {
+                    text: prompt
+                  },
+                  {
+                    inline_data: {
+                      mime_type: 'image/jpeg',
+                      data: request.imageBase64
+                    }
+                  }
+                ]
+              }],
+              generationConfig: {
+                temperature: 0.7,
+                topK: 40,
+                topP: 0.95,
+                maxOutputTokens: 1024,
               }
-            ]
-          }],
-          generationConfig: {
-            temperature: 0.7,
-            topK: 40,
-            topP: 0.95,
-            maxOutputTokens: 1024,
+            })
+          });
+
+          console.log('🤖 Gemini API response status:', response.status);
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: { message: 'Unknown error' } }));
+            console.error('❌ Gemini API error:', errorData);
+            lastError = new Error(`Gemini API error: ${errorData.error?.message || response.statusText}`);
+            continue; // Try next model
           }
-        })
-      });
 
-      console.log('🤖 Gemini API response status:', response.status);
+          const data = await response.json();
+          console.log('🤖 Gemini API data received:', {
+            hasCandidates: !!data.candidates,
+            candidatesLength: data.candidates?.length || 0
+          });
+          
+          const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+          
+          if (!generatedText) {
+            console.error('❌ No text in Gemini response:', data);
+            lastError = new Error('No response from Gemini API');
+            continue; // Try next model
+          }
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: { message: 'Unknown error' } }));
-        console.error('❌ Gemini API error:', errorData);
-        throw new Error(`Gemini API error: ${errorData.error?.message || response.statusText}`);
+          console.log('🤖 Generated text:', generatedText.substring(0, 200));
+          
+          const parsed = this.parseAIResponse(generatedText);
+          console.log('🤖 Parsed result:', parsed);
+          
+          // Success! Return immediately
+          return parsed;
+        } catch (error) {
+          console.error(`❌ Failed with model ${modelUrl}:`, error);
+          lastError = error instanceof Error ? error : new Error('Unknown error');
+          continue; // Try next model
+        }
       }
-
-      const data = await response.json();
-      console.log('🤖 Gemini API data received:', {
-        hasCandidates: !!data.candidates,
-        candidatesLength: data.candidates?.length || 0
-      });
       
-      const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      
-      if (!generatedText) {
-        console.error('❌ No text in Gemini response:', data);
-        throw new Error('No response from Gemini API');
-      }
-
-      console.log('🤖 Generated text:', generatedText.substring(0, 200));
-      
-      const parsed = this.parseAIResponse(generatedText);
-      console.log('🤖 Parsed result:', parsed);
-      
-      return parsed;
+      // All models failed
+      console.error('❌ All Gemini models failed');
+      return {
+        description: '',
+        keywords: '',
+        success: false,
+        error: lastError?.message || 'All Gemini models failed'
+      };
     } catch (error) {
       console.error('❌ AI Analysis failed:', error);
       return {
