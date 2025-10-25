@@ -36,10 +36,27 @@ class AIImageAnalyzer {
   }
 
   /**
+   * List available models (for debugging)
+   */
+  async listAvailableModels(): Promise<void> {
+    try {
+      console.log('🔍 Fetching available models...');
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${this.apiKey}`);
+      const data = await response.json();
+      console.log('📋 Available models:', data);
+    } catch (error) {
+      console.error('❌ Failed to fetch models:', error);
+    }
+  }
+
+  /**
    * Analyze image and generate description + keywords
    */
   async analyzeImage(request: AIAnalysisRequest): Promise<AIAnalysisResult> {
     try {
+      // First, list available models
+      await this.listAvailableModels();
+      
       console.log('🤖 Building prompt for Gemini API...');
       const prompt = this.buildPrompt(request.userTitle, request.originalTitle);
       
