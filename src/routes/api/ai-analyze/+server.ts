@@ -39,7 +39,15 @@ class AIImageAnalyzer {
    */
   async analyzeImage(request: AIAnalysisRequest): Promise<AIAnalysisResult> {
     try {
+      console.log('🤖 Building prompt for Gemini API...');
       const prompt = this.buildPrompt(request.userTitle, request.originalTitle);
+      
+      console.log('🤖 Calling Gemini API:', {
+        baseUrl: this.baseUrl,
+        hasApiKey: !!this.apiKey,
+        promptLength: prompt.length,
+        imageBase64Length: request.imageBase64.length
+      });
       
       const response = await fetch(`${this.baseUrl}?key=${this.apiKey}`, {
         method: 'POST',
@@ -69,21 +77,35 @@ class AIImageAnalyzer {
         })
       });
 
+      console.log('🤖 Gemini API response status:', response.status);
+
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorData = await response.json().catch(() => ({ error: { message: 'Unknown error' } }));
+        console.error('❌ Gemini API error:', errorData);
         throw new Error(`Gemini API error: ${errorData.error?.message || response.statusText}`);
       }
 
       const data = await response.json();
+      console.log('🤖 Gemini API data received:', {
+        hasCandidates: !!data.candidates,
+        candidatesLength: data.candidates?.length || 0
+      });
+      
       const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text;
       
       if (!generatedText) {
+        console.error('❌ No text in Gemini response:', data);
         throw new Error('No response from Gemini API');
       }
 
-      return this.parseAIResponse(generatedText);
+      console.log('🤖 Generated text:', generatedText.substring(0, 200));
+      
+      const parsed = this.parseAIResponse(generatedText);
+      console.log('🤖 Parsed result:', parsed);
+      
+      return parsed;
     } catch (error) {
-      console.error('AI Analysis failed:', error);
+      console.error('❌ AI Analysis failed:', error);
       return {
         description: '',
         keywords: '',
@@ -156,26 +178,40 @@ WICHTIG: Antworte nur auf Deutsch.`;
 
 export async function POST({ request }) {
   try {
+    console.log('🤖 AI Analysis API called');
+    
     const body = await request.json();
     const { imageBase64, userTitle, originalTitle } = body;
 
+    console.log('🤖 Request data:', {
+      hasImageBase64: !!imageBase64,
+      imageBase64Length: imageBase64?.length || 0,
+      userTitle,
+      originalTitle
+    });
+
     if (!imageBase64 || !userTitle) {
+      console.error('❌ Missing required fields');
       return json({ 
         success: false, 
         error: 'Missing required fields: imageBase64 and userTitle' 
       }, { status: 400 });
     }
 
+    console.log('🤖 Creating AI Analyzer...');
     const analyzer = new AIImageAnalyzer();
+    
+    console.log('🤖 Starting AI analysis...');
     const result = await analyzer.analyzeImage({
       imageBase64,
       userTitle,
       originalTitle
     });
 
+    console.log('🤖 AI Analysis result:', result);
     return json(result);
   } catch (error) {
-    console.error('AI Analysis API error:', error);
+    console.error('❌ AI Analysis API error:', error);
     return json({ 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error' 
