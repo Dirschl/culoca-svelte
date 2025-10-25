@@ -44,14 +44,14 @@ class AIImageAnalyzer {
       const prompt = this.buildPrompt(request.userTitle, request.originalTitle);
       
       // Try multiple models in order of preference
-      // Updated with new Gemini 2.5 models that actually work
+      // gemini-2.5-flash-lite-preview-09-2025 works reliably
       const models = [
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite-preview-09-2025:generateContent',
         'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent',
         'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-001:generateContent',
         'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-001:generateContent',
         'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-002:generateContent',
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent',
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent'
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent'
       ];
       
       let lastError: Error | null = null;
