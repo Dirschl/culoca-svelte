@@ -20,7 +20,7 @@ interface AIAnalysisResult {
  */
 class AIImageAnalyzer {
   private apiKey: string;
-  private baseUrl = 'https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash-exp:generateContent';
+  private baseUrl = 'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent';
 
   constructor() {
     // Use SvelteKit's recommended environment variable loading
@@ -28,7 +28,7 @@ class AIImageAnalyzer {
     
     console.log('🔍 AI Analyzer Debug:');
     console.log('  env.GOOGLE_GEMINI_API_KEY:', this.apiKey ? 'SET' : 'NOT SET');
-    console.log('  Using Gemini Model: gemini-2.0-flash-exp');
+    console.log('  Using Gemini Model: gemini-1.5-pro (stable version)');
     
     if (!this.apiKey) {
       throw new Error('GOOGLE_GEMINI_API_KEY environment variable is required');
