@@ -61,12 +61,15 @@ class AIImageAnalyzer {
       const prompt = this.buildPrompt(request.userTitle, request.originalTitle);
       
       // Try multiple models in order of preference
+      // Updated with new Gemini 2.5 models from ListModels
       const models = [
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-vision:generateContent',
-        'https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent',
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent',
-        'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent',
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent'
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent',
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite-preview-09-2025:generateContent',
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent',
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-001:generateContent',
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-001:generateContent',
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-002:generateContent',
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent'
       ];
       
       let lastError: Error | null = null;
