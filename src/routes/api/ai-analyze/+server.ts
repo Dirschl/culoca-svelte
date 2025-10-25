@@ -20,7 +20,7 @@ interface AIAnalysisResult {
  */
 class AIImageAnalyzer {
   private apiKey: string;
-  private baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+  private baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent';
 
   constructor() {
     // Use SvelteKit's recommended environment variable loading
