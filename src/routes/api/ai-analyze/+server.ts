@@ -36,40 +36,22 @@ class AIImageAnalyzer {
   }
 
   /**
-   * List available models (for debugging)
-   */
-  async listAvailableModels(): Promise<void> {
-    try {
-      console.log('🔍 Fetching available models...');
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${this.apiKey}`);
-      const data = await response.json();
-      console.log('📋 Available models:', data);
-    } catch (error) {
-      console.error('❌ Failed to fetch models:', error);
-    }
-  }
-
-  /**
    * Analyze image and generate description + keywords
    */
   async analyzeImage(request: AIAnalysisRequest): Promise<AIAnalysisResult> {
     try {
-      // First, list available models
-      await this.listAvailableModels();
-      
       console.log('🤖 Building prompt for Gemini API...');
       const prompt = this.buildPrompt(request.userTitle, request.originalTitle);
       
       // Try multiple models in order of preference
-      // Updated with new Gemini 2.5 models from ListModels
+      // Updated with new Gemini 2.5 models that actually work
       const models = [
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent',
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite-preview-09-2025:generateContent',
         'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent',
         'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-001:generateContent',
         'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-001:generateContent',
         'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-002:generateContent',
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent'
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent',
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent'
       ];
       
       let lastError: Error | null = null;
