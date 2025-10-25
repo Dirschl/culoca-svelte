@@ -19,35 +19,49 @@
   $: showButton = userTitle.length >= 40 && !disabled;
 
   async function handleAIAnalysis() {
-    if (!imageFile || isAnalyzing) return;
+    if (!imageFile || isAnalyzing) {
+      console.log('🤖 AI Analysis blocked:', { hasImageFile: !!imageFile, isAnalyzing });
+      return;
+    }
 
+    console.log('🤖 AI Analysis started');
     isAnalyzing = true;
     
     try {
+      console.log('🤖 Creating analyzer...');
       const analyzer = new AIImageAnalyzer();
-      const imageBase64 = await analyzer.resizeImageForAI(imageFile);
       
+      console.log('🤖 Resizing image for AI...');
+      const imageBase64 = await analyzer.resizeImageForAI(imageFile);
+      console.log('🤖 Image resized:', { length: imageBase64.length });
+      
+      console.log('🤖 Calling analyzeImage...');
       const result = await analyzer.analyzeImage({
         imageBase64,
         userTitle,
         originalTitle
       });
 
+      console.log('🤖 AI Analysis result:', result);
+
       if (result.success) {
+        console.log('✅ AI Analysis successful');
         dispatch('analysisComplete', {
           description: result.description,
           keywords: result.keywords
         });
       } else {
+        console.error('❌ AI Analysis failed:', result.error);
         dispatch('analysisError', { error: result.error || 'AI analysis failed' });
       }
     } catch (error) {
-      console.error('AI Analysis error:', error);
+      console.error('❌ AI Analysis error:', error);
       dispatch('analysisError', { 
         error: error instanceof Error ? error.message : 'Unknown error' 
       });
     } finally {
       isAnalyzing = false;
+      console.log('🤖 AI Analysis finished');
     }
   }
 </script>

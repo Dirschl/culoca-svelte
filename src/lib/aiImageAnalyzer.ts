@@ -21,6 +21,13 @@ export class AIImageAnalyzer {
    */
   async analyzeImage(request: AIAnalysisRequest): Promise<AIAnalysisResult> {
     try {
+      console.log('🤖 Client: Sending AI analysis request...');
+      console.log('🤖 Client: Request data:', {
+        userTitle: request.userTitle,
+        originalTitle: request.originalTitle,
+        imageBase64Length: request.imageBase64?.length || 0
+      });
+      
       const response = await fetch('/api/ai-analyze', {
         method: 'POST',
         headers: {
@@ -29,15 +36,19 @@ export class AIImageAnalyzer {
         body: JSON.stringify(request)
       });
 
+      console.log('🤖 Client: Response status:', response.status);
+
       if (!response.ok) {
         const errorData = await response.json();
+        console.error('❌ Client: API error:', errorData);
         throw new Error(`AI Analysis API error: ${errorData.error || response.statusText}`);
       }
 
       const result = await response.json();
+      console.log('🤖 Client: Result received:', result);
       return result;
     } catch (error) {
-      console.error('AI Analysis failed:', error);
+      console.error('❌ Client: AI Analysis failed:', error);
       return {
         description: '',
         keywords: '',
