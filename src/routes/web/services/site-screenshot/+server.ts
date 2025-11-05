@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { chromium } from 'playwright';
+import { execSync } from 'child_process';
 
 interface ScreenshotOptions {
   url: string;
@@ -213,12 +214,48 @@ export const POST: RequestHandler = async ({ request }) => {
 };
 
 /**
+ * Check and install Playwright browsers if needed (for Vercel Serverless)
+ */
+async function ensureBrowserInstalled(): Promise<boolean> {
+  try {
+    // Try to launch browser - if it fails, browsers are not installed
+    const testBrowser = await chromium.launch({ headless: true });
+    await testBrowser.close();
+    return true;
+  } catch (error) {
+    console.log('⚠️ Browser not found, attempting to install...');
+    try {
+      // Install browsers in runtime (for Vercel Serverless)
+      execSync('npx playwright install chromium --with-deps', {
+        stdio: 'inherit',
+        timeout: 180000 // 3 minutes timeout
+      });
+      console.log('✅ Browser installed successfully');
+      return true;
+    } catch (installError) {
+      console.error('❌ Failed to install browser:', installError);
+      return false;
+    }
+  }
+}
+
+/**
  * Generate screenshot using Playwright
  */
 async function generateScreenshot(options: ScreenshotOptions): Promise<ScreenshotResult> {
   let browser: any = null;
   
   try {
+    // Ensure browser is installed (especially for Vercel Serverless)
+    const browserInstalled = await ensureBrowserInstalled();
+    if (!browserInstalled) {
+      return {
+        success: false,
+        error: 'Browser installation failed',
+        message: 'Could not install Chromium browser. Please check Vercel build logs.'
+      };
+    }
+    
     console.log('🚀 Launching Chromium browser...');
     
     // Launch browser
