@@ -9,7 +9,7 @@
       "permanent": true
     }
   ],
-  "buildCommand": "npm run build",
+  "buildCommand": "npm run postinstall:vercel && npm run build",
   "installCommand": "npm install",
   "framework": "sveltekit"
 } 
