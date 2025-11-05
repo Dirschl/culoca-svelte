@@ -215,15 +215,17 @@ export const POST: RequestHandler = async ({ request }) => {
 
 /**
  * Get Chromium executable path (uses @sparticuz/chromium for Vercel Serverless)
+ * Note: @sparticuz/chromium.executablePath() returns a Promise!
  */
-function getChromiumExecutablePath(): string {
+async function getChromiumExecutablePath(): Promise<string> {
   // Check if we're in a serverless environment (Vercel, AWS Lambda, etc.)
   const isServerless = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.LAMBDA_TASK_ROOT;
   
   if (isServerless) {
     console.log('🌐 Serverless environment detected, using @sparticuz/chromium');
     try {
-      const path = chromiumPkg.executablePath();
+      // @sparticuz/chromium.executablePath() returns a Promise!
+      const path = await chromiumPkg.executablePath();
       console.log('✅ @sparticuz/chromium executable path:', path);
       return path;
     } catch (error) {
@@ -258,8 +260,8 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
     // Get executable path (uses @sparticuz/chromium on Vercel)
     let executablePath: string;
     try {
-      executablePath = getChromiumExecutablePath();
-      console.log('📍 Browser executable path resolved');
+      executablePath = await getChromiumExecutablePath();
+      console.log('📍 Browser executable path resolved:', executablePath);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       console.error('❌ Failed to get executable path:', errorMsg);
