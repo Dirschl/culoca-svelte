@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { chromium } from 'playwright';
-import { execSync } from 'child_process';
+import { chromium } from 'playwright-core';
+import chromiumPkg from '@sparticuz/chromium';
 
 interface ScreenshotOptions {
   url: string;
@@ -213,116 +213,17 @@ export const POST: RequestHandler = async ({ request }) => {
   }
 };
 
-// Cache for browser installation check
-let browserInstallChecked = false;
-let browserInstalled = false;
-
 /**
- * Check and install Playwright browsers if needed (for Vercel Serverless)
+ * Get Chromium executable path (uses @sparticuz/chromium for Vercel Serverless)
  */
-async function ensureBrowserInstalled(): Promise<boolean> {
-  // Cache the result to avoid checking multiple times
-  if (browserInstallChecked) {
-    return browserInstalled;
+function getChromiumExecutablePath(): string {
+  // Use @sparticuz/chromium for Vercel Serverless (much smaller, optimized)
+  if (process.env.VERCEL) {
+    return chromiumPkg.executablePath();
   }
   
-  browserInstallChecked = true;
-  
-  try {
-    // Quick check: try to access browser executable path
-    const chromiumPath = chromium.executablePath();
-    console.log('✅ Browser executable found at:', chromiumPath);
-    
-    // Verify it actually exists
-    const fs = await import('fs');
-    if (fs.existsSync(chromiumPath)) {
-      browserInstalled = true;
-      return true;
-    } else {
-      throw new Error('Browser executable path returned but file does not exist');
-    }
-  } catch (error) {
-    console.log('⚠️ Browser not found, attempting to install...');
-    console.log('⚠️ Error:', error instanceof Error ? error.message : String(error));
-    
-    try {
-      // For Vercel Serverless, install to /tmp (only writable directory)
-      const installPath = process.env.VERCEL ? '/tmp/.cache/ms-playwright' : undefined;
-      
-      // Create directory structure if needed
-      const fs = await import('fs');
-      if (installPath) {
-        try {
-          fs.mkdirSync(installPath, { recursive: true });
-          console.log('📁 Created directory:', installPath);
-        } catch (mkdirError) {
-          console.log('⚠️ Directory might already exist:', mkdirError);
-        }
-      }
-      
-      // Set npm/npx cache directories to /tmp for Vercel
-      const env = {
-        ...process.env,
-        PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '0',
-        PLAYWRIGHT_BROWSERS_PATH: installPath || process.env.PLAYWRIGHT_BROWSERS_PATH || '0',
-        // Force npm/npx to use /tmp for cache
-        NPM_CONFIG_CACHE: process.env.VERCEL ? '/tmp/.npm' : process.env.NPM_CONFIG_CACHE,
-        HOME: process.env.VERCEL ? '/tmp' : process.env.HOME,
-        XDG_CACHE_HOME: process.env.VERCEL ? '/tmp/.cache' : process.env.XDG_CACHE_HOME
-      };
-      
-      // Create npm cache directory
-      if (process.env.VERCEL && env.NPM_CONFIG_CACHE) {
-        try {
-          fs.mkdirSync(env.NPM_CONFIG_CACHE, { recursive: true });
-        } catch (e) {
-          // Ignore
-        }
-      }
-      
-      console.log('📦 Installing browsers to:', env.PLAYWRIGHT_BROWSERS_PATH || 'default location');
-      console.log('📦 Using npm cache:', env.NPM_CONFIG_CACHE || 'default');
-      
-      // Install browsers in runtime (for Vercel Serverless)
-      // Install both chromium and chromium-headless-shell (needed for single-process mode)
-      // Keep cwd as project directory so npx can find node_modules
-      const cwd = process.env.VERCEL ? '/var/task' : process.cwd();
-      
-      console.log('📦 Installing chromium...');
-      execSync('npx playwright install chromium --with-deps', {
-        stdio: 'inherit',
-        timeout: 180000, // 3 minutes timeout
-        env,
-        cwd
-      });
-      
-      console.log('📦 Installing chromium-headless-shell...');
-      execSync('npx playwright install chromium-headless-shell --with-deps', {
-        stdio: 'inherit',
-        timeout: 180000, // 3 minutes timeout
-        env,
-        cwd
-      });
-      
-      console.log('✅ Browser installed successfully');
-      
-      // Verify installation
-      try {
-        const chromiumPath = chromium.executablePath();
-        console.log('✅ Verified browser at:', chromiumPath);
-        browserInstalled = true;
-        return true;
-      } catch (verifyError) {
-        console.error('❌ Browser installation verification failed:', verifyError);
-        browserInstalled = false;
-        return false;
-      }
-    } catch (installError) {
-      console.error('❌ Failed to install browser:', installError);
-      browserInstalled = false;
-      return false;
-    }
-  }
+  // Use regular playwright for local development
+  return chromium.executablePath();
 }
 
 /**
@@ -332,45 +233,26 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
   let browser: any = null;
   
   try {
-    // Ensure browser is installed (especially for Vercel Serverless)
-    const browserInstalled = await ensureBrowserInstalled();
-    if (!browserInstalled) {
-      return {
-        success: false,
-        error: 'Browser installation failed',
-        message: 'Could not install Chromium browser. Please check Vercel build logs.'
-      };
-    }
-    
     console.log('🚀 Launching Chromium browser...');
     
+    // Get executable path (uses @sparticuz/chromium on Vercel)
+    const executablePath = getChromiumExecutablePath();
+    console.log('📍 Using browser executable:', executablePath);
+    
     // Launch browser
-    // For Vercel, use the installed browser path
     const launchOptions: any = {
       headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--disable-gpu'
-        // Removed --single-process to avoid chromium-headless-shell requirement
-        // Use regular chromium instead
-      ]
+      executablePath,
+      args: process.env.VERCEL 
+        ? chromiumPkg.args // Optimized args for serverless
+        : [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-accelerated-2d-canvas',
+            '--disable-gpu'
+          ]
     };
-    
-    // If we installed to /tmp, specify the executable path
-    if (process.env.VERCEL && process.env.PLAYWRIGHT_BROWSERS_PATH) {
-      try {
-        const chromiumPath = chromium.executablePath();
-        if (chromiumPath) {
-          launchOptions.executablePath = chromiumPath;
-          console.log('📍 Using browser executable:', chromiumPath);
-        }
-      } catch (e) {
-        console.log('⚠️ Could not get executable path, using default');
-      }
-    }
     
     browser = await chromium.launch(launchOptions);
 
