@@ -463,10 +463,21 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
               text.includes('agree') ||
               text.includes('zustimmen') ||
               text.includes('allow') ||
-              text.includes('erlauben')
+              text.includes('erlauben') ||
+              text.includes('alle akzeptieren') ||
+              text.includes('all accept')
             ) {
               try {
+                // Scroll button into view if needed
+                button.scrollIntoView({ behavior: 'instant', block: 'center' });
                 button.click();
+                // Also try to trigger click event
+                const clickEvent = new MouseEvent('click', {
+                  bubbles: true,
+                  cancelable: true,
+                  view: window
+                });
+                button.dispatchEvent(clickEvent);
               } catch (e) {
                 // Ignore click errors
               }
@@ -479,35 +490,120 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
 
       // Remove any remaining overlay elements that might be cookie banners
       const allElements = document.querySelectorAll('*');
+      const viewportHeight = window.innerHeight;
+      
       allElements.forEach((el: Element) => {
         const element = el as HTMLElement;
         const style = window.getComputedStyle(element);
         const zIndex = parseInt(style.zIndex || '0', 10);
+        const rect = element.getBoundingClientRect();
+        const bottom = rect.bottom;
+        const isAtBottom = bottom > viewportHeight * 0.8; // Bottom 20% of screen
+        const isOverlay = style.position === 'fixed' || style.position === 'absolute';
+        const text = element.textContent?.toLowerCase() || '';
+        const id = element.id.toLowerCase();
+        const className = element.className.toLowerCase();
         
         // Check if element is an overlay (high z-index, positioned fixed/absolute)
+        // OR if it's at the bottom of the screen (common for cookie banners)
+        const isCookieBanner = (
+          text.includes('cookie') ||
+          text.includes('consent') ||
+          text.includes('gdpr') ||
+          text.includes('privacy') ||
+          text.includes('datenschutz') ||
+          text.includes('accept') ||
+          text.includes('akzeptieren') ||
+          text.includes('zustimmen') ||
+          id.includes('cookie') ||
+          id.includes('consent') ||
+          id.includes('gdpr') ||
+          className.includes('cookie') ||
+          className.includes('consent') ||
+          className.includes('gdpr')
+        );
+        
+        // Remove if:
+        // 1. It's a cookie banner (by text/ID/class)
+        // 2. OR it's a high z-index overlay at the bottom of the screen (likely a banner)
         if (
-          (style.position === 'fixed' || style.position === 'absolute') &&
-          zIndex > 1000 &&
-          (element.textContent?.toLowerCase().includes('cookie') ||
-           element.textContent?.toLowerCase().includes('consent') ||
-           element.textContent?.toLowerCase().includes('gdpr') ||
-           element.id.toLowerCase().includes('cookie') ||
-           element.className.toLowerCase().includes('cookie'))
+          isOverlay && (
+            (zIndex > 1000 && isCookieBanner) ||
+            (isAtBottom && zIndex > 500) || // High z-index at bottom = likely banner
+            (isAtBottom && rect.height < 150 && rect.width > viewportHeight * 0.5) // Wide, short element at bottom
+          )
         ) {
-          element.style.display = 'none';
-          element.remove();
+          // Use !important to override any inline styles
+          element.style.setProperty('display', 'none', 'important');
+          element.style.setProperty('visibility', 'hidden', 'important');
+          element.style.setProperty('opacity', '0', 'important');
+          element.style.setProperty('height', '0', 'important');
+          element.style.setProperty('max-height', '0', 'important');
+          element.style.setProperty('overflow', 'hidden', 'important');
+          try {
+            element.remove();
+          } catch (e) {
+            // Ignore removal errors
+          }
         }
       });
+      
+      // Remove body/html classes that might control cookie banner visibility
+      const body = document.body;
+      const html = document.documentElement;
+      
+      if (body) {
+        Array.from(body.classList).forEach(cls => {
+          if (cls.toLowerCase().includes('cookie') || 
+              cls.toLowerCase().includes('consent') || 
+              cls.toLowerCase().includes('gdpr')) {
+            body.classList.remove(cls);
+          }
+        });
+      }
+      
+      if (html) {
+        Array.from(html.classList).forEach(cls => {
+          if (cls.toLowerCase().includes('cookie') || 
+              cls.toLowerCase().includes('consent') || 
+              cls.toLowerCase().includes('gdpr')) {
+            html.classList.remove(cls);
+          }
+        });
+      }
+      
+      // Add CSS to hide any remaining cookie-related elements
+      const style = document.createElement('style');
+      style.id = 'culoca-cookie-hider';
+      style.textContent = `
+        [id*="cookie" i],
+        [class*="cookie" i],
+        [id*="consent" i],
+        [class*="consent" i],
+        [id*="gdpr" i],
+        [class*="gdpr" i],
+        [role="dialog"][aria-label*="cookie" i],
+        [role="dialog"][aria-label*="consent" i] {
+          display: none !important;
+          visibility: hidden !important;
+          opacity: 0 !important;
+          height: 0 !important;
+          max-height: 0 !important;
+          overflow: hidden !important;
+          pointer-events: none !important;
+        }
+      `;
+      document.head.appendChild(style);
       });
     };
 
     // Remove cookie banners multiple times (some load with delay)
     await removeCookieBanners();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(1000); // Wait for banner animations/closing
     await removeCookieBanners();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(1000); // Wait for banner animations/closing
     await removeCookieBanners();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(1000); // Final wait before screenshot
 
     console.log('📸 Taking screenshot...');
     // Take screenshot
