@@ -258,7 +258,17 @@ async function ensureBrowserInstalled(): Promise<boolean> {
       console.log('📦 Installing browsers to:', env.PLAYWRIGHT_BROWSERS_PATH || 'default location');
       
       // Install browsers in runtime (for Vercel Serverless)
+      // Install both chromium and chromium-headless-shell (needed for single-process mode)
+      console.log('📦 Installing chromium...');
       execSync('npx playwright install chromium --with-deps', {
+        stdio: 'inherit',
+        timeout: 180000, // 3 minutes timeout
+        env,
+        cwd: process.cwd()
+      });
+      
+      console.log('📦 Installing chromium-headless-shell...');
+      execSync('npx playwright install chromium-headless-shell --with-deps', {
         stdio: 'inherit',
         timeout: 180000, // 3 minutes timeout
         env,
@@ -314,8 +324,9 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
         '--disable-accelerated-2d-canvas',
-        '--disable-gpu',
-        '--single-process' // Important for Vercel Serverless
+        '--disable-gpu'
+        // Removed --single-process to avoid chromium-headless-shell requirement
+        // Use regular chromium instead
       ]
     };
     
@@ -325,9 +336,10 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
         const chromiumPath = chromium.executablePath();
         if (chromiumPath) {
           launchOptions.executablePath = chromiumPath;
+          console.log('📍 Using browser executable:', chromiumPath);
         }
       } catch (e) {
-        // Use default path
+        console.log('⚠️ Could not get executable path, using default');
       }
     }
     
