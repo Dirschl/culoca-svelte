@@ -69,7 +69,7 @@ export const GET: RequestHandler = async ({ url }) => {
       format: (url.searchParams.get('format') || 'jpeg') as 'png' | 'jpeg',
       quality: parseInt(url.searchParams.get('quality') || '80'),
       waitUntil: (url.searchParams.get('waitUntil') || 'domcontentloaded') as 'load' | 'networkidle' | 'domcontentloaded',
-      timeout: parseInt(url.searchParams.get('timeout') || '45000')
+      timeout: parseInt(url.searchParams.get('timeout') || '30000')
     };
 
     // Validate quality
@@ -87,8 +87,8 @@ export const GET: RequestHandler = async ({ url }) => {
 
     console.log('📸 Generating screenshot:', options);
 
-    // Generate screenshot with retry logic
-    const result = await generateScreenshotWithRetry(options, 3);
+    // Generate screenshot with retry logic (2 attempts max for faster failure)
+    const result = await generateScreenshotWithRetry(options, 2);
 
     if (!result.success) {
       console.error('❌ Screenshot generation failed after retries:', result.error);
@@ -157,7 +157,7 @@ export const POST: RequestHandler = async ({ request }) => {
       format: options.format || 'jpeg',
       quality: options.quality || 80,
       waitUntil: options.waitUntil || 'domcontentloaded',
-      timeout: options.timeout || 45000
+      timeout: options.timeout || 30000
     };
 
     // Validate quality
@@ -247,7 +247,7 @@ async function getChromiumExecutablePath(): Promise<string> {
  */
 async function generateScreenshotWithRetry(
   options: ScreenshotOptions,
-  maxRetries: number = 3
+  maxRetries: number = 2
 ): Promise<ScreenshotResult> {
   let lastError: Error | null = null;
   
@@ -255,7 +255,12 @@ async function generateScreenshotWithRetry(
     console.log(`🔄 Screenshot attempt ${attempt}/${maxRetries} for ${options.url}`);
     
     try {
-      const result = await generateScreenshot(options);
+      // Use shorter timeout for retries (faster failure)
+      const retryOptions = {
+        ...options,
+        timeout: attempt > 1 ? Math.min(options.timeout || 30000, 20000) : options.timeout || 30000
+      };
+      const result = await generateScreenshot(retryOptions);
       
       if (result.success) {
         if (attempt > 1) {
@@ -266,21 +271,29 @@ async function generateScreenshotWithRetry(
       
       // If result has an error, log it but continue to retry
       lastError = result.error ? new Error(result.error) : new Error('Screenshot generation failed');
-      console.log(`⚠️ Attempt ${attempt} failed: ${lastError.message}`);
+      console.log(`⚠️ Attempt ${attempt} failed: ${lastError.message}`, {
+        url: options.url,
+        error: result.error,
+        message: result.message
+      });
       
-      // Wait before retrying (exponential backoff)
+      // Wait before retrying (shorter wait for faster processing)
       if (attempt < maxRetries) {
-        const waitTime = Math.min(1000 * Math.pow(2, attempt - 1), 5000); // Max 5 seconds
+        const waitTime = Math.min(500 * attempt, 2000); // Max 2 seconds (500ms, 1000ms)
         console.log(`⏳ Waiting ${waitTime}ms before retry...`);
         await new Promise(resolve => setTimeout(resolve, waitTime));
       }
     } catch (error) {
       lastError = error instanceof Error ? error : new Error('Unknown error');
-      console.error(`❌ Attempt ${attempt} threw error:`, lastError.message);
+      console.error(`❌ Attempt ${attempt} threw error:`, {
+        url: options.url,
+        error: lastError.message,
+        stack: lastError.stack
+      });
       
-      // Wait before retrying (exponential backoff)
+      // Wait before retrying (shorter wait for faster processing)
       if (attempt < maxRetries) {
-        const waitTime = Math.min(1000 * Math.pow(2, attempt - 1), 5000); // Max 5 seconds
+        const waitTime = Math.min(500 * attempt, 2000); // Max 2 seconds (500ms, 1000ms)
         console.log(`⏳ Waiting ${waitTime}ms before retry...`);
         await new Promise(resolve => setTimeout(resolve, waitTime));
       }
@@ -288,7 +301,12 @@ async function generateScreenshotWithRetry(
   }
   
   // All retries failed
-  console.error(`❌ All ${maxRetries} attempts failed for ${options.url}`);
+  console.error(`❌ All ${maxRetries} attempts failed for ${options.url}`, {
+    url: options.url,
+    attempts: maxRetries,
+    lastError: lastError?.message,
+    stack: lastError?.stack
+  });
   return {
     success: false,
     error: 'Screenshot generation failed after all retries',
