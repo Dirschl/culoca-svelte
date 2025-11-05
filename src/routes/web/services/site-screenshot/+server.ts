@@ -230,7 +230,7 @@ async function ensureBrowserInstalled(): Promise<boolean> {
   
   try {
     // Quick check: try to access browser executable path
-    const chromiumPath = require('playwright').chromium.executablePath();
+    const chromiumPath = chromium.executablePath();
     console.log('✅ Browser executable found at:', chromiumPath);
     browserInstalled = true;
     return true;
