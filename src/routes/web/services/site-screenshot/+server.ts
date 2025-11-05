@@ -80,6 +80,7 @@ interface ScreenshotOptions {
   quality?: number;
   waitUntil?: 'load' | 'networkidle' | 'domcontentloaded';
   timeout?: number;
+  useBotUserAgent?: boolean; // Use bot User-Agent when bot=1 parameter is present (for Real Cookie Manager)
 }
 
 interface ScreenshotResult {
@@ -136,13 +137,25 @@ export const GET: RequestHandler = async ({ url }) => {
     }
 
     // Validate URL
+    let parsedUrl: URL;
     try {
-      new URL(targetUrl);
+      parsedUrl = new URL(targetUrl);
     } catch {
       return json({ 
         error: 'Invalid URL format',
         provided: targetUrl
       }, { status: 400 });
+    }
+
+    // Check if bot=1 parameter is present in the target URL
+    // WordPress adds ?bot=1&nocookie=1&rcm_skip=1 to bypass cookie managers
+    // When bot=1 is present, we must use a bot User-Agent for Real Cookie Manager to work
+    const useBotUserAgent = parsedUrl.searchParams.get('bot') === '1';
+    
+    if (useBotUserAgent) {
+      console.log('🤖 Bot mode enabled: bot=1 parameter detected, will use bot User-Agent');
+    } else {
+      console.log('👤 Normal mode: no bot parameter, will use normal User-Agent');
     }
 
     // Parse options
@@ -154,7 +167,8 @@ export const GET: RequestHandler = async ({ url }) => {
       format: (url.searchParams.get('format') || 'jpeg') as 'png' | 'jpeg',
       quality: parseInt(url.searchParams.get('quality') || '80'),
       waitUntil: (url.searchParams.get('waitUntil') || 'domcontentloaded') as 'load' | 'networkidle' | 'domcontentloaded',
-      timeout: parseInt(url.searchParams.get('timeout') || '30000')
+      timeout: parseInt(url.searchParams.get('timeout') || '30000'),
+      useBotUserAgent
     };
 
     // Validate quality
@@ -244,14 +258,26 @@ export const POST: RequestHandler = async ({ request }) => {
     }
 
     // Validate URL
+    let parsedUrl: URL;
     try {
-      new URL(targetUrl);
+      parsedUrl = new URL(targetUrl);
     } catch {
       releaseScreenshotSlot();
       return json({ 
         error: 'Invalid URL format',
         provided: targetUrl
       }, { status: 400 });
+    }
+
+    // Check if bot=1 parameter is present in the target URL
+    // WordPress adds ?bot=1&nocookie=1&rcm_skip=1 to bypass cookie managers
+    // When bot=1 is present, we must use a bot User-Agent for Real Cookie Manager to work
+    const useBotUserAgent = parsedUrl.searchParams.get('bot') === '1';
+    
+    if (useBotUserAgent) {
+      console.log('🤖 Bot mode enabled: bot=1 parameter detected, will use bot User-Agent');
+    } else {
+      console.log('👤 Normal mode: no bot parameter, will use normal User-Agent');
     }
 
     // Parse options with defaults
@@ -263,7 +289,8 @@ export const POST: RequestHandler = async ({ request }) => {
       format: options.format || 'jpeg',
       quality: options.quality || 80,
       waitUntil: options.waitUntil || 'domcontentloaded',
-      timeout: options.timeout || 30000
+      timeout: options.timeout || 30000,
+      useBotUserAgent
     };
 
     // Validate quality
@@ -501,19 +528,26 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
 
     let context: any;
     try {
-      // Use normal browser User-Agent instead of bot User-Agent
-      // Many sites hide cookie banners for normal users or auto-accept them
-      // Bot User-Agent might trigger more aggressive cookie consent dialogs
+      // Determine User-Agent based on bot=1 parameter
+      // If bot=1 is present, use bot User-Agent (required for Real Cookie Manager to hide banners)
+      // Otherwise, use normal User-Agent (better quality, no cookie banners for normal users)
+      const userAgent = options.useBotUserAgent
+        ? 'Mozilla/5.0 (compatible; ScreenshotBot/1.0; +https://culoca.com/bot)'
+        : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+      
       context = await browser.newContext({
         viewport: {
           width: options.width || 1920,
           height: options.height || 1080
         },
-        // Use normal Chrome User-Agent instead of bot identifier
-        // This helps avoid cookie consent dialogs that only show for bots
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        userAgent
       });
-      console.log('✅ Browser context created with normal User-Agent');
+      
+      if (options.useBotUserAgent) {
+        console.log('✅ Browser context created with bot User-Agent (for Real Cookie Manager)');
+      } else {
+        console.log('✅ Browser context created with normal User-Agent (better quality)');
+      }
     } catch (contextError) {
       const errorMsg = contextError instanceof Error ? contextError.message : String(contextError);
       throw new Error(`Failed to create browser context: ${errorMsg}. Browser may have closed due to insufficient /tmp space.`);
