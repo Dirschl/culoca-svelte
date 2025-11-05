@@ -343,12 +343,25 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
       throw new Error(`Failed to get Chromium executable: ${errorMsg}`);
     }
     
-    // Launch browser
+    // Launch browser with memory-optimized settings for serverless
     const launchOptions: any = {
       headless: true,
       executablePath,
       args: isServerless 
-        ? chromiumPkg.args // Optimized args for serverless (@sparticuz/chromium)
+        ? [
+            ...chromiumPkg.args,
+            // Reduce shared memory usage to handle low /tmp space
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--disable-software-rasterizer',
+            '--disable-extensions',
+            '--disable-background-networking',
+            '--disable-background-timer-throttling',
+            '--disable-backgrounding-occluded-windows',
+            '--disable-renderer-backgrounding',
+            '--disable-features=TranslateUI',
+            '--disable-ipc-flooding-protection'
+          ]
         : [
             '--no-sandbox',
             '--disable-setuid-sandbox',
@@ -368,17 +381,43 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
     browser = await chromium.launch(launchOptions);
 
     console.log('✅ Browser launched successfully');
+    
+    // Wait a bit for browser to fully initialize (especially in serverless environments)
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Check if browser is still connected before creating context
+    if (!browser.isConnected()) {
+      throw new Error('Browser disconnected immediately after launch (likely due to insufficient resources or /tmp space)');
+    }
 
-    const context = await browser.newContext({
-      viewport: {
-        width: options.width || 1920,
-        height: options.height || 1080
-      },
-      // Set custom User-Agent for screenshot bot
-      userAgent: 'Mozilla/5.0 (compatible; ScreenshotBot/1.0; +https://culoca.com/bot)'
-    });
+    let context: any;
+    try {
+      context = await browser.newContext({
+        viewport: {
+          width: options.width || 1920,
+          height: options.height || 1080
+        },
+        // Set custom User-Agent for screenshot bot
+        userAgent: 'Mozilla/5.0 (compatible; ScreenshotBot/1.0; +https://culoca.com/bot)'
+      });
+      console.log('✅ Browser context created');
+    } catch (contextError) {
+      const errorMsg = contextError instanceof Error ? contextError.message : String(contextError);
+      throw new Error(`Failed to create browser context: ${errorMsg}. Browser may have closed due to insufficient /tmp space.`);
+    }
 
-    const page = await context.newPage();
+    let page: any;
+    try {
+      // Check browser connection again before creating page
+      if (!browser.isConnected()) {
+        throw new Error('Browser disconnected before creating page');
+      }
+      page = await context.newPage();
+      console.log('✅ Browser page created');
+    } catch (pageError) {
+      const errorMsg = pageError instanceof Error ? pageError.message : String(pageError);
+      throw new Error(`Failed to create browser page: ${errorMsg}. Browser may have closed due to insufficient resources.`);
+    }
 
     console.log('🌐 Navigating to:', options.url);
 
