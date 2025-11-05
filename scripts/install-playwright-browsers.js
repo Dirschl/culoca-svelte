@@ -25,10 +25,10 @@ console.log('🔍 Environment check:', {
 // Always try to install on Linux (Vercel uses Linux)
 if (isVercel || isLinux || isCI) {
   console.log('📦 Installing Playwright browsers for production...');
-  console.log('📦 Running: npx playwright install chromium --with-deps');
+  console.log('📦 Running: npx playwright install chromium chromium-headless-shell --with-deps');
   try {
-    // Use npx to ensure we get the right playwright version
-    execSync('npx playwright install chromium --with-deps', {
+    // Install both chromium and chromium-headless-shell (needed for some modes)
+    execSync('npx playwright install chromium chromium-headless-shell --with-deps', {
       stdio: 'inherit',
       env: { 
         ...process.env, 
