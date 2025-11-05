@@ -649,18 +649,19 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
     }
 
     console.log('⏳ Waiting for dynamic content...');
-    // Wait longer for cookie banners and dynamic content to load
-    await page.waitForTimeout(2000);
+    // Wait briefly for cookie banners and dynamic content to load
+    await page.waitForTimeout(1000);
 
-    // Try to remove cookie consent banners, but don't fail if it doesn't work
-    // We'll create the screenshot anyway (with or without cookie banner)
-    console.log('🍪 Attempting to remove cookie consent banners (non-blocking)...');
+    // Try to remove cookie consent banners with a strict timeout
+    // If it fails or takes too long, we'll create the screenshot anyway (with or without cookie banner)
+    console.log('🍪 Attempting to remove cookie consent banners (non-blocking, max 3s timeout)...');
     
-    // Remove cookie banners multiple times (some load with delay)
-    // Wrap in try-catch to ensure it never prevents screenshot creation
-    const removeCookieBanners = async (): Promise<boolean> => {
-      try {
-        await page.evaluate(() => {
+    // Remove cookie banners with timeout - if it takes longer than 3 seconds, skip it
+    const removeCookieBannersWithTimeout = async (timeoutMs: number = 3000): Promise<boolean> => {
+      return Promise.race([
+        (async () => {
+          try {
+            await page.evaluate(() => {
       // Common cookie consent banner selectors
       const cookieSelectors = [
         // Generic cookie consent classes/ids
@@ -934,35 +935,47 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
       `;
       document.head.appendChild(style);
       });
-        return true; // Success
-      } catch (error) {
-        console.warn('⚠️ Cookie banner removal failed (non-critical):', error instanceof Error ? error.message : String(error));
-        return false; // Failed but non-critical
-      }
+            return true; // Success
+          } catch (error) {
+            console.warn('⚠️ Cookie banner removal failed (non-critical):', error instanceof Error ? error.message : String(error));
+            return false; // Failed but non-critical
+          }
+        })(),
+        new Promise<boolean>((resolve) => {
+          setTimeout(() => {
+            console.log(`⏰ Cookie banner removal timeout after ${timeoutMs}ms, proceeding with screenshot`);
+            resolve(false);
+          }, timeoutMs);
+        })
+      ]);
     };
 
-    // Try to remove cookie banners multiple times (some load with delay)
-    // But don't fail if it doesn't work - we'll take screenshot anyway
+    // Try to remove cookie banners quickly (max 2 attempts, 3 seconds total timeout)
+    // If it fails or takes too long, immediately proceed with screenshot
     try {
-      const result1 = await removeCookieBanners();
-      if (result1) console.log('✅ Cookie banner removal attempt 1: success');
-      await page.waitForTimeout(1000); // Wait for banner animations/closing
-      
-      const result2 = await removeCookieBanners();
-      if (result2) console.log('✅ Cookie banner removal attempt 2: success');
-      await page.waitForTimeout(1000); // Wait for banner animations/closing
-      
-      const result3 = await removeCookieBanners();
-      if (result3) console.log('✅ Cookie banner removal attempt 3: success');
-      await page.waitForTimeout(1000); // Final wait before screenshot
-      
-      if (!result1 && !result2 && !result3) {
-        console.log('⚠️ Cookie banner removal failed on all attempts, proceeding with screenshot anyway');
+      const cookieRemovalStart = Date.now();
+      const result1 = await removeCookieBannersWithTimeout(2000); // 2 second timeout for first attempt
+      if (result1) {
+        console.log('✅ Cookie banner removal attempt 1: success');
+        await page.waitForTimeout(500); // Brief wait for banner animations/closing
+      } else {
+        const elapsed = Date.now() - cookieRemovalStart;
+        if (elapsed < 2000) {
+          // First attempt didn't timeout, try once more quickly
+          const result2 = await removeCookieBannersWithTimeout(1000); // 1 second timeout for second attempt
+          if (result2) {
+            console.log('✅ Cookie banner removal attempt 2: success');
+            await page.waitForTimeout(500);
+          } else {
+            console.log('⚠️ Cookie banner removal failed or timed out, proceeding with screenshot (may include cookie banner)');
+          }
+        } else {
+          console.log('⚠️ Cookie banner removal timed out, proceeding with screenshot (may include cookie banner)');
+        }
       }
     } catch (error) {
       // Non-critical: continue with screenshot even if cookie banner removal fails
       console.warn('⚠️ Cookie banner removal encountered error (non-critical, continuing):', error instanceof Error ? error.message : String(error));
-      await page.waitForTimeout(1000); // Wait a bit before screenshot
     }
 
     console.log('📸 Taking screenshot...');
