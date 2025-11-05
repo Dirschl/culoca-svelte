@@ -14,7 +14,7 @@
 		"lint": "prettier --plugin-search-dir . --check . && eslint .",
 		"test:unit": "vitest",
 		"test": "npm run test:unit -- --run",
-		"postinstall": "npm rebuild sharp --platform=linux --arch=x64",
+		"postinstall": "npm rebuild sharp --platform=linux --arch=x64 && node scripts/install-playwright-browsers.js",
 		"db:check": "./tools/pre-deployment-check.sh",
 		"db:check:staging": "./tools/pre-deployment-check.sh staging",
 		"db:check:production": "./tools/pre-deployment-check.sh production",
