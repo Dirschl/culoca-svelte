@@ -298,11 +298,13 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
       viewport: {
         width: options.width || 1920,
         height: options.height || 1080
-      },
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      }
     });
 
     const page = await context.newPage();
+
+    // Set custom User-Agent for screenshot bot
+    await page.setUserAgent('Mozilla/5.0 (compatible; ScreenshotBot/1.0; +https://example.com/bot)');
 
     console.log('🌐 Navigating to:', options.url);
 
