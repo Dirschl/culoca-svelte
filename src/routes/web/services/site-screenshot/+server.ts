@@ -13,6 +13,13 @@ interface ScreenshotOptions {
   timeout?: number;
 }
 
+interface ScreenshotResult {
+  success: boolean;
+  buffer?: Buffer;
+  error?: string;
+  message?: string;
+}
+
 /**
  * Site Screenshot Service
  * 
@@ -80,14 +87,17 @@ export const GET: RequestHandler = async ({ url }) => {
     console.log('📸 Generating screenshot:', options);
 
     // Generate screenshot
-    const screenshot = await generateScreenshot(options);
+    const result = await generateScreenshot(options);
 
-    if (!screenshot) {
+    if (!result.success) {
       return json({ 
-        error: 'Failed to generate screenshot',
+        error: result.error || 'Failed to generate screenshot',
+        message: result.message,
         url: targetUrl
       }, { status: 500 });
     }
+
+    const screenshot = result.buffer;
 
     // Return image
     const contentType = options.format === 'png' ? 'image/png' : 'image/jpeg';
@@ -164,14 +174,17 @@ export const POST: RequestHandler = async ({ request }) => {
     console.log('📸 Generating screenshot (POST):', screenshotOptions);
 
     // Generate screenshot
-    const screenshot = await generateScreenshot(screenshotOptions);
+    const result = await generateScreenshot(screenshotOptions);
 
-    if (!screenshot) {
+    if (!result.success) {
       return json({ 
-        error: 'Failed to generate screenshot',
+        error: result.error || 'Failed to generate screenshot',
+        message: result.message,
         url: targetUrl
       }, { status: 500 });
     }
+
+    const screenshot = result.buffer;
 
     // Return JSON with base64 encoded image (better for WordPress)
     const base64 = screenshot.toString('base64');
@@ -202,10 +215,12 @@ export const POST: RequestHandler = async ({ request }) => {
 /**
  * Generate screenshot using Playwright
  */
-async function generateScreenshot(options: ScreenshotOptions): Promise<Buffer | null> {
+async function generateScreenshot(options: ScreenshotOptions): Promise<ScreenshotResult> {
   let browser: any = null;
   
   try {
+    console.log('🚀 Launching Chromium browser...');
+    
     // Launch browser
     browser = await chromium.launch({
       headless: true,
@@ -214,9 +229,12 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Buffer | 
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
         '--disable-accelerated-2d-canvas',
-        '--disable-gpu'
+        '--disable-gpu',
+        '--single-process' // Important for Vercel Serverless
       ]
     });
+
+    console.log('✅ Browser launched successfully');
 
     const context = await browser.newContext({
       viewport: {
@@ -228,15 +246,19 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Buffer | 
 
     const page = await context.newPage();
 
+    console.log('🌐 Navigating to:', options.url);
+
     // Navigate to URL
     await page.goto(options.url, {
       waitUntil: options.waitUntil || 'networkidle',
       timeout: options.timeout || 30000
     });
 
+    console.log('⏳ Waiting for dynamic content...');
     // Wait a bit for any dynamic content
     await page.waitForTimeout(1000);
 
+    console.log('📸 Taking screenshot...');
     // Take screenshot
     const screenshotOptions: any = {
       type: options.format || 'jpeg',
@@ -249,16 +271,35 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Buffer | 
 
     const buffer = await page.screenshot(screenshotOptions);
 
+    console.log('✅ Screenshot taken, size:', buffer.length, 'bytes');
+
     await browser.close();
     
-    return buffer;
+    return {
+      success: true,
+      buffer
+    };
 
   } catch (error) {
-    console.error('❌ Error generating screenshot:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorStack = error instanceof Error ? error.stack : String(error);
+    
+    console.error('❌ Error generating screenshot:', errorMessage);
+    console.error('❌ Error stack:', errorStack);
+    
     if (browser) {
-      await browser.close().catch(() => {});
+      try {
+        await browser.close();
+      } catch (closeError) {
+        console.error('❌ Error closing browser:', closeError);
+      }
     }
-    return null;
+    
+    return {
+      success: false,
+      error: 'Screenshot generation failed',
+      message: errorMessage
+    };
   }
 }
 
