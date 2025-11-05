@@ -99,71 +99,56 @@ export const load: PageServerLoad = async ({ url, request }) => {
   // 3 echte zufällige Items über die gesamte Datenbank für WelcomeSection laden (für SEO)
   let featuredItems: any[] = [];
   try {
-    // Verwende SQL RANDOM() für echte Zufälligkeit über gesamte Sammlung
+    // Verwende direkte Query mit zufälligen Offsets für echte Zufälligkeit
     // Füge einen Timestamp hinzu um Caching zu vermeiden
     const timestamp = Date.now();
     console.log('[Server] Requesting random items at:', timestamp);
     
-    const { data, error } = await supabase.rpc('get_random_items', {
-      item_limit: 3
-    });
+    // Direkte Query mit zufälligen Offsets
+    const { count } = await supabase
+      .from('items')
+      .select('*', { count: 'exact', head: true })
+      .not('slug', 'is', null)
+      .eq('is_private', false);
     
-    if (error) {
-      console.error('[Server] Error with RPC, using direct query with random offsets:', error);
-      // Fallback: Direkte Query mit zufälligen Offsets
-      const { count } = await supabase
-        .from('items')
-        .select('*', { count: 'exact', head: true })
-        .not('slug', 'is', null)
-        .eq('is_private', false);
+    console.log('[Server] Total public items count:', count);
+    
+    if (count && count > 3) {
+      // Generiere 3 zufällige Offsets
+      const randomOffsets = Array.from({ length: 3 }, () => 
+        Math.floor(Math.random() * Math.max(1, count - 1))
+      ).sort((a, b) => a - b); // Sortiere für bessere Performance
       
-      console.log('[Server] Total public items count:', count);
+      console.log('[Server] Random offsets:', randomOffsets);
       
-      if (count && count > 3) {
-        // Generiere 3 zufällige Offsets
-        const randomOffsets = Array.from({ length: 3 }, () => 
-          Math.floor(Math.random() * Math.max(1, count - 1))
-        ).sort((a, b) => a - b); // Sortiere für bessere Performance
-        
-        console.log('[Server] Random offsets:', randomOffsets);
-        
-        // Lade Items an den zufälligen Positionen (slug ist alles was wir brauchen, Rest kommt von og-image API)
-        const promises = randomOffsets.map(offset => 
-          supabase
-            .from('items')
-            .select('id, title, slug, description')
-            .not('slug', 'is', null)
-            .eq('is_private', false)
-            .order('created_at', { ascending: false })
-            .range(offset, offset)
-            .single()
-        );
-        
-        const results = await Promise.all(promises);
-        console.log('[Server] Query results:', results.map(r => ({ error: r.error, hasData: !!r.data })));
-        
-        const fallbackData = results
-          .filter(r => !r.error && r.data)
-          .map(r => r.data);
+      // Lade Items an den zufälligen Positionen (slug ist alles was wir brauchen, Rest kommt von og-image API)
+      const promises = randomOffsets.map(offset => 
+        supabase
+          .from('items')
+          .select('id, title, slug, description')
+          .not('slug', 'is', null)
+          .eq('is_private', false)
+          .order('created_at', { ascending: false })
+          .range(offset, offset)
+          .single()
+      );
       
-        if (fallbackData.length > 0) {
-          featuredItems = fallbackData.map(item => ({
-            id: item.id,
-            slug: item.slug,
-            title: item.title || 'Unbenanntes Item',
-            description: item.description || ''
-          }));
-          console.log('[Server] Fallback featured items:', featuredItems);
-        }
+      const results = await Promise.all(promises);
+      console.log('[Server] Query results:', results.map(r => ({ error: r.error, hasData: !!r.data })));
+      
+      const fallbackData = results
+        .filter(r => !r.error && r.data)
+        .map(r => r.data);
+    
+      if (fallbackData.length > 0) {
+        featuredItems = fallbackData.map(item => ({
+          id: item.id,
+          slug: item.slug,
+          title: item.title || 'Unbenanntes Item',
+          description: item.description || ''
+        }));
+        console.log('[Server] Loaded featured items for SEO:', featuredItems.length);
       }
-    } else if (data && data.length > 0) {
-      featuredItems = data.map((item: any) => ({
-        id: item.id,
-        slug: item.slug,
-        title: item.title || 'Unbenanntes Item',
-        description: item.description || ''
-      }));
-      console.log('[Server] Loaded featured items for SEO:', featuredItems.length);
     }
   } catch (error) {
     console.error('[Server] Error loading featured items:', error);
