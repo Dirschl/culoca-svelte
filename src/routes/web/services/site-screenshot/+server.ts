@@ -4,22 +4,54 @@ import { chromium } from 'playwright-core';
 import chromiumPkg from '@sparticuz/chromium';
 
 // Rate limiting: Maximum concurrent screenshot generations per serverless instance
-const MAX_CONCURRENT_SCREENSHOTS = 3;
+// Reduced to 1 to prevent /tmp space issues in Vercel serverless environment
+const MAX_CONCURRENT_SCREENSHOTS = 1;
+const MAX_QUEUE_SIZE = 10; // Maximum requests waiting in queue
+const QUEUE_TIMEOUT = 60000; // 60 seconds timeout for queue
 let activeScreenshotCount = 0;
 const screenshotQueue: Array<() => void> = [];
 
 /**
  * Acquire a screenshot slot (wait if all slots are taken)
+ * Returns true if slot acquired, false if queue is full or timeout
  */
-async function acquireScreenshotSlot(): Promise<void> {
+async function acquireScreenshotSlot(): Promise<boolean> {
   return new Promise((resolve) => {
     if (activeScreenshotCount < MAX_CONCURRENT_SCREENSHOTS) {
       activeScreenshotCount++;
-      resolve();
+      console.log(`✅ Screenshot slot acquired (${activeScreenshotCount} active)`);
+      resolve(true);
     } else {
+      // Check if queue is full
+      if (screenshotQueue.length >= MAX_QUEUE_SIZE) {
+        console.log(`⚠️ Queue full (${screenshotQueue.length} waiting, ${activeScreenshotCount} active) - rejecting request`);
+        resolve(false);
+        return;
+      }
+      
       // Wait in queue
-      screenshotQueue.push(resolve);
+      const queueEntry = () => {
+        if (activeScreenshotCount < MAX_CONCURRENT_SCREENSHOTS) {
+          activeScreenshotCount++;
+          console.log(`✅ Queued screenshot slot acquired (${screenshotQueue.length - 1} remaining, ${activeScreenshotCount} active)`);
+          resolve(true);
+        } else {
+          resolve(false);
+        }
+      };
+      
+      screenshotQueue.push(queueEntry);
       console.log(`⏳ Screenshot request queued (${screenshotQueue.length} waiting, ${activeScreenshotCount} active)`);
+      
+      // Timeout: reject after QUEUE_TIMEOUT
+      setTimeout(() => {
+        const index = screenshotQueue.indexOf(queueEntry);
+        if (index !== -1) {
+          screenshotQueue.splice(index, 1);
+          console.log(`⏰ Queue timeout - request rejected after ${QUEUE_TIMEOUT}ms`);
+          resolve(false);
+        }
+      }, QUEUE_TIMEOUT);
     }
   });
 }
@@ -77,7 +109,20 @@ interface ScreenshotResult {
  */
 export const GET: RequestHandler = async ({ url }) => {
   // Acquire screenshot slot (wait if queue is full)
-  await acquireScreenshotSlot();
+  const slotAcquired = await acquireScreenshotSlot();
+  
+  if (!slotAcquired) {
+    return json({ 
+      error: 'Service temporarily unavailable',
+      message: 'Too many concurrent screenshot requests. Please try again later.',
+      retryAfter: 60
+    }, { 
+      status: 503,
+      headers: {
+        'Retry-After': '60'
+      }
+    });
+  }
   
   try {
     const targetUrl = url.searchParams.get('url');
@@ -171,7 +216,20 @@ export const GET: RequestHandler = async ({ url }) => {
  */
 export const POST: RequestHandler = async ({ request }) => {
   // Acquire screenshot slot (wait if queue is full)
-  await acquireScreenshotSlot();
+  const slotAcquired = await acquireScreenshotSlot();
+  
+  if (!slotAcquired) {
+    return json({ 
+      error: 'Service temporarily unavailable',
+      message: 'Too many concurrent screenshot requests. Please try again later.',
+      retryAfter: 60
+    }, { 
+      status: 503,
+      headers: {
+        'Retry-After': '60'
+      }
+    });
+  }
   
   try {
     const body = await request.json().catch(() => ({}));
