@@ -249,22 +249,51 @@ async function ensureBrowserInstalled(): Promise<boolean> {
       // For Vercel Serverless, install to /tmp (only writable directory)
       const installPath = process.env.VERCEL ? '/tmp/.cache/ms-playwright' : undefined;
       
+      // Create directory structure if needed
+      const fs = await import('fs');
+      if (installPath) {
+        try {
+          fs.mkdirSync(installPath, { recursive: true });
+          console.log('📁 Created directory:', installPath);
+        } catch (mkdirError) {
+          console.log('⚠️ Directory might already exist:', mkdirError);
+        }
+      }
+      
+      // Set npm/npx cache directories to /tmp for Vercel
       const env = {
         ...process.env,
         PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '0',
-        PLAYWRIGHT_BROWSERS_PATH: installPath || process.env.PLAYWRIGHT_BROWSERS_PATH || '0'
+        PLAYWRIGHT_BROWSERS_PATH: installPath || process.env.PLAYWRIGHT_BROWSERS_PATH || '0',
+        // Force npm/npx to use /tmp for cache
+        NPM_CONFIG_CACHE: process.env.VERCEL ? '/tmp/.npm' : process.env.NPM_CONFIG_CACHE,
+        HOME: process.env.VERCEL ? '/tmp' : process.env.HOME,
+        XDG_CACHE_HOME: process.env.VERCEL ? '/tmp/.cache' : process.env.XDG_CACHE_HOME
       };
       
+      // Create npm cache directory
+      if (process.env.VERCEL && env.NPM_CONFIG_CACHE) {
+        try {
+          fs.mkdirSync(env.NPM_CONFIG_CACHE, { recursive: true });
+        } catch (e) {
+          // Ignore
+        }
+      }
+      
       console.log('📦 Installing browsers to:', env.PLAYWRIGHT_BROWSERS_PATH || 'default location');
+      console.log('📦 Using npm cache:', env.NPM_CONFIG_CACHE || 'default');
       
       // Install browsers in runtime (for Vercel Serverless)
       // Install both chromium and chromium-headless-shell (needed for single-process mode)
+      // Keep cwd as project directory so npx can find node_modules
+      const cwd = process.env.VERCEL ? '/var/task' : process.cwd();
+      
       console.log('📦 Installing chromium...');
       execSync('npx playwright install chromium --with-deps', {
         stdio: 'inherit',
         timeout: 180000, // 3 minutes timeout
         env,
-        cwd: process.cwd()
+        cwd
       });
       
       console.log('📦 Installing chromium-headless-shell...');
@@ -272,7 +301,7 @@ async function ensureBrowserInstalled(): Promise<boolean> {
         stdio: 'inherit',
         timeout: 180000, // 3 minutes timeout
         env,
-        cwd: process.cwd()
+        cwd
       });
       
       console.log('✅ Browser installed successfully');
