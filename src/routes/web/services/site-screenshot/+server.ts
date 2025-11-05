@@ -232,21 +232,52 @@ async function ensureBrowserInstalled(): Promise<boolean> {
     // Quick check: try to access browser executable path
     const chromiumPath = chromium.executablePath();
     console.log('✅ Browser executable found at:', chromiumPath);
-    browserInstalled = true;
-    return true;
+    
+    // Verify it actually exists
+    const fs = await import('fs');
+    if (fs.existsSync(chromiumPath)) {
+      browserInstalled = true;
+      return true;
+    } else {
+      throw new Error('Browser executable path returned but file does not exist');
+    }
   } catch (error) {
     console.log('⚠️ Browser not found, attempting to install...');
+    console.log('⚠️ Error:', error instanceof Error ? error.message : String(error));
+    
     try {
+      // For Vercel Serverless, install to /tmp (only writable directory)
+      const installPath = process.env.VERCEL ? '/tmp/.cache/ms-playwright' : undefined;
+      
+      const env = {
+        ...process.env,
+        PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '0',
+        PLAYWRIGHT_BROWSERS_PATH: installPath || process.env.PLAYWRIGHT_BROWSERS_PATH || '0'
+      };
+      
+      console.log('📦 Installing browsers to:', env.PLAYWRIGHT_BROWSERS_PATH || 'default location');
+      
       // Install browsers in runtime (for Vercel Serverless)
-      // This is a fallback - browsers should be installed during build
       execSync('npx playwright install chromium --with-deps', {
         stdio: 'inherit',
         timeout: 180000, // 3 minutes timeout
-        env: { ...process.env, PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '0' }
+        env,
+        cwd: process.cwd()
       });
+      
       console.log('✅ Browser installed successfully');
-      browserInstalled = true;
-      return true;
+      
+      // Verify installation
+      try {
+        const chromiumPath = chromium.executablePath();
+        console.log('✅ Verified browser at:', chromiumPath);
+        browserInstalled = true;
+        return true;
+      } catch (verifyError) {
+        console.error('❌ Browser installation verification failed:', verifyError);
+        browserInstalled = false;
+        return false;
+      }
     } catch (installError) {
       console.error('❌ Failed to install browser:', installError);
       browserInstalled = false;
@@ -275,7 +306,8 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
     console.log('🚀 Launching Chromium browser...');
     
     // Launch browser
-    browser = await chromium.launch({
+    // For Vercel, use the installed browser path
+    const launchOptions: any = {
       headless: true,
       args: [
         '--no-sandbox',
@@ -285,7 +317,21 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
         '--disable-gpu',
         '--single-process' // Important for Vercel Serverless
       ]
-    });
+    };
+    
+    // If we installed to /tmp, specify the executable path
+    if (process.env.VERCEL && process.env.PLAYWRIGHT_BROWSERS_PATH) {
+      try {
+        const chromiumPath = chromium.executablePath();
+        if (chromiumPath) {
+          launchOptions.executablePath = chromiumPath;
+        }
+      } catch (e) {
+        // Use default path
+      }
+    }
+    
+    browser = await chromium.launch(launchOptions);
 
     console.log('✅ Browser launched successfully');
 
