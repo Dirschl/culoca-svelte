@@ -163,12 +163,15 @@ export const GET: RequestHandler = async ({ url }) => {
     // Check if bot=1 parameter is present in the target URL
     // WordPress adds ?bot=1&nocookie=1&rcm_skip=1 to bypass cookie managers
     // When bot=1 is present, we must use a bot User-Agent for Real Cookie Manager to work
-    const useBotUserAgent = parsedUrl.searchParams.get('bot') === '1';
+    const botParam = parsedUrl.searchParams.get('bot');
+    console.log(`🔍 [GET] Bot parameter from URL: "${botParam}" (type: ${typeof botParam})`);
+    const useBotUserAgent = botParam === '1';
+    console.log(`🔍 [GET] useBotUserAgent calculated: ${useBotUserAgent}`);
     
     if (useBotUserAgent) {
       console.log('🤖 Bot mode enabled: bot=1 parameter detected, will use bot User-Agent');
     } else {
-      console.log('👤 Normal mode: no bot parameter, will use normal User-Agent');
+      console.log('👤 Normal mode: no bot parameter or bot!=1, will use normal User-Agent');
     }
 
     // Parse options
@@ -181,7 +184,7 @@ export const GET: RequestHandler = async ({ url }) => {
       quality: parseInt(url.searchParams.get('quality') || '80'),
       waitUntil: (url.searchParams.get('waitUntil') || 'domcontentloaded') as 'load' | 'networkidle' | 'domcontentloaded',
       timeout: parseInt(url.searchParams.get('timeout') || '30000'),
-      useBotUserAgent
+      useBotUserAgent: useBotUserAgent === true // Explicitly ensure it's boolean true, not just truthy
     };
 
     // Validate quality
@@ -294,12 +297,15 @@ export const POST: RequestHandler = async ({ request }) => {
     // Check if bot=1 parameter is present in the target URL
     // WordPress adds ?bot=1&nocookie=1&rcm_skip=1 to bypass cookie managers
     // When bot=1 is present, we must use a bot User-Agent for Real Cookie Manager to work
-    const useBotUserAgent = parsedUrl.searchParams.get('bot') === '1';
+    const botParam = parsedUrl.searchParams.get('bot');
+    console.log(`🔍 [POST] Bot parameter from URL: "${botParam}" (type: ${typeof botParam})`);
+    const useBotUserAgent = botParam === '1';
+    console.log(`🔍 [POST] useBotUserAgent calculated: ${useBotUserAgent}`);
     
     if (useBotUserAgent) {
       console.log('🤖 Bot mode enabled: bot=1 parameter detected, will use bot User-Agent');
     } else {
-      console.log('👤 Normal mode: no bot parameter, will use normal User-Agent');
+      console.log('👤 Normal mode: no bot parameter or bot!=1, will use normal User-Agent');
     }
 
     // Parse options with defaults
@@ -312,7 +318,7 @@ export const POST: RequestHandler = async ({ request }) => {
       quality: options.quality || 80,
       waitUntil: options.waitUntil || 'domcontentloaded',
       timeout: options.timeout || 30000,
-      useBotUserAgent
+      useBotUserAgent: useBotUserAgent === true // Explicitly ensure it's boolean true, not just truthy
     };
 
     // Validate quality
@@ -553,9 +559,17 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
       // Determine User-Agent based on bot=1 parameter
       // If bot=1 is present, use bot User-Agent (required for Real Cookie Manager to hide banners)
       // Otherwise, use normal User-Agent (better quality, no cookie banners for normal users)
-      const userAgent = options.useBotUserAgent
+      console.log(`🔍 useBotUserAgent value: ${options.useBotUserAgent} (type: ${typeof options.useBotUserAgent})`);
+      console.log(`🔍 URL: ${options.url}`);
+      
+      // Explicitly check for true (not just truthy) to ensure we only use bot when explicitly requested
+      const useBotUserAgent = options.useBotUserAgent === true;
+      
+      const userAgent = useBotUserAgent
         ? 'Mozilla/5.0 (compatible; ScreenshotBot/1.0; +https://culoca.com/bot)'
         : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+      
+      console.log(`🔍 Selected User-Agent: ${useBotUserAgent ? 'BOT' : 'NORMAL'}`);
       
       context = await browser.newContext({
         viewport: {
@@ -565,7 +579,7 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
         userAgent
       });
       
-      if (options.useBotUserAgent) {
+      if (useBotUserAgent) {
         console.log('✅ Browser context created with bot User-Agent (for Real Cookie Manager)');
       } else {
         console.log('✅ Browser context created with normal User-Agent (better quality)');
