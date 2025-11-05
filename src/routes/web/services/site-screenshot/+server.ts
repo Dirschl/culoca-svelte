@@ -213,27 +213,43 @@ export const POST: RequestHandler = async ({ request }) => {
   }
 };
 
+// Cache for browser installation check
+let browserInstallChecked = false;
+let browserInstalled = false;
+
 /**
  * Check and install Playwright browsers if needed (for Vercel Serverless)
  */
 async function ensureBrowserInstalled(): Promise<boolean> {
+  // Cache the result to avoid checking multiple times
+  if (browserInstallChecked) {
+    return browserInstalled;
+  }
+  
+  browserInstallChecked = true;
+  
   try {
-    // Try to launch browser - if it fails, browsers are not installed
-    const testBrowser = await chromium.launch({ headless: true });
-    await testBrowser.close();
+    // Quick check: try to access browser executable path
+    const chromiumPath = require('playwright').chromium.executablePath();
+    console.log('✅ Browser executable found at:', chromiumPath);
+    browserInstalled = true;
     return true;
   } catch (error) {
     console.log('⚠️ Browser not found, attempting to install...');
     try {
       // Install browsers in runtime (for Vercel Serverless)
+      // This is a fallback - browsers should be installed during build
       execSync('npx playwright install chromium --with-deps', {
         stdio: 'inherit',
-        timeout: 180000 // 3 minutes timeout
+        timeout: 180000, // 3 minutes timeout
+        env: { ...process.env, PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '0' }
       });
       console.log('✅ Browser installed successfully');
+      browserInstalled = true;
       return true;
     } catch (installError) {
       console.error('❌ Failed to install browser:', installError);
+      browserInstalled = false;
       return false;
     }
   }
