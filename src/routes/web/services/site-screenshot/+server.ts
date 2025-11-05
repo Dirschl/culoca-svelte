@@ -217,12 +217,23 @@ export const POST: RequestHandler = async ({ request }) => {
  * Get Chromium executable path (uses @sparticuz/chromium for Vercel Serverless)
  */
 function getChromiumExecutablePath(): string {
-  // Use @sparticuz/chromium for Vercel Serverless (much smaller, optimized)
-  if (process.env.VERCEL) {
-    return chromiumPkg.executablePath();
+  // Check if we're in a serverless environment (Vercel, AWS Lambda, etc.)
+  const isServerless = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.LAMBDA_TASK_ROOT;
+  
+  if (isServerless) {
+    console.log('🌐 Serverless environment detected, using @sparticuz/chromium');
+    try {
+      const path = chromiumPkg.executablePath();
+      console.log('✅ @sparticuz/chromium executable path:', path);
+      return path;
+    } catch (error) {
+      console.error('❌ Error getting @sparticuz/chromium path:', error);
+      throw new Error('Failed to get Chromium executable path for serverless environment');
+    }
   }
   
   // Use regular playwright for local development
+  console.log('💻 Local environment detected, using playwright-core');
   return chromium.executablePath();
 }
 
@@ -233,18 +244,34 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
   let browser: any = null;
   
   try {
+    // Check if we're in a serverless environment
+    const isServerless = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.LAMBDA_TASK_ROOT;
+    console.log('🌍 Environment check:', {
+      VERCEL: !!process.env.VERCEL,
+      AWS_LAMBDA: !!process.env.AWS_LAMBDA_FUNCTION_NAME,
+      LAMBDA_TASK_ROOT: !!process.env.LAMBDA_TASK_ROOT,
+      isServerless
+    });
+    
     console.log('🚀 Launching Chromium browser...');
     
     // Get executable path (uses @sparticuz/chromium on Vercel)
-    const executablePath = getChromiumExecutablePath();
-    console.log('📍 Using browser executable:', executablePath);
+    let executablePath: string;
+    try {
+      executablePath = getChromiumExecutablePath();
+      console.log('📍 Browser executable path resolved');
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.error('❌ Failed to get executable path:', errorMsg);
+      throw new Error(`Failed to get Chromium executable: ${errorMsg}`);
+    }
     
     // Launch browser
     const launchOptions: any = {
       headless: true,
       executablePath,
-      args: process.env.VERCEL 
-        ? chromiumPkg.args // Optimized args for serverless
+      args: isServerless 
+        ? chromiumPkg.args // Optimized args for serverless (@sparticuz/chromium)
         : [
             '--no-sandbox',
             '--disable-setuid-sandbox',
@@ -253,6 +280,13 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
             '--disable-gpu'
           ]
     };
+    
+    console.log('🔧 Launch options:', { 
+      headless: launchOptions.headless, 
+      executablePathLength: executablePath?.length || 0,
+      argsCount: launchOptions.args?.length || 0,
+      isServerless
+    });
     
     browser = await chromium.launch(launchOptions);
 
