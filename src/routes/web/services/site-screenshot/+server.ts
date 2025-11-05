@@ -318,6 +318,159 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
     // Wait a bit for any dynamic content
     await page.waitForTimeout(1000);
 
+    console.log('🍪 Removing cookie consent banners...');
+    // Remove common cookie consent banners and overlays
+    await page.evaluate(() => {
+      // Common cookie consent banner selectors
+      const cookieSelectors = [
+        // Generic cookie consent classes/ids
+        '[id*="cookie"]',
+        '[class*="cookie"]',
+        '[id*="Cookie"]',
+        '[class*="Cookie"]',
+        '[id*="COOKIE"]',
+        '[class*="COOKIE"]',
+        // Common consent banner libraries
+        '#CybotCookiebotDialog',
+        '#cookie-law-info-bar',
+        '.cookie-law-info-bar',
+        '#cookieNotice',
+        '.cookie-notice',
+        '#cookie-bar',
+        '.cookie-bar',
+        '#cookieconsent',
+        '.cookieconsent',
+        '#cookieConsent',
+        '.cookieConsent',
+        '#gdpr-cookie-consent',
+        '.gdpr-cookie-consent',
+        '#cc-window',
+        '.cc-window',
+        '#cc-banner',
+        '.cc-banner',
+        '#consent-banner',
+        '.consent-banner',
+        '#privacy-policy-banner',
+        '.privacy-policy-banner',
+        // CookieBot, OneTrust, etc.
+        '[id*="onetrust"]',
+        '[class*="onetrust"]',
+        '[id*="Cookiebot"]',
+        '[class*="Cookiebot"]',
+        // GDPR specific
+        '[id*="gdpr"]',
+        '[class*="gdpr"]',
+        '[id*="GDPR"]',
+        '[class*="GDPR"]',
+        // Common overlay patterns
+        '[data-cookie*="consent"]',
+        '[data-gdpr*="consent"]',
+        '[role="dialog"][aria-label*="cookie" i]',
+        '[role="dialog"][aria-label*="Cookie" i]',
+        '[role="dialog"][aria-label*="consent" i]',
+        '[role="dialog"][aria-label*="Consent" i]',
+        // Common bottom banners
+        '.cookie-banner-bottom',
+        '#cookie-banner-bottom',
+        '.cookie-popup',
+        '#cookie-popup'
+      ];
+
+      cookieSelectors.forEach(selector => {
+        try {
+          const elements = document.querySelectorAll(selector);
+          elements.forEach((el: Element) => {
+            const element = el as HTMLElement;
+            // Check if element contains cookie-related text
+            const text = element.textContent?.toLowerCase() || '';
+            if (
+              text.includes('cookie') ||
+              text.includes('consent') ||
+              text.includes('gdpr') ||
+              text.includes('privacy') ||
+              text.includes('datenschutz') ||
+              text.includes('accept') ||
+              text.includes('akzeptieren') ||
+              element.id.toLowerCase().includes('cookie') ||
+              element.className.toLowerCase().includes('cookie')
+            ) {
+              // Remove element
+              element.style.display = 'none';
+              element.remove();
+            }
+          });
+        } catch (e) {
+          // Ignore selector errors
+        }
+      });
+
+      // Also try to click common "Accept" buttons to dismiss banners
+      const acceptButtonSelectors = [
+        'button[class*="accept"]',
+        'button[id*="accept"]',
+        'button[class*="Accept"]',
+        'button[id*="Accept"]',
+        'a[class*="accept"]',
+        'a[id*="accept"]',
+        '[class*="cookie"] button',
+        '[id*="cookie"] button',
+        '[class*="consent"] button',
+        '[id*="consent"] button'
+      ];
+
+      acceptButtonSelectors.forEach(selector => {
+        try {
+          const buttons = document.querySelectorAll(selector);
+          buttons.forEach((btn: Element) => {
+            const button = btn as HTMLElement;
+            const text = button.textContent?.toLowerCase() || '';
+            if (
+              text.includes('accept') ||
+              text.includes('akzeptieren') ||
+              text.includes('ok') ||
+              text.includes('agree') ||
+              text.includes('zustimmen') ||
+              text.includes('allow') ||
+              text.includes('erlauben')
+            ) {
+              try {
+                button.click();
+              } catch (e) {
+                // Ignore click errors
+              }
+            }
+          });
+        } catch (e) {
+          // Ignore selector errors
+        }
+      });
+
+      // Remove any remaining overlay elements that might be cookie banners
+      const allElements = document.querySelectorAll('*');
+      allElements.forEach((el: Element) => {
+        const element = el as HTMLElement;
+        const style = window.getComputedStyle(element);
+        const zIndex = parseInt(style.zIndex || '0', 10);
+        
+        // Check if element is an overlay (high z-index, positioned fixed/absolute)
+        if (
+          (style.position === 'fixed' || style.position === 'absolute') &&
+          zIndex > 1000 &&
+          (element.textContent?.toLowerCase().includes('cookie') ||
+           element.textContent?.toLowerCase().includes('consent') ||
+           element.textContent?.toLowerCase().includes('gdpr') ||
+           element.id.toLowerCase().includes('cookie') ||
+           element.className.toLowerCase().includes('cookie'))
+        ) {
+          element.style.display = 'none';
+          element.remove();
+        }
+      });
+    });
+
+    // Wait a bit after removing cookie banners
+    await page.waitForTimeout(500);
+
     console.log('📸 Taking screenshot...');
     // Take screenshot
     const screenshotOptions: any = {
