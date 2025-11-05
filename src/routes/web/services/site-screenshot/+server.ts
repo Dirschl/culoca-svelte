@@ -298,13 +298,12 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
       viewport: {
         width: options.width || 1920,
         height: options.height || 1080
-      }
+      },
+      // Set custom User-Agent for screenshot bot
+      userAgent: 'Mozilla/5.0 (compatible; ScreenshotBot/1.0; +https://culoca.com/bot)'
     });
 
     const page = await context.newPage();
-
-    // Set custom User-Agent for screenshot bot
-    await page.setUserAgent('Mozilla/5.0 (compatible; ScreenshotBot/1.0; +https://example.com/bot)');
 
     console.log('🌐 Navigating to:', options.url);
 
@@ -315,12 +314,14 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
     });
 
     console.log('⏳ Waiting for dynamic content...');
-    // Wait a bit for any dynamic content
-    await page.waitForTimeout(1000);
+    // Wait longer for cookie banners and dynamic content to load
+    await page.waitForTimeout(2000);
 
     console.log('🍪 Removing cookie consent banners...');
-    // Remove common cookie consent banners and overlays
-    await page.evaluate(() => {
+    
+    // Remove cookie banners multiple times (some load with delay)
+    const removeCookieBanners = async () => {
+      await page.evaluate(() => {
       // Common cookie consent banner selectors
       const cookieSelectors = [
         // Generic cookie consent classes/ids
@@ -373,7 +374,29 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
         '.cookie-banner-bottom',
         '#cookie-banner-bottom',
         '.cookie-popup',
-        '#cookie-popup'
+        '#cookie-popup',
+        // Additional common patterns
+        '[id*="cookie-banner"]',
+        '[class*="cookie-banner"]',
+        '[id*="cookie-popup"]',
+        '[class*="cookie-popup"]',
+        '[id*="cookie-notice"]',
+        '[class*="cookie-notice"]',
+        '[id*="cookie-consent"]',
+        '[class*="cookie-consent"]',
+        '[id*="cookiebar"]',
+        '[class*="cookiebar"]',
+        '[id*="cookieBar"]',
+        '[class*="cookieBar"]',
+        // WordPress specific
+        '#cookie-law-info-bar',
+        '.cookie-law-info-bar',
+        '#cliModalBackDrop',
+        '.cli-modal-backdrop',
+        // Iframe cookie banners
+        'iframe[src*="cookie"]',
+        'iframe[id*="cookie"]',
+        'iframe[class*="cookie"]'
       ];
 
       cookieSelectors.forEach(selector => {
@@ -415,7 +438,16 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
         '[class*="cookie"] button',
         '[id*="cookie"] button',
         '[class*="consent"] button',
-        '[id*="consent"] button'
+        '[id*="consent"] button',
+        // More specific selectors
+        'button[class*="cookie"]',
+        'button[id*="cookie"]',
+        'a[class*="cookie"]',
+        'a[id*="cookie"]',
+        '[class*="cookie"] [class*="accept"]',
+        '[id*="cookie"] [class*="accept"]',
+        '[class*="cookie"] [id*="accept"]',
+        '[id*="cookie"] [id*="accept"]'
       ];
 
       acceptButtonSelectors.forEach(selector => {
@@ -466,9 +498,15 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
           element.remove();
         }
       });
-    });
+      });
+    };
 
-    // Wait a bit after removing cookie banners
+    // Remove cookie banners multiple times (some load with delay)
+    await removeCookieBanners();
+    await page.waitForTimeout(500);
+    await removeCookieBanners();
+    await page.waitForTimeout(500);
+    await removeCookieBanners();
     await page.waitForTimeout(500);
 
     console.log('📸 Taking screenshot...');
