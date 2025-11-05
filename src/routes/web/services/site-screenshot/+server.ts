@@ -68,8 +68,8 @@ export const GET: RequestHandler = async ({ url }) => {
       fullPage: url.searchParams.get('fullPage') === 'true',
       format: (url.searchParams.get('format') || 'jpeg') as 'png' | 'jpeg',
       quality: parseInt(url.searchParams.get('quality') || '80'),
-      waitUntil: (url.searchParams.get('waitUntil') || 'networkidle') as 'load' | 'networkidle' | 'domcontentloaded',
-      timeout: parseInt(url.searchParams.get('timeout') || '30000')
+      waitUntil: (url.searchParams.get('waitUntil') || 'domcontentloaded') as 'load' | 'networkidle' | 'domcontentloaded',
+      timeout: parseInt(url.searchParams.get('timeout') || '45000')
     };
 
     // Validate quality
@@ -87,10 +87,11 @@ export const GET: RequestHandler = async ({ url }) => {
 
     console.log('📸 Generating screenshot:', options);
 
-    // Generate screenshot
-    const result = await generateScreenshot(options);
+    // Generate screenshot with retry logic
+    const result = await generateScreenshotWithRetry(options, 3);
 
     if (!result.success) {
+      console.error('❌ Screenshot generation failed after retries:', result.error);
       return json({ 
         error: result.error || 'Failed to generate screenshot',
         message: result.message,
@@ -155,8 +156,8 @@ export const POST: RequestHandler = async ({ request }) => {
       fullPage: options.fullPage || false,
       format: options.format || 'jpeg',
       quality: options.quality || 80,
-      waitUntil: options.waitUntil || 'networkidle',
-      timeout: options.timeout || 30000
+      waitUntil: options.waitUntil || 'domcontentloaded',
+      timeout: options.timeout || 45000
     };
 
     // Validate quality
@@ -174,10 +175,11 @@ export const POST: RequestHandler = async ({ request }) => {
 
     console.log('📸 Generating screenshot (POST):', screenshotOptions);
 
-    // Generate screenshot
-    const result = await generateScreenshot(screenshotOptions);
+    // Generate screenshot with retry logic
+    const result = await generateScreenshotWithRetry(screenshotOptions, 3);
 
     if (!result.success) {
+      console.error('❌ Screenshot generation failed after retries:', result.error);
       return json({ 
         error: result.error || 'Failed to generate screenshot',
         message: result.message,
@@ -237,6 +239,61 @@ async function getChromiumExecutablePath(): Promise<string> {
   // Use regular playwright for local development
   console.log('💻 Local environment detected, using playwright-core');
   return chromium.executablePath();
+}
+
+/**
+ * Generate screenshot with retry logic
+ * Retries up to maxRetries times if screenshot generation fails
+ */
+async function generateScreenshotWithRetry(
+  options: ScreenshotOptions,
+  maxRetries: number = 3
+): Promise<ScreenshotResult> {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    console.log(`🔄 Screenshot attempt ${attempt}/${maxRetries} for ${options.url}`);
+    
+    try {
+      const result = await generateScreenshot(options);
+      
+      if (result.success) {
+        if (attempt > 1) {
+          console.log(`✅ Screenshot succeeded on attempt ${attempt}`);
+        }
+        return result;
+      }
+      
+      // If result has an error, log it but continue to retry
+      lastError = result.error ? new Error(result.error) : new Error('Screenshot generation failed');
+      console.log(`⚠️ Attempt ${attempt} failed: ${lastError.message}`);
+      
+      // Wait before retrying (exponential backoff)
+      if (attempt < maxRetries) {
+        const waitTime = Math.min(1000 * Math.pow(2, attempt - 1), 5000); // Max 5 seconds
+        console.log(`⏳ Waiting ${waitTime}ms before retry...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      }
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error('Unknown error');
+      console.error(`❌ Attempt ${attempt} threw error:`, lastError.message);
+      
+      // Wait before retrying (exponential backoff)
+      if (attempt < maxRetries) {
+        const waitTime = Math.min(1000 * Math.pow(2, attempt - 1), 5000); // Max 5 seconds
+        console.log(`⏳ Waiting ${waitTime}ms before retry...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      }
+    }
+  }
+  
+  // All retries failed
+  console.error(`❌ All ${maxRetries} attempts failed for ${options.url}`);
+  return {
+    success: false,
+    error: 'Screenshot generation failed after all retries',
+    message: lastError?.message || 'Unknown error'
+  };
 }
 
 /**
