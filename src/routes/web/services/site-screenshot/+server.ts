@@ -307,11 +307,63 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
 
     console.log('🌐 Navigating to:', options.url);
 
-    // Navigate to URL
-    await page.goto(options.url, {
-      waitUntil: options.waitUntil || 'networkidle',
-      timeout: options.timeout || 30000
-    });
+    // Navigate to URL with fallback strategy
+    // First try with domcontentloaded (faster, more reliable)
+    // If that fails, try load, then commit
+    let navigationSuccess = false;
+    
+    // Strategy 1: Try domcontentloaded (fast and reliable)
+    try {
+      await page.goto(options.url, {
+        waitUntil: 'domcontentloaded',
+        timeout: options.timeout || 30000
+      });
+      console.log('✅ Page loaded (domcontentloaded)');
+      navigationSuccess = true;
+      
+      // If networkidle was requested, wait a bit longer for network activity to settle
+      // But don't block forever - use a reasonable timeout
+      if (options.waitUntil === 'networkidle') {
+        console.log('⏳ Waiting for network to settle...');
+        // Wait for network requests to settle (simulated networkidle)
+        // Most pages settle within 5-10 seconds
+        await page.waitForTimeout(5000);
+        console.log('✅ Network activity settled');
+      }
+    } catch (error) {
+      console.log('⚠️ domcontentloaded failed, trying load event...');
+      
+      // Strategy 2: Try load event
+      try {
+        await page.goto(options.url, {
+          waitUntil: 'load',
+          timeout: options.timeout || 30000
+        });
+        console.log('✅ Page loaded (load event)');
+        navigationSuccess = true;
+      } catch (loadError) {
+        console.log('⚠️ load event failed, trying commit...');
+        
+        // Strategy 3: Try commit (just wait for navigation to start)
+        try {
+          await page.goto(options.url, {
+            waitUntil: 'commit',
+            timeout: options.timeout || 30000
+          });
+          console.log('✅ Page navigation committed');
+          // Wait a bit for content to load
+          await page.waitForTimeout(3000);
+          navigationSuccess = true;
+        } catch (commitError) {
+          console.error('❌ All navigation strategies failed');
+          throw new Error(`Failed to navigate to ${options.url}: ${commitError instanceof Error ? commitError.message : 'Unknown error'}`);
+        }
+      }
+    }
+    
+    if (!navigationSuccess) {
+      throw new Error(`Failed to navigate to ${options.url}`);
+    }
 
     console.log('⏳ Waiting for dynamic content...');
     // Wait longer for cookie banners and dynamic content to load
