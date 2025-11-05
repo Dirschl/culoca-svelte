@@ -6,7 +6,7 @@ import chromiumPkg from '@sparticuz/chromium';
 // Rate limiting: Maximum concurrent screenshot generations per serverless instance
 // Reduced to 1 to prevent /tmp space issues in Vercel serverless environment
 const MAX_CONCURRENT_SCREENSHOTS = 1;
-const MAX_QUEUE_SIZE = 10; // Maximum requests waiting in queue
+const MAX_QUEUE_SIZE = 20; // Maximum requests waiting in queue (increased for better throughput)
 const QUEUE_TIMEOUT = 60000; // 60 seconds timeout for queue
 let activeScreenshotCount = 0;
 const screenshotQueue: Array<() => void> = [];
@@ -60,7 +60,13 @@ async function acquireScreenshotSlot(): Promise<boolean> {
  * Release a screenshot slot (process next in queue if any)
  */
 function releaseScreenshotSlot(): void {
-  activeScreenshotCount--;
+  if (activeScreenshotCount > 0) {
+    activeScreenshotCount--;
+    console.log(`🔓 Screenshot slot released (${activeScreenshotCount} active, ${screenshotQueue.length} queued)`);
+  } else {
+    console.warn(`⚠️ Attempted to release slot but activeScreenshotCount is already 0`);
+  }
+  
   if (screenshotQueue.length > 0) {
     const next = screenshotQueue.shift();
     if (next) {
@@ -68,6 +74,8 @@ function releaseScreenshotSlot(): void {
       next();
       console.log(`✅ Processing queued screenshot (${screenshotQueue.length} remaining, ${activeScreenshotCount} active)`);
     }
+  } else if (activeScreenshotCount === 0) {
+    console.log(`✅ All screenshot slots free, no queued requests`);
   }
 }
 
@@ -109,10 +117,14 @@ interface ScreenshotResult {
  * - timeout (optional): Timeout in milliseconds (default: 30000)
  */
 export const GET: RequestHandler = async ({ url }) => {
+  const targetUrl = url.searchParams.get('url');
+  console.log(`📥 GET request received for: ${targetUrl || 'NO URL'} (active: ${activeScreenshotCount}, queued: ${screenshotQueue.length})`);
+  
   // Acquire screenshot slot (wait if queue is full)
   const slotAcquired = await acquireScreenshotSlot();
   
   if (!slotAcquired) {
+    console.log(`❌ Slot acquisition failed for: ${targetUrl || 'NO URL'} (active: ${activeScreenshotCount}, queued: ${screenshotQueue.length})`);
     return json({ 
       error: 'Service temporarily unavailable',
       message: 'Too many concurrent screenshot requests. Please try again later.',
@@ -125,9 +137,9 @@ export const GET: RequestHandler = async ({ url }) => {
     });
   }
   
+  console.log(`✅ Slot acquired for: ${targetUrl || 'NO URL'} (active: ${activeScreenshotCount}, queued: ${screenshotQueue.length})`);
+  
   try {
-    const targetUrl = url.searchParams.get('url');
-    
     if (!targetUrl) {
       releaseScreenshotSlot();
       return json({ 
@@ -141,6 +153,7 @@ export const GET: RequestHandler = async ({ url }) => {
     try {
       parsedUrl = new URL(targetUrl);
     } catch {
+      releaseScreenshotSlot();
       return json({ 
         error: 'Invalid URL format',
         provided: targetUrl
@@ -229,10 +242,17 @@ export const GET: RequestHandler = async ({ url }) => {
  * POST handler for JSON-based requests (better for WordPress)
  */
 export const POST: RequestHandler = async ({ request }) => {
+  // Parse body first to get URL for logging
+  const body = await request.json().catch(() => ({}));
+  const { url: targetUrl } = body;
+  
+  console.log(`📥 POST request received for: ${targetUrl || 'NO URL'} (active: ${activeScreenshotCount}, queued: ${screenshotQueue.length})`);
+  
   // Acquire screenshot slot (wait if queue is full)
   const slotAcquired = await acquireScreenshotSlot();
   
   if (!slotAcquired) {
+    console.log(`❌ Slot acquisition failed for: ${targetUrl || 'NO URL'} (active: ${activeScreenshotCount}, queued: ${screenshotQueue.length})`);
     return json({ 
       error: 'Service temporarily unavailable',
       message: 'Too many concurrent screenshot requests. Please try again later.',
@@ -245,11 +265,13 @@ export const POST: RequestHandler = async ({ request }) => {
     });
   }
   
+  console.log(`✅ Slot acquired for: ${targetUrl || 'NO URL'} (active: ${activeScreenshotCount}, queued: ${screenshotQueue.length})`);
+  
   try {
-    const body = await request.json().catch(() => ({}));
-    const { url: targetUrl, ...options } = body;
+    const { url: urlParam, ...options } = body;
+    const targetUrlParam = urlParam || targetUrl;
 
-    if (!targetUrl) {
+    if (!targetUrlParam) {
       releaseScreenshotSlot();
       return json({ 
         error: 'Missing required parameter: url',
@@ -260,12 +282,12 @@ export const POST: RequestHandler = async ({ request }) => {
     // Validate URL
     let parsedUrl: URL;
     try {
-      parsedUrl = new URL(targetUrl);
+      parsedUrl = new URL(targetUrlParam);
     } catch {
       releaseScreenshotSlot();
       return json({ 
         error: 'Invalid URL format',
-        provided: targetUrl
+        provided: targetUrlParam
       }, { status: 400 });
     }
 
@@ -282,7 +304,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
     // Parse options with defaults
     const screenshotOptions: ScreenshotOptions = {
-      url: targetUrl,
+      url: targetUrlParam,
       width: options.width || 1920,
       height: options.height || 1080,
       fullPage: options.fullPage || false,
@@ -317,7 +339,7 @@ export const POST: RequestHandler = async ({ request }) => {
       return json({ 
         error: result.error || 'Failed to generate screenshot',
         message: result.message,
-        url: targetUrl
+        url: targetUrlParam
       }, { status: 500 });
     }
 
@@ -330,7 +352,7 @@ export const POST: RequestHandler = async ({ request }) => {
     releaseScreenshotSlot();
     return json({
       success: true,
-      url: targetUrl,
+      url: targetUrlParam,
       format: screenshotOptions.format,
       dimensions: {
         width: screenshotOptions.width,
