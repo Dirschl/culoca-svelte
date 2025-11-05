@@ -3,6 +3,42 @@ import type { RequestHandler } from './$types';
 import { chromium } from 'playwright-core';
 import chromiumPkg from '@sparticuz/chromium';
 
+// Rate limiting: Maximum concurrent screenshot generations per serverless instance
+const MAX_CONCURRENT_SCREENSHOTS = 3;
+let activeScreenshotCount = 0;
+const screenshotQueue: Array<() => void> = [];
+
+/**
+ * Acquire a screenshot slot (wait if all slots are taken)
+ */
+async function acquireScreenshotSlot(): Promise<void> {
+  return new Promise((resolve) => {
+    if (activeScreenshotCount < MAX_CONCURRENT_SCREENSHOTS) {
+      activeScreenshotCount++;
+      resolve();
+    } else {
+      // Wait in queue
+      screenshotQueue.push(resolve);
+      console.log(`⏳ Screenshot request queued (${screenshotQueue.length} waiting, ${activeScreenshotCount} active)`);
+    }
+  });
+}
+
+/**
+ * Release a screenshot slot (process next in queue if any)
+ */
+function releaseScreenshotSlot(): void {
+  activeScreenshotCount--;
+  if (screenshotQueue.length > 0) {
+    const next = screenshotQueue.shift();
+    if (next) {
+      activeScreenshotCount++;
+      next();
+      console.log(`✅ Processing queued screenshot (${screenshotQueue.length} remaining, ${activeScreenshotCount} active)`);
+    }
+  }
+}
+
 interface ScreenshotOptions {
   url: string;
   width?: number;
@@ -40,10 +76,14 @@ interface ScreenshotResult {
  * - timeout (optional): Timeout in milliseconds (default: 30000)
  */
 export const GET: RequestHandler = async ({ url }) => {
+  // Acquire screenshot slot (wait if queue is full)
+  await acquireScreenshotSlot();
+  
   try {
     const targetUrl = url.searchParams.get('url');
     
     if (!targetUrl) {
+      releaseScreenshotSlot();
       return json({ 
         error: 'Missing required parameter: url',
         usage: 'GET /web/services/site-screenshot?url=https://example.com&width=1920&height=1080&format=jpeg'
@@ -92,6 +132,7 @@ export const GET: RequestHandler = async ({ url }) => {
 
     if (!result.success) {
       console.error('❌ Screenshot generation failed after retries:', result.error);
+      releaseScreenshotSlot();
       return json({ 
         error: result.error || 'Failed to generate screenshot',
         message: result.message,
@@ -104,6 +145,7 @@ export const GET: RequestHandler = async ({ url }) => {
     // Return image
     const contentType = options.format === 'png' ? 'image/png' : 'image/jpeg';
     
+    releaseScreenshotSlot();
     return new Response(screenshot, {
       headers: {
         'Content-Type': contentType,
@@ -116,6 +158,7 @@ export const GET: RequestHandler = async ({ url }) => {
 
   } catch (error) {
     console.error('❌ Error in site-screenshot:', error);
+    releaseScreenshotSlot();
     return json({ 
       error: 'Internal server error',
       message: error instanceof Error ? error.message : 'Unknown error'
@@ -127,11 +170,15 @@ export const GET: RequestHandler = async ({ url }) => {
  * POST handler for JSON-based requests (better for WordPress)
  */
 export const POST: RequestHandler = async ({ request }) => {
+  // Acquire screenshot slot (wait if queue is full)
+  await acquireScreenshotSlot();
+  
   try {
     const body = await request.json().catch(() => ({}));
     const { url: targetUrl, ...options } = body;
 
     if (!targetUrl) {
+      releaseScreenshotSlot();
       return json({ 
         error: 'Missing required parameter: url',
         usage: 'POST /web/services/site-screenshot with JSON body: { "url": "https://example.com", "width": 1920, "height": 1080, "format": "jpeg" }'
@@ -142,6 +189,7 @@ export const POST: RequestHandler = async ({ request }) => {
     try {
       new URL(targetUrl);
     } catch {
+      releaseScreenshotSlot();
       return json({ 
         error: 'Invalid URL format',
         provided: targetUrl
@@ -175,11 +223,12 @@ export const POST: RequestHandler = async ({ request }) => {
 
     console.log('📸 Generating screenshot (POST):', screenshotOptions);
 
-    // Generate screenshot with retry logic
-    const result = await generateScreenshotWithRetry(screenshotOptions, 3);
+    // Generate screenshot with retry logic (2 attempts max for faster failure)
+    const result = await generateScreenshotWithRetry(screenshotOptions, 2);
 
     if (!result.success) {
       console.error('❌ Screenshot generation failed after retries:', result.error);
+      releaseScreenshotSlot();
       return json({ 
         error: result.error || 'Failed to generate screenshot',
         message: result.message,
@@ -193,6 +242,7 @@ export const POST: RequestHandler = async ({ request }) => {
     const base64 = screenshot.toString('base64');
     const contentType = screenshotOptions.format === 'png' ? 'image/png' : 'image/jpeg';
     
+    releaseScreenshotSlot();
     return json({
       success: true,
       url: targetUrl,
@@ -208,6 +258,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
   } catch (error) {
     console.error('❌ Error in site-screenshot (POST):', error);
+    releaseScreenshotSlot();
     return json({ 
       error: 'Internal server error',
       message: error instanceof Error ? error.message : 'Unknown error'
