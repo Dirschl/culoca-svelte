@@ -501,15 +501,19 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
 
     let context: any;
     try {
+      // Use normal browser User-Agent instead of bot User-Agent
+      // Many sites hide cookie banners for normal users or auto-accept them
+      // Bot User-Agent might trigger more aggressive cookie consent dialogs
       context = await browser.newContext({
         viewport: {
           width: options.width || 1920,
           height: options.height || 1080
         },
-        // Set custom User-Agent for screenshot bot
-        userAgent: 'Mozilla/5.0 (compatible; ScreenshotBot/1.0; +https://culoca.com/bot)'
+        // Use normal Chrome User-Agent instead of bot identifier
+        // This helps avoid cookie consent dialogs that only show for bots
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
       });
-      console.log('✅ Browser context created');
+      console.log('✅ Browser context created with normal User-Agent');
     } catch (contextError) {
       const errorMsg = contextError instanceof Error ? contextError.message : String(contextError);
       throw new Error(`Failed to create browser context: ${errorMsg}. Browser may have closed due to insufficient /tmp space.`);
@@ -592,11 +596,15 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
     // Wait longer for cookie banners and dynamic content to load
     await page.waitForTimeout(2000);
 
-    console.log('🍪 Removing cookie consent banners...');
+    // Try to remove cookie consent banners, but don't fail if it doesn't work
+    // We'll create the screenshot anyway (with or without cookie banner)
+    console.log('🍪 Attempting to remove cookie consent banners (non-blocking)...');
     
     // Remove cookie banners multiple times (some load with delay)
-    const removeCookieBanners = async () => {
-      await page.evaluate(() => {
+    // Wrap in try-catch to ensure it never prevents screenshot creation
+    const removeCookieBanners = async (): Promise<boolean> => {
+      try {
+        await page.evaluate(() => {
       // Common cookie consent banner selectors
       const cookieSelectors = [
         // Generic cookie consent classes/ids
@@ -870,15 +878,36 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
       `;
       document.head.appendChild(style);
       });
+        return true; // Success
+      } catch (error) {
+        console.warn('⚠️ Cookie banner removal failed (non-critical):', error instanceof Error ? error.message : String(error));
+        return false; // Failed but non-critical
+      }
     };
 
-    // Remove cookie banners multiple times (some load with delay)
-    await removeCookieBanners();
-    await page.waitForTimeout(1000); // Wait for banner animations/closing
-    await removeCookieBanners();
-    await page.waitForTimeout(1000); // Wait for banner animations/closing
-    await removeCookieBanners();
-    await page.waitForTimeout(1000); // Final wait before screenshot
+    // Try to remove cookie banners multiple times (some load with delay)
+    // But don't fail if it doesn't work - we'll take screenshot anyway
+    try {
+      const result1 = await removeCookieBanners();
+      if (result1) console.log('✅ Cookie banner removal attempt 1: success');
+      await page.waitForTimeout(1000); // Wait for banner animations/closing
+      
+      const result2 = await removeCookieBanners();
+      if (result2) console.log('✅ Cookie banner removal attempt 2: success');
+      await page.waitForTimeout(1000); // Wait for banner animations/closing
+      
+      const result3 = await removeCookieBanners();
+      if (result3) console.log('✅ Cookie banner removal attempt 3: success');
+      await page.waitForTimeout(1000); // Final wait before screenshot
+      
+      if (!result1 && !result2 && !result3) {
+        console.log('⚠️ Cookie banner removal failed on all attempts, proceeding with screenshot anyway');
+      }
+    } catch (error) {
+      // Non-critical: continue with screenshot even if cookie banner removal fails
+      console.warn('⚠️ Cookie banner removal encountered error (non-critical, continuing):', error instanceof Error ? error.message : String(error));
+      await page.waitForTimeout(1000); // Wait a bit before screenshot
+    }
 
     console.log('📸 Taking screenshot...');
     // Take screenshot
