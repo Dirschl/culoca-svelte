@@ -140,7 +140,7 @@ export const GET: RequestHandler = async ({ url }) => {
       fullPage: url.searchParams.get('fullPage') === 'true',
       format: (url.searchParams.get('format') || 'jpeg') as 'png' | 'jpeg',
       quality: parseInt(url.searchParams.get('quality') || '80'),
-      waitUntil: (url.searchParams.get('waitUntil') || 'domcontentloaded') as 'load' | 'networkidle' | 'domcontentloaded',
+      waitUntil: (url.searchParams.get('waitUntil') || 'load') as 'load' | 'networkidle' | 'domcontentloaded', // Default to 'load' for fully rendered pages
       timeout: parseInt(url.searchParams.get('timeout') || '15000'), // Reduced from 30s to 15s for faster processing
       useBotUserAgent: useBotUserAgent === true // Explicitly ensure it's boolean true, not just truthy
     };
@@ -274,7 +274,7 @@ export const POST: RequestHandler = async ({ request }) => {
       fullPage: options.fullPage || false,
       format: options.format || 'jpeg',
       quality: options.quality || 80,
-      waitUntil: options.waitUntil || 'domcontentloaded',
+      waitUntil: options.waitUntil || 'load', // Default to 'load' for fully rendered pages
       timeout: options.timeout || 15000, // Reduced from 30s to 15s for faster processing
       useBotUserAgent: useBotUserAgent === true // Explicitly ensure it's boolean true, not just truthy
     };
@@ -563,43 +563,39 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
     console.log('🌐 Navigating to:', options.url);
 
     // Navigate to URL with fallback strategy
-    // First try with domcontentloaded (faster, more reliable)
-    // If that fails, try load, then commit
+    // For screenshots, we need fully loaded pages (images, stylesheets, etc.)
+    // Strategy: Try 'load' first (waits for all resources), then fallback to 'domcontentloaded', then 'commit'
     let navigationSuccess = false;
     
-    // Strategy 1: Try domcontentloaded (fast and reliable)
     // Use shorter timeout to prevent hanging (15s instead of 30s)
     const navigationTimeout = Math.min(options.timeout || 15000, 15000);
+    
+    // Strategy 1: Try 'load' event (waits for all resources - images, stylesheets, etc.)
+    // This is better for screenshots as it ensures the page is fully rendered
     try {
       await page.goto(options.url, {
-        waitUntil: 'domcontentloaded',
+        waitUntil: 'load',
         timeout: navigationTimeout
       });
-      console.log('✅ Page loaded (domcontentloaded)');
+      console.log('✅ Page loaded (load event - all resources loaded)');
       navigationSuccess = true;
-      
-      // If networkidle was requested, wait a bit longer for network activity to settle
-      // But don't block forever - use a reasonable timeout (reduced to 2s)
-      if (options.waitUntil === 'networkidle') {
-        console.log('⏳ Waiting for network to settle...');
-        // Wait for network requests to settle (simulated networkidle)
-        // Reduced to 2 seconds for faster processing
-        await page.waitForTimeout(2000);
-        console.log('✅ Network activity settled');
-      }
     } catch (error) {
-      console.log('⚠️ domcontentloaded failed, trying load event...');
+      console.log('⚠️ load event failed, trying domcontentloaded...');
       
-      // Strategy 2: Try load event
+      // Strategy 2: Try domcontentloaded (faster, but may not wait for all resources)
       try {
         await page.goto(options.url, {
-          waitUntil: 'load',
+          waitUntil: 'domcontentloaded',
           timeout: navigationTimeout
         });
-        console.log('✅ Page loaded (load event)');
+        console.log('✅ Page loaded (domcontentloaded)');
         navigationSuccess = true;
-      } catch (loadError) {
-        console.log('⚠️ load event failed, trying commit...');
+        // Wait longer for resources to load since domcontentloaded doesn't wait for them
+        console.log('⏳ Waiting for images and resources to load...');
+        await page.waitForTimeout(3000); // Give time for images/stylesheets to load
+        console.log('✅ Resources should be loaded now');
+      } catch (domError) {
+        console.log('⚠️ domcontentloaded failed, trying commit...');
         
         // Strategy 3: Try commit (just wait for navigation to start)
         try {
@@ -608,8 +604,8 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
             timeout: navigationTimeout
           });
           console.log('✅ Page navigation committed');
-          // Wait a bit for content to load (reduced to 2s)
-          await page.waitForTimeout(2000);
+          // Wait longer for content to load since commit only waits for navigation start
+          await page.waitForTimeout(4000);
           navigationSuccess = true;
         } catch (commitError) {
           console.error('❌ All navigation strategies failed');
@@ -622,9 +618,28 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
       throw new Error(`Failed to navigate to ${options.url}`);
     }
 
-    console.log('⏳ Waiting for dynamic content...');
-    // Wait briefly for cookie banners and dynamic content to load
-    await page.waitForTimeout(500);
+    console.log('⏳ Waiting for dynamic content and images to fully render...');
+    // Wait for dynamic content, lazy-loaded images, and JavaScript-rendered content
+    await page.waitForTimeout(2000);
+    
+    // Wait for images to load (if they're still loading)
+    try {
+      await page.evaluate(() => {
+        return Promise.all(
+          Array.from(document.images)
+            .filter(img => !img.complete)
+            .map(img => new Promise((resolve) => {
+              img.onload = resolve;
+              img.onerror = resolve; // Resolve even on error to not block
+              // Timeout after 2 seconds
+              setTimeout(resolve, 2000);
+            }))
+        );
+      });
+      console.log('✅ Images loaded');
+    } catch (e) {
+      console.log('⚠️ Image loading check failed, continuing anyway');
+    }
 
     // Try to remove cookie consent banners with a strict timeout
     // If it fails or takes too long, we'll create the screenshot anyway (with or without cookie banner)
