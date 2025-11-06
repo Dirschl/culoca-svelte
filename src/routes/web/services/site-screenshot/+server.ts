@@ -783,6 +783,15 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
 
       // Also try to click common "Accept" buttons to dismiss banners
       const acceptButtonSelectors = [
+        // Cookie Law Info Plugin specific (WordPress)
+        '#cookie_action_close_header',
+        '[data-cli_action="accept"]',
+        '.cookie_action_close_header',
+        '.cli_action_button',
+        '.wt-cli-accept-btn',
+        'a[data-cli_action="accept"]',
+        'button[data-cli_action="accept"]',
+        // Generic accept buttons
         'button[class*="accept"]',
         'button[id*="accept"]',
         'button[class*="Accept"]',
@@ -804,6 +813,38 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
         '[id*="cookie"] [id*="accept"]'
       ];
 
+      // Special handling for Cookie Law Info Plugin banner
+      try {
+        const cookieLawInfoBar = document.getElementById('cookie-law-info-bar');
+        if (cookieLawInfoBar) {
+          // Try to click the accept button first
+          const acceptButton = cookieLawInfoBar.querySelector('#cookie_action_close_header, [data-cli_action="accept"], .cookie_action_close_header, .cli_action_button, .wt-cli-accept-btn');
+          if (acceptButton) {
+            try {
+              (acceptButton as HTMLElement).scrollIntoView({ behavior: 'instant', block: 'center' });
+              (acceptButton as HTMLElement).click();
+              // Also trigger click event
+              const clickEvent = new MouseEvent('click', {
+                bubbles: true,
+                cancelable: true,
+                view: window
+              });
+              acceptButton.dispatchEvent(clickEvent);
+            } catch (e) {
+              // If button click fails, remove banner directly
+              cookieLawInfoBar.style.display = 'none';
+              cookieLawInfoBar.remove();
+            }
+          } else {
+            // No button found, remove banner directly
+            cookieLawInfoBar.style.display = 'none';
+            cookieLawInfoBar.remove();
+          }
+        }
+      } catch (e) {
+        // Ignore errors
+      }
+
       acceptButtonSelectors.forEach(selector => {
         try {
           const buttons = document.querySelectorAll(selector);
@@ -819,7 +860,8 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
               text.includes('allow') ||
               text.includes('erlauben') ||
               text.includes('alle akzeptieren') ||
-              text.includes('all accept')
+              text.includes('all accept') ||
+              text.includes('annehmen') // German "accept"
             ) {
               try {
                 // Scroll button into view if needed
@@ -930,6 +972,7 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
       const style = document.createElement('style');
       style.id = 'culoca-cookie-hider';
       style.textContent = `
+        #cookie-law-info-bar,
         [id*="cookie" i],
         [class*="cookie" i],
         [id*="consent" i],
@@ -937,7 +980,10 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
         [id*="gdpr" i],
         [class*="gdpr" i],
         [role="dialog"][aria-label*="cookie" i],
-        [role="dialog"][aria-label*="consent" i] {
+        [role="dialog"][aria-label*="consent" i],
+        .cookie-law-info-bar,
+        #cliModalBackDrop,
+        .cli-modal-backdrop {
           display: none !important;
           visibility: hidden !important;
           opacity: 0 !important;
@@ -948,6 +994,21 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
         }
       `;
       document.head.appendChild(style);
+      
+      // Final check: remove cookie-law-info-bar if still present
+      try {
+        const remainingBar = document.getElementById('cookie-law-info-bar');
+        if (remainingBar) {
+          remainingBar.style.display = 'none';
+          remainingBar.style.visibility = 'hidden';
+          remainingBar.style.opacity = '0';
+          remainingBar.style.height = '0';
+          remainingBar.style.maxHeight = '0';
+          remainingBar.remove();
+        }
+      } catch (e) {
+        // Ignore errors
+      }
       });
             return true; // Success
           } catch (error) {
