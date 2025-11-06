@@ -485,7 +485,28 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
             '--disable-backgrounding-occluded-windows',
             '--disable-renderer-backgrounding',
             '--disable-features=TranslateUI',
-            '--disable-ipc-flooding-protection'
+            '--disable-ipc-flooding-protection',
+            // Additional stability options
+            '--no-first-run',
+            '--no-default-browser-check',
+            '--disable-sync',
+            '--disable-default-apps',
+            '--disable-component-extensions-with-background-pages',
+            '--disable-breakpad',
+            '--disable-client-side-phishing-detection',
+            '--disable-component-update',
+            '--disable-domain-reliability',
+            '--disable-features=AudioServiceOutOfProcess',
+            '--disable-hang-monitor',
+            '--disable-popup-blocking',
+            '--disable-prompt-on-repost',
+            '--disable-translate',
+            '--metrics-recording-only',
+            '--mute-audio',
+            '--no-crash-upload',
+            '--no-pings',
+            '--password-store=basic',
+            '--use-mock-keychain'
           ]
         : [
             '--no-sandbox',
@@ -507,12 +528,19 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
 
     console.log('✅ Browser launched successfully');
     
-    // Wait a bit for browser to fully initialize (especially in serverless environments)
-    await new Promise(resolve => setTimeout(resolve, 500));
+    // Wait longer for browser to fully initialize (especially in serverless environments)
+    // Increased from 500ms to 1000ms to give browser more time to stabilize
+    await new Promise(resolve => setTimeout(resolve, 1000));
     
     // Check if browser is still connected before creating context
     if (!browser.isConnected()) {
       throw new Error('Browser disconnected immediately after launch (likely due to insufficient resources or /tmp space)');
+    }
+    
+    // Additional check: wait a bit more and verify browser is still alive
+    await new Promise(resolve => setTimeout(resolve, 300));
+    if (!browser.isConnected()) {
+      throw new Error('Browser disconnected during initialization (likely due to resource constraints)');
     }
 
     let context: any;
@@ -565,17 +593,30 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
 
     console.log('🌐 Navigating to:', options.url);
 
+    // Check browser and page state before navigation
+    if (!browser.isConnected()) {
+      throw new Error('Browser disconnected before navigation');
+    }
+    if (page.isClosed()) {
+      throw new Error('Page was closed before navigation');
+    }
+
     // Navigate to URL with fallback strategy
     // For screenshots, we need fully loaded pages (images, stylesheets, etc.)
     // Strategy: Try 'load' first (waits for all resources), then fallback to 'domcontentloaded', then 'commit'
     let navigationSuccess = false;
     
-    // Use shorter timeout to prevent hanging (15s instead of 30s)
-    const navigationTimeout = Math.min(options.timeout || 15000, 15000);
+    // Use shorter timeout to prevent hanging (10s instead of 15s for faster failure detection)
+    const navigationTimeout = Math.min(options.timeout || 10000, 10000);
     
     // Strategy 1: Try 'load' event (waits for all resources - images, stylesheets, etc.)
     // This is better for screenshots as it ensures the page is fully rendered
     try {
+      // Check browser connection before navigation
+      if (!browser.isConnected() || page.isClosed()) {
+        throw new Error('Browser or page closed before navigation attempt');
+      }
+      
       await page.goto(options.url, {
         waitUntil: 'load',
         timeout: navigationTimeout
@@ -583,7 +624,13 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
       console.log('✅ Page loaded (load event - all resources loaded)');
       navigationSuccess = true;
     } catch (error) {
-      console.log('⚠️ load event failed, trying domcontentloaded...');
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.log(`⚠️ load event failed: ${errorMsg}, trying domcontentloaded...`);
+      
+      // Check if browser/page is still alive before retry
+      if (!browser.isConnected() || page.isClosed()) {
+        throw new Error(`Browser or page closed during navigation: ${errorMsg}`);
+      }
       
       // Strategy 2: Try domcontentloaded (faster, but may not wait for all resources)
       try {
@@ -598,7 +645,13 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
         await page.waitForTimeout(3000); // Give time for images/stylesheets to load
         console.log('✅ Resources should be loaded now');
       } catch (domError) {
-        console.log('⚠️ domcontentloaded failed, trying commit...');
+        const domErrorMsg = domError instanceof Error ? domError.message : String(domError);
+        console.log(`⚠️ domcontentloaded failed: ${domErrorMsg}, trying commit...`);
+        
+        // Check if browser/page is still alive before retry
+        if (!browser.isConnected() || page.isClosed()) {
+          throw new Error(`Browser or page closed during navigation: ${domErrorMsg}`);
+        }
         
         // Strategy 3: Try commit (just wait for navigation to start)
         try {
@@ -611,8 +664,9 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
           await page.waitForTimeout(4000);
           navigationSuccess = true;
         } catch (commitError) {
+          const commitErrorMsg = commitError instanceof Error ? commitError.message : String(commitError);
           console.error('❌ All navigation strategies failed');
-          throw new Error(`Failed to navigate to ${options.url}: ${commitError instanceof Error ? commitError.message : 'Unknown error'}`);
+          throw new Error(`Failed to navigate to ${options.url}: ${commitErrorMsg}`);
         }
       }
     }
