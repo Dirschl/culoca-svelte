@@ -392,8 +392,10 @@ async function generateScreenshotWithRetry(
       }
       
       // If result has an error, log it but continue to retry
-      lastError = result.error ? new Error(result.error) : new Error('Screenshot generation failed');
-      console.log(`⚠️ Attempt ${attempt} failed: ${lastError.message}`, {
+      // Use the detailed message if available, otherwise use the error
+      const errorMessage = result.message || result.error || 'Screenshot generation failed';
+      lastError = new Error(errorMessage);
+      console.log(`⚠️ Attempt ${attempt} failed: ${errorMessage}`, {
         url: options.url,
         error: result.error,
         message: result.message
@@ -423,16 +425,17 @@ async function generateScreenshotWithRetry(
   }
   
   // All retries failed
+  const finalErrorMessage = lastError?.message || 'Unknown error';
   console.error(`❌ All ${maxRetries} attempts failed for ${options.url}`, {
     url: options.url,
     attempts: maxRetries,
-    lastError: lastError?.message,
+    lastError: finalErrorMessage,
     stack: lastError?.stack
   });
   return {
     success: false,
     error: 'Screenshot generation failed after all retries',
-    message: lastError?.message || 'Unknown error'
+    message: finalErrorMessage // Use the detailed error message from generateScreenshot
   };
 }
 
