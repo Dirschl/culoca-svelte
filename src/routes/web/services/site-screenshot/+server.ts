@@ -1008,72 +1008,19 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
       // Special handling for "Privacy Overview" / "Datenschutzübersicht" banners
       // (Real Cookie Manager or similar - used by eva-woeckl.com, aumin.de, vladimirsterzer.com)
       try {
-        // Find elements with "Privacy Overview" or "Datenschutzübersicht" in title or text
-        const privacyBanners = document.querySelectorAll('[title*="Privacy Overview"], [title*="Datenschutzübersicht"], [class*="privacy-overview"], [id*="privacy-overview"], [class*="datenschutz"], [id*="datenschutz"]');
-        
-        privacyBanners.forEach((banner: Element) => {
-          const bannerElement = banner as HTMLElement;
-          const bannerText = bannerElement.textContent?.toLowerCase() || '';
-          
-          // Check if this is a cookie/privacy banner
-          if (bannerText.includes('cookie') || bannerText.includes('privacy') || bannerText.includes('datenschutz') || bannerText.includes('consent')) {
-            // Try to find "SPEICHERN & AKZEPTIEREN" button inside the banner
-            const buttons = bannerElement.querySelectorAll('button, a, [role="button"]');
-            let foundAcceptButton = false;
-            
-            buttons.forEach((btn: Element) => {
-              const button = btn as HTMLElement;
-              const buttonText = button.textContent?.toLowerCase() || '';
-              
-              // Check for "SPEICHERN & AKZEPTIEREN" or similar
-              if (
-                buttonText.includes('speichern') && buttonText.includes('akzeptieren') ||
-                buttonText.includes('save') && buttonText.includes('accept') ||
-                buttonText.includes('speichern & akzeptieren') ||
-                buttonText.includes('save & accept')
-              ) {
-                try {
-                  // Scroll to button to ensure it's visible
-                  button.scrollIntoView({ behavior: 'instant', block: 'center' });
-                  // Click immediately (no setTimeout in page.evaluate - it doesn't wait)
-                  button.click();
-                  // Also trigger click event
-                  const clickEvent = new MouseEvent('click', {
-                    bubbles: true,
-                    cancelable: true,
-                    view: window
-                  });
-                  button.dispatchEvent(clickEvent);
-                  foundAcceptButton = true;
-                } catch (e) {
-                  // Ignore click errors
-                }
-              }
-            });
-            
-            // If no button found or click failed, try to remove banner directly
-            if (!foundAcceptButton) {
-              bannerElement.style.display = 'none';
-              bannerElement.style.visibility = 'hidden';
-              bannerElement.style.opacity = '0';
-              bannerElement.style.height = '0';
-              bannerElement.style.maxHeight = '0';
-              try {
-                bannerElement.remove();
-              } catch (e) {
-                // Ignore removal errors
-              }
-            }
-          }
-        });
-        
-        // Also search for "SPEICHERN & AKZEPTIEREN" buttons anywhere on the page
+        // FIRST: Search for "SPEICHERN & AKZEPTIEREN" buttons anywhere on the page (priority)
+        // This button closes the banner completely, not the "Schließen" button which opens details
         const allButtons = document.querySelectorAll('button, a, [role="button"]');
+        let foundSaveAcceptButton = false;
+        
         allButtons.forEach((btn: Element) => {
+          if (foundSaveAcceptButton) return; // Already found and clicked
+          
           const button = btn as HTMLElement;
           const buttonText = button.textContent?.toLowerCase() || '';
           
-          // Check for "SPEICHERN & AKZEPTIEREN" pattern
+          // Check for "SPEICHERN & AKZEPTIEREN" pattern (must contain BOTH words)
+          // This is the button that closes the banner, NOT "Schließen" which opens details
           if (
             (buttonText.includes('speichern') && buttonText.includes('akzeptieren')) ||
             (buttonText.includes('save') && buttonText.includes('accept'))
@@ -1110,9 +1057,9 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
             
             if (isInBanner) {
               try {
-                // Scroll to button to ensure it's visible
-                button.scrollIntoView({ behavior: 'instant', block: 'center' });
-                // Click immediately (no setTimeout in page.evaluate - it doesn't wait)
+                // Scroll to button to ensure it's visible (but don't scroll too far)
+                button.scrollIntoView({ behavior: 'instant', block: 'nearest' });
+                // Click immediately
                 button.click();
                 // Also trigger click event
                 const clickEvent = new MouseEvent('click', {
@@ -1121,12 +1068,82 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
                   view: window
                 });
                 button.dispatchEvent(clickEvent);
+                foundSaveAcceptButton = true;
               } catch (e) {
                 // Ignore click errors
               }
             }
           }
         });
+        
+        // If we found and clicked "SPEICHERN & AKZEPTIEREN", scroll back to top
+        if (foundSaveAcceptButton) {
+          window.scrollTo({ top: 0, behavior: 'instant' });
+        } else {
+          // If "SPEICHERN & AKZEPTIEREN" not found, try to find and remove banner directly
+          // Find elements with "Privacy Overview" or "Datenschutzübersicht" in title or text
+          const privacyBanners = document.querySelectorAll('[title*="Privacy Overview"], [title*="Datenschutzübersicht"], [class*="privacy-overview"], [id*="privacy-overview"], [class*="datenschutz"], [id*="datenschutz"]');
+          
+          privacyBanners.forEach((banner: Element) => {
+            const bannerElement = banner as HTMLElement;
+            const bannerText = bannerElement.textContent?.toLowerCase() || '';
+            
+            // Check if this is a cookie/privacy banner
+            if (bannerText.includes('cookie') || bannerText.includes('privacy') || bannerText.includes('datenschutz') || bannerText.includes('consent')) {
+              // Try to find "SPEICHERN & AKZEPTIEREN" button inside the banner
+              const buttons = bannerElement.querySelectorAll('button, a, [role="button"]');
+              let foundAcceptButton = false;
+              
+              buttons.forEach((btn: Element) => {
+                if (foundAcceptButton) return;
+                
+                const button = btn as HTMLElement;
+                const buttonText = button.textContent?.toLowerCase() || '';
+                
+                // IMPORTANT: Only click "SPEICHERN & AKZEPTIEREN", NOT "Schließen" or "X"
+                // "Schließen" opens details, "SPEICHERN & AKZEPTIEREN" closes the banner
+                if (
+                  (buttonText.includes('speichern') && buttonText.includes('akzeptieren')) ||
+                  (buttonText.includes('save') && buttonText.includes('accept'))
+                ) {
+                  // Make sure it's NOT a "Schließen" button
+                  if (!buttonText.includes('schließen') && !buttonText.includes('close') && !buttonText.match(/^x$/)) {
+                    try {
+                      button.scrollIntoView({ behavior: 'instant', block: 'nearest' });
+                      button.click();
+                      const clickEvent = new MouseEvent('click', {
+                        bubbles: true,
+                        cancelable: true,
+                        view: window
+                      });
+                      button.dispatchEvent(clickEvent);
+                      foundAcceptButton = true;
+                    } catch (e) {
+                      // Ignore click errors
+                    }
+                  }
+                }
+              });
+              
+              // If no "SPEICHERN & AKZEPTIEREN" button found, remove banner directly
+              if (!foundAcceptButton) {
+                bannerElement.style.display = 'none';
+                bannerElement.style.visibility = 'hidden';
+                bannerElement.style.opacity = '0';
+                bannerElement.style.height = '0';
+                bannerElement.style.maxHeight = '0';
+                try {
+                  bannerElement.remove();
+                } catch (e) {
+                  // Ignore removal errors
+                }
+              } else {
+                // Scroll back to top after clicking
+                window.scrollTo({ top: 0, behavior: 'instant' });
+              }
+            }
+          });
+        }
       } catch (e) {
         // Ignore errors
       }
@@ -1137,20 +1154,26 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
           buttons.forEach((btn: Element) => {
             const button = btn as HTMLElement;
             const text = button.textContent?.toLowerCase() || '';
+            // IMPORTANT: Ignore "Schließen" / "Close" / "X" buttons - they open details, not close the banner
+            // Only click buttons that actually accept/close the banner
             if (
-              text.includes('accept') ||
-              text.includes('akzeptieren') ||
-              text.includes('speichern') || // "SPEICHERN & AKZEPTIEREN" (SAVE & ACCEPT)
-              text.includes('speichern & akzeptieren') ||
-              text.includes('save & accept') ||
-              text.includes('ok') ||
-              text.includes('agree') ||
-              text.includes('zustimmen') ||
-              text.includes('allow') ||
-              text.includes('erlauben') ||
-              text.includes('alle akzeptieren') ||
-              text.includes('all accept') ||
-              text.includes('annehmen') // German "accept"
+              !text.includes('schließen') && // Don't click "Schließen" - it opens details
+              !text.match(/^x$/) && // Don't click standalone "X"
+              !text.includes('close') && // Don't click "Close" buttons
+              (
+                text.includes('accept') ||
+                text.includes('akzeptieren') ||
+                (text.includes('speichern') && text.includes('akzeptieren')) || // "SPEICHERN & AKZEPTIEREN" (must have both)
+                text.includes('save & accept') ||
+                text.includes('ok') ||
+                text.includes('agree') ||
+                text.includes('zustimmen') ||
+                text.includes('allow') ||
+                text.includes('erlauben') ||
+                text.includes('alle akzeptieren') ||
+                text.includes('all accept') ||
+                text.includes('annehmen') // German "accept"
+              )
             ) {
               try {
                 // Scroll button into view if needed
@@ -1360,9 +1383,31 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
         const elapsed = Date.now() - cookieRemovalStart;
         console.log(`⚠️ Cookie banner removal failed or timed out after ${elapsed}ms, proceeding immediately with screenshot (may include cookie banner)`);
       }
+      
+      // IMPORTANT: Always scroll to top before taking screenshot
+      // This ensures we capture the main page content, not the cookie banner details that might be below the footer
+      try {
+        await page.evaluate(() => {
+          window.scrollTo({ top: 0, behavior: 'instant' });
+        });
+        await page.waitForTimeout(200); // Brief wait for scroll to complete
+        console.log('✅ Scrolled to top before screenshot');
+      } catch (e) {
+        console.log('⚠️ Could not scroll to top (non-critical):', e instanceof Error ? e.message : String(e));
+      }
     } catch (error) {
       // Non-critical: continue with screenshot even if cookie banner removal fails
       console.warn('⚠️ Cookie banner removal encountered error (non-critical, continuing immediately):', error instanceof Error ? error.message : String(error));
+      
+      // Still try to scroll to top even if banner removal failed
+      try {
+        await page.evaluate(() => {
+          window.scrollTo({ top: 0, behavior: 'instant' });
+        });
+        await page.waitForTimeout(200);
+      } catch (e) {
+        // Ignore scroll errors
+      }
     }
 
     console.log('📸 Taking screenshot...');
