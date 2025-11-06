@@ -783,13 +783,18 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
 
       // Also try to click common "Accept" buttons to dismiss banners
       const acceptButtonSelectors = [
-        // Cookie Law Info Plugin specific (WordPress)
+        // Cookie Law Info Plugin specific (WordPress) - prefer "accept_all" over "accept"
+        '#wt-cli-accept-all-btn',
+        '[data-cli_action="accept_all"]',
+        '.wt-cli-accept-all-btn',
         '#cookie_action_close_header',
         '[data-cli_action="accept"]',
         '.cookie_action_close_header',
         '.cli_action_button',
         '.wt-cli-accept-btn',
+        'a[data-cli_action="accept_all"]',
         'a[data-cli_action="accept"]',
+        'button[data-cli_action="accept_all"]',
         'button[data-cli_action="accept"]',
         // Generic accept buttons
         'button[class*="accept"]',
@@ -817,8 +822,13 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
       try {
         const cookieLawInfoBar = document.getElementById('cookie-law-info-bar');
         if (cookieLawInfoBar) {
-          // Try to click the accept button first
-          const acceptButton = cookieLawInfoBar.querySelector('#cookie_action_close_header, [data-cli_action="accept"], .cookie_action_close_header, .cli_action_button, .wt-cli-accept-btn');
+          // Try to find accept button (prefer "accept_all" over "accept" for better coverage)
+          let acceptButton = cookieLawInfoBar.querySelector('#wt-cli-accept-all-btn, [data-cli_action="accept_all"], .wt-cli-accept-all-btn');
+          if (!acceptButton) {
+            // Fallback to regular accept button
+            acceptButton = cookieLawInfoBar.querySelector('#cookie_action_close_header, [data-cli_action="accept"], .cookie_action_close_header, .cli_action_button, .wt-cli-accept-btn');
+          }
+          
           if (acceptButton) {
             try {
               (acceptButton as HTMLElement).scrollIntoView({ behavior: 'instant', block: 'center' });
