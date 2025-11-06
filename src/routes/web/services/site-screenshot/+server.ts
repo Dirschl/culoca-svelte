@@ -1045,11 +1045,24 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
       screenshotOptions.quality = options.quality;
     }
 
-    const buffer = await page.screenshot(screenshotOptions);
+    // Take screenshot with timeout protection
+    const screenshotTimeout = 10000; // 10 seconds max for screenshot
+    const buffer = await Promise.race([
+      page.screenshot(screenshotOptions),
+      new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Screenshot timeout: Taking screenshot took too long')), screenshotTimeout);
+      })
+    ]);
 
     console.log('✅ Screenshot taken, size:', buffer.length, 'bytes');
 
-    await browser.close();
+    // Always close browser, even on success
+    try {
+      await browser.close();
+      console.log('✅ Browser closed successfully');
+    } catch (closeError) {
+      console.warn('⚠️ Error closing browser after success:', closeError instanceof Error ? closeError.message : String(closeError));
+    }
     
     return {
       success: true,
@@ -1060,21 +1073,52 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     const errorStack = error instanceof Error ? error.stack : String(error);
     
-    console.error('❌ Error generating screenshot:', errorMessage);
+    // Determine error type for better error messages
+    let errorType = 'Unknown error';
+    let detailedMessage = errorMessage;
+    
+    if (errorMessage.includes('timeout') || errorMessage.includes('Timeout')) {
+      errorType = 'Navigation timeout';
+      detailedMessage = `Page took too long to load (timeout: ${options.timeout}ms). The page may be slow or have blocking resources.`;
+    } else if (errorMessage.includes('net::ERR') || errorMessage.includes('net::')) {
+      errorType = 'Network error';
+      detailedMessage = `Network error while loading page: ${errorMessage}`;
+    } else if (errorMessage.includes('Target page, context or browser has been closed')) {
+      errorType = 'Browser closed';
+      detailedMessage = 'Browser instance was closed unexpectedly. This may indicate resource constraints.';
+    } else if (errorMessage.includes('Protocol error') || errorMessage.includes('Session closed')) {
+      errorType = 'Browser protocol error';
+      detailedMessage = `Browser communication error: ${errorMessage}`;
+    }
+    
+    console.error(`❌ Error generating screenshot (${errorType}):`, detailedMessage);
     console.error('❌ Error stack:', errorStack);
     
+    // Always try to close browser, even on error
     if (browser) {
       try {
+        // Give browser a moment to stabilize before closing
+        await new Promise(resolve => setTimeout(resolve, 100));
         await browser.close();
+        console.log('✅ Browser closed after error');
       } catch (closeError) {
-        console.error('❌ Error closing browser:', closeError);
+        console.error('❌ Error closing browser:', closeError instanceof Error ? closeError.message : String(closeError));
+        // Force kill if normal close fails (in case browser is hung)
+        try {
+          if (browser.process && browser.process().pid) {
+            process.kill(browser.process().pid, 'SIGKILL');
+            console.log('⚠️ Force-killed browser process');
+          }
+        } catch (killError) {
+          // Ignore kill errors
+        }
       }
     }
     
     return {
       success: false,
-      error: 'Screenshot generation failed',
-      message: errorMessage
+      error: `Screenshot generation failed: ${errorType}`,
+      message: detailedMessage
     };
   }
 }
