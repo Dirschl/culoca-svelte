@@ -183,7 +183,7 @@ export const GET: RequestHandler = async ({ url }) => {
       format: (url.searchParams.get('format') || 'jpeg') as 'png' | 'jpeg',
       quality: parseInt(url.searchParams.get('quality') || '80'),
       waitUntil: (url.searchParams.get('waitUntil') || 'domcontentloaded') as 'load' | 'networkidle' | 'domcontentloaded',
-      timeout: parseInt(url.searchParams.get('timeout') || '30000'),
+      timeout: parseInt(url.searchParams.get('timeout') || '15000'), // Reduced from 30s to 15s for faster processing
       useBotUserAgent: useBotUserAgent === true // Explicitly ensure it's boolean true, not just truthy
     };
 
@@ -317,7 +317,7 @@ export const POST: RequestHandler = async ({ request }) => {
       format: options.format || 'jpeg',
       quality: options.quality || 80,
       waitUntil: options.waitUntil || 'domcontentloaded',
-      timeout: options.timeout || 30000,
+      timeout: options.timeout || 15000, // Reduced from 30s to 15s for faster processing
       useBotUserAgent: useBotUserAgent === true // Explicitly ensure it's boolean true, not just truthy
     };
 
@@ -610,21 +610,23 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
     let navigationSuccess = false;
     
     // Strategy 1: Try domcontentloaded (fast and reliable)
+    // Use shorter timeout to prevent hanging (15s instead of 30s)
+    const navigationTimeout = Math.min(options.timeout || 15000, 15000);
     try {
       await page.goto(options.url, {
         waitUntil: 'domcontentloaded',
-        timeout: options.timeout || 30000
+        timeout: navigationTimeout
       });
       console.log('✅ Page loaded (domcontentloaded)');
       navigationSuccess = true;
       
       // If networkidle was requested, wait a bit longer for network activity to settle
-      // But don't block forever - use a reasonable timeout
+      // But don't block forever - use a reasonable timeout (reduced to 2s)
       if (options.waitUntil === 'networkidle') {
         console.log('⏳ Waiting for network to settle...');
         // Wait for network requests to settle (simulated networkidle)
-        // Most pages settle within 5-10 seconds
-        await page.waitForTimeout(5000);
+        // Reduced to 2 seconds for faster processing
+        await page.waitForTimeout(2000);
         console.log('✅ Network activity settled');
       }
     } catch (error) {
@@ -634,7 +636,7 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
       try {
         await page.goto(options.url, {
           waitUntil: 'load',
-          timeout: options.timeout || 30000
+          timeout: navigationTimeout
         });
         console.log('✅ Page loaded (load event)');
         navigationSuccess = true;
@@ -645,11 +647,11 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
         try {
           await page.goto(options.url, {
             waitUntil: 'commit',
-            timeout: options.timeout || 30000
+            timeout: navigationTimeout
           });
           console.log('✅ Page navigation committed');
-          // Wait a bit for content to load
-          await page.waitForTimeout(3000);
+          // Wait a bit for content to load (reduced to 2s)
+          await page.waitForTimeout(2000);
           navigationSuccess = true;
         } catch (commitError) {
           console.error('❌ All navigation strategies failed');
