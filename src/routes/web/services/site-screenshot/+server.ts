@@ -511,6 +511,7 @@ async function generateScreenshotWithRetry(
  */
 async function generateScreenshot(options: ScreenshotOptions): Promise<ScreenshotResult> {
   let browser: any = null;
+  let context: any = null;
   
   try {
     // Check if we're in a serverless environment
@@ -610,7 +611,6 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
       throw new Error('Browser disconnected during initialization (likely due to resource constraints)');
     }
 
-    let context: any;
     try {
       // Determine User-Agent based on bot=1 parameter
       // If bot=1 is present, use bot User-Agent (required for Real Cookie Manager to hide banners)
@@ -793,6 +793,30 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
             // Execute cookie banner removal with timeout protection
             await Promise.race([
               page.evaluate(() => {
+      // Helper function to safely get className as string (handles SVG elements)
+      const getClassName = (element: Element): string => {
+        if (!element) return '';
+        const className = element.className;
+        if (typeof className === 'string') {
+          return className;
+        }
+        // Handle SVGAnimatedString for SVG elements
+        if (className && typeof className === 'object' && 'baseVal' in className) {
+          return className.baseVal || '';
+        }
+        // Fallback: try to get classList
+        if (element.classList) {
+          return Array.from(element.classList).join(' ');
+        }
+        return '';
+      };
+      
+      // Helper function to safely get id as string
+      const getId = (element: Element): string => {
+        if (!element) return '';
+        return element.id || '';
+      };
+      
       // Common cookie consent banner selectors
       const cookieSelectors = [
         // Generic cookie consent classes/ids
@@ -877,6 +901,8 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
             const element = el as HTMLElement;
             // Check if element contains cookie-related text
             const text = element.textContent?.toLowerCase() || '';
+            const elementId = getId(element).toLowerCase();
+            const elementClassName = getClassName(element).toLowerCase();
             if (
               text.includes('cookie') ||
               text.includes('consent') ||
@@ -885,8 +911,8 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
               text.includes('datenschutz') ||
               text.includes('accept') ||
               text.includes('akzeptieren') ||
-              element.id.toLowerCase().includes('cookie') ||
-              element.className.toLowerCase().includes('cookie')
+              elementId.includes('cookie') ||
+              elementClassName.includes('cookie')
             ) {
               // Remove element
               element.style.display = 'none';
@@ -1024,8 +1050,8 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
         const isAtBottom = bottom > viewportHeight * 0.8; // Bottom 20% of screen
         const isOverlay = style.position === 'fixed' || style.position === 'absolute';
         const text = element.textContent?.toLowerCase() || '';
-        const id = element.id.toLowerCase();
-        const className = element.className.toLowerCase();
+        const id = getId(element).toLowerCase();
+        const className = getClassName(element).toLowerCase();
         
         // Check if element is an overlay (high z-index, positioned fixed/absolute)
         // OR if it's at the bottom of the screen (common for cookie banners)
@@ -1210,12 +1236,28 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
     // Always close browser, even on success
     // Wait for browser to fully close to prevent resource leaks
     try {
-      // Close all pages first
-      const pages = await browser.pages();
-      await Promise.all(pages.map(page => page.close().catch(() => {})));
+      // Close all pages first (if browser.pages() method exists and browser is still connected)
+      if (browser && browser.isConnected && browser.isConnected()) {
+        try {
+          // Check if browser.pages exists and is a function
+          if (typeof browser.pages === 'function') {
+            const pages = await browser.pages();
+            await Promise.all(pages.map(page => page.close().catch(() => {})));
+          } else if (context) {
+            // Fallback: close all pages in context if browser.pages() doesn't exist
+            const pages = context.pages();
+            await Promise.all(pages.map(page => page.close().catch(() => {})));
+          }
+        } catch (pagesError) {
+          // Ignore errors when closing pages (browser might already be closing)
+          console.log('⚠️ Could not close pages (non-critical):', pagesError instanceof Error ? pagesError.message : String(pagesError));
+        }
+      }
       
       // Then close browser
-      await browser.close();
+      if (browser && browser.isConnected && browser.isConnected()) {
+        await browser.close();
+      }
       
       // Wait a bit to ensure browser process is fully terminated
       await new Promise(resolve => setTimeout(resolve, 200));
@@ -1225,9 +1267,13 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
       console.warn('⚠️ Error closing browser after success:', closeError instanceof Error ? closeError.message : String(closeError));
       // Try to force kill browser process if normal close fails
       try {
-        if (browser.process && browser.process().pid) {
-          process.kill(browser.process().pid, 'SIGKILL');
-          console.log('⚠️ Force-killed browser process after success');
+        if (browser && browser.process && typeof browser.process === 'function') {
+          const browserProcess = browser.process();
+          if (browserProcess && browserProcess.pid) {
+            // ChildProcess.kill() takes signal as first argument
+            browserProcess.kill('SIGKILL');
+            console.log('⚠️ Force-killed browser process after success');
+          }
         }
       } catch (killError) {
         // Ignore kill errors
@@ -1269,15 +1315,41 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
       try {
         // Give browser a moment to stabilize before closing
         await new Promise(resolve => setTimeout(resolve, 100));
-        await browser.close();
+        
+        // Close all pages first (if browser.pages() method exists and browser is still connected)
+        if (browser.isConnected && browser.isConnected()) {
+          try {
+            // Check if browser.pages exists and is a function
+            if (typeof browser.pages === 'function') {
+              const pages = await browser.pages();
+              await Promise.all(pages.map(page => page.close().catch(() => {})));
+            } else if (context) {
+              // Fallback: close all pages in context if browser.pages() doesn't exist
+              const pages = context.pages();
+              await Promise.all(pages.map(page => page.close().catch(() => {})));
+            }
+          } catch (pagesError) {
+            // Ignore errors when closing pages (browser might already be closing)
+            console.log('⚠️ Could not close pages after error (non-critical):', pagesError instanceof Error ? pagesError.message : String(pagesError));
+          }
+        }
+        
+        // Then close browser
+        if (browser.isConnected && browser.isConnected()) {
+          await browser.close();
+        }
         console.log('✅ Browser closed after error');
       } catch (closeError) {
         console.error('❌ Error closing browser:', closeError instanceof Error ? closeError.message : String(closeError));
         // Force kill if normal close fails (in case browser is hung)
         try {
-          if (browser.process && browser.process().pid) {
-            process.kill(browser.process().pid, 'SIGKILL');
-            console.log('⚠️ Force-killed browser process');
+          if (browser && browser.process && typeof browser.process === 'function') {
+            const browserProcess = browser.process();
+            if (browserProcess && browserProcess.pid) {
+              // ChildProcess.kill() takes signal as first argument
+              browserProcess.kill('SIGKILL');
+              console.log('⚠️ Force-killed browser process');
+            }
           }
         } catch (killError) {
           // Ignore kill errors
