@@ -338,6 +338,73 @@ export const POST: RequestHandler = async ({ request }) => {
 };
 
 /**
+ * Resolve redirects manually to avoid browser crashes during redirect handling
+ * Returns the final URL after following all redirects
+ */
+async function resolveRedirects(url: string, maxRedirects: number = 5): Promise<string> {
+  let currentUrl = url;
+  let redirectCount = 0;
+  
+  while (redirectCount < maxRedirects) {
+    try {
+      // Create AbortController for timeout (compatible with older Node.js versions)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+      
+      try {
+        const response = await fetch(currentUrl, {
+          method: 'HEAD',
+          redirect: 'manual',
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (response.status >= 300 && response.status < 400) {
+          const location = response.headers.get('location');
+          if (location) {
+            redirectCount++;
+            // Handle relative redirects
+            try {
+              currentUrl = new URL(location, currentUrl).href;
+              console.log(`🔄 Redirect ${redirectCount}: ${url} -> ${currentUrl}`);
+            } catch {
+              // Invalid redirect URL, return current URL
+              console.log(`⚠️ Invalid redirect location: ${location}, using current URL`);
+              break;
+            }
+          } else {
+            // No location header, return current URL
+            break;
+          }
+        } else {
+          // No redirect, return current URL
+          break;
+        }
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        throw fetchError;
+      }
+    } catch (error) {
+      // If redirect resolution fails, return original URL and let Playwright handle it
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      if (errorMsg.includes('aborted')) {
+        console.log(`⚠️ Redirect resolution timeout for ${url}, will let Playwright handle it`);
+      } else {
+        console.log(`⚠️ Failed to resolve redirects for ${url}, will let Playwright handle it:`, errorMsg);
+      }
+      return url;
+    }
+  }
+  
+  if (redirectCount >= maxRedirects) {
+    console.log(`⚠️ Max redirects (${maxRedirects}) reached for ${url}, using last resolved URL`);
+  }
+  
+  return currentUrl;
+}
+
+/**
  * Get Chromium executable path (uses @sparticuz/chromium for Vercel Serverless)
  * Note: @sparticuz/chromium.executablePath() returns a Promise!
  */
@@ -591,7 +658,23 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
       throw new Error(`Failed to create browser page: ${errorMsg}. Browser may have closed due to insufficient resources.`);
     }
 
-    console.log('🌐 Navigating to:', options.url);
+    // Resolve redirects manually to avoid browser crashes during redirect handling
+    // This is especially important for URLs that redirect (e.g., aumin.de -> www.aumin.de)
+    console.log('🔍 Resolving redirects for:', options.url);
+    let finalUrl = options.url;
+    try {
+      finalUrl = await resolveRedirects(options.url);
+      if (finalUrl !== options.url) {
+        console.log(`✅ Redirect resolved: ${options.url} -> ${finalUrl}`);
+      } else {
+        console.log('✅ No redirects found, using original URL');
+      }
+    } catch (error) {
+      console.log(`⚠️ Redirect resolution failed, using original URL:`, error instanceof Error ? error.message : String(error));
+      finalUrl = options.url; // Fallback to original URL
+    }
+
+    console.log('🌐 Navigating to:', finalUrl);
 
     // Check browser and page state before navigation
     if (!browser.isConnected()) {
@@ -617,7 +700,7 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
         throw new Error('Browser or page closed before navigation attempt');
       }
       
-      await page.goto(options.url, {
+      await page.goto(finalUrl, {
         waitUntil: 'load',
         timeout: navigationTimeout
       });
@@ -634,7 +717,7 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
       
       // Strategy 2: Try domcontentloaded (faster, but may not wait for all resources)
       try {
-        await page.goto(options.url, {
+        await page.goto(finalUrl, {
           waitUntil: 'domcontentloaded',
           timeout: navigationTimeout
         });
@@ -655,7 +738,7 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
         
         // Strategy 3: Try commit (just wait for navigation to start)
         try {
-          await page.goto(options.url, {
+          await page.goto(finalUrl, {
             waitUntil: 'commit',
             timeout: navigationTimeout
           });
@@ -666,13 +749,13 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
         } catch (commitError) {
           const commitErrorMsg = commitError instanceof Error ? commitError.message : String(commitError);
           console.error('❌ All navigation strategies failed');
-          throw new Error(`Failed to navigate to ${options.url}: ${commitErrorMsg}`);
+          throw new Error(`Failed to navigate to ${finalUrl}: ${commitErrorMsg}`);
         }
       }
     }
     
     if (!navigationSuccess) {
-      throw new Error(`Failed to navigate to ${options.url}`);
+      throw new Error(`Failed to navigate to ${finalUrl}`);
     }
 
     console.log('⏳ Waiting for dynamic content and images to fully render...');
