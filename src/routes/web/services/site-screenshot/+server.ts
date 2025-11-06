@@ -664,18 +664,20 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
 
     console.log('⏳ Waiting for dynamic content...');
     // Wait briefly for cookie banners and dynamic content to load
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(500);
 
     // Try to remove cookie consent banners with a strict timeout
     // If it fails or takes too long, we'll create the screenshot anyway (with or without cookie banner)
-    console.log('🍪 Attempting to remove cookie consent banners (non-blocking, max 3s timeout)...');
+    console.log('🍪 Attempting to remove cookie consent banners (non-blocking, max 1.5s timeout)...');
     
-    // Remove cookie banners with timeout - if it takes longer than 3 seconds, skip it
-    const removeCookieBannersWithTimeout = async (timeoutMs: number = 3000): Promise<boolean> => {
+    // Remove cookie banners with timeout - if it takes longer than timeout, skip it
+    const removeCookieBannersWithTimeout = async (timeoutMs: number = 1500): Promise<boolean> => {
       return Promise.race([
         (async () => {
           try {
-            await page.evaluate(() => {
+            // Execute cookie banner removal with timeout protection
+            await Promise.race([
+              page.evaluate(() => {
       // Common cookie consent banner selectors
       const cookieSelectors = [
         // Generic cookie consent classes/ids
@@ -1019,7 +1021,12 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
       } catch (e) {
         // Ignore errors
       }
-      });
+      }),
+              // Timeout for page.evaluate itself (should be faster than outer timeout)
+              new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('page.evaluate timeout')), Math.min(timeoutMs - 200, 1000));
+              })
+            ]);
             return true; // Success
           } catch (error) {
             console.warn('⚠️ Cookie banner removal failed (non-critical):', error instanceof Error ? error.message : String(error));
@@ -1035,32 +1042,21 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
       ]);
     };
 
-    // Try to remove cookie banners quickly (max 2 attempts, 3 seconds total timeout)
+    // Try to remove cookie banners quickly (max 1.5 seconds total timeout)
     // If it fails or takes too long, immediately proceed with screenshot
     try {
       const cookieRemovalStart = Date.now();
-      const result1 = await removeCookieBannersWithTimeout(2000); // 2 second timeout for first attempt
-      if (result1) {
-        console.log('✅ Cookie banner removal attempt 1: success');
-        await page.waitForTimeout(500); // Brief wait for banner animations/closing
+      const result = await removeCookieBannersWithTimeout(1500); // 1.5 second timeout - if it takes longer, skip it
+      if (result) {
+        console.log('✅ Cookie banner removal: success');
+        await page.waitForTimeout(300); // Brief wait for banner animations/closing
       } else {
         const elapsed = Date.now() - cookieRemovalStart;
-        if (elapsed < 2000) {
-          // First attempt didn't timeout, try once more quickly
-          const result2 = await removeCookieBannersWithTimeout(1000); // 1 second timeout for second attempt
-          if (result2) {
-            console.log('✅ Cookie banner removal attempt 2: success');
-            await page.waitForTimeout(500);
-          } else {
-            console.log('⚠️ Cookie banner removal failed or timed out, proceeding with screenshot (may include cookie banner)');
-          }
-        } else {
-          console.log('⚠️ Cookie banner removal timed out, proceeding with screenshot (may include cookie banner)');
-        }
+        console.log(`⚠️ Cookie banner removal failed or timed out after ${elapsed}ms, proceeding immediately with screenshot (may include cookie banner)`);
       }
     } catch (error) {
       // Non-critical: continue with screenshot even if cookie banner removal fails
-      console.warn('⚠️ Cookie banner removal encountered error (non-critical, continuing):', error instanceof Error ? error.message : String(error));
+      console.warn('⚠️ Cookie banner removal encountered error (non-critical, continuing immediately):', error instanceof Error ? error.message : String(error));
     }
 
     console.log('📸 Taking screenshot...');
