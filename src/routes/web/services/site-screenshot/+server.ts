@@ -5,77 +5,35 @@ import chromiumPkg from '@sparticuz/chromium';
 
 // Rate limiting: Maximum concurrent screenshot generations per serverless instance
 // Reduced to 1 to prevent /tmp space issues in Vercel serverless environment
+// NO QUEUE: If a screenshot is already running, immediately reject new requests with HTTP 503
+// This forces clients (like WordPress plugins) to send requests sequentially
 const MAX_CONCURRENT_SCREENSHOTS = 1;
-const MAX_QUEUE_SIZE = 20; // Maximum requests waiting in queue (increased for better throughput)
-const QUEUE_TIMEOUT = 60000; // 60 seconds timeout for queue
 let activeScreenshotCount = 0;
-const screenshotQueue: Array<() => void> = [];
 
 /**
- * Acquire a screenshot slot (wait if all slots are taken)
- * Returns true if slot acquired, false if queue is full or timeout
+ * Acquire a screenshot slot
+ * Returns true if slot acquired, false if already in use (no queue - immediate rejection)
  */
-async function acquireScreenshotSlot(): Promise<boolean> {
-  return new Promise((resolve) => {
-    if (activeScreenshotCount < MAX_CONCURRENT_SCREENSHOTS) {
-      activeScreenshotCount++;
-      console.log(`✅ Screenshot slot acquired (${activeScreenshotCount} active)`);
-      resolve(true);
-    } else {
-      // Check if queue is full
-      if (screenshotQueue.length >= MAX_QUEUE_SIZE) {
-        console.log(`⚠️ Queue full (${screenshotQueue.length} waiting, ${activeScreenshotCount} active) - rejecting request`);
-        resolve(false);
-        return;
-      }
-      
-      // Wait in queue
-      const queueEntry = () => {
-        if (activeScreenshotCount < MAX_CONCURRENT_SCREENSHOTS) {
-          activeScreenshotCount++;
-          console.log(`✅ Queued screenshot slot acquired (${screenshotQueue.length - 1} remaining, ${activeScreenshotCount} active)`);
-          resolve(true);
-        } else {
-          resolve(false);
-        }
-      };
-      
-      screenshotQueue.push(queueEntry);
-      console.log(`⏳ Screenshot request queued (${screenshotQueue.length} waiting, ${activeScreenshotCount} active)`);
-      
-      // Timeout: reject after QUEUE_TIMEOUT
-      setTimeout(() => {
-        const index = screenshotQueue.indexOf(queueEntry);
-        if (index !== -1) {
-          screenshotQueue.splice(index, 1);
-          console.log(`⏰ Queue timeout - request rejected after ${QUEUE_TIMEOUT}ms`);
-          resolve(false);
-        }
-      }, QUEUE_TIMEOUT);
-    }
-  });
+function acquireScreenshotSlot(): boolean {
+  if (activeScreenshotCount < MAX_CONCURRENT_SCREENSHOTS) {
+    activeScreenshotCount++;
+    console.log(`✅ Screenshot slot acquired (${activeScreenshotCount} active)`);
+    return true;
+  } else {
+    console.log(`⚠️ Screenshot slot busy (${activeScreenshotCount} active) - rejecting request immediately (no queue)`);
+    return false;
+  }
 }
 
 /**
- * Release a screenshot slot (process next in queue if any)
+ * Release a screenshot slot
  */
 function releaseScreenshotSlot(): void {
   if (activeScreenshotCount > 0) {
     activeScreenshotCount--;
-    console.log(`🔓 Screenshot slot released (${activeScreenshotCount} active, ${screenshotQueue.length} queued)`);
+    console.log(`🔓 Screenshot slot released (${activeScreenshotCount} active)`);
   } else {
     console.warn(`⚠️ Attempted to release slot but activeScreenshotCount is already 0`);
-  }
-  
-  if (screenshotQueue.length > 0) {
-    const next = screenshotQueue.shift();
-    if (next) {
-      activeScreenshotCount++;
-      next();
-      console.log(`✅ Processing queued screenshot (${screenshotQueue.length} remaining, ${activeScreenshotCount} active)`);
-    }
-  } else if (activeScreenshotCount === 0) {
-    console.log(`✅ All screenshot slots free, no queued requests`);
   }
 }
 
@@ -118,26 +76,26 @@ interface ScreenshotResult {
  */
 export const GET: RequestHandler = async ({ url }) => {
   const targetUrl = url.searchParams.get('url');
-  console.log(`📥 GET request received for: ${targetUrl || 'NO URL'} (active: ${activeScreenshotCount}, queued: ${screenshotQueue.length})`);
+  console.log(`📥 GET request received for: ${targetUrl || 'NO URL'} (active: ${activeScreenshotCount})`);
   
-  // Acquire screenshot slot (wait if queue is full)
-  const slotAcquired = await acquireScreenshotSlot();
+  // Acquire screenshot slot (immediate rejection if busy - no queue)
+  const slotAcquired = acquireScreenshotSlot();
   
   if (!slotAcquired) {
-    console.log(`❌ Slot acquisition failed for: ${targetUrl || 'NO URL'} (active: ${activeScreenshotCount}, queued: ${screenshotQueue.length})`);
+    console.log(`❌ Slot acquisition failed for: ${targetUrl || 'NO URL'} (active: ${activeScreenshotCount}) - service busy, please retry`);
     return json({ 
       error: 'Service temporarily unavailable',
-      message: 'Too many concurrent screenshot requests. Please try again later.',
-      retryAfter: 60
+      message: 'Screenshot service is busy. Please retry in a moment.',
+      retryAfter: 5
     }, { 
       status: 503,
       headers: {
-        'Retry-After': '60'
+        'Retry-After': '5'
       }
     });
   }
   
-  console.log(`✅ Slot acquired for: ${targetUrl || 'NO URL'} (active: ${activeScreenshotCount}, queued: ${screenshotQueue.length})`);
+  console.log(`✅ Slot acquired for: ${targetUrl || 'NO URL'} (active: ${activeScreenshotCount})`);
   
   try {
     if (!targetUrl) {
@@ -249,26 +207,26 @@ export const POST: RequestHandler = async ({ request }) => {
   const body = await request.json().catch(() => ({}));
   const { url: targetUrl } = body;
   
-  console.log(`📥 POST request received for: ${targetUrl || 'NO URL'} (active: ${activeScreenshotCount}, queued: ${screenshotQueue.length})`);
+  console.log(`📥 POST request received for: ${targetUrl || 'NO URL'} (active: ${activeScreenshotCount})`);
   
-  // Acquire screenshot slot (wait if queue is full)
-  const slotAcquired = await acquireScreenshotSlot();
+  // Acquire screenshot slot (immediate rejection if busy - no queue)
+  const slotAcquired = acquireScreenshotSlot();
   
   if (!slotAcquired) {
-    console.log(`❌ Slot acquisition failed for: ${targetUrl || 'NO URL'} (active: ${activeScreenshotCount}, queued: ${screenshotQueue.length})`);
+    console.log(`❌ Slot acquisition failed for: ${targetUrl || 'NO URL'} (active: ${activeScreenshotCount}) - service busy, please retry`);
     return json({ 
       error: 'Service temporarily unavailable',
-      message: 'Too many concurrent screenshot requests. Please try again later.',
-      retryAfter: 60
+      message: 'Screenshot service is busy. Please retry in a moment.',
+      retryAfter: 5
     }, { 
       status: 503,
       headers: {
-        'Retry-After': '60'
+        'Retry-After': '5'
       }
     });
   }
   
-  console.log(`✅ Slot acquired for: ${targetUrl || 'NO URL'} (active: ${activeScreenshotCount}, queued: ${screenshotQueue.length})`);
+  console.log(`✅ Slot acquired for: ${targetUrl || 'NO URL'} (active: ${activeScreenshotCount})`);
   
   try {
     const { url: urlParam, ...options } = body;
