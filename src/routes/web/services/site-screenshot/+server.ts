@@ -939,6 +939,13 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
         'a[data-cli_action="accept"]',
         'button[data-cli_action="accept_all"]',
         'button[data-cli_action="accept"]',
+        // Real Cookie Manager / Privacy Overview specific (for eva-woeckl.com, aumin.de, vladimirsterzer.com)
+        '[title*="Privacy Overview"] button',
+        '[title*="Datenschutzübersicht"] button',
+        '[class*="privacy"] button',
+        '[id*="privacy"] button',
+        '[class*="datenschutz"] button',
+        '[id*="datenschutz"] button',
         // Generic accept buttons
         'button[class*="accept"]',
         'button[id*="accept"]',
@@ -997,6 +1004,132 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
       } catch (e) {
         // Ignore errors
       }
+      
+      // Special handling for "Privacy Overview" / "Datenschutzübersicht" banners
+      // (Real Cookie Manager or similar - used by eva-woeckl.com, aumin.de, vladimirsterzer.com)
+      try {
+        // Find elements with "Privacy Overview" or "Datenschutzübersicht" in title or text
+        const privacyBanners = document.querySelectorAll('[title*="Privacy Overview"], [title*="Datenschutzübersicht"], [class*="privacy-overview"], [id*="privacy-overview"], [class*="datenschutz"], [id*="datenschutz"]');
+        
+        privacyBanners.forEach((banner: Element) => {
+          const bannerElement = banner as HTMLElement;
+          const bannerText = bannerElement.textContent?.toLowerCase() || '';
+          
+          // Check if this is a cookie/privacy banner
+          if (bannerText.includes('cookie') || bannerText.includes('privacy') || bannerText.includes('datenschutz') || bannerText.includes('consent')) {
+            // Try to find "SPEICHERN & AKZEPTIEREN" button inside the banner
+            const buttons = bannerElement.querySelectorAll('button, a, [role="button"]');
+            let foundAcceptButton = false;
+            
+            buttons.forEach((btn: Element) => {
+              const button = btn as HTMLElement;
+              const buttonText = button.textContent?.toLowerCase() || '';
+              
+              // Check for "SPEICHERN & AKZEPTIEREN" or similar
+              if (
+                buttonText.includes('speichern') && buttonText.includes('akzeptieren') ||
+                buttonText.includes('save') && buttonText.includes('accept') ||
+                buttonText.includes('speichern & akzeptieren') ||
+                buttonText.includes('save & accept')
+              ) {
+                try {
+                  // Scroll to button to ensure it's visible
+                  button.scrollIntoView({ behavior: 'instant', block: 'center' });
+                  // Click immediately (no setTimeout in page.evaluate - it doesn't wait)
+                  button.click();
+                  // Also trigger click event
+                  const clickEvent = new MouseEvent('click', {
+                    bubbles: true,
+                    cancelable: true,
+                    view: window
+                  });
+                  button.dispatchEvent(clickEvent);
+                  foundAcceptButton = true;
+                } catch (e) {
+                  // Ignore click errors
+                }
+              }
+            });
+            
+            // If no button found or click failed, try to remove banner directly
+            if (!foundAcceptButton) {
+              bannerElement.style.display = 'none';
+              bannerElement.style.visibility = 'hidden';
+              bannerElement.style.opacity = '0';
+              bannerElement.style.height = '0';
+              bannerElement.style.maxHeight = '0';
+              try {
+                bannerElement.remove();
+              } catch (e) {
+                // Ignore removal errors
+              }
+            }
+          }
+        });
+        
+        // Also search for "SPEICHERN & AKZEPTIEREN" buttons anywhere on the page
+        const allButtons = document.querySelectorAll('button, a, [role="button"]');
+        allButtons.forEach((btn: Element) => {
+          const button = btn as HTMLElement;
+          const buttonText = button.textContent?.toLowerCase() || '';
+          
+          // Check for "SPEICHERN & AKZEPTIEREN" pattern
+          if (
+            (buttonText.includes('speichern') && buttonText.includes('akzeptieren')) ||
+            (buttonText.includes('save') && buttonText.includes('accept'))
+          ) {
+            // Check if button is in a privacy/cookie banner context
+            let parent = button.parentElement;
+            let isInBanner = false;
+            let maxDepth = 5; // Limit search depth
+            
+            while (parent && maxDepth > 0) {
+              const parentText = parent.textContent?.toLowerCase() || '';
+              const parentId = getId(parent).toLowerCase();
+              const parentClassName = getClassName(parent).toLowerCase();
+              
+              if (
+                parentText.includes('privacy') ||
+                parentText.includes('datenschutz') ||
+                parentText.includes('cookie') ||
+                parentText.includes('consent') ||
+                parentId.includes('privacy') ||
+                parentId.includes('datenschutz') ||
+                parentId.includes('cookie') ||
+                parentClassName.includes('privacy') ||
+                parentClassName.includes('datenschutz') ||
+                parentClassName.includes('cookie')
+              ) {
+                isInBanner = true;
+                break;
+              }
+              
+              parent = parent.parentElement;
+              maxDepth--;
+            }
+            
+            if (isInBanner) {
+              try {
+                // Scroll to button to ensure it's visible
+                button.scrollIntoView({ behavior: 'instant', block: 'center' });
+                // Click immediately (no setTimeout in page.evaluate - it doesn't wait)
+                button.click();
+                // Also trigger click event
+                const clickEvent = new MouseEvent('click', {
+                  bubbles: true,
+                  cancelable: true,
+                  view: window
+                });
+                button.dispatchEvent(clickEvent);
+              } catch (e) {
+                // Ignore click errors
+              }
+            }
+          }
+        });
+      } catch (e) {
+        // Ignore errors
+      }
 
       acceptButtonSelectors.forEach(selector => {
         try {
@@ -1007,6 +1140,9 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
             if (
               text.includes('accept') ||
               text.includes('akzeptieren') ||
+              text.includes('speichern') || // "SPEICHERN & AKZEPTIEREN" (SAVE & ACCEPT)
+              text.includes('speichern & akzeptieren') ||
+              text.includes('save & accept') ||
               text.includes('ok') ||
               text.includes('agree') ||
               text.includes('zustimmen') ||
@@ -1183,14 +1319,43 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
       ]);
     };
 
-    // Try to remove cookie banners quickly (max 1.5 seconds total timeout)
+    // Try to remove cookie banners quickly (max 2 seconds total timeout for better success rate)
     // If it fails or takes too long, immediately proceed with screenshot
     try {
       const cookieRemovalStart = Date.now();
-      const result = await removeCookieBannersWithTimeout(1500); // 1.5 second timeout - if it takes longer, skip it
+      const result = await removeCookieBannersWithTimeout(2000); // 2 second timeout - increased for "SPEICHERN & AKZEPTIEREN" buttons
       if (result) {
         console.log('✅ Cookie banner removal: success');
-        await page.waitForTimeout(300); // Brief wait for banner animations/closing
+        // Wait longer for banner to disappear (especially for "SPEICHERN & AKZEPTIEREN" buttons)
+        await page.waitForTimeout(500); // Increased from 300ms to 500ms for better banner removal
+        
+        // Also check if banner is still visible and try to hide it with CSS if needed
+        try {
+          const bannerStillVisible = await page.evaluate(() => {
+            // Check for common cookie banner elements
+            const banners = document.querySelectorAll('[title*="Privacy Overview"], [title*="Datenschutzübersicht"], [class*="privacy-overview"], [id*="privacy-overview"], [class*="datenschutz"], [id*="datenschutz"], [id*="cookie"], [class*="cookie"]');
+            let visibleCount = 0;
+            banners.forEach((banner: Element) => {
+              const el = banner as HTMLElement;
+              const style = window.getComputedStyle(el);
+              if (style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') {
+                visibleCount++;
+                // Force hide if still visible
+                el.style.setProperty('display', 'none', 'important');
+                el.style.setProperty('visibility', 'hidden', 'important');
+                el.style.setProperty('opacity', '0', 'important');
+              }
+            });
+            return visibleCount;
+          });
+          
+          if (bannerStillVisible > 0) {
+            console.log(`⚠️ ${bannerStillVisible} cookie banner(s) still visible after removal, forcing hide with CSS`);
+            await page.waitForTimeout(200); // Additional wait after forcing hide
+          }
+        } catch (e) {
+          // Ignore errors in banner visibility check
+        }
       } else {
         const elapsed = Date.now() - cookieRemovalStart;
         console.log(`⚠️ Cookie banner removal failed or timed out after ${elapsed}ms, proceeding immediately with screenshot (may include cookie banner)`);
