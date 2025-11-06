@@ -1038,6 +1038,17 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
     }
 
     console.log('📸 Taking screenshot...');
+    
+    // Check if browser is still connected before taking screenshot
+    if (!browser.isConnected()) {
+      throw new Error('Browser disconnected before screenshot. This may indicate resource constraints or browser crash.');
+    }
+    
+    // Check if page is still open
+    if (page.isClosed()) {
+      throw new Error('Page was closed before screenshot. This may indicate navigation failure or page crash.');
+    }
+    
     // Take screenshot
     const screenshotOptions: any = {
       type: options.format || 'jpeg',
@@ -1060,11 +1071,30 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
     console.log('✅ Screenshot taken, size:', buffer.length, 'bytes');
 
     // Always close browser, even on success
+    // Wait for browser to fully close to prevent resource leaks
     try {
+      // Close all pages first
+      const pages = await browser.pages();
+      await Promise.all(pages.map(page => page.close().catch(() => {})));
+      
+      // Then close browser
       await browser.close();
+      
+      // Wait a bit to ensure browser process is fully terminated
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
       console.log('✅ Browser closed successfully');
     } catch (closeError) {
       console.warn('⚠️ Error closing browser after success:', closeError instanceof Error ? closeError.message : String(closeError));
+      // Try to force kill browser process if normal close fails
+      try {
+        if (browser.process && browser.process().pid) {
+          process.kill(browser.process().pid, 'SIGKILL');
+          console.log('⚠️ Force-killed browser process after success');
+        }
+      } catch (killError) {
+        // Ignore kill errors
+      }
     }
     
     return {
