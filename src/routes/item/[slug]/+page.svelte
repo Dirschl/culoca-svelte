@@ -1079,14 +1079,21 @@ let showRightsManager = false;
   {#if image}
     {@const itemName = image.title || image.original_name || `Bild ${image.id}`}
     {@const itemUrl = `https://culoca.com/item/${image.slug}`}
-    {@const imagePath2048 = image.path_2048 || image.path_512}
-    {@const imagePath512 = image.path_512}
-    {@const extensionMatch = imagePath2048 ? imagePath2048.match(/\.(jpg|jpeg|webp|png)$/i) : null}
+    {@const hasPath2048 = !!image.path_2048}
+    {@const hasPath512 = !!image.path_512}
+    {@const imagePathForExtension = image.path_2048 || image.path_512}
+    {@const extensionMatch = imagePathForExtension ? imagePathForExtension.match(/\.(jpg|jpeg|webp|png)$/i) : null}
     {@const fileExtension = extensionMatch ? extensionMatch[0].toLowerCase() : '.jpg'}
     
-    <!-- Generate SEO-friendly URLs -->
-    {@const imageUrl2048 = `https://culoca.com/images/${image.slug}${fileExtension}`}
-    {@const imageUrl512 = imagePath512 ? `https://culoca.com/images/${image.slug}${fileExtension}?size=512` : imageUrl2048}
+    <!-- Generate SEO-friendly URLs with explicit size parameters -->
+    <!-- contentUrl: Always use 2048px version if available, otherwise 512px -->
+    {@const imageUrl2048 = hasPath2048
+      ? `https://culoca.com/images/${image.slug}${fileExtension}?size=2048`
+      : (hasPath512 ? `https://culoca.com/images/${image.slug}${fileExtension}?size=512` : '')}
+    <!-- thumbnailUrl: Always use 512px version if available, otherwise 2048px (fallback) -->
+    {@const imageUrl512 = hasPath512
+      ? `https://culoca.com/images/${image.slug}${fileExtension}?size=512`
+      : (hasPath2048 ? `https://culoca.com/images/${image.slug}${fileExtension}?size=2048` : '')}
     
     <!-- Calculate dimensions for 2048px and 512px versions (proportional scaling) -->
     <!-- Note: image.width and image.height are original dimensions after EXIF orientation -->
