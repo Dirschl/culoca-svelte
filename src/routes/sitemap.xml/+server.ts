@@ -99,7 +99,8 @@ export const GET: RequestHandler = async () => {
     // Add item pages with optimized data (following Google's current guidelines)
     for (const item of allItems) {
       xml += '  <url>\n';
-      xml += `    <loc>${baseUrl}/item/${item.slug}</loc>\n`;
+      // Use trailing slash for consistent URLs
+      xml += `    <loc>${baseUrl}/item/${item.slug}/</loc>\n`;
       
       // Verwende tatsächliches Änderungsdatum für bessere Crawl-Effizienz
       const lastModDate = item.updated_at || item.created_at;
@@ -107,7 +108,7 @@ export const GET: RequestHandler = async () => {
       xml += `    <lastmod>${formattedDate}</lastmod>\n`;
       
       // Add enhanced image data for better SEO
-      // Use SEO-friendly URL with slug-based filename: /images/{slug}.jpg
+      // Use SEO-friendly URL with size suffix: /images/{slug}-2048.jpg (no query parameters)
       if (item.path_2048 || item.path_512) {
         xml += '    <image:image>\n';
         
@@ -117,11 +118,13 @@ export const GET: RequestHandler = async () => {
         const extensionMatch = imagePath.match(/\.(jpg|jpeg|webp|png)$/i);
         const fileExtension = extensionMatch ? extensionMatch[0].toLowerCase() : '.jpg';
         
-        // Use SEO-friendly URL with slug-based filename
+        // Use SEO-friendly URL with size suffix (2048px version preferred)
         // This gives Google a meaningful filename instead of UUID-based filenames
         // Note: <image:title> and <image:caption> are deprecated by Google
         // Focus on <image:loc> - the actual URL is what matters for indexing
-        const seoImageUrl = `${baseUrl}/images/${item.slug}${fileExtension}`;
+        const seoImageUrl = item.path_2048
+          ? `${baseUrl}/images/${item.slug}-2048${fileExtension}`
+          : `${baseUrl}/images/${item.slug}-512${fileExtension}`;
         xml += `      <image:loc>${seoImageUrl}</image:loc>\n`;
         
         xml += '    </image:image>\n';
