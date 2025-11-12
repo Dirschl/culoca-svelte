@@ -248,8 +248,8 @@ let showRightsManager = false;
         ? `${baseUrl}/${image.slug}-2048${fileExtension}`
         : (image.path_512 ? `${baseUrl}/${image.slug}-512${fileExtension}` : '');
       imageSrcset = srcsetParts.join(', ');
-      // sizes: use 512px for mobile (up to 500px), 800px for desktop (matches actual render width)
-      imageSizes = '(max-width: 500px) 512px, 800px';
+      // sizes: use 512px for mobile (up to 900px), 2048px for desktop
+      imageSizes = '(max-width: 900px) 512px, 2048px';
     }
   }
 
@@ -1176,7 +1176,7 @@ let showRightsManager = false;
     <!-- Preload LCP image for better performance -->
     {#if imageUrl2048}
       {#if imageUrl512 && imageUrl512 !== imageUrl2048}
-        <link rel="preload" as="image" href={imageUrl2048} imagesrcset={`${imageUrl512} 512w, ${imageUrl2048} 2048w`} imagesizes="(max-width: 500px) 512px, 800px">
+        <link rel="preload" as="image" href={imageUrl2048} imagesrcset={`${imageUrl512} 512w, ${imageUrl2048} 2048w`} imagesizes="(max-width: 900px) 512px, 2048px">
       {:else}
         <link rel="preload" as="image" href={imageUrl2048}>
       {/if}
