@@ -40,4 +40,30 @@ export function getImageUrls(image: any): {
     srcHD: getImageUrl(image, '2048'),
     thumbnail: getImageUrl(image, '64')
   };
+}
+
+/**
+ * Get SEO-friendly image URL with slug-based filename
+ * This is useful for sitemaps and external links to improve SEO
+ * @param image - Image object with slug and path_2048 or path_512
+ * @param baseUrl - Base URL for the site (default: 'https://culoca.com')
+ * @returns SEO-friendly URL like '/images/{slug}.jpg'
+ */
+export function getSeoImageUrl(image: any, baseUrl: string = 'https://culoca.com'): string {
+  if (!image || !image.slug) {
+    return '';
+  }
+
+  // Determine file extension from path_2048 or path_512
+  const imagePath = image.path_2048 || image.path_512;
+  if (!imagePath) {
+    return '';
+  }
+
+  // Extract extension from the actual file path (e.g., "abc123.jpg" -> ".jpg")
+  const extensionMatch = imagePath.match(/\.(jpg|jpeg|webp|png)$/i);
+  const fileExtension = extensionMatch ? extensionMatch[0].toLowerCase() : '.jpg';
+
+  // Return SEO-friendly URL with slug-based filename
+  return `${baseUrl}/images/${image.slug}${fileExtension}`;
 } 

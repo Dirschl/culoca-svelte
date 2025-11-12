@@ -107,20 +107,22 @@ export const GET: RequestHandler = async () => {
       xml += `    <lastmod>${formattedDate}</lastmod>\n`;
       
       // Add enhanced image data for better SEO
+      // Use SEO-friendly URL with slug-based filename: /images/{slug}.jpg
       if (item.path_2048 || item.path_512) {
         xml += '    <image:image>\n';
-        // Use 2048px if available, otherwise fallback to 512px
-        const imagePath = item.path_2048 || item.path_512;
-        const imageBucket = item.path_2048 ? 'images-2048' : 'images-512';
-        xml += `      <image:loc>https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/${imageBucket}/${imagePath}</image:loc>\n`;
         
-        // Add title and caption for better image SEO (Google now supports this again)
-        if (item.title) {
-          xml += `      <image:title><![CDATA[${item.title}]]></image:title>\n`;
-        }
-        if (item.description) {
-          xml += `      <image:caption><![CDATA[${item.description}]]></image:caption>\n`;
-        }
+        // Determine file extension from path_2048 or path_512
+        // Extract extension from the actual file path (e.g., "abc123.jpg" -> ".jpg")
+        const imagePath = item.path_2048 || item.path_512;
+        const extensionMatch = imagePath.match(/\.(jpg|jpeg|webp|png)$/i);
+        const fileExtension = extensionMatch ? extensionMatch[0].toLowerCase() : '.jpg';
+        
+        // Use SEO-friendly URL with slug-based filename
+        // This gives Google a meaningful filename instead of UUID-based filenames
+        // Note: <image:title> and <image:caption> are deprecated by Google
+        // Focus on <image:loc> - the actual URL is what matters for indexing
+        const seoImageUrl = `${baseUrl}/images/${item.slug}${fileExtension}`;
+        xml += `      <image:loc>${seoImageUrl}</image:loc>\n`;
         
         xml += '    </image:image>\n';
       }
