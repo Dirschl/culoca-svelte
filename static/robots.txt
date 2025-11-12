@@ -1,6 +1,10 @@
 User-agent: *
 Allow: /
 
+# Explicitly allow item pages and image URLs for Google Image Search
+Allow: /item/
+Allow: /images/
+
 # Disallow login and admin pages
 Disallow: /login
 Disallow: /admin/

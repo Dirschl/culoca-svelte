@@ -8,7 +8,14 @@ export const load: PageLoad = async ({ data, url }) => {
     const metaTags = {
       title: image.title || image.original_name || 'Bild',
       description: image.description || image.caption || `Bild von ${image.title || image.original_name || 'unbekannt'}`,
-      image: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${image.path_2048 || image.path_512}`,
+      image: (() => {
+        // Use SEO-friendly URL with slug-based filename
+        const imagePath = image.path_2048 || image.path_512;
+        if (!imagePath || !image.slug) return '';
+        const extensionMatch = imagePath.match(/\.(jpg|jpeg|webp|png)$/i);
+        const fileExtension = extensionMatch ? extensionMatch[0].toLowerCase() : '.jpg';
+        return `https://culoca.com/images/${image.slug}${fileExtension}`;
+      })(),
       imageAlt: image.description || image.caption || `Bild von ${image.title || image.original_name || 'unbekannt'}`,
       url: url.toString(),
       author: image.full_name || 'Johann Dirschl',

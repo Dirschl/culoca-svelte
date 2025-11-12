@@ -203,15 +203,17 @@ let showRightsManager = false;
 
   let imageSource = '';
   $: imageSource = image ? (() => {
-    const baseUrl = 'https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public';
-    const timestamp = Date.now(); // Cache buster
-    if (image.path_2048) {
-      return `${baseUrl}/images-2048/${image.path_2048}?t=${timestamp}`;
-    }
-    if (image.path_512) {
-      return `${baseUrl}/images-512/${image.path_512}?t=${timestamp}`;
-    }
-    return '';
+    // Use SEO-friendly URL with slug-based filename (no cache-buster for Google crawling)
+    // Determine file extension from path_2048 or path_512
+    const imagePath = image.path_2048 || image.path_512;
+    if (!imagePath || !image.slug) return '';
+    
+    // Extract extension from the actual file path (e.g., "abc123.jpg" -> ".jpg")
+    const extensionMatch = imagePath.match(/\.(jpg|jpeg|webp|png)$/i);
+    const fileExtension = extensionMatch ? extensionMatch[0].toLowerCase() : '.jpg';
+    
+    // Return SEO-friendly URL: /images/{slug}.{extension}
+    return `https://culoca.com/images/${image.slug}${fileExtension}`;
   })() : '';
 
   // Beispiel: Handler für Location-Filter
@@ -1036,7 +1038,11 @@ let showRightsManager = false;
       (image.title || image.original_name || `Bild ${image.id}`).substring(0, 107) + '...' : 
       (image.title || image.original_name || `Bild ${image.id}`)}
     {@const itemUrl = `https://culoca.com/item/${image.slug}`}
-    {@const thumbnailUrl = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${image.path_2048 || image.path_512}`}
+    {@const imagePath = image.path_2048 || image.path_512}
+    {@const extensionMatch = imagePath ? imagePath.match(/\.(jpg|jpeg|webp|png)$/i) : null}
+    {@const fileExtension = extensionMatch ? extensionMatch[0].toLowerCase() : '.jpg'}
+    {@const thumbnailUrl = `https://culoca.com/images/${image.slug}${fileExtension}`}
+    {@const seoImageUrl = thumbnailUrl}
     {@const uploadDate = image.created_at ? new Date(image.created_at).toISOString() : null}
     {@const dateModified = image.updated_at ? new Date(image.updated_at).toISOString() : 
       (image.created_at ? new Date(image.created_at).toISOString() : null)}
@@ -1054,14 +1060,14 @@ let showRightsManager = false;
       "@type": "ImageObject",
       "url": itemUrl,
       "mainEntityOfPage": itemUrl,
-      "contentUrl": imageSource,
-      "thumbnailUrl": thumbnailUrl,
+      "contentUrl": seoImageUrl,
+      "thumbnailUrl": seoImageUrl,
       "name": itemName,
       "description": image.description || '',
       "inLanguage": "de",
       "width": image.width || 0,
       "height": image.height || 0,
-      "encodingFormat": "image/jpeg",
+      "encodingFormat": fileExtension === '.webp' ? 'image/webp' : fileExtension === '.png' ? 'image/png' : 'image/jpeg',
       "license": "https://culoca.com/web/license",
       "creditText": creatorName,
       "copyrightNotice": copyrightNotice,
