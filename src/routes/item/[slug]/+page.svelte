@@ -1151,6 +1151,7 @@ let showRightsManager = false;
       ? (Array.isArray(image.keywords) ? image.keywords : image.keywords.split(',').map(k => k.trim()))
           .filter(k => k && k.length > 0)
           .slice(0, 15)
+          .map(k => k.normalize('NFC')) // UTF-8 NFC normalization
       : []}
     
     {@const rawCaption = image.exif_data?.Caption || image.title || itemName}
@@ -1159,7 +1160,18 @@ let showRightsManager = false;
     {@const sha256 = image.sha256 || undefined}
     {@const creatorName = image.full_name || 'Culoca User'}
     {@const createdYear = image.created_at ? new Date(image.created_at).getFullYear() : new Date().getFullYear()}
+    {@const creditText = `Foto: ${creatorName}`}
     {@const copyrightNotice = `© ${createdYear} ${creatorName} | culoca.com. Alle Rechte vorbehalten.`}
+    
+    <!-- UTF-8 Normalization: Ensure NFC (not NFD) to prevent encoding issues like "SchoÃßbach" -->
+    {@const normalizeUTF8 = (str) => str ? str.normalize('NFC') : str}
+    {@const normalizedItemName = normalizeUTF8(itemName)}
+    {@const normalizedCaption = normalizeUTF8(caption)}
+    {@const normalizedDescription = normalizeUTF8(image.description || caption || '')}
+    {@const normalizedCreatorName = normalizeUTF8(creatorName)}
+    {@const normalizedCreditText = normalizeUTF8(creditText)}
+    {@const normalizedCopyrightNotice = normalizeUTF8(copyrightNotice)}
+    {@const normalizedContentLocationName = normalizeUTF8(image.title || itemName)}}
     
     {@html `<script type="application/ld+json">
     ${JSON.stringify({
@@ -1171,26 +1183,28 @@ let showRightsManager = false;
           "url": imageUrl2048,
           "contentUrl": imageUrl2048,
           "thumbnailUrl": imageUrl512,
-          "name": itemName,
-          "caption": caption,
-          "description": image.description || caption || '',
+          "name": normalizedItemName,
+          "caption": normalizedCaption,
+          "description": normalizedDescription,
           "inLanguage": "de",
           "width": width2048,
           "height": height2048,
           "encodingFormat": fileExtension === '.webp' ? 'image/webp' : fileExtension === '.png' ? 'image/png' : 'image/jpeg',
           "license": "https://culoca.com/web/license",
+          "creditText": normalizedCreditText,
+          "copyrightNotice": normalizedCopyrightNotice,
           "acquireLicensePage": "https://culoca.com/web/license",
           "creator": {
             "@type": "Person",
-            "name": creatorName
+            "name": normalizedCreatorName
           },
           "copyrightHolder": {
             "@type": "Person",
-            "name": creatorName
+            "name": normalizedCreatorName
           },
           "contentLocation": {
             "@type": "Place",
-            "name": image.title || itemName,
+            "name": normalizedContentLocationName,
             "geo": {
               "@type": "GeoCoordinates",
               "latitude": image.lat || 0,
@@ -1208,7 +1222,7 @@ let showRightsManager = false;
           "@type": "WebPage",
           "@id": itemUrl,
           "url": itemUrl,
-          "name": itemName,
+          "name": normalizedItemName,
           "primaryImageOfPage": {
             "@id": imageUrl2048
           }
