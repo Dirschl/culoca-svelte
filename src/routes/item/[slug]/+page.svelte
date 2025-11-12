@@ -1171,7 +1171,16 @@ let showRightsManager = false;
     {@const normalizedCreatorName = normalizeUTF8(creatorName)}
     {@const normalizedCreditText = normalizeUTF8(creditText)}
     {@const normalizedCopyrightNotice = normalizeUTF8(copyrightNotice)}
-    {@const normalizedContentLocationName = normalizeUTF8(image.title || itemName)}}
+    {@const normalizedContentLocationName = normalizeUTF8(image.title || itemName)}
+    
+    <!-- Preload LCP image for better performance -->
+    {#if imageUrl2048}
+      {#if imageUrl512 && imageUrl512 !== imageUrl2048}
+        <link rel="preload" as="image" href={imageUrl2048} imagesrcset={`${imageUrl512} 512w, ${imageUrl2048} 2048w`} imagesizes="(max-width: 900px) 512px, 2048px">
+      {:else}
+        <link rel="preload" as="image" href={imageUrl2048}>
+      {/if}
+    {/if}
     
     {@html `<script type="application/ld+json">
     ${JSON.stringify({
