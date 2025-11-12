@@ -28,18 +28,31 @@ export const GET: RequestHandler = async ({ params, url, request }) => {
   console.log(`🔍 [Images] Request for slug path: ${slugPath}`);
 
   try {
-    // Extract extension from slug path (e.g., "my-slug.jpg" -> slug: "my-slug", extension: ".jpg")
+    // Extract size suffix and extension from slug path
+    // Examples:
+    // - "my-slug-2048.jpg" -> slug: "my-slug", size: "2048", extension: ".jpg"
+    // - "my-slug-512.jpg" -> slug: "my-slug", size: "512", extension: ".jpg"
+    // - "my-slug.jpg" -> slug: "my-slug", size: null, extension: ".jpg"
     let actualSlug = slugPath;
     let requestedExtension = '';
+    let requestedSize: '512' | '2048' | null = null;
     
-    // Check if slug path ends with .jpg, .jpeg, .webp, or .png
-    const extensionMatch = slugPath.match(/\.(jpg|jpeg|webp|png)$/i);
-    if (extensionMatch) {
-      requestedExtension = extensionMatch[0].toLowerCase();
-      actualSlug = slugPath.slice(0, -requestedExtension.length);
+    // Check for size suffix pattern: -2048.jpg or -512.jpg
+    const sizeSuffixMatch = slugPath.match(/-(2048|512)\.(jpg|jpeg|webp|png)$/i);
+    if (sizeSuffixMatch) {
+      requestedSize = sizeSuffixMatch[1] as '512' | '2048';
+      requestedExtension = '.' + sizeSuffixMatch[2].toLowerCase();
+      actualSlug = slugPath.slice(0, -(`-${requestedSize}${requestedExtension}`.length));
+    } else {
+      // Check if slug path ends with .jpg, .jpeg, .webp, or .png (without size suffix)
+      const extensionMatch = slugPath.match(/\.(jpg|jpeg|webp|png)$/i);
+      if (extensionMatch) {
+        requestedExtension = extensionMatch[0].toLowerCase();
+        actualSlug = slugPath.slice(0, -requestedExtension.length);
+      }
     }
 
-    console.log(`🔍 [Images] Extracted slug: ${actualSlug}, requested extension: ${requestedExtension || 'none'}`);
+    console.log(`🔍 [Images] Extracted slug: ${actualSlug}, size: ${requestedSize || 'default'}, extension: ${requestedExtension || 'none'}`);
 
     // 1. Query database for item with this slug
     const { data: item, error: dbError } = await supabase
@@ -71,14 +84,14 @@ export const GET: RequestHandler = async ({ params, url, request }) => {
       });
     }
 
-    // 3. Check for size parameter (for srcset support: ?size=512 or ?size=2048)
+    // 3. Check for size parameter (fallback for query parameter: ?size=512 or ?size=2048)
+    // Priority: size suffix in URL > query parameter > default (2048px)
     const sizeParam = url.searchParams.get('size');
-    let requestedSize: '512' | '2048' | null = null;
-    if (sizeParam === '512' || sizeParam === '2048') {
+    if (!requestedSize && (sizeParam === '512' || sizeParam === '2048')) {
       requestedSize = sizeParam;
     }
 
-    // 4. Determine which image to serve based on size parameter
+    // 4. Determine which image to serve based on size suffix/parameter
     let imagePath: string | null = null;
     let bucket: string | null = null;
     
@@ -93,9 +106,11 @@ export const GET: RequestHandler = async ({ params, url, request }) => {
       if (item.path_2048) {
         imagePath = item.path_2048;
         bucket = 'images-2048';
+        requestedSize = '2048'; // Set for consistent behavior
       } else if (item.path_512) {
         imagePath = item.path_512;
         bucket = 'images-512';
+        requestedSize = '512'; // Set for consistent behavior
       }
     }
 

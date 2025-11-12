@@ -201,38 +201,52 @@ let showRightsManager = false;
     };
   });
 
-  // Generate SEO-friendly image URLs for srcset
+  // Generate SEO-friendly image URLs for srcset (no query parameters)
   let imageSource = '';
   let imageSrcset = '';
   let imageSizes = '';
+  let imageWidth2048 = 2048;
+  let imageHeight2048 = 1365;
   $: if (image) {
     const imagePath = image.path_2048 || image.path_512;
     if (!imagePath || !image.slug) {
       imageSource = '';
       imageSrcset = '';
       imageSizes = '';
+      imageWidth2048 = 2048;
+      imageHeight2048 = 1365;
     } else {
       // Extract extension from the actual file path (e.g., "abc123.jpg" -> ".jpg")
       const extensionMatch = imagePath.match(/\.(jpg|jpeg|webp|png)$/i);
       const fileExtension = extensionMatch ? extensionMatch[0].toLowerCase() : '.jpg';
       const baseUrl = 'https://culoca.com/images';
       
-      // Generate srcset with available sizes (512px and 2048px)
+      // Calculate dimensions for 2048px version (proportional scaling)
+      const originalWidth = image.width || 2048;
+      const originalHeight = image.height || 1365;
+      const maxDimension2048 = 2048;
+      const scale2048 = originalWidth > maxDimension2048 || originalHeight > maxDimension2048
+        ? Math.min(maxDimension2048 / originalWidth, maxDimension2048 / originalHeight)
+        : 1;
+      imageWidth2048 = Math.max(1, Math.min(Math.round(originalWidth * scale2048), maxDimension2048));
+      imageHeight2048 = Math.max(1, Math.min(Math.round(originalHeight * scale2048), maxDimension2048));
+      
+      // Generate srcset with available sizes (512px and 2048px) using size suffixes
       // Use 512px for smaller screens, 2048px for larger screens
       const srcsetParts: string[] = [];
       if (image.path_512) {
         // For 512px images, we use them for screens up to 1024px wide
-        srcsetParts.push(`${baseUrl}/${image.slug}${fileExtension}?size=512 512w`);
+        srcsetParts.push(`${baseUrl}/${image.slug}-512${fileExtension} 512w`);
       }
       if (image.path_2048) {
         // For 2048px images, we use them for screens 1024px and wider
-        srcsetParts.push(`${baseUrl}/${image.slug}${fileExtension}?size=2048 2048w`);
+        srcsetParts.push(`${baseUrl}/${image.slug}-2048${fileExtension} 2048w`);
       }
       
-      // Fallback: if no srcset, use main image source
-      imageSource = srcsetParts.length > 0 
-        ? `${baseUrl}/${image.slug}${fileExtension}`
-        : '';
+      // Fallback: if no srcset, use main image source (2048px version)
+      imageSource = image.path_2048
+        ? `${baseUrl}/${image.slug}-2048${fileExtension}`
+        : (image.path_512 ? `${baseUrl}/${image.slug}-512${fileExtension}` : '');
       imageSrcset = srcsetParts.join(', ');
       // sizes: use 512px for mobile (up to 900px), 2048px for desktop
       imageSizes = '(max-width: 900px) 512px, 2048px';
@@ -1024,7 +1038,7 @@ let showRightsManager = false;
   <title>{image?.title || `Item ${itemSlug} - culoca.com`}</title>
   <meta name="description" content={image?.description || image?.caption || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
   
-  <link rel="canonical" href={`https://culoca.com/item/${itemSlug}`}>
+  <link rel="canonical" href={`https://culoca.com/item/${itemSlug}/`}>
   
   <!-- Robots -->
   <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
@@ -1036,16 +1050,27 @@ let showRightsManager = false;
   <meta property="og:locale" content="de_DE">
   <meta property="og:title" content={image?.title || `Item ${itemSlug} - culoca.com`}>
   <meta property="og:description" content={image?.description || image?.caption || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
-  <meta property="og:url" content={`https://culoca.com/item/${itemSlug}`}> 
-  <!-- Open Graph Image: Use SEO-friendly URL for better indexing -->
+  <meta property="og:url" content={`https://culoca.com/item/${itemSlug}/`}> 
+  <!-- Open Graph Image: Use SEO-friendly URL with size suffix (no query parameters) -->
   {#if image}
-    {@const imagePath = image.path_2048 || image.path_512}
-    {@const extensionMatch = imagePath ? imagePath.match(/\.(jpg|jpeg|webp|png)$/i) : null}
+    {@const imagePathForExtension = image.path_2048 || image.path_512}
+    {@const extensionMatch = imagePathForExtension ? imagePathForExtension.match(/\.(jpg|jpeg|webp|png)$/i) : null}
     {@const fileExtension = extensionMatch ? extensionMatch[0].toLowerCase() : '.jpg'}
-    {@const ogImageUrl = `https://culoca.com/images/${image.slug}${fileExtension}`}
+    {@const ogImageUrl = image.path_2048
+      ? `https://culoca.com/images/${image.slug}-2048${fileExtension}`
+      : (image.path_512 ? `https://culoca.com/images/${image.slug}-512${fileExtension}` : '')}
+    <!-- Calculate dimensions for 2048px version (proportional scaling) -->
+    {@const originalWidth = image.width || 2048}
+    {@const originalHeight = image.height || 1365}
+    {@const maxDimension2048 = 2048}
+    {@const scale2048 = originalWidth > maxDimension2048 || originalHeight > maxDimension2048
+      ? Math.min(maxDimension2048 / originalWidth, maxDimension2048 / originalHeight)
+      : 1}
+    {@const width2048 = Math.max(1, Math.min(Math.round(originalWidth * scale2048), maxDimension2048))}
+    {@const height2048 = Math.max(1, Math.min(Math.round(originalHeight * scale2048), maxDimension2048))}
     <meta property="og:image" content={ogImageUrl}>
-    <meta property="og:image:width" content={image.width?.toString() || '2048'}>
-    <meta property="og:image:height" content={image.height?.toString() || '1365'}>
+    <meta property="og:image:width" content={width2048.toString()}>
+    <meta property="og:image:height" content={height2048.toString()}>
     <meta property="og:image:alt" content={image.title || image.description || `Item ${itemSlug}`}>
   {:else}
     <meta property="og:image" content={`https://culoca.com/api/og-image/${itemSlug}`}>
@@ -1059,10 +1084,12 @@ let showRightsManager = false;
   <meta name="twitter:title" content={image?.title || `Item ${itemSlug} - culoca.com`}>
   <meta name="twitter:description" content={image?.description || image?.caption || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
   {#if image}
-    {@const imagePath = image.path_2048 || image.path_512}
-    {@const extensionMatch = imagePath ? imagePath.match(/\.(jpg|jpeg|webp|png)$/i) : null}
+    {@const imagePathForExtension = image.path_2048 || image.path_512}
+    {@const extensionMatch = imagePathForExtension ? imagePathForExtension.match(/\.(jpg|jpeg|webp|png)$/i) : null}
     {@const fileExtension = extensionMatch ? extensionMatch[0].toLowerCase() : '.jpg'}
-    {@const twitterImageUrl = `https://culoca.com/images/${image.slug}${fileExtension}`}
+    {@const twitterImageUrl = image.path_2048
+      ? `https://culoca.com/images/${image.slug}-2048${fileExtension}`
+      : (image.path_512 ? `https://culoca.com/images/${image.slug}-512${fileExtension}` : '')}
     <meta name="twitter:image" content={twitterImageUrl}>
   {:else}
     <meta name="twitter:image" content={`https://culoca.com/api/og-image/${itemSlug}`}>
@@ -1078,22 +1105,22 @@ let showRightsManager = false;
   <!-- Strukturierte Daten (JSON-LD) für bessere SEO - Optimiert nach Google-Richtlinien -->
   {#if image}
     {@const itemName = image.title || image.original_name || `Bild ${image.id}`}
-    {@const itemUrl = `https://culoca.com/item/${image.slug}`}
+    {@const itemUrl = `https://culoca.com/item/${image.slug}/`}
     {@const hasPath2048 = !!image.path_2048}
     {@const hasPath512 = !!image.path_512}
     {@const imagePathForExtension = image.path_2048 || image.path_512}
     {@const extensionMatch = imagePathForExtension ? imagePathForExtension.match(/\.(jpg|jpeg|webp|png)$/i) : null}
     {@const fileExtension = extensionMatch ? extensionMatch[0].toLowerCase() : '.jpg'}
     
-    <!-- Generate SEO-friendly URLs with explicit size parameters -->
+    <!-- Generate SEO-friendly URLs with size suffixes (no query parameters) -->
     <!-- contentUrl: Always use 2048px version if available, otherwise 512px -->
     {@const imageUrl2048 = hasPath2048
-      ? `https://culoca.com/images/${image.slug}${fileExtension}?size=2048`
-      : (hasPath512 ? `https://culoca.com/images/${image.slug}${fileExtension}?size=512` : '')}
+      ? `https://culoca.com/images/${image.slug}-2048${fileExtension}`
+      : (hasPath512 ? `https://culoca.com/images/${image.slug}-512${fileExtension}` : '')}
     <!-- thumbnailUrl: Always use 512px version if available, otherwise 2048px (fallback) -->
     {@const imageUrl512 = hasPath512
-      ? `https://culoca.com/images/${image.slug}${fileExtension}?size=512`
-      : (hasPath2048 ? `https://culoca.com/images/${image.slug}${fileExtension}?size=2048` : '')}
+      ? `https://culoca.com/images/${image.slug}-512${fileExtension}`
+      : (hasPath2048 ? `https://culoca.com/images/${image.slug}-2048${fileExtension}` : '')}
     
     <!-- Calculate dimensions for 2048px and 512px versions (proportional scaling) -->
     <!-- Note: image.width and image.height are original dimensions after EXIF orientation -->
@@ -1213,8 +1240,8 @@ let showRightsManager = false;
               ? `${image.title} - ${image.description}` 
               : image.title || image.description || image.caption || `Bild von ${image.original_name || 'unbekannt'}`}
             class="main-image"
-            width={image.width || undefined}
-            height={image.height || undefined}
+            width={imageWidth2048}
+            height={imageHeight2048}
             loading="eager"
             decoding="async"
             fetchpriority="high"
