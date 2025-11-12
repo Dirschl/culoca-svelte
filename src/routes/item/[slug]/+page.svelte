@@ -1077,80 +1077,109 @@ let showRightsManager = false;
   
   <!-- Strukturierte Daten (JSON-LD) für bessere SEO - Optimiert nach Google-Richtlinien -->
   {#if image}
-    {@const itemName = (image.title || image.original_name || `Bild ${image.id}`).length > 110 ? 
-      (image.title || image.original_name || `Bild ${image.id}`).substring(0, 107) + '...' : 
-      (image.title || image.original_name || `Bild ${image.id}`)}
+    {@const itemName = image.title || image.original_name || `Bild ${image.id}`}
     {@const itemUrl = `https://culoca.com/item/${image.slug}`}
-    {@const imagePath = image.path_2048 || image.path_512}
-    {@const extensionMatch = imagePath ? imagePath.match(/\.(jpg|jpeg|webp|png)$/i) : null}
+    {@const imagePath2048 = image.path_2048 || image.path_512}
+    {@const imagePath512 = image.path_512}
+    {@const extensionMatch = imagePath2048 ? imagePath2048.match(/\.(jpg|jpeg|webp|png)$/i) : null}
     {@const fileExtension = extensionMatch ? extensionMatch[0].toLowerCase() : '.jpg'}
-    {@const thumbnailUrl = `https://culoca.com/images/${image.slug}${fileExtension}`}
-    {@const seoImageUrl = thumbnailUrl}
+    
+    <!-- Generate SEO-friendly URLs -->
+    {@const imageUrl2048 = `https://culoca.com/images/${image.slug}${fileExtension}`}
+    {@const imageUrl512 = imagePath512 ? `https://culoca.com/images/${image.slug}${fileExtension}?size=512` : imageUrl2048}
+    
+    <!-- Calculate dimensions for 2048px and 512px versions (proportional scaling) -->
+    <!-- Note: image.width and image.height are original dimensions after EXIF orientation -->
+    {@const originalWidth = image.width || 2048}
+    {@const originalHeight = image.height || 1365}
+    
+    <!-- For 2048px: scale down if original is larger than 2048px on any side, otherwise use original -->
+    <!-- This matches the resize logic: fit: 'inside', withoutEnlargement: true -->
+    {@const maxDimension2048 = 2048}
+    {@const scale2048 = originalWidth > maxDimension2048 || originalHeight > maxDimension2048
+      ? Math.min(maxDimension2048 / originalWidth, maxDimension2048 / originalHeight)
+      : 1}
+    {@const width2048 = Math.max(1, Math.min(Math.round(originalWidth * scale2048), maxDimension2048))}
+    {@const height2048 = Math.max(1, Math.min(Math.round(originalHeight * scale2048), maxDimension2048))}
+    
+    <!-- For 512px thumbnail: scale down proportionally (always scale for thumbnail) -->
+    {@const maxDimension512 = 512}
+    {@const scale512 = Math.min(maxDimension512 / originalWidth, maxDimension512 / originalHeight)}
+    {@const width512 = Math.max(1, Math.round(originalWidth * scale512))}
+    {@const height512 = Math.max(1, Math.round(originalHeight * scale512))}
+    
     {@const uploadDate = image.created_at ? new Date(image.created_at).toISOString() : null}
     {@const dateModified = image.updated_at ? new Date(image.updated_at).toISOString() : 
       (image.created_at ? new Date(image.created_at).toISOString() : null)}
-    {@const keywordsCsv = image.keywords ? image.keywords.join(', ') : ''}
+    
+    <!-- Process keywords: limit to 8-15 precise keywords, convert to array -->
+    {@const keywordsArray = image.keywords 
+      ? (Array.isArray(image.keywords) ? image.keywords : image.keywords.split(',').map(k => k.trim()))
+          .filter(k => k && k.length > 0)
+          .slice(0, 15)
+      : []}
+    
     {@const rawCaption = image.exif_data?.Caption || image.title || itemName}
     {@const exifCaption = image.exif_data?.Caption ? decodeURIComponent(escape(rawCaption)) : (image.title || itemName)}
-    {@const caption = image.caption || exifCaption}
+    {@const caption = image.caption || exifCaption || image.description || ''}
     {@const sha256 = image.sha256 || undefined}
     {@const creatorName = image.full_name || 'Culoca User'}
     {@const createdYear = image.created_at ? new Date(image.created_at).getFullYear() : new Date().getFullYear()}
     {@const copyrightNotice = `© ${createdYear} ${creatorName} | culoca.com. Alle Rechte vorbehalten.`}
+    
     {@html `<script type="application/ld+json">
     ${JSON.stringify({
       "@context": "https://schema.org",
-      "@type": "ImageObject",
-      "url": itemUrl,
-      "mainEntityOfPage": itemUrl,
-      "contentUrl": seoImageUrl,
-      "thumbnailUrl": seoImageUrl,
-      "name": itemName,
-      "description": image.description || '',
-      "inLanguage": "de",
-      "width": image.width || 0,
-      "height": image.height || 0,
-      "encodingFormat": fileExtension === '.webp' ? 'image/webp' : fileExtension === '.png' ? 'image/png' : 'image/jpeg',
-      "license": "https://culoca.com/web/license",
-      "creditText": creatorName,
-      "copyrightNotice": copyrightNotice,
-      "acquireLicensePage": "https://culoca.com/web/license",
-      "caption": caption,
-      "keywords": keywordsCsv,
-      "representativeOfPage": true,
-      "isFamilyFriendly": true,
-      ...(sha256 ? { "sha256": sha256 } : {}),
-      "creator": {
-        "@type": "Person",
-        "name": creatorName
-      },
-      "author": {
-        "@type": "Person",
-        "name": creatorName
-      },
-      "copyrightHolder": {
-        "@type": "Person",
-        "name": creatorName
-      },
-      "publisher": {
-        "@type": "Organization",
-        "name": "Culoca",
-        "url": "https://culoca.com"
-      },
-      "contentLocation": {
-        "@type": "Place",
-        "name": image.title || 'Unbekannter Ort',
-        "geo": {
-          "@type": "GeoCoordinates",
-          "latitude": image.lat || 0,
-          "longitude": image.lon || 0
+      "@graph": [
+        {
+          "@type": "ImageObject",
+          "@id": imageUrl2048,
+          "url": imageUrl2048,
+          "contentUrl": imageUrl2048,
+          "thumbnailUrl": imageUrl512,
+          "name": itemName,
+          "caption": caption,
+          "description": image.description || caption || '',
+          "inLanguage": "de",
+          "width": width2048,
+          "height": height2048,
+          "encodingFormat": fileExtension === '.webp' ? 'image/webp' : fileExtension === '.png' ? 'image/png' : 'image/jpeg',
+          "license": "https://culoca.com/web/license",
+          "acquireLicensePage": "https://culoca.com/web/license",
+          "creator": {
+            "@type": "Person",
+            "name": creatorName
+          },
+          "copyrightHolder": {
+            "@type": "Person",
+            "name": creatorName
+          },
+          "contentLocation": {
+            "@type": "Place",
+            "name": image.title || itemName,
+            "geo": {
+              "@type": "GeoCoordinates",
+              "latitude": image.lat || 0,
+              "longitude": image.lon || 0
+            }
+          },
+          ...(uploadDate && { "datePublished": uploadDate }),
+          ...(dateModified && { "dateModified": dateModified }),
+          ...(uploadDate && { "uploadDate": uploadDate }),
+          ...(keywordsArray.length > 0 && { "keywords": keywordsArray }),
+          ...(sha256 ? { "sha256": sha256 } : {}),
+          "representativeOfPage": true
+        },
+        {
+          "@type": "WebPage",
+          "@id": itemUrl,
+          "url": itemUrl,
+          "name": itemName,
+          "primaryImageOfPage": {
+            "@id": imageUrl2048
+          }
         }
-      },
-      // Add datePublished and dateModified for better Google understanding
-      ...(uploadDate && { "datePublished": uploadDate }),
-      ...(dateModified && { "dateModified": dateModified }),
-      // Also include uploadDate for backward compatibility
-      ...(uploadDate && { "uploadDate": uploadDate })
+      ]
     }, null, 2)}
     </script>`}
   {/if}
