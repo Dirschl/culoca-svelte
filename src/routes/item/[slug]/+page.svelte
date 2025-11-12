@@ -201,20 +201,43 @@ let showRightsManager = false;
     };
   });
 
+  // Generate SEO-friendly image URLs for srcset
   let imageSource = '';
-  $: imageSource = image ? (() => {
-    // Use SEO-friendly URL with slug-based filename (no cache-buster for Google crawling)
-    // Determine file extension from path_2048 or path_512
+  let imageSrcset = '';
+  let imageSizes = '';
+  $: if (image) {
     const imagePath = image.path_2048 || image.path_512;
-    if (!imagePath || !image.slug) return '';
-    
-    // Extract extension from the actual file path (e.g., "abc123.jpg" -> ".jpg")
-    const extensionMatch = imagePath.match(/\.(jpg|jpeg|webp|png)$/i);
-    const fileExtension = extensionMatch ? extensionMatch[0].toLowerCase() : '.jpg';
-    
-    // Return SEO-friendly URL: /images/{slug}.{extension}
-    return `https://culoca.com/images/${image.slug}${fileExtension}`;
-  })() : '';
+    if (!imagePath || !image.slug) {
+      imageSource = '';
+      imageSrcset = '';
+      imageSizes = '';
+    } else {
+      // Extract extension from the actual file path (e.g., "abc123.jpg" -> ".jpg")
+      const extensionMatch = imagePath.match(/\.(jpg|jpeg|webp|png)$/i);
+      const fileExtension = extensionMatch ? extensionMatch[0].toLowerCase() : '.jpg';
+      const baseUrl = 'https://culoca.com/images';
+      
+      // Generate srcset with available sizes (512px and 2048px)
+      // Use 512px for smaller screens, 2048px for larger screens
+      const srcsetParts: string[] = [];
+      if (image.path_512) {
+        // For 512px images, we use them for screens up to 1024px wide
+        srcsetParts.push(`${baseUrl}/${image.slug}${fileExtension}?size=512 512w`);
+      }
+      if (image.path_2048) {
+        // For 2048px images, we use them for screens 1024px and wider
+        srcsetParts.push(`${baseUrl}/${image.slug}${fileExtension}?size=2048 2048w`);
+      }
+      
+      // Fallback: if no srcset, use main image source
+      imageSource = srcsetParts.length > 0 
+        ? `${baseUrl}/${image.slug}${fileExtension}`
+        : '';
+      imageSrcset = srcsetParts.join(', ');
+      // sizes: use 512px for mobile (up to 900px), 2048px for desktop
+      imageSizes = '(max-width: 900px) 512px, 2048px';
+    }
+  }
 
   // Beispiel: Handler für Location-Filter
   function setLocationFilter() {
@@ -1014,16 +1037,36 @@ let showRightsManager = false;
   <meta property="og:title" content={image?.title || `Item ${itemSlug} - culoca.com`}>
   <meta property="og:description" content={image?.description || image?.caption || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
   <meta property="og:url" content={`https://culoca.com/item/${itemSlug}`}> 
-  <meta property="og:image" content={`https://culoca.com/api/og-image/${itemSlug}`}>
-  <meta property="og:image:width" content="1200">
-  <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content={image?.title || `Item ${itemSlug}`}>
+  <!-- Open Graph Image: Use SEO-friendly URL for better indexing -->
+  {#if image}
+    {@const imagePath = image.path_2048 || image.path_512}
+    {@const extensionMatch = imagePath ? imagePath.match(/\.(jpg|jpeg|webp|png)$/i) : null}
+    {@const fileExtension = extensionMatch ? extensionMatch[0].toLowerCase() : '.jpg'}
+    {@const ogImageUrl = `https://culoca.com/images/${image.slug}${fileExtension}`}
+    <meta property="og:image" content={ogImageUrl}>
+    <meta property="og:image:width" content={image.width?.toString() || '2048'}>
+    <meta property="og:image:height" content={image.height?.toString() || '1365'}>
+    <meta property="og:image:alt" content={image.title || image.description || `Item ${itemSlug}`}>
+  {:else}
+    <meta property="og:image" content={`https://culoca.com/api/og-image/${itemSlug}`}>
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content={`Item ${itemSlug}`}>
+  {/if}
   
   <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content={image?.title || `Item ${itemSlug} - culoca.com`}>
   <meta name="twitter:description" content={image?.description || image?.caption || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
-  <meta name="twitter:image" content={`https://culoca.com/api/og-image/${itemSlug}`}>
+  {#if image}
+    {@const imagePath = image.path_2048 || image.path_512}
+    {@const extensionMatch = imagePath ? imagePath.match(/\.(jpg|jpeg|webp|png)$/i) : null}
+    {@const fileExtension = extensionMatch ? extensionMatch[0].toLowerCase() : '.jpg'}
+    {@const twitterImageUrl = `https://culoca.com/images/${image.slug}${fileExtension}`}
+    <meta name="twitter:image" content={twitterImageUrl}>
+  {:else}
+    <meta name="twitter:image" content={`https://culoca.com/api/og-image/${itemSlug}`}>
+  {/if}
   <meta name="twitter:image:alt" content={image?.title || `Item ${itemSlug}`}>
   
   <meta name="author" content={image?.full_name || 'culoca.com'}>
@@ -1103,8 +1146,11 @@ let showRightsManager = false;
           "longitude": image.lon || 0
         }
       },
-      ...(uploadDate && { "uploadDate": uploadDate }),
-      ...(dateModified && { "dateModified": dateModified })
+      // Add datePublished and dateModified for better Google understanding
+      ...(uploadDate && { "datePublished": uploadDate }),
+      ...(dateModified && { "dateModified": dateModified }),
+      // Also include uploadDate for backward compatibility
+      ...(uploadDate && { "uploadDate": uploadDate })
     }, null, 2)}
     </script>`}
   {/if}
@@ -1125,11 +1171,16 @@ let showRightsManager = false;
         <a href="/" class="image-link">
           <img
             src={imageSource}
-            alt={image.description || image.caption || `Bild von ${image.title || image.original_name || 'unbekannt'}`}
+            srcset={imageSrcset || undefined}
+            sizes={imageSizes || undefined}
+            alt={image.title && image.description 
+              ? `${image.title} - ${image.description}` 
+              : image.title || image.description || image.caption || `Bild von ${image.original_name || 'unbekannt'}`}
             class="main-image"
-            width={image.width || 0}
-            height={image.height || 0}
+            width={image.width || undefined}
+            height={image.height || undefined}
             loading="eager"
+            decoding="async"
             fetchpriority="high"
           />
         </a>
