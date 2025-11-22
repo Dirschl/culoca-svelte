@@ -267,26 +267,37 @@
     };
   });
 
-  // Reaktive Sortierung nach GPS-Position
+  // Track last GPS position to detect changes
+  let lastReactiveLat: number | null = null;
+  let lastReactiveLon: number | null = null;
+  
+  // Reaktive Sortierung nach GPS-Position - reagiert auf Props-Änderungen
   $: if (userLat !== null && userLon !== null && $gridItems.length > 0) {
+    // Prüfe ob sich GPS-Position geändert hat
+    const gpsChanged = lastReactiveLat !== userLat || lastReactiveLon !== userLon;
     
-    console.log('[MobileGallery] GPS position changed, re-sorting items by distance');
-    
-    // Sortiere die vorhandenen Items nach aktueller GPS-Position
-    const sortedItems = [...$gridItems].sort((a: any, b: any) => {
-      if (!a.lat || !a.lon || !b.lat || !b.lon) return 0;
+    if (gpsChanged) {
+      console.log('[MobileGallery] GPS position changed, re-sorting items by distance', {
+        oldLat: lastReactiveLat,
+        oldLon: lastReactiveLon,
+        newLat: userLat,
+        newLon: userLon
+      });
       
-      const distanceA = getDistanceInMeters(userLat, userLon, a.lat, a.lon);
-      const distanceB = getDistanceInMeters(userLat, userLon, b.lat, b.lon);
+      lastReactiveLat = userLat;
+      lastReactiveLon = userLon;
       
-      return distanceA - distanceB;
-    });
-    
-    // Nur updaten wenn sich die Reihenfolge geändert hat
-    const firstItemChanged = sortedItems.length > 0 && $gridItems.length > 0 && 
-                            sortedItems[0].id !== $gridItems[0].id;
-    
-    if (firstItemChanged) {
+      // Sortiere die vorhandenen Items nach aktueller GPS-Position
+      const sortedItems = [...$gridItems].sort((a: any, b: any) => {
+        if (!a.lat || !a.lon || !b.lat || !b.lon) return 0;
+        
+        const distanceA = getDistanceInMeters(userLat, userLon, a.lat, a.lon);
+        const distanceB = getDistanceInMeters(userLat, userLon, b.lat, b.lon);
+        
+        return distanceA - distanceB;
+      });
+      
+      // Immer updaten wenn GPS-Position sich geändert hat (nicht nur wenn erstes Item sich ändert)
       console.log('[MobileGallery] Items re-sorted, closest item is now:', sortedItems[0]?.id);
       gridItems.set(sortedItems);
       
@@ -296,6 +307,13 @@
         dispatch('firstImageChanged', sortedItems[0]);
       }
     }
+  }
+  
+  // Initial set last GPS position when items are first loaded
+  $: if (userLat !== null && userLon !== null && lastReactiveLat === null) {
+    lastReactiveLat = userLat;
+    lastReactiveLon = userLon;
+    console.log('[MobileGallery] Initial GPS position set:', { lat: userLat, lon: userLon });
   }
 
   // Funktion um erstes Bild für Audioguide zu senden
