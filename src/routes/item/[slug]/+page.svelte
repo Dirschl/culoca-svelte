@@ -1254,22 +1254,20 @@ let showRightsManager = false;
     {:else if image}
     <div class="passepartout-container">
       <figure>
-        <a href="/" class="image-link">
-          <img
-            src={imageSource}
-            srcset={imageSrcset || undefined}
-            sizes={imageSizes || undefined}
-            alt={image.title && image.description 
-              ? `${image.title} - ${image.description}` 
-              : image.title || image.description || image.caption || `Bild von ${image.original_name || 'unbekannt'}`}
-            class="main-image"
-            width={imageWidth2048}
-            height={imageHeight2048}
-            loading="eager"
-            decoding="async"
-            fetchpriority="high"
-          />
-        </a>
+        <img
+          src={imageSource}
+          srcset={imageSrcset || undefined}
+          sizes={imageSizes || undefined}
+          alt={image.title && image.description 
+            ? `${image.title} - ${image.description}` 
+            : image.title || image.description || image.caption || `Bild von ${image.original_name || 'unbekannt'}`}
+          class="main-image"
+          width={imageWidth2048}
+          height={imageHeight2048}
+          loading="eager"
+          decoding="async"
+          fetchpriority="high"
+        />
         {#if image.caption}
           <figcaption>{image.caption}</figcaption>
         {/if}

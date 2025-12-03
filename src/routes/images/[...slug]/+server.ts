@@ -196,8 +196,8 @@ export const GET: RequestHandler = async ({ params, url, request }) => {
       'Access-Control-Allow-Origin': '*',
       'ETag': etag,
       'Last-Modified': lastModifiedDate.toUTCString(),
-      // Explicitly allow Google to index images (no noindex header)
-      // X-Robots-Tag is not set, which means images are indexable by default
+      // Explicitly allow Google to index images for Google Image Search
+      'X-Robots-Tag': 'index, follow, max-image-preview:large',
       // Add SEO-friendly headers
       'X-Content-Type-Options': 'nosniff'
     });
