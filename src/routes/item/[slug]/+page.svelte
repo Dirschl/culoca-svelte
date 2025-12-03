@@ -1174,8 +1174,8 @@ let showRightsManager = false;
     {@const normalizedContentLocationName = normalizeUTF8(image.title || itemName)}
     
     <!-- Preload LCP image for better performance -->
-    {#if imageUrl2048}
-      {#if imageUrl512 && imageUrl512 !== imageUrl2048}
+    {#if imageUrl2048 && imageUrl2048.length > 0 && image.slug}
+      {#if imageUrl512 && imageUrl512 !== imageUrl2048 && imageUrl512.length > 0}
         <link rel="preload" as="image" href={imageUrl2048} imagesrcset={`${imageUrl512} 512w, ${imageUrl2048} 2048w`} imagesizes="(max-width: 900px) 512px, 2048px">
       {:else}
         <link rel="preload" as="image" href={imageUrl2048}>
@@ -1254,20 +1254,22 @@ let showRightsManager = false;
     {:else if image}
     <div class="passepartout-container">
       <figure>
-        <img
-          src={imageSource}
-          srcset={imageSrcset || undefined}
-          sizes={imageSizes || undefined}
-          alt={image.title && image.description 
-            ? `${image.title} - ${image.description}` 
-            : image.title || image.description || image.caption || `Bild von ${image.original_name || 'unbekannt'}`}
-          class="main-image"
-          width={imageWidth2048}
-          height={imageHeight2048}
-          loading="eager"
-          decoding="async"
-          fetchpriority="high"
-        />
+        <a href="/" class="image-link">
+          <img
+            src={imageSource}
+            srcset={imageSrcset || undefined}
+            sizes={imageSizes || undefined}
+            alt={image.title && image.description 
+              ? `${image.title} - ${image.description}` 
+              : image.title || image.description || image.caption || `Bild von ${image.original_name || 'unbekannt'}`}
+            class="main-image"
+            width={imageWidth2048}
+            height={imageHeight2048}
+            loading="eager"
+            decoding="async"
+            fetchpriority="high"
+          />
+        </a>
         {#if image.caption}
           <figcaption>{image.caption}</figcaption>
         {/if}
