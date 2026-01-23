@@ -4,6 +4,7 @@ import { goto } from '$app/navigation';
 import type { NewsFlashImage } from './types';
 import { galleryStats } from './galleryStats';
 import { supabase } from './supabaseClient';
+import { getSeoImageUrl } from './utils/seoImageUrl';
 
 // Modus: 'eigene', 'alle', 'aus'
 export let mode: 'eigene' | 'alle' | 'aus' = 'alle';
@@ -315,8 +316,9 @@ function handleScroll(event: Event) {
           {/if}
           {#each images as img (img.id)}
             {@const displayWidth = img.width && img.height ? Math.round(140 * img.width / img.height) : 140}
+            {@const seoImageUrl = getSeoImageUrl(img.slug, img.path_512, '512')}
             <a href={`/item/${img.slug}`} class="newsflash-thumb" tabindex="0" role="button" aria-label={img.title || img.original_name || 'Bild'} title={img.title || img.original_name || 'Bild'} style="width:{displayWidth}px;">
-              <img src={"https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/" + img.path_512} alt={img.title || img.original_name || 'Bild'} width={displayWidth} height="140" loading="lazy" />
+              <img src={seoImageUrl || `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${img.path_512}`} alt={img.title || img.original_name || 'Bild'} width={displayWidth} height="140" loading="lazy" />
               {#if showImageCaptions && (img.title || img.original_name)}
                 <div class="newsflash-caption-overlay">
                   {img.title || img.original_name}
@@ -347,8 +349,9 @@ function handleScroll(event: Event) {
             <div class="newsflash-time">{lastUpdate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} {displayedImageCount}/{$galleryStats.totalCount}</div>
           {/if}
           {#each images as img (img.id)}
+            {@const seoGridImageUrl = getSeoImageUrl(img.slug, img.path_512, '512')}
             <a href={`/item/${img.slug}`} class="newsflash-thumb" tabindex="0" role="button" aria-label={img.title || img.original_name || 'Bild'} title={img.title || img.original_name || 'Bild'}>
-              <img src={"https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/" + img.path_512} alt={img.title || img.original_name || 'Bild'} />
+              <img src={seoGridImageUrl || `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${img.path_512}`} alt={img.title || img.original_name || 'Bild'} />
               {#if showImageCaptions && (img.title || img.original_name)}
                 <div class="newsflash-caption-overlay">
                   {img.title || img.original_name}

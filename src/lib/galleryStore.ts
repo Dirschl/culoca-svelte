@@ -1,5 +1,6 @@
 import { writable, get } from 'svelte/store';
 import { browser } from '$app/environment';
+import { getSeoImageUrl } from './utils/seoImageUrl';
 
 // Gallery Items and Loading State
 export const galleryItems = writable<any[]>([]);
@@ -186,23 +187,35 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
   if (items && items.length) {
     let mapped = items
       .filter((item: any) => item.path_512)
-      .map((item: any) => ({
-        src: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${item.path_512}`,
-        width: item.width,
-        height: item.height,
-        id: item.id,
-        slug: item.slug,
-        lat: item.lat,
-        lon: item.lon,
-        title: item.title,
-        distance: item.distance,
-        description: item.description,
-        profile_id: item.profile_id,
-        isSourceItem: item.isSourceItem,
-        path_64: item.path_64,
-        path_512: item.path_512,
-        path_2048: item.path_2048
-      }));
+      .map((item: any) => {
+        // Use SEO-friendly URLs for better Google indexing
+        const seoSrc = getSeoImageUrl(item.slug, item.path_512, '512');
+        const seoSrcHD = getSeoImageUrl(item.slug, item.path_2048 || item.path_512, '2048');
+        // Fallback to Supabase URLs if SEO URL generation fails
+        const fallbackSrc = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${item.path_512}`;
+        const fallbackSrcHD = item.path_2048 
+          ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${item.path_2048}`
+          : fallbackSrc;
+        
+        return {
+          src: seoSrc || fallbackSrc,
+          srcHD: seoSrcHD || fallbackSrcHD,
+          width: item.width,
+          height: item.height,
+          id: item.id,
+          slug: item.slug,
+          lat: item.lat,
+          lon: item.lon,
+          title: item.title,
+          distance: item.distance,
+          description: item.description,
+          profile_id: item.profile_id,
+          isSourceItem: item.isSourceItem,
+          path_64: item.path_64,
+          path_512: item.path_512,
+          path_2048: item.path_2048
+        };
+      });
 
     // Nur beim ersten Laden (offset === 0) das Source-Objekt zulassen
     if (offset > 0) {

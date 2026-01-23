@@ -5,6 +5,7 @@
   import { updateGalleryStats } from '$lib/galleryStats';
   import { supabase } from '$lib/supabaseClient';
   import { createEventDispatcher } from 'svelte';
+  import { getSeoImageUrl } from './utils/seoImageUrl';
   
   const dispatch = createEventDispatcher();
   export let userLat: number | null = null;
@@ -99,19 +100,28 @@
     
     // Convert images to gallery format (like simulation)
     const converted = newImages.map((img: any) => {
-      let bestSrc = '';
+      // Use SEO-friendly URLs for better Google indexing
+      const seoSrc = getSeoImageUrl(img.slug, img.path_512, '512');
+      const seoSrcHD = getSeoImageUrl(img.slug, img.path_2048 || img.path_512, '2048');
+      
+      // Fallback to Supabase URLs if SEO URL not available
+      let fallbackSrc = '';
       if (img.path_512) {
-        bestSrc = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${img.path_512}`;
+        fallbackSrc = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${img.path_512}`;
       } else if (img.path_2048) {
-        bestSrc = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${img.path_2048}`;
+        fallbackSrc = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${img.path_2048}`;
       } else if (img.path_64) {
-        bestSrc = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/${img.path_64}`;
+        fallbackSrc = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/${img.path_64}`;
       }
+      const fallbackSrcHD = img.path_2048 
+        ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${img.path_2048}` 
+        : fallbackSrc;
+      
       return {
         id: img.id,
         slug: img.slug,
-        src: bestSrc,
-        srcHD: img.path_2048 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${img.path_2048}` : bestSrc,
+        src: seoSrc || fallbackSrc,
+        srcHD: seoSrcHD || fallbackSrcHD,
         width: img.width && img.width > 0 ? img.width : 400,
         height: img.height && img.height > 0 ? img.height : 300,
         lat: img.lat,
@@ -179,19 +189,28 @@
         
         // Convert images to gallery format (like simulation)
         const converted = newImages.map((img: any) => {
-          let bestSrc = '';
+          // Use SEO-friendly URLs for better Google indexing
+          const seoSrc = getSeoImageUrl(img.slug, img.path_512, '512');
+          const seoSrcHD = getSeoImageUrl(img.slug, img.path_2048 || img.path_512, '2048');
+          
+          // Fallback to Supabase URLs if SEO URL not available
+          let fallbackSrc = '';
           if (img.path_512) {
-            bestSrc = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${img.path_512}`;
+            fallbackSrc = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${img.path_512}`;
           } else if (img.path_2048) {
-            bestSrc = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${img.path_2048}`;
+            fallbackSrc = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${img.path_2048}`;
           } else if (img.path_64) {
-            bestSrc = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/${img.path_64}`;
+            fallbackSrc = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/${img.path_64}`;
           }
+          const fallbackSrcHD = img.path_2048 
+            ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${img.path_2048}` 
+            : fallbackSrc;
+          
           return {
             id: img.id,
             slug: img.slug,
-            src: bestSrc,
-            srcHD: img.path_2048 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${img.path_2048}` : bestSrc,
+            src: seoSrc || fallbackSrc,
+            srcHD: seoSrcHD || fallbackSrcHD,
             width: img.width && img.width > 0 ? img.width : 400,
             height: img.height && img.height > 0 ? img.height : 300,
             lat: img.lat,

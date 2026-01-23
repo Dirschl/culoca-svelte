@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { supabase } from '$lib/supabaseClient';
 import { safeFunctionCall } from '$lib/databaseConfig';
+import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
 
 function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371e3; // Earth's radius in meters
@@ -81,15 +82,20 @@ export async function GET({ params }) {
               .filter((item: any) => item.id !== image.id && item.lat && item.lon)
               .map((item: any) => {
                 const distance = getDistanceInMeters(image.lat, image.lon, item.lat, item.lon);
+                // Use SEO-friendly URLs for better Google indexing
+                const seoSrc = getSeoImageUrl(item.slug, item.path_512, '512');
+                const seoSrcHD = getSeoImageUrl(item.slug, item.path_2048 || item.path_512, '2048');
+                const fallbackSrc = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${item.path_512}`;
+                const fallbackSrcHD = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${item.path_2048}`;
                 return {
                   id: item.id,
                   slug: item.slug,
                   lat: item.lat,
                   lon: item.lon,
                   distance,
-                  src: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${item.path_512}`,
-                  srcHD: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${item.path_2048}`,
-                  src64: item.path_64 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/${item.path_64}` : `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${item.path_512}`,
+                  src: seoSrc || fallbackSrc,
+                  srcHD: seoSrcHD || fallbackSrcHD,
+                  src64: item.path_64 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/${item.path_64}` : fallbackSrc,
                   width: item.width,
                   height: item.height,
                   title: item.title || item.original_name || 'Bild',
@@ -105,22 +111,29 @@ export async function GET({ params }) {
         } else {
           nearby = (nearbyData || [])
             .filter((item: any) => item.id !== image.id)
-            .map((item: any) => ({
-              id: item.id,
-              slug: item.slug,
-              lat: item.lat,
-              lon: item.lon,
-              distance: item.distance,
-              src: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${item.path_512}`,
-              srcHD: `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${item.path_2048}`,
-              src64: item.path_64 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/${item.path_64}` : `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${item.path_512}`,
-              width: item.width,
-              height: item.height,
-              title: item.title || item.original_name || 'Bild',
-              description: item.description || `Bild aus der Nähe von ${image.title}`,
-              caption: item.caption || item.description || `Bild aus der Nähe von ${image.title}`,
-              gallery: item.gallery ?? true
-            }))
+            .map((item: any) => {
+              // Use SEO-friendly URLs for better Google indexing
+              const seoSrc = getSeoImageUrl(item.slug, item.path_512, '512');
+              const seoSrcHD = getSeoImageUrl(item.slug, item.path_2048 || item.path_512, '2048');
+              const fallbackSrc = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${item.path_512}`;
+              const fallbackSrcHD = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${item.path_2048}`;
+              return {
+                id: item.id,
+                slug: item.slug,
+                lat: item.lat,
+                lon: item.lon,
+                distance: item.distance,
+                src: seoSrc || fallbackSrc,
+                srcHD: seoSrcHD || fallbackSrcHD,
+                src64: item.path_64 ? `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/${item.path_64}` : fallbackSrc,
+                width: item.width,
+                height: item.height,
+                title: item.title || item.original_name || 'Bild',
+                description: item.description || `Bild aus der Nähe von ${image.title}`,
+                caption: item.caption || item.description || `Bild aus der Nähe von ${image.title}`,
+                gallery: item.gallery ?? true
+              };
+            })
             .filter((item: any) => item.distance <= 2000)
             .slice(0, 300);
         }
