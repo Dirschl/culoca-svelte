@@ -155,6 +155,7 @@
   let simulationMode = false;
   let isInIframe = false;
   let gpsStatus: 'active' | 'cached' | 'none' | 'checking' | 'denied' | 'unavailable' = 'none';
+  let skipGpsPrompt = false;
   let autoguide = false;
   let lastGPSUpdateTime: number | null = null;
   let settingsIconRotation = 0;
@@ -194,9 +195,22 @@
   let currentImageId = ''; // Track current image ID to know when to update text
   let lastAnnouncedImageId = ''; // Track last announced image to prevent duplicates
   let scrollTimeout: number | null = null;
+  const GPS_PROMPT_PREFERENCE_KEY = 'culoca-gps-preference';
   
   // Bot-Erkennung als globale Variable
   let isBot = data.isBot || false;
+
+  function setGpsPromptPreference(preference: 'skip' | 'ask' | 'map' | 'gps') {
+    if (!browser) return;
+    localStorage.setItem(GPS_PROMPT_PREFERENCE_KEY, preference);
+    skipGpsPrompt = preference === 'skip';
+  }
+
+  function loadGpsPromptPreference() {
+    if (!browser) return;
+    const storedPreference = localStorage.getItem(GPS_PROMPT_PREFERENCE_KEY);
+    skipGpsPrompt = storedPreference === 'skip';
+  }
 
 
 
@@ -948,6 +962,8 @@
   }
   
   onMount(() => {
+    loadGpsPromptPreference();
+
     // Initialize filter store from URL parameters
     filterStore.initFromUrl($pageStore.url.searchParams);
     console.log('[onMount] Initialized filterStore from URL parameters');
@@ -1082,9 +1098,9 @@
             lastGPSUpdateTime = gpsData.timestamp;
             
             // Update filterStore with saved GPS data
-            filterStore.updateGpsStatus(true, { lat: userLat, lon: userLon });
+            filterStore.updateGpsStatus(true, { lat: gpsData.lat, lon: gpsData.lon });
             
-            console.log('[App-Start] Using saved GPS data:', { userLat, userLon, gpsAge: Math.round(gpsAge / 1000 / 60) + ' minutes' });
+            console.log('[App-Start] Using saved GPS data:', { lat: gpsData.lat, lon: gpsData.lon, gpsAge: Math.round(gpsAge / 1000 / 60) + ' minutes' });
           } else {
             console.log('[App-Start] Saved GPS data too old, clearing:', { gpsAge: Math.round(gpsAge / 1000 / 60) + ' minutes' });
             localStorage.removeItem('userGps');
@@ -1140,11 +1156,11 @@
       // Normale User: Lade gespeicherte GPS-Daten zuerst
       console.log('[App-Start] Normal user - loading saved GPS data first');
       
-      // Versuche gespeicherte GPS-Daten zu laden
-      const hasSavedGPS = loadGPSData();
-      
-      // Dann versuche live GPS zu starten
-      if (navigator.geolocation) {
+      // Dann versuche live GPS zu starten (außer User hat "Ohne Standort fortfahren" gewählt)
+      if (skipGpsPrompt && !hasLoadedGPS) {
+        console.log('[App-Start] GPS prompt skipped by user preference');
+        gpsStatus = 'none';
+      } else if (navigator.geolocation) {
         console.log('[App-Start] Geolocation available, initializing intelligently...');
         initializeGPSIntelligently();
       } else {
@@ -1422,6 +1438,7 @@
     if (browser) {
       localStorage.setItem('gpsAllowed', 'true');
       saveGPSData(lat, lon);
+      setGpsPromptPreference('map');
       console.log('[Location-Selected] Saved selected location as GPS gemerkt:', { lat, lon });
     }
     
@@ -1484,6 +1501,7 @@
           gpsStatus = 'active';
           
           if (browser) localStorage.setItem('gpsAllowed', 'true');
+          setGpsPromptPreference('gps');
           console.log("[GPS] Position geändert:", userLat, userLon);
           
           // WICHTIG: GPS-Position in filterStore speichern
@@ -1593,6 +1611,7 @@
   // Neue Funktion: Versuche GPS zu initialisieren mit besserer Fehlerbehandlung
   function tryInitializeGPS() {
     console.log('[GPS] User clicked "Standort verwenden" - trying to initialize GPS...');
+    setGpsPromptPreference('ask');
     
     if (!navigator.geolocation) {
       gpsStatus = "unavailable";
@@ -1765,9 +1784,9 @@
             lastGPSUpdateTime = gpsData.timestamp;
             
             // Update filterStore with saved GPS data
-            filterStore.updateGpsStatus(true, { lat: userLat, lon: userLon });
+            filterStore.updateGpsStatus(true, { lat: gpsData.lat, lon: gpsData.lon });
             
-            console.log('[GPS] Loaded JSON GPS data:', { userLat, userLon });
+            console.log('[GPS] Loaded JSON GPS data:', { lat: gpsData.lat, lon: gpsData.lon });
             return true;
           } else {
             console.log('[GPS] Saved GPS data too old, clearing');
@@ -1997,6 +2016,7 @@
   // NEU: Funktion zum manuellen Starten von GPS
   function startGPS() {
     console.log('[GPS] User requested GPS start');
+    setGpsPromptPreference('ask');
     if (navigator.geolocation) {
       gpsStatus = 'checking';
       initializeGPS();
@@ -2020,7 +2040,7 @@
 
 </script>
 
-{#if browser && (gpsStatus === 'denied' || gpsStatus === 'unavailable') && !userLat && !userLon && !isBot && typeof window !== 'undefined'}
+{#if browser && !skipGpsPrompt && (gpsStatus === 'denied' || gpsStatus === 'unavailable') && !userLat && !userLon && !isBot && typeof window !== 'undefined'}
   <div style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(30,30,30,0.92);z-index:10000;display:flex;flex-direction:column;align-items:center;justify-content:center;">
     <div style="background:#222;padding:2rem 2.5rem;border-radius:1rem;box-shadow:0 2px 16px #0008;max-width:90vw;text-align:center;">
       <h2 style="color:#fff;margin-bottom:1rem;">Standort auswählen</h2>
@@ -2044,6 +2064,7 @@
             gpsWatchId = null;
             console.log('[GPS-Modal] Stopped GPS watcher when user chose "Standort auf Karte auswählen"');
           }
+          setGpsPromptPreference('ask');
           gpsStatus = 'none';
           showFullscreenMap = true;
         }} style="padding: 0.9rem 2.2rem; font-size: 1.15rem; border-radius: 0.5rem; background: #4CAF50; color: #fff; border: none; cursor: pointer; font-weight:600;">
@@ -2056,6 +2077,7 @@
             gpsWatchId = null;
             console.log('[GPS-Modal] Stopped GPS watcher when user chose "Ohne Standort"');
           }
+          setGpsPromptPreference('skip');
           gpsStatus = 'none';
         }} style="padding: 0.9rem 2.2rem; font-size: 1.15rem; border-radius: 0.5rem; background: #666; color: #fff; border: none; cursor: pointer; font-weight:600;">
           Ohne Standort fortfahren
@@ -2280,6 +2302,7 @@
         if (browser) {
           localStorage.setItem('gpsAllowed', 'true');
           saveGPSData(lat, lon);
+          setGpsPromptPreference('map');
           console.log('[FullscreenMap] Saved selected location as GPS gemerkt:', { lat, lon });
         }
         
