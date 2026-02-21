@@ -23,7 +23,7 @@ export const GET: RequestHandler = async () => {
     // Entfernt: Keine Slug-Mappings mehr
     // Sitemap enthält nur korrekte Datenbank-Slugs
 
-    // Fetch all items in batches to bypass limits
+    // Fetch all public items in batches to bypass limits
     let allItems: any[] = [];
     
     try {
@@ -41,7 +41,9 @@ export const GET: RequestHandler = async () => {
           .from('items')
           .select('slug, title, description, path_2048, path_512, created_at, updated_at')
           .not('slug', 'is', null)
-          .eq('is_private', false) // Only public items
+          .not('path_512', 'is', null)
+          // Public items include false and null (legacy rows)
+          .or('is_private.eq.false,is_private.is.null')
           .order('updated_at', { ascending: false })
           .range(offset, offset + batchSize - 1);
         
@@ -93,6 +95,19 @@ export const GET: RequestHandler = async () => {
       xml += `    <lastmod>${currentDate}</lastmod>\n`;
       xml += `    <priority>${page.priority}</priority>\n`;
       xml += `    <changefreq>${page.changefreq}</changefreq>\n`;
+      xml += '  </url>\n';
+    }
+
+    // Add crawlable pagination pages so bots can discover all item links
+    const itemsPerPage = 50;
+    const totalPages = Math.max(1, Math.ceil(allItems.length / itemsPerPage));
+    for (let p = 2; p <= totalPages; p++) {
+      xml += '  <url>\n';
+      xml += `    <loc>${baseUrl}/?page=${p}</loc>\n`;
+      const currentDate = new Date().toISOString().split('T')[0];
+      xml += `    <lastmod>${currentDate}</lastmod>\n`;
+      xml += '    <priority>0.7</priority>\n';
+      xml += '    <changefreq>daily</changefreq>\n';
       xml += '  </url>\n';
     }
 

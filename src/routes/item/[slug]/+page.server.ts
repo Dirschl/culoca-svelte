@@ -109,11 +109,48 @@ export const load: PageServerLoad = async ({ params, url, depends }) => {
     // Nearby items are now loaded client-side to prevent Google from "stealing" nearby titles/descriptions
     // This prevents SEO issues where Google assigns nearby image titles to the main image
     let nearby: any[] = [];
+
+    // Lightweight internal linking for crawlers/users:
+    // previous/next public item by created_at for a stable crawl graph
+    let seoLinks: { newer: { slug: string; title: string | null } | null; older: { slug: string; title: string | null } | null } = {
+      newer: null,
+      older: null
+    };
+
+    if (img?.created_at) {
+      const { data: newerItem } = await supabase
+        .from('items')
+        .select('slug, title, created_at')
+        .not('slug', 'is', null)
+        .not('path_512', 'is', null)
+        .or('is_private.eq.false,is_private.is.null')
+        .gt('created_at', img.created_at)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      const { data: olderItem } = await supabase
+        .from('items')
+        .select('slug, title, created_at')
+        .not('slug', 'is', null)
+        .not('path_512', 'is', null)
+        .or('is_private.eq.false,is_private.is.null')
+        .lt('created_at', img.created_at)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      seoLinks = {
+        newer: newerItem ? { slug: newerItem.slug, title: newerItem.title } : null,
+        older: olderItem ? { slug: olderItem.slug, title: olderItem.title } : null
+      };
+    }
     
     return {
       image: { ...img, profile, full_name },
       error: null,
-      nearby
+      nearby,
+      seoLinks
     };
   } catch (err) {
     console.error('🔍 [DetailPage] Unexpected error:', err);

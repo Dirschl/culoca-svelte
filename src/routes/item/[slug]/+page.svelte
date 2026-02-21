@@ -73,6 +73,7 @@ let showRightsManager = false;
   let image = data?.image ?? null;
   let error = data?.error ?? '';
   let nearby: any[] = []; // Will be loaded client-side
+  let seoLinks = data?.seoLinks ?? { newer: null, older: null };
   let loading = !image;
   let profile = null;
   let metaTags = data?.metaTags ?? null;
@@ -1039,6 +1040,12 @@ let showRightsManager = false;
   <meta name="description" content={image?.description || image?.caption || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
   
   <link rel="canonical" href={`https://culoca.com/item/${itemSlug}/`}>
+  {#if seoLinks?.newer?.slug}
+    <link rel="prev" href={`https://culoca.com/item/${seoLinks.newer.slug}/`}>
+  {/if}
+  {#if seoLinks?.older?.slug}
+    <link rel="next" href={`https://culoca.com/item/${seoLinks.older.slug}/`}>
+  {/if}
   
   <!-- Robots -->
   <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
@@ -1435,6 +1442,17 @@ let showRightsManager = false;
           {/each}
         </ul>
       </div>
+    {/if}
+
+    {#if seoLinks?.newer?.slug || seoLinks?.older?.slug}
+      <nav class="item-seo-nav" aria-label="Weitere Bilder">
+        {#if seoLinks?.newer?.slug}
+          <a href={`/item/${seoLinks.newer.slug}`} rel="prev" class="item-seo-nav-link">Neueres Item</a>
+        {/if}
+        {#if seoLinks?.older?.slug}
+          <a href={`/item/${seoLinks.older.slug}`} rel="next" class="item-seo-nav-link">Älteres Item</a>
+        {/if}
+      </nav>
     {/if}
 
 
@@ -2740,6 +2758,28 @@ let showRightsManager = false;
     padding: 0;
     max-height: calc(90vh - 80px);
     overflow-y: auto;
+  }
+
+  .item-seo-nav {
+    display: flex;
+    gap: 0.75rem;
+    margin: 1rem 0 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .item-seo-nav-link {
+    display: inline-block;
+    padding: 0.4rem 0.7rem;
+    border-radius: 6px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    text-decoration: none;
+    border: 1px solid var(--border-color);
+    font-size: 0.9rem;
+  }
+
+  .item-seo-nav-link:hover {
+    border-color: var(--accent-color);
   }
 
   /* FAB Position für Rights Manager */
