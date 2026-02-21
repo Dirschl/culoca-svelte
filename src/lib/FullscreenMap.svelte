@@ -62,6 +62,11 @@
   let showManualInput = false;
   let manualLat = '';
   let manualLon = '';
+  let placeSearchQuery = '';
+  let placeSearchResults: Array<{ place_id: string; display_name: string; lat: string; lon: string }> = [];
+  let placeSearchLoading = false;
+  let placeSearchError = '';
+  let placeSearchTimeout: ReturnType<typeof setTimeout> | null = null;
   
   // Previous position for movement tracking
   let previousPosition: { lat: number; lon: number; timestamp: number } | null = null;
@@ -759,6 +764,90 @@
       // Pre-fill with current position if available
       manualLat = userLat.toFixed(6);
       manualLon = userLon.toFixed(6);
+    } else if (!showManualInput) {
+      placeSearchResults = [];
+      placeSearchLoading = false;
+      placeSearchError = '';
+      if (placeSearchTimeout) {
+        clearTimeout(placeSearchTimeout);
+        placeSearchTimeout = null;
+      }
+    }
+  }
+
+  async function searchPlaces(query: string) {
+    const trimmedQuery = query.trim();
+    if (trimmedQuery.length < 3) {
+      placeSearchResults = [];
+      placeSearchLoading = false;
+      placeSearchError = '';
+      return;
+    }
+
+    placeSearchLoading = true;
+    placeSearchError = '';
+
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&q=${encodeURIComponent(trimmedQuery)}`;
+      const response = await fetch(url, {
+        headers: {
+          'Accept': 'application/json',
+          'Accept-Language': 'de'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Geocoding failed with status ${response.status}`);
+      }
+
+      const results = await response.json();
+      if (!Array.isArray(results)) {
+        throw new Error('Invalid geocoding response');
+      }
+
+      placeSearchResults = results;
+      if (results.length === 0) {
+        placeSearchError = 'Kein Ort gefunden. Bitte Suchbegriff verfeinern.';
+      }
+    } catch (error) {
+      console.error('[FullscreenMap] Place search failed:', error);
+      placeSearchResults = [];
+      placeSearchError = 'Ortssuche ist aktuell nicht verfügbar.';
+    } finally {
+      placeSearchLoading = false;
+    }
+  }
+
+  function handlePlaceSearchInput() {
+    placeSearchError = '';
+
+    if (placeSearchTimeout) {
+      clearTimeout(placeSearchTimeout);
+    }
+
+    placeSearchTimeout = setTimeout(() => {
+      searchPlaces(placeSearchQuery);
+    }, 300);
+  }
+
+  function selectPlaceResult(result: { display_name: string; lat: string; lon: string }) {
+    const lat = Number(result.lat);
+    const lon = Number(result.lon);
+
+    if (Number.isNaN(lat) || Number.isNaN(lon)) {
+      placeSearchError = 'Ungültige Koordinaten vom Suchdienst.';
+      return;
+    }
+
+    manualLat = lat.toFixed(6);
+    manualLon = lon.toFixed(6);
+    placeSearchQuery = result.display_name;
+    placeSearchResults = [];
+    placeSearchError = '';
+
+    if (map) {
+      const targetZoom = Math.max(14, map.getZoom());
+      map.setView([lat, lon], targetZoom, { animate: true });
     }
   }
   
@@ -1071,6 +1160,10 @@
   });
   
   onDestroy(() => {
+    if (placeSearchTimeout) {
+      clearTimeout(placeSearchTimeout);
+    }
+
     // Clean up auto-rotation if active
     if (autoRotateEnabled) {
       if (watchId !== null) {
@@ -1569,6 +1662,32 @@
         <p class="manual-input-hint">Geben Sie GPS-Koordinaten im Dezimalformat ein</p>
         
         <div class="input-group">
+          <label for="manual-place">Ort suchen</label>
+          <input
+            id="manual-place"
+            type="text"
+            bind:value={placeSearchQuery}
+            on:input={handlePlaceSearchInput}
+            placeholder="z.B. München, Marienplatz"
+          />
+          {#if placeSearchLoading}
+            <div class="search-status">Suche läuft...</div>
+          {/if}
+          {#if placeSearchError}
+            <div class="search-error">{placeSearchError}</div>
+          {/if}
+          {#if placeSearchResults.length > 0}
+            <div class="search-results">
+              {#each placeSearchResults as result (result.place_id)}
+                <button type="button" class="search-result-item" on:click={() => selectPlaceResult(result)}>
+                  {result.display_name}
+                </button>
+              {/each}
+            </div>
+          {/if}
+        </div>
+
+        <div class="input-group">
           <label for="manual-lat">Breitengrad (Latitude)</label>
           <input
             id="manual-lat"
@@ -1821,6 +1940,48 @@
   .input-group input::placeholder {
     color: var(--text-secondary);
     opacity: 0.6;
+  }
+
+  .search-status {
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+  }
+
+  .search-error {
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+    color: #ff7f7f;
+  }
+
+  .search-results {
+    margin-top: 0.5rem;
+    max-height: 180px;
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-primary);
+  }
+
+  .search-result-item {
+    width: 100%;
+    text-align: left;
+    padding: 0.65rem 0.8rem;
+    border: none;
+    border-bottom: 1px solid var(--border-color);
+    background: transparent;
+    color: var(--text-primary);
+    cursor: pointer;
+    font-size: 0.9rem;
+    line-height: 1.3;
+  }
+
+  .search-result-item:last-child {
+    border-bottom: none;
+  }
+
+  .search-result-item:hover {
+    background: var(--bg-secondary);
   }
   
   .button-group {
