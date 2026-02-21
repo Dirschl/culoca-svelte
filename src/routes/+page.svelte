@@ -1414,7 +1414,10 @@
   }
 
   function handleOpenMap() {
-    openMapWithSearch = false;
+    // Wenn kein aktiver Standort vorhanden ist, direkt das Orts-Suchfeld öffnen
+    // (gleiches Verhalten wie im initialen Standort-Dialog).
+    const hasCoordinates = userLat !== null && userLon !== null;
+    openMapWithSearch = !hasCoordinates;
     showFullscreenMap = true;
   }
   
