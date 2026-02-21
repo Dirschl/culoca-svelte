@@ -139,6 +139,7 @@
   // Globale States für Umschaltung, Overlay, etc.
   let showLoginOverlay = false;
   let showFullscreenMap = false;
+  let openMapWithSearch = false;
   let isManual3x3Mode = false;
   // GPS-Koordinaten reaktiv aus dem filterStore lesen
   $: userLat = $filterStore.lastGpsPosition?.lat ?? null;
@@ -1413,6 +1414,7 @@
   }
 
   function handleOpenMap() {
+    openMapWithSearch = false;
     showFullscreenMap = true;
   }
   
@@ -2066,6 +2068,7 @@
           }
           setGpsPromptPreference('ask');
           gpsStatus = 'none';
+          openMapWithSearch = true;
           showFullscreenMap = true;
         }} style="padding: 0.9rem 2.2rem; font-size: 1.15rem; border-radius: 0.5rem; background: #4CAF50; color: #fff; border: none; cursor: pointer; font-weight:600;">
           🗺️ Standort auf Karte auswählen
@@ -2253,7 +2256,7 @@
       on:bulkUpload={() => isLoggedIn ? window.location.href = '/bulk-upload' : window.location.href = '/login'}
       on:profile={() => isLoggedIn ? window.location.href = '/profile' : window.location.href = '/login'}
       on:settings={() => isLoggedIn ? window.location.href = '/settings' : window.location.href = '/login'}
-      on:map={() => showFullscreenMap = true}
+      on:map={() => { openMapWithSearch = false; showFullscreenMap = true; }}
       on:testMode={() => simulationMode ? window.location.href = '/' : window.location.href = '/simulation'}
     />
   {/if}
@@ -2276,7 +2279,8 @@
       userLon={effectiveLon}
       {deviceHeading}
       {isManual3x3Mode}
-      on:close={() => showFullscreenMap = false}
+      openManualInput={openMapWithSearch}
+      on:close={() => { showFullscreenMap = false; openMapWithSearch = false; }}
       on:imageClick={(event) => {
         const imageSlug = event.detail.imageSlug || event.detail.slug || event.detail.imageId;
         window.location.href = `/item/${imageSlug}`;
@@ -2311,6 +2315,7 @@
         
         // Close the map
         showFullscreenMap = false;
+        openMapWithSearch = false;
         
         // Trigger gallery reload with new coordinates
         if (galleryInitialized) {

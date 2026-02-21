@@ -64,13 +64,13 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
       console.log('[GalleryStore] Using Location Filter coordinates:', mergedParams.lat, mergedParams.lon);
     } else {
       // Nur wenn kein Location Filter gesetzt ist, verwende aktuelle GPS-Position
-      if (!mergedParams.lat || !mergedParams.lon) {
+      if (mergedParams.lat == null || mergedParams.lon == null) {
         // Versuche GPS-Koordinaten aus dem Browser zu holen
         if (typeof window !== 'undefined') {
           // Hole GPS-Koordinaten aus dem Hauptspeicher (falls verfügbar)
           const userLat = (window as any).userLat;
           const userLon = (window as any).userLon;
-          if (userLat && userLon) {
+          if (userLat != null && userLon != null) {
             mergedParams.lat = userLat;
             mergedParams.lon = userLon;
             console.log('[GalleryStore] Using GPS from window object:', mergedParams.lat, mergedParams.lon);
@@ -95,17 +95,11 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
   // Wenn Location Filter gesetzt ist, immer laden (auch ohne GPS)
   // Wenn User Filter gesetzt ist, auch ohne GPS laden (Sortierung nach Datum)
   // Nur bei normalen Filtern ohne GPS warten
-  if (!mergedParams.lat || !mergedParams.lon) {
-    if (mergedParams.user_id) {
-      // Bei User-Filter auch ohne GPS laden (Sortierung nach Datum)
-      console.log('[GalleryStore] User filter active, loading without GPS coordinates');
-      mergedParams.lat = 0;
-      mergedParams.lon = 0;
-    } else {
-      console.log('[GalleryStore] No GPS coordinates available and no filters set, waiting for GPS...');
-      isGalleryLoading.set(false);
-      return; // Beende ohne zu laden
-    }
+  if (mergedParams.lat == null || mergedParams.lon == null) {
+    // Fallback ohne GPS: trotzdem laden (globale Liste / Suche)
+    console.log('[GalleryStore] No GPS coordinates available, loading with fallback coordinates 0/0');
+    mergedParams.lat = 0;
+    mergedParams.lon = 0;
   }
   
   galleryParams.set(mergedParams);
@@ -120,7 +114,7 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
     url = new URL('/api/gallery-items-search', window.location.origin);
     url.searchParams.set('page', String(Math.floor(offset / effectiveLimit)));
     url.searchParams.set('search', mergedParams.search);
-    if (mergedParams.lat && mergedParams.lon) {
+    if (mergedParams.lat !== null && mergedParams.lon !== null) {
       url.searchParams.set('lat', String(mergedParams.lat));
       url.searchParams.set('lon', String(mergedParams.lon));
     }
@@ -138,8 +132,8 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
     url = new URL('/api/gallery-items-normal', window.location.origin);
     url.searchParams.set('page', String(Math.floor(offset / effectiveLimit)));
     // WICHTIG: Immer lat/lon setzen, auch wenn 0 (für Fallback ohne GPS)
-    url.searchParams.set('lat', String(mergedParams.lat || 0));
-    url.searchParams.set('lon', String(mergedParams.lon || 0));
+    url.searchParams.set('lat', String(mergedParams.lat ?? 0));
+    url.searchParams.set('lon', String(mergedParams.lon ?? 0));
     // NEU: User-Filter Parameter hinzufügen
     if (mergedParams.user_id) {
       url.searchParams.set('user_id', String(mergedParams.user_id));
@@ -276,9 +270,9 @@ export function resetGallery(params: { search?: string; lat?: number; lon?: numb
   const currentParams = get(galleryParams);
   const newParams = { 
     search: params.search || '', 
-    lat: params.lat || null, 
-    lon: params.lon || null, 
-    radius: params.radius || null,
+    lat: params.lat ?? null, 
+    lon: params.lon ?? null, 
+    radius: params.radius ?? null,
     user_id: params.user_id || null
   };
   

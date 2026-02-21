@@ -18,6 +18,7 @@
   export let userLon: number | null = null;
   export let deviceHeading: number | null = null;
   export let isManual3x3Mode: boolean = false;
+  export let openManualInput: boolean = false;
   
   const dispatch = createEventDispatcher();
   
@@ -60,6 +61,7 @@
   
   // Manual coordinate input fallback
   let showManualInput = false;
+  let hasConsumedOpenManualInput = false;
   let manualLat = '';
   let manualLon = '';
   let placeSearchQuery = '';
@@ -94,6 +96,19 @@
   } else {
     // Normal Mode → Standard-Einstellung (deaktiviert für freie Erkundung)
     keepMarkerCentered = false;
+  }
+
+  $: if (!openManualInput) {
+    hasConsumedOpenManualInput = false;
+  }
+
+  $: if (openManualInput && !hasConsumedOpenManualInput) {
+    hasConsumedOpenManualInput = true;
+    showManualInput = true;
+    if (userLat && userLon) {
+      manualLat = userLat.toFixed(6);
+      manualLon = userLon.toFixed(6);
+    }
   }
   
     // Load saved map state from localStorage
