@@ -4,22 +4,21 @@ import type { RequestHandler } from './$types';
 
 // GET: Alle Profilrechte des aktuellen Benutzers abrufen
 export const GET: RequestHandler = async ({ request }) => {
-  // Create Supabase client directly
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-  
-  if (!supabaseUrl || !supabaseKey) {
-    return json({ error: 'Missing Supabase environment variables' }, { status: 500 });
-  }
-  
-  const supabase = createClient(supabaseUrl, supabaseKey);
-  
   try {
     // Get session from Authorization header
     const authHeader = request.headers.get('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return json({ error: 'Nicht angemeldet' }, { status: 401 });
     }
+
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    if (!supabaseUrl || !supabaseKey) {
+      return json({ error: 'Missing Supabase environment variables' }, { status: 500 });
+    }
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
 
     const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: userError } = await supabase.auth.getUser(token);
@@ -53,22 +52,21 @@ export const GET: RequestHandler = async ({ request }) => {
 
 // POST: Neue Profilrechte erstellen oder aktualisieren
 export const POST: RequestHandler = async ({ request }) => {
-  // Create Supabase client directly
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-  
-  if (!supabaseUrl || !supabaseKey) {
-    return json({ error: 'Missing Supabase environment variables' }, { status: 500 });
-  }
-  
-  const supabase = createClient(supabaseUrl, supabaseKey);
-  
   try {
     // Get session from Authorization header
     const authHeader = request.headers.get('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return json({ error: 'Nicht angemeldet' }, { status: 401 });
     }
+
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    if (!supabaseUrl || !supabaseKey) {
+      return json({ error: 'Missing Supabase environment variables' }, { status: 500 });
+    }
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
 
     const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: userError } = await supabase.auth.getUser(token);
@@ -187,22 +185,21 @@ export const POST: RequestHandler = async ({ request }) => {
 
 // DELETE: Profilrechte löschen
 export const DELETE: RequestHandler = async ({ request }) => {
-  // Create Supabase client directly
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-  
-  if (!supabaseUrl || !supabaseKey) {
-    return json({ error: 'Missing Supabase environment variables' }, { status: 500 });
-  }
-  
-  const supabase = createClient(supabaseUrl, supabaseKey);
-  
   try {
     // Get session from Authorization header
     const authHeader = request.headers.get('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return json({ error: 'Nicht angemeldet' }, { status: 401 });
     }
+
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    if (!supabaseUrl || !supabaseKey) {
+      return json({ error: 'Missing Supabase environment variables' }, { status: 500 });
+    }
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
 
     const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: userError } = await supabase.auth.getUser(token);
