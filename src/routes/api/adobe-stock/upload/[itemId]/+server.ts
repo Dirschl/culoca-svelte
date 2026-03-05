@@ -57,7 +57,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
 
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('adobe_stock_sftp_enabled, adobe_stock_profile_url')
+      .select('adobe_stock_sftp_enabled, adobe_stock_profile_url, adobe_stock_sftp_host, adobe_stock_sftp_username, adobe_stock_sftp_password, adobe_stock_sftp_remote_dir')
       .eq('id', user.id)
       .single();
 
@@ -71,14 +71,14 @@ export const POST: RequestHandler = async ({ params, request }) => {
       return json({ error: 'Originaldatei für dieses Item nicht verfügbar' }, { status: 400 });
     }
 
-    const sftpHostRaw = process.env.ADOBE_STOCK_SFTP_HOST || 'sftp.contributor.adobestock.com';
+    const sftpHostRaw = profile.adobe_stock_sftp_host || 'sftp.contributor.adobestock.com';
     const sftpHost = normalizeSftpHost(sftpHostRaw);
-    const sftpUser = process.env.ADOBE_STOCK_SFTP_USERNAME;
-    const sftpPassword = process.env.ADOBE_STOCK_SFTP_PASSWORD;
-    const sftpRemoteDir = (process.env.ADOBE_STOCK_SFTP_REMOTE_DIR || '').replace(/^\/+/, '').replace(/\/+$/, '');
+    const sftpUser = profile.adobe_stock_sftp_username;
+    const sftpPassword = profile.adobe_stock_sftp_password;
+    const sftpRemoteDir = (profile.adobe_stock_sftp_remote_dir || '').replace(/^\/+/, '').replace(/\/+$/, '');
 
     if (!sftpUser || !sftpPassword) {
-      return json({ error: 'Adobe SFTP Zugangsdaten fehlen im Server-Environment' }, { status: 500 });
+      return json({ error: 'Adobe SFTP Zugangsdaten fehlen im Benutzerprofil' }, { status: 400 });
     }
 
     const fileResponse = await fetch(item.original_url);

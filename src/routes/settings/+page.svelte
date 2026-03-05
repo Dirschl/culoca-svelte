@@ -37,6 +37,10 @@
   let saveOriginals = true;
   let adobeStockSftpEnabled = false;
   let adobeStockProfileUrl = '';
+  let adobeStockSftpHost = '';
+  let adobeStockSftpUsername = '';
+  let adobeStockSftpPassword = '';
+  let adobeStockSftpRemoteDir = '';
 
   let galleryLayout = 'grid';
 
@@ -139,6 +143,10 @@
         saveOriginals = data.save_originals ?? true;
         adobeStockSftpEnabled = data.adobe_stock_sftp_enabled ?? false;
         adobeStockProfileUrl = data.adobe_stock_profile_url || '';
+        adobeStockSftpHost = data.adobe_stock_sftp_host || 'sftp.contributor.adobestock.com';
+        adobeStockSftpUsername = data.adobe_stock_sftp_username || '';
+        adobeStockSftpPassword = data.adobe_stock_sftp_password || '';
+        adobeStockSftpRemoteDir = data.adobe_stock_sftp_remote_dir || '';
       }
     } catch (error) {
       console.error('Error loading profile:', error);
@@ -177,6 +185,10 @@
         save_originals: saveOriginals,
         adobe_stock_sftp_enabled: adobeStockSftpEnabled,
         adobe_stock_profile_url: adobeStockProfileUrl || null,
+        adobe_stock_sftp_host: adobeStockSftpHost || null,
+        adobe_stock_sftp_username: adobeStockSftpUsername || null,
+        adobe_stock_sftp_password: adobeStockSftpPassword || null,
+        adobe_stock_sftp_remote_dir: adobeStockSftpRemoteDir || null,
         updated_at: new Date().toISOString()
       };
 
@@ -632,6 +644,70 @@
                 class="settings-input"
                 bind:value={adobeStockProfileUrl}
                 placeholder="https://stock.adobe.com/de/contributor/..."
+              />
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-info">
+              <label class="setting-label" for="adobe-stock-sftp-host">Adobe SFTP Host</label>
+              <p class="setting-description">Beispiel: sftp.contributor.adobestock.com</p>
+            </div>
+            <div class="setting-control setting-control-wide">
+              <input
+                id="adobe-stock-sftp-host"
+                type="text"
+                class="settings-input"
+                bind:value={adobeStockSftpHost}
+                placeholder="sftp.contributor.adobestock.com"
+              />
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-info">
+              <label class="setting-label" for="adobe-stock-sftp-username">Adobe SFTP Benutzer</label>
+              <p class="setting-description">Dein Contributor SFTP Benutzer.</p>
+            </div>
+            <div class="setting-control setting-control-wide">
+              <input
+                id="adobe-stock-sftp-username"
+                type="text"
+                class="settings-input"
+                bind:value={adobeStockSftpUsername}
+                placeholder="z.B. 203176725"
+              />
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-info">
+              <label class="setting-label" for="adobe-stock-sftp-password">Adobe SFTP Kennwort</label>
+              <p class="setting-description">Wird im eigenen Profil gespeichert und nur für deinen Upload verwendet.</p>
+            </div>
+            <div class="setting-control setting-control-wide">
+              <input
+                id="adobe-stock-sftp-password"
+                type="password"
+                class="settings-input"
+                bind:value={adobeStockSftpPassword}
+                placeholder="SFTP Kennwort"
+              />
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-info">
+              <label class="setting-label" for="adobe-stock-sftp-remote-dir">Adobe Zielordner (optional)</label>
+              <p class="setting-description">Optionaler Zielpfad auf dem Adobe-SFTP.</p>
+            </div>
+            <div class="setting-control setting-control-wide">
+              <input
+                id="adobe-stock-sftp-remote-dir"
+                type="text"
+                class="settings-input"
+                bind:value={adobeStockSftpRemoteDir}
+                placeholder="optional/zielordner"
               />
             </div>
           </div>
