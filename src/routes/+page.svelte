@@ -221,11 +221,12 @@
     return !skipGpsPrompt;
   }
 
-  function blockMobileModeDueToGpsSettings() {
-    mobileModeLocationPromptPending = false;
+  function openGpsReactivationDialog() {
+    mobileModeLocationPromptPending = true;
     isManual3x3Mode = false;
-    showFullscreenMap = false;
-    openMapWithSearch = false;
+    showFullscreenMap = true;
+    openMapWithSearch = true;
+    gpsStatus = 'none';
     statusOverlayMessage = 'GPS-Funktionen sind in den Einstellungen deaktiviert';
     showStatusOverlay = true;
     setTimeout(() => { showStatusOverlay = false; }, 2500);
@@ -1439,8 +1440,8 @@
 
     const wantsEnableMobileMode = !isManual3x3Mode;
     if (wantsEnableMobileMode && !areGpsFeaturesAllowed()) {
-      console.log('[Mobile-Mode] Blocked: GPS features disabled in settings');
-      blockMobileModeDueToGpsSettings();
+      console.log('[Mobile-Mode] GPS features disabled in settings - opening reactivation dialog');
+      openGpsReactivationDialog();
       return;
     }
 
@@ -1699,13 +1700,6 @@
   // Neue Funktion: Versuche GPS zu initialisieren mit besserer Fehlerbehandlung
   function tryInitializeGPS() {
     console.log('[GPS] User clicked "Standort verwenden" - trying to initialize GPS...');
-
-    if (!areGpsFeaturesAllowed()) {
-      console.log('[GPS] Blocked: GPS features disabled in settings');
-      blockMobileModeDueToGpsSettings();
-      return;
-    }
-
     setGpsPromptPreference('ask');
     
     if (!navigator.geolocation) {
@@ -1900,7 +1894,7 @@
   function toggle3x3Mode() {
     const wantsEnableMobileMode = !isManual3x3Mode;
     if (wantsEnableMobileMode && !areGpsFeaturesAllowed()) {
-      blockMobileModeDueToGpsSettings();
+      openGpsReactivationDialog();
       return;
     }
     const hasCoordinates = userLat !== null && userLon !== null;
