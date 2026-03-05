@@ -1,7 +1,7 @@
 <svelte:head>
   <title>Culoca - Entdecke deine Umgebung mit GPS & Fotos</title>
   <meta name="description" content="Entdecke und teile Fotos, Events, Anzeigen, dein Profil oder Firma als GPS Items mit Geo Koordinaten. Zeige was dir gefällt starte deine eigene Culoca Galerie." />
-  <meta name="robots" content="index, follow" />
+  <meta name="robots" content="index, follow, noimageindex" />
   <meta name="author" content="DIRSCHL.com GmbH" />
   <meta name="keywords" content="GPS, Geo-Lokalisierung, Fotos, Bilder, Galerie, lokale Suche, versteckte Orte, Sehenswürdigkeiten, Events, Culoca, Entdeckungen, Umgebung, Regional, Fotografie, Wandern, Freizeit, Plattform, App, Landschaft, Lost Places, Fotolocations, Reiseführer, Urlaub, kennenlernen, Social Media, digital, für alle, Standort, Lokal, Items, Distanz, Entfernung, Freigeben, Download, Karten, Routenplaner, Anzeigen, Unterhaltung, Orte, Ort" />
   <link rel="canonical" href="https://culoca.com/" />
@@ -969,12 +969,12 @@
     filterStore.initFromUrl($pageStore.url.searchParams);
     console.log('[onMount] Initialized filterStore from URL parameters');
     
-    // URL-Parameter für mobilen Modus verarbeiten (nur für Audioguide)
+    // URL-Parameter für mobilen Modus verarbeiten
     const urlParams = new URLSearchParams(window.location.search);
     const mobileParam = urlParams.get('mobile');
     if (mobileParam === 'true') {
       console.log('[onMount] Mobile mode detected via URL parameter');
-      // Nur für Audioguide-Zwecke, nicht für Galerie-Logik
+      isManual3x3Mode = true;
     }
     
     // WICHTIG: Kurze Verzögerung um sicherzustellen, dass der FilterStore korrekt initialisiert wurde
@@ -2154,9 +2154,20 @@
   {/if}
   <WelcomeSection initialWelcomeContent={data.welcomeContent || {}} featuredItems={data.featuredItems || []} />
   
-  <!-- Bot-friendly pagination links (only visible to bots) -->
-  {#if browser && isBot}
-    <div class="bot-pagination" style="display: none;">
+  <!-- SSR gallery for bots: indexable image list without GPS/JS -->
+  {#if isBot && data.newsFlashItems?.length}
+    <section class="bot-gallery" aria-label="Bot Gallery">
+      {#each data.newsFlashItems as img}
+        <a class="bot-gallery-item" href={`/item/${img.slug}/`} rel="follow">
+          <span class="bot-gallery-title">{img.title || img.original_name || img.slug}</span>
+        </a>
+      {/each}
+    </section>
+  {/if}
+  
+  <!-- Bot-friendly pagination links -->
+  {#if isBot}
+    <div class="bot-pagination">
       {#each Array.from({length: Math.ceil(data.totalCount / 50)}, (_, i) => i + 1) as pageNum}
         <a href="/?page={pageNum}" rel="next">Page {pageNum}</a>
       {/each}
@@ -2341,6 +2352,32 @@
   opacity: 1;
   background: var(--bg-tertiary);
   color: var(--text-primary);
+}
+
+.bot-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+  margin: 1rem 0;
+}
+
+.bot-gallery-item {
+  display: block;
+}
+
+.bot-gallery-title {
+  display: block;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--border-color, #ddd);
+  color: var(--text-primary, #111);
+  background: var(--bg-secondary, #f7f7f7);
+}
+
+.bot-pagination {
+  margin: 0.5rem 0 1rem;
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 /* Autoguide Bar */

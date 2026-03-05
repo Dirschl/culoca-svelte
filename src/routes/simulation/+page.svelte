@@ -1094,7 +1094,7 @@
     <!-- Right Side - App iFrame -->
     <div class="app-side">
       <iframe 
-        src="/?autoguide=true&showDistance=true&showCompass=true&simulation=true"
+        src="/?autoguide=true&showDistance=true&showCompass=true&simulation=true&mobile=true"
         class="app-iframe"
         title="Culoca App Simulation"
       ></iframe>
