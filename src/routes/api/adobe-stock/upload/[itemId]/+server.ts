@@ -6,6 +6,7 @@ import os from 'os';
 import path from 'path';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
+import { createClient as createWebdavClient } from 'webdav';
 
 const execFileAsync = promisify(execFile);
 
@@ -81,12 +82,53 @@ export const POST: RequestHandler = async ({ params, request }) => {
       return json({ error: 'Adobe SFTP Zugangsdaten fehlen im Benutzerprofil' }, { status: 400 });
     }
 
-    const fileResponse = await fetch(item.original_url);
-    if (!fileResponse.ok) {
-      return json({ error: `Originaldatei konnte nicht geladen werden (${fileResponse.status})` }, { status: 502 });
+    let fileBuffer: Buffer | null = null;
+    let lastDownloadError = '';
+
+    // Primary: direct fetch (works for public originals URLs)
+    try {
+      const fileResponse = await fetch(item.original_url);
+      if (fileResponse.ok) {
+        fileBuffer = Buffer.from(await fileResponse.arrayBuffer());
+      } else {
+        lastDownloadError = `HTTP ${fileResponse.status}`;
+      }
+    } catch (e: any) {
+      lastDownloadError = e?.message || 'direct fetch failed';
     }
 
-    const fileBuffer = Buffer.from(await fileResponse.arrayBuffer());
+    // Fallback: load from protected Hetzner WebDAV if direct URL is unauthorized
+    if (!fileBuffer) {
+      try {
+        const webdavUrl = process.env.HETZNER_WEBDAV_URL;
+        const webdavUser = process.env.HETZNER_WEBDAV_USER;
+        const webdavPassword = process.env.HETZNER_WEBDAV_PASSWORD;
+
+        if (!webdavUrl || !webdavUser || !webdavPassword) {
+          throw new Error('Hetzner WebDAV credentials missing');
+        }
+
+        const parsed = new URL(item.original_url);
+        const webdavPath = decodeURIComponent(parsed.pathname);
+
+        const webdav = createWebdavClient(webdavUrl, {
+          username: webdavUser,
+          password: webdavPassword
+        });
+
+        const webdavData = await webdav.getFileContents(webdavPath, { format: 'binary' });
+        fileBuffer = Buffer.isBuffer(webdavData) ? webdavData : Buffer.from(webdavData as ArrayBuffer);
+      } catch (e: any) {
+        lastDownloadError = `${lastDownloadError}; webdav: ${e?.message || 'unknown error'}`;
+      }
+    }
+
+    if (!fileBuffer) {
+      return json({
+        error: 'Originaldatei konnte nicht geladen werden (401)',
+        details: lastDownloadError
+      }, { status: 502 });
+    }
     const safeName = (item.original_name || `${item.id}.jpg`).replace(/[^\w.\-]+/g, '_');
     const localTempPath = path.join(os.tmpdir(), `adobe-${item.id}-${Date.now()}-${safeName}`);
     await fs.writeFile(localTempPath, fileBuffer);
