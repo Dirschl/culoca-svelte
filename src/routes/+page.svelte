@@ -2082,31 +2082,11 @@
     <div style="background:#222;padding:2rem 2.5rem;border-radius:1rem;box-shadow:0 2px 16px #0008;max-width:90vw;text-align:center;">
       <h2 style="color:#fff;margin-bottom:1rem;">Standort auswählen</h2>
       <p style="color:#ccc;font-size:1.1rem;margin-bottom:1.5rem;">
-        {#if browser && gpsStatus === 'denied'}
-          GPS ist nicht verfügbar. Wähle deinen Standort auf der Karte aus, um die Galerie nach Entfernung zu sortieren.
-        {:else if browser && gpsStatus === 'unavailable'}
-          GPS ist nicht verfügbar. Wähle deinen Standort auf der Karte aus, um die Galerie nach Entfernung zu sortieren.
-        {:else}
-          Keine GPS-Daten verfügbar. Wähle deinen Standort aus, um die Galerie nach Entfernung zu sortieren.
-        {/if}
+        Für den mobilen Galeriemodus wird ein Standort benötigt.
       </p>
       <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;">
-        <button on:click={tryInitializeGPS} style="padding: 0.9rem 2.2rem; font-size: 1.15rem; border-radius: 0.5rem; background: #3a7; color: #fff; border: none; cursor: pointer; font-weight:600;">
-          📍 Standort verwenden
-        </button>
-        <button on:click={() => {
-          // WICHTIG: Stoppe GPS-Watcher um Konflikte zu vermeiden
-          if (gpsWatchId) {
-            navigator.geolocation.clearWatch(gpsWatchId);
-            gpsWatchId = null;
-            console.log('[GPS-Modal] Stopped GPS watcher when user chose "Standort auf Karte auswählen"');
-          }
-          setGpsPromptPreference('ask');
-          gpsStatus = 'none';
-          openMapWithSearch = true;
-          showFullscreenMap = true;
-        }} style="padding: 0.9rem 2.2rem; font-size: 1.15rem; border-radius: 0.5rem; background: #4CAF50; color: #fff; border: none; cursor: pointer; font-weight:600;">
-          🗺️ Standort auf Karte auswählen
+        <button on:click={tryInitializeGPS} disabled={gpsStatus === 'checking'} style="padding: 0.9rem 2.2rem; font-size: 1.15rem; border-radius: 0.5rem; background: #3a7; color: #fff; border: none; cursor: pointer; font-weight:600; opacity:{gpsStatus === 'checking' ? '0.7' : '1'};">
+          Eigenen GPS Standort aktivieren
         </button>
         <button on:click={() => {
           // WICHTIG: Stoppe GPS-Watcher um Konflikte zu vermeiden
@@ -2120,33 +2100,39 @@
           mobileModeLocationPromptPending = false;
           isManual3x3Mode = false;
         }} style="padding: 0.9rem 2.2rem; font-size: 1.15rem; border-radius: 0.5rem; background: #666; color: #fff; border: none; cursor: pointer; font-weight:600;">
-          Ohne Standort fortfahren
+          ohne GPS Standort
+        </button>
+        <button on:click={() => {
+          // WICHTIG: Stoppe GPS-Watcher um Konflikte zu vermeiden
+          if (gpsWatchId) {
+            navigator.geolocation.clearWatch(gpsWatchId);
+            gpsWatchId = null;
+            console.log('[GPS-Modal] Stopped GPS watcher when user chose "Standort auf Karte auswählen"');
+          }
+          setGpsPromptPreference('ask');
+          gpsStatus = 'none';
+          openMapWithSearch = true;
+          showFullscreenMap = true;
+        }} style="padding: 0.9rem 2.2rem; font-size: 1.15rem; border-radius: 0.5rem; background: #4CAF50; color: #fff; border: none; cursor: pointer; font-weight:600;">
+          Standort oder GPS Daten eintragen / auswählen
         </button>
       </div>
-      {#if browser && (gpsStatus === 'denied' || gpsStatus === 'unavailable' || gpsStatus === 'none')}
+      {#if gpsStatus === 'checking'}
+        <div style="display:flex;justify-content:center;margin-top:1rem;">
+          <div style="width:32px;height:32px;border:4px solid #3a7;border-top:4px solid transparent;border-radius:50%;animation:spin 1s linear infinite;"></div>
+        </div>
+        <div style="margin-top:0.8rem;color:#9ad1b0;font-size:1rem;">GPS wird geladen...</div>
+      {:else if gpsStatus === 'denied' || gpsStatus === 'unavailable' || gpsStatus === 'none'}
         <div style="margin-top:1.2rem;color:#f66;font-size:1.05rem;">
           {#if gpsStatus === 'denied'}
-            Standort-Freigabe wurde abgelehnt.<br>Du kannst die Galerie trotzdem nutzen.
+            Standort-Freigabe wurde abgelehnt.
           {:else if gpsStatus === 'unavailable'}
-            Standort konnte nicht ermittelt werden.<br>Du kannst die Galerie trotzdem nutzen.
+            Standort konnte nicht ermittelt werden.
           {:else}
-            GPS-Berechtigung erforderlich.<br>Klicke auf "Standort verwenden" um GPS zu aktivieren.
+            Ohne Standort ist keine mobile Galerie verfügbar.
           {/if}
         </div>
       {/if}
-    </div>
-  </div>
-{:else if browser && mobileModeLocationPromptPending && gpsStatus === 'checking' && !isBot && typeof window !== 'undefined'}
-  <!-- GPS wird geladen - zeige Ladeindikator -->
-  <div style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(30,30,30,0.92);z-index:10000;display:flex;flex-direction:column;align-items:center;justify-content:center;">
-    <div style="background:#222;padding:2rem 2.5rem;border-radius:1rem;box-shadow:0 2px 16px #0008;max-width:90vw;text-align:center;">
-      <h2 style="color:#fff;margin-bottom:1rem;">GPS wird geladen...</h2>
-      <p style="color:#ccc;font-size:1.1rem;margin-bottom:1.5rem;">
-        Bitte warte, während dein Standort ermittelt wird.
-      </p>
-      <div style="display:flex;justify-content:center;margin-top:1rem;">
-        <div style="width:40px;height:40px;border:4px solid #3a7;border-top:4px solid transparent;border-radius:50%;animation:spin 1s linear infinite;"></div>
-      </div>
       <style>
         @keyframes spin {
           0% { transform: rotate(0deg); }
