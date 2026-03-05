@@ -35,6 +35,8 @@
   
   // Upload Einstellungen
   let saveOriginals = true;
+  let adobeStockSftpEnabled = false;
+  let adobeStockProfileUrl = '';
 
   let galleryLayout = 'grid';
 
@@ -135,6 +137,8 @@
         showImageCaptions = data.show_image_captions ?? true;
 
         saveOriginals = data.save_originals ?? true;
+        adobeStockSftpEnabled = data.adobe_stock_sftp_enabled ?? false;
+        adobeStockProfileUrl = data.adobe_stock_profile_url || '';
       }
     } catch (error) {
       console.error('Error loading profile:', error);
@@ -171,6 +175,8 @@
         avatar_url: profile?.avatar_url,
         newsflash_mode: newsFlashMode,
         save_originals: saveOriginals,
+        adobe_stock_sftp_enabled: adobeStockSftpEnabled,
+        adobe_stock_profile_url: adobeStockProfileUrl || null,
         updated_at: new Date().toISOString()
       };
 
@@ -191,6 +197,8 @@
     
         localStorage.setItem('newsFlashMode', newsFlashMode);
         localStorage.setItem('saveOriginals', saveOriginals ? 'true' : 'false');
+        localStorage.setItem('adobeStockSftpEnabled', adobeStockSftpEnabled ? 'true' : 'false');
+        localStorage.setItem('adobeStockProfileUrl', adobeStockProfileUrl || '');
         localStorage.setItem('culoca-gps-preference', gpsFeaturesEnabled ? 'ask' : 'skip');
 
         if (!gpsFeaturesEnabled) {
@@ -597,6 +605,36 @@
               <span class="setting-status">{saveOriginals ? 'Aktiviert' : 'Deaktiviert'}</span>
             </div>
           </div>
+
+          <div class="setting-row">
+            <div class="setting-info">
+              <label class="setting-label" for="adobe-stock-sftp-toggle">SFTP Upload Stock Adobe</label>
+              <p class="setting-description">Erlaubt den Upload von Originalbildern zu Adobe Stock per SFTP aus Culoca.</p>
+            </div>
+            <div class="setting-control">
+              <label class="toggle-switch" for="adobe-stock-sftp-toggle">
+                <input type="checkbox" id="adobe-stock-sftp-toggle" bind:checked={adobeStockSftpEnabled} />
+                <span class="toggle-slider"></span>
+              </label>
+              <span class="setting-status">{adobeStockSftpEnabled ? 'Aktiviert' : 'Deaktiviert'}</span>
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-info">
+              <label class="setting-label" for="adobe-stock-profile-url">Adobe Stock Profil-Link</label>
+              <p class="setting-description">Fallback-Link für bereits hochgeladene, aber noch nicht freigegebene Bilder.</p>
+            </div>
+            <div class="setting-control setting-control-wide">
+              <input
+                id="adobe-stock-profile-url"
+                type="url"
+                class="settings-input"
+                bind:value={adobeStockProfileUrl}
+                placeholder="https://stock.adobe.com/de/contributor/..."
+              />
+            </div>
+          </div>
         </section>
 
         <!-- Actions -->
@@ -846,6 +884,20 @@
     align-items: center;
     gap: 1rem;
     flex-shrink: 0;
+  }
+
+  .setting-control-wide {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .settings-input {
+    width: min(420px, 100%);
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
   }
 
   .setting-status {

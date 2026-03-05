@@ -78,6 +78,12 @@ let showRightsManager = false;
   let profile = null;
   let metaTags = data?.metaTags ?? null;
   let showImageCaptions = true; // Default to true
+  let adobeStockUrlEdit = '';
+  let adobeStockAssetIdEdit = '';
+  let adobeUploadLoading = false;
+  let adobeSaveLoading = false;
+  let adobeMessage = '';
+  let lastAdobeItemId = '';
 
   // SEO/Meta: Slug statt ID verwenden - reaktiv auf URL-Parameter
   let itemSlug: string = '';
@@ -91,6 +97,13 @@ let showRightsManager = false;
   // Load nearby items client-side to prevent Google from "stealing" nearby titles/descriptions
   $: if (image && browser && image.slug) {
     loadNearbyItems();
+  }
+
+  $: if (image?.id && image.id !== lastAdobeItemId) {
+    lastAdobeItemId = image.id;
+    adobeStockUrlEdit = image.adobe_stock_url || '';
+    adobeStockAssetIdEdit = image.adobe_stock_asset_id || '';
+    adobeMessage = '';
   }
 
   async function loadNearbyItems() {
@@ -1033,6 +1046,84 @@ let showRightsManager = false;
       }
     });
   }
+
+  function extractAdobeAssetId(url: string): string {
+    const match = url.match(/\/(\d+)(?:[/?#]|$)/);
+    return match ? match[1] : '';
+  }
+
+  async function saveAdobeStockData() {
+    if (!image || !isCreator) return;
+    try {
+      adobeSaveLoading = true;
+      const normalizedUrl = adobeStockUrlEdit.trim();
+      const inferredId = adobeStockAssetIdEdit.trim() || extractAdobeAssetId(normalizedUrl);
+      const nextStatus = normalizedUrl ? (image.adobe_stock_status === 'none' ? 'uploaded' : image.adobe_stock_status) : 'none';
+
+      const res = await authFetch(`/api/item/${image.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adobe_stock_url: normalizedUrl || null,
+          adobe_stock_asset_id: inferredId || null,
+          adobe_stock_status: nextStatus
+        })
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        adobeMessage = data?.error || 'Adobe-Link konnte nicht gespeichert werden';
+        return;
+      }
+
+      const data = await res.json();
+      if (data?.item) {
+        image = { ...image, ...data.item };
+      } else {
+        image = {
+          ...image,
+          adobe_stock_url: normalizedUrl || null,
+          adobe_stock_asset_id: inferredId || null,
+          adobe_stock_status: nextStatus
+        };
+      }
+      adobeStockAssetIdEdit = inferredId;
+      adobeMessage = 'Adobe-Daten gespeichert';
+    } catch (e) {
+      adobeMessage = 'Adobe-Daten konnten nicht gespeichert werden';
+    } finally {
+      adobeSaveLoading = false;
+    }
+  }
+
+  async function uploadToAdobeStock() {
+    if (!image || !isCreator) return;
+    try {
+      adobeUploadLoading = true;
+      adobeMessage = '';
+
+      const res = await authFetch(`/api/adobe-stock/upload/${image.id}`, {
+        method: 'POST'
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        adobeMessage = data?.error || 'Upload zu Adobe fehlgeschlagen';
+        return;
+      }
+
+      if (data?.item) {
+        image = { ...image, ...data.item };
+        adobeStockUrlEdit = data.item.adobe_stock_url || adobeStockUrlEdit;
+        adobeStockAssetIdEdit = data.item.adobe_stock_asset_id || adobeStockAssetIdEdit;
+      }
+      adobeMessage = data?.message || 'Upload zu Adobe gestartet';
+    } catch (e) {
+      adobeMessage = 'Upload zu Adobe fehlgeschlagen';
+    } finally {
+      adobeUploadLoading = false;
+    }
+  }
 </script>
 
 <svelte:head>
@@ -1545,6 +1636,46 @@ let showRightsManager = false;
         {/if}
         <div class="filename">ID: {image?.id}</div>
         <div class="filename">64px: {fileSizes.size64 ? formatFileSize(fileSizes.size64) : 'unbekannt'}  |  512px: {fileSizes.size512 ? formatFileSize(fileSizes.size512) : 'unbekannt'}  |  2048px: {fileSizes.size2048 ? formatFileSize(fileSizes.size2048) : 'unbekannt'}</div>
+
+        {#if isCreator}
+          <div class="adobe-stock-card">
+            <h3>Adobe Stock</h3>
+            <div class="meta-line">Status: {image?.adobe_stock_status || 'none'}</div>
+            {#if image?.adobe_stock_uploaded_at}
+              <div class="meta-line">Upload: {new Date(image.adobe_stock_uploaded_at).toLocaleString('de-DE')}</div>
+            {/if}
+            {#if image?.adobe_stock_error}
+              <div class="meta-line adobe-error">{image.adobe_stock_error}</div>
+            {/if}
+
+            <input
+              type="url"
+              class="adobe-input"
+              bind:value={adobeStockUrlEdit}
+              placeholder="Adobe Stock Link (manuell oder später automatisch)"
+            />
+            <input
+              type="text"
+              class="adobe-input"
+              bind:value={adobeStockAssetIdEdit}
+              placeholder="Adobe Asset ID (optional)"
+            />
+            <div class="adobe-actions">
+              <button class="adobe-btn" on:click={saveAdobeStockData} disabled={adobeSaveLoading}>
+                {adobeSaveLoading ? 'Speichert...' : 'Adobe-Link speichern'}
+              </button>
+              <button class="adobe-btn primary" on:click={uploadToAdobeStock} disabled={adobeUploadLoading}>
+                {adobeUploadLoading ? 'Lädt hoch...' : 'Original zu Adobe hochladen'}
+              </button>
+            </div>
+            {#if adobeMessage}
+              <div class="meta-line">{adobeMessage}</div>
+            {/if}
+            {#if image?.adobe_stock_url}
+              <a class="adobe-link" href={image.adobe_stock_url} target="_blank" rel="noopener">Adobe Link öffnen</a>
+            {/if}
+          </div>
+        {/if}
       </div>
       <!-- Column 2: All EXIF/Meta -->
       <div class="meta-column">
@@ -2800,5 +2931,61 @@ let showRightsManager = false;
     .fab-button.rights-manager {
       bottom: 10rem;
     }
+  }
+
+  .adobe-stock-card {
+    margin-top: 1rem;
+    padding: 0.9rem;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: var(--bg-secondary);
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+  }
+
+  .adobe-stock-card h3 {
+    margin: 0 0 0.25rem 0;
+    font-size: 1rem;
+  }
+
+  .adobe-input {
+    width: 100%;
+    padding: 0.55rem 0.65rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+  }
+
+  .adobe-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .adobe-btn {
+    border: 1px solid var(--border-color);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    border-radius: 8px;
+    padding: 0.5rem 0.75rem;
+    cursor: pointer;
+  }
+
+  .adobe-btn.primary {
+    background: #ee7221;
+    color: #fff;
+    border-color: #ee7221;
+  }
+
+  .adobe-link {
+    font-size: 0.9rem;
+    color: var(--accent-color);
+    text-decoration: underline;
+  }
+
+  .adobe-error {
+    color: #d64545;
   }
 </style> 

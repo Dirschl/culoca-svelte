@@ -80,7 +80,22 @@ export const PATCH = async ({ params, request, locals }) => {
   }
 
   // Erlaubte Felder
-  const allowedFields = ['title', 'description', 'caption', 'keywords', 'original_name', 'gallery', 'lat', 'lon', 'slug'];
+  const allowedFields = [
+    'title',
+    'description',
+    'caption',
+    'keywords',
+    'original_name',
+    'gallery',
+    'lat',
+    'lon',
+    'slug',
+    'adobe_stock_status',
+    'adobe_stock_uploaded_at',
+    'adobe_stock_asset_id',
+    'adobe_stock_url',
+    'adobe_stock_error'
+  ];
   const updateData = {};
   for (const key of allowedFields) {
     if (body[key] !== undefined) {
