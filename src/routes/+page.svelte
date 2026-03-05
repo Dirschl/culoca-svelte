@@ -1373,6 +1373,7 @@
   
   $: if (galleryInitialized && browser) {
     const gps = getEffectiveGpsPosition();
+    const gpsSource = gps?.source || 'direct';
     // EINFACH: Verwende nur aktive GPS oder Fallback
     let effectiveLat: number | null = null;
     let effectiveLon: number | null = null;
@@ -1388,14 +1389,14 @@
     }
     
     // Debug-Logging für reaktive Trigger
-    const triggerLog = `GPS-Trigger: lat=${effectiveLat}, lon=${effectiveLon}, gpsStatus=${gpsStatus}, source=${gps?.source || 'direct'}, lastLat=${lastLoadedLat}, lastLon=${lastLoadedLon}, lastSource=${lastLoadedSource}`;
+    const triggerLog = `GPS-Trigger: lat=${effectiveLat}, lon=${effectiveLon}, gpsStatus=${gpsStatus}, source=${gpsSource}, lastLat=${lastLoadedLat}, lastLon=${lastLoadedLon}, lastSource=${lastLoadedSource}`;
     
     if (triggerLog !== lastTriggerLog) {
       console.log('[GPS-Trigger-Debug]', triggerLog);
       lastTriggerLog = triggerLog;
     }
     
-    if (effectiveLat && effectiveLon && (effectiveLat !== lastLoadedLat || effectiveLon !== lastLoadedLon || gps?.source !== lastLoadedSource)) {
+    if (effectiveLat && effectiveLon && (effectiveLat !== lastLoadedLat || effectiveLon !== lastLoadedLon || gpsSource !== lastLoadedSource)) {
       // Debounce GPS updates um Endlosschleifen zu verhindern
       if (gpsUpdateTimeout) {
         clearTimeout(gpsUpdateTimeout);
@@ -1406,7 +1407,7 @@
         console.log('[GPS-Trigger] Executing delayed reset');
         lastLoadedLat = effectiveLat;
         lastLoadedLon = effectiveLon;
-        lastLoadedSource = gps?.source || 'direct';
+        lastLoadedSource = gpsSource;
         
         if (isManual3x3Mode) {
           // Mobile Mode: Keine Galerie-Reset, Mobile Galerie sortiert sich selbst reaktiv
@@ -2135,7 +2136,7 @@
     gpsStatus = 'none';
     userLat = null;
     userLon = null;
-    filterStore.updateGpsStatus(false);
+    filterStore.clearGpsData();
     if (browser) {
       localStorage.removeItem('gpsAllowed');
       localStorage.removeItem('userGps');
