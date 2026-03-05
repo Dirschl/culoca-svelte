@@ -12,20 +12,26 @@ export const load: PageServerLoad = async ({ url, request }) => {
   
   // Bot detection for enhanced SEO
   const userAgent = request.headers.get('user-agent') || '';
-  const isBot = userAgent.toLowerCase().includes('googlebot') ||
-                userAgent.toLowerCase().includes('bingbot') ||
-                userAgent.toLowerCase().includes('slurp') ||
-                userAgent.toLowerCase().includes('duckduckbot') ||
-                userAgent.toLowerCase().includes('facebookexternalhit') ||
-                userAgent.toLowerCase().includes('twitterbot') ||
-                userAgent.toLowerCase().includes('linkedinbot') ||
-                userAgent.toLowerCase().includes('yandexbot') ||
-                userAgent.toLowerCase().includes('baiduspider') ||
-                userAgent.toLowerCase().includes('rogerbot') ||
-                userAgent.toLowerCase().includes('dotbot') ||
-                userAgent.toLowerCase().includes('ia_archiver') ||
-                userAgent.toLowerCase().includes('google-inspectiontool') ||
-                userAgent.toLowerCase().includes('inspectiontool');
+  const userAgentLower = userAgent.toLowerCase();
+  const forceBot = ['1', 'true', 'yes'].includes((url.searchParams.get('bot') || '').toLowerCase());
+  const isBot = forceBot ||
+                userAgentLower.includes('googlebot') ||
+                userAgentLower.includes('bingbot') ||
+                userAgentLower.includes('slurp') ||
+                userAgentLower.includes('duckduckbot') ||
+                userAgentLower.includes('facebookexternalhit') ||
+                userAgentLower.includes('twitterbot') ||
+                userAgentLower.includes('linkedinbot') ||
+                userAgentLower.includes('yandexbot') ||
+                userAgentLower.includes('baiduspider') ||
+                userAgentLower.includes('rogerbot') ||
+                userAgentLower.includes('dotbot') ||
+                userAgentLower.includes('ia_archiver') ||
+                userAgentLower.includes('google-inspectiontool') ||
+                userAgentLower.includes('inspectiontool') ||
+                userAgentLower.includes('headlesschrome') ||
+                userAgentLower.includes('lighthouse') ||
+                userAgentLower.includes('node');
 
   // Supabase client für serverseitige Daten
   const supabaseUrl = (process.env.PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL || import.meta.env.PUBLIC_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL) as string;

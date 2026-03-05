@@ -973,9 +973,13 @@
     // URL-Parameter für mobilen Modus verarbeiten
     const urlParams = new URLSearchParams(window.location.search);
     const mobileParam = urlParams.get('mobile');
+    const botParam = (urlParams.get('bot') || '').toLowerCase();
     if (mobileParam === 'true') {
       console.log('[onMount] Mobile mode detected via URL parameter');
       isManual3x3Mode = true;
+    }
+    if (botParam === '1' || botParam === 'true' || botParam === 'yes') {
+      isBot = true;
     }
     
     // WICHTIG: Kurze Verzögerung um sicherzustellen, dass der FilterStore korrekt initialisiert wurde
@@ -1127,7 +1131,7 @@
     if (browser) {
       const userAgent = navigator.userAgent.toLowerCase();
       // Bot-User-Agents erkennen (inkl. Google Inspection Tool)
-      isBot = userAgent.includes('googlebot') ||
+      const detectedBot = userAgent.includes('googlebot') ||
                userAgent.includes('bingbot') ||
                userAgent.includes('slurp') ||
                userAgent.includes('duckduckbot') ||
@@ -1140,7 +1144,11 @@
                userAgent.includes('dotbot') ||
                userAgent.includes('ia_archiver') ||
                userAgent.includes('google-inspectiontool') ||
-               userAgent.includes('inspectiontool');
+               userAgent.includes('inspectiontool') ||
+               userAgent.includes('headlesschrome') ||
+               userAgent.includes('lighthouse');
+      // Keep server-side bot detection truthy to avoid hydration hiding of bot SSR content
+      isBot = isBot || detectedBot;
       
       // Debug-Ausgabe
       console.log('[Bot-Debug] User-Agent:', userAgent);
