@@ -793,6 +793,18 @@
     }
   }
 
+  function cancelManualInput() {
+    showManualInput = false;
+    placeSearchResults = [];
+    placeSearchLoading = false;
+    placeSearchError = '';
+    if (placeSearchTimeout) {
+      clearTimeout(placeSearchTimeout);
+      placeSearchTimeout = null;
+    }
+    closeMap();
+  }
+
   async function searchPlaces(query: string) {
     const trimmedQuery = query.trim();
     if (trimmedQuery.length < 3) {
@@ -1751,7 +1763,7 @@
         </div>
         
         <div class="button-group">
-          <button class="btn-cancel" on:click={toggleManualInput}>Abbrechen</button>
+          <button class="btn-cancel" on:click={cancelManualInput}>Abbrechen</button>
           <button class="btn-submit" on:click={submitManualCoordinates}>Übernehmen</button>
         </div>
       </div>
