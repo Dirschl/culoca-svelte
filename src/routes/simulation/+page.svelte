@@ -31,7 +31,7 @@
   let showDistance = true;
   let showCompass = false;
   let autoguide = false;
-  let newsFlashMode: 'aus' | 'eigene' | 'alle' = 'alle';
+  let newsFlashMode: 'aus' | 'eigene' | 'alle' = 'aus';
   let userLat: number | null = null;
   let userLon: number | null = null;
   let deviceHeading: number | null = null;
@@ -746,8 +746,8 @@
       const isLoaded = dynamicLoader.isCellLoaded(cell.x, cell.y);
       const isCenter = currentCenterCell && cell.x === currentCenterCell.x && cell.y === currentCenterCell.y;
       
-      // Calculate cell boundaries (1010)
-      const cellSizeDeg = 10 / 111.0; // 10km in degrees
+      // Calculate cell boundaries based on dynamic loader config
+      const cellSizeDeg = dynamicLoader.getCellSizeDeg();
       const halfCell = cellSizeDeg / 2;
       
       const bounds = [

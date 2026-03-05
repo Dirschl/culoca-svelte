@@ -148,7 +148,7 @@
   let showCompass = false;
   let showImageCaptions = true;
   let isLoggedIn = false;
-  let newsFlashMode: 'alle' | 'eigene' | 'aus' = 'alle';
+  let newsFlashMode: 'alle' | 'eigene' | 'aus' = 'aus';
   let profileAvatar: string | null = null;
   let deviceHeading = null;
   let authChecked = false;
@@ -303,7 +303,7 @@
         showCompass = data?.show_compass ?? false;
         autoguide = data?.autoguide ?? false;
         showImageCaptions = data?.show_image_captions ?? true;
-        newsFlashMode = data?.newsflash_mode ?? 'alle';
+        newsFlashMode = data?.newsflash_mode ?? 'aus';
         
         // Also check localStorage for immediate updates
         if (browser && typeof localStorage !== 'undefined') {
@@ -949,10 +949,10 @@
   // Setze Default-Settings für anonyme User
   function setAnonymousUserDefaults() {
     if (browser && !isLoggedIn) {
-      // Setze NewsFlash auf 'alle' für anonyme User wenn nicht bereits gesetzt
+      // Setze NewsFlash auf 'aus' für anonyme User wenn nicht bereits gesetzt
       if (!localStorage.getItem('newsFlashMode')) {
-        localStorage.setItem('newsFlashMode', 'alle');
-        newsFlashMode = 'alle';
+        localStorage.setItem('newsFlashMode', 'aus');
+        newsFlashMode = 'aus';
       }
       
       // WelcomeVisible ist bereits standardmäßig auf true gesetzt
@@ -1268,34 +1268,28 @@
                 console.log('[Gallery-Init] Updated original gallery coordinates:', { originalGalleryLat, originalGalleryLon });
               }
               
-              // Nur für Mobile Mode: Galerie neu laden
-              if (isManual3x3Mode) {
-                const galleryParams: any = {
-                  lat: effectiveLat,
-                  lon: effectiveLon
-                };
-                
-                // WICHTIG: User-Filter beibehalten falls gesetzt
-                if ($filterStore.userFilter) {
-                  galleryParams.user_id = $filterStore.userFilter.userId;
-                }
-                
-                // Füge Suchparameter hinzu falls vorhanden
-                if (searchParam) {
-                  galleryParams.search = searchParam;
-                  setSearchQuery(searchParam);
-                }
-                // Setze fromItem, wenn Location-Filter aktiv
-                if ($filterStore.locationFilter) {
-                  galleryParams.fromItem = true;
-                }
-                
-                console.log('[Gallery-Init] Reloading mobile gallery with GPS coordinates:', galleryParams);
-                resetGallery(galleryParams);
-              } else {
-                // Normal Mode: Nur Koordinaten aktualisieren, keine Neuladung
-                console.log('[Gallery-Init] Normal mode: Updated GPS coordinates without reloading gallery');
+              const galleryParams: any = {
+                lat: effectiveLat,
+                lon: effectiveLon
+              };
+
+              // WICHTIG: User-Filter beibehalten falls gesetzt
+              if ($filterStore.userFilter) {
+                galleryParams.user_id = $filterStore.userFilter.userId;
               }
+
+              // Füge Suchparameter hinzu falls vorhanden
+              if (searchParam) {
+                galleryParams.search = searchParam;
+                setSearchQuery(searchParam);
+              }
+              // Setze fromItem, wenn Location-Filter aktiv
+              if ($filterStore.locationFilter) {
+                galleryParams.fromItem = true;
+              }
+
+              console.log('[Gallery-Init] Reloading gallery with GPS coordinates:', galleryParams);
+              resetGallery(galleryParams);
               
               return; // Koordinaten aktualisiert, beende Warteschleife
             }
@@ -1374,8 +1368,9 @@
           // Mobile Mode: Keine Galerie-Reset, Mobile Galerie sortiert sich selbst reaktiv
           console.log('[GPS-Trigger] Mobile Mode: Skipping gallery reset, mobile gallery will sort itself');
         } else {
-          // Normal Mode: KEINE automatischen Reloads - nur clientseitige Sortierung
-          console.log('[GPS-Trigger] Normal Mode: No automatic reloads, only client-side sorting');
+          // Normal Mode: Mit GPS neu laden für Distanzsortierung aus der API
+          resetGallery({ lat: effectiveLat, lon: effectiveLon });
+          console.log('[GPS-Trigger] Normal Mode: Reloaded gallery with GPS coordinates');
         }
         
         // Clientseitige Sortierung für bereits geladene Items (unabhängig vom Modus)
@@ -2138,9 +2133,9 @@
     onToggleLayout={toggleLayout}
     onClear={clearSearchAndReloadGallery}
   />
-  {#if newsFlashMode !== 'aus'}
+  {#if newsFlashMode !== 'aus' || isBot}
                     <NewsFlash 
-                  mode={newsFlashMode}
+                  mode={isBot ? 'alle' : newsFlashMode}
                   userId={null}
                   layout={$useJustifiedLayout ? 'justified' : 'grid'}
                   limit={15}

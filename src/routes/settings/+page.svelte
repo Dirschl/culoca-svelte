@@ -28,7 +28,7 @@
   let showDistance = false;
   let showCompass = false;
   let autoguide = false;
-  let newsFlashMode: 'aus' | 'eigene' | 'alle' = 'alle';
+  let newsFlashMode: 'aus' | 'eigene' | 'alle' = 'aus';
   let showWelcome = true;
   let showImageCaptions = true;
 
@@ -126,7 +126,7 @@
         showDistance = data.show_distance ?? false;
         showCompass = data.show_compass ?? false;
         autoguide = data.autoguide ?? false;
-        newsFlashMode = data.newsflash_mode ?? 'alle';
+        newsFlashMode = data.newsflash_mode ?? 'aus';
         showWelcome = data.show_welcome ?? true;
         showImageCaptions = data.show_image_captions ?? true;
 

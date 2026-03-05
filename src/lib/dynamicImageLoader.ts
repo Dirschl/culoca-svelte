@@ -22,7 +22,7 @@ export class DynamicImageLoader {
   private currentCenterCell: { x: number; y: number } | null = null;
   
   // Grid configuration
-  private readonly CELL_SIZE_KM = 10; // 10km x 10km cells
+  private readonly CELL_SIZE_KM = 5; // 5km x 5km cells (mobile + simulation performance)
   private readonly CELL_SIZE_DEG = this.CELL_SIZE_KM / 111.0; // Convert km to degrees
   private readonly GRID_SIZE = 3; // 3x3 grid around current position
 
@@ -51,6 +51,14 @@ export class DynamicImageLoader {
     const x = Math.floor(lon / this.CELL_SIZE_DEG);
     const y = Math.floor(lat / this.CELL_SIZE_DEG);
     return { x, y };
+  }
+
+  getCellSizeKm(): number {
+    return this.CELL_SIZE_KM;
+  }
+
+  getCellSizeDeg(): number {
+    return this.CELL_SIZE_DEG;
   }
 
   // Convert grid coordinates to cell center lat/lon
