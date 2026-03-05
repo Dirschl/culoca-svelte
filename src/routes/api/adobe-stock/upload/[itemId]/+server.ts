@@ -84,6 +84,9 @@ export const POST: RequestHandler = async ({ params, request }) => {
 
     let fileBuffer: Buffer | null = null;
     let lastDownloadError = '';
+    const webdavUrl = process.env.HETZNER_WEBDAV_URL;
+    const webdavUser = process.env.HETZNER_WEBDAV_USER;
+    const webdavPassword = process.env.HETZNER_WEBDAV_PASSWORD;
 
     // Primary: direct fetch (works for public originals URLs)
     try {
@@ -97,27 +100,57 @@ export const POST: RequestHandler = async ({ params, request }) => {
       lastDownloadError = e?.message || 'direct fetch failed';
     }
 
+    // Retry with Basic Auth for protected Storagebox URLs
+    if (!fileBuffer && webdavUser && webdavPassword) {
+      try {
+        const auth = Buffer.from(`${webdavUser}:${webdavPassword}`).toString('base64');
+        const authResponse = await fetch(item.original_url, {
+          headers: {
+            Authorization: `Basic ${auth}`
+          }
+        });
+        if (authResponse.ok) {
+          fileBuffer = Buffer.from(await authResponse.arrayBuffer());
+        } else {
+          lastDownloadError = `${lastDownloadError}; auth-fetch HTTP ${authResponse.status}`;
+        }
+      } catch (e: any) {
+        lastDownloadError = `${lastDownloadError}; auth-fetch ${e?.message || 'failed'}`;
+      }
+    }
+
     // Fallback: load from protected Hetzner WebDAV if direct URL is unauthorized
     if (!fileBuffer) {
       try {
-        const webdavUrl = process.env.HETZNER_WEBDAV_URL;
-        const webdavUser = process.env.HETZNER_WEBDAV_USER;
-        const webdavPassword = process.env.HETZNER_WEBDAV_PASSWORD;
-
         if (!webdavUrl || !webdavUser || !webdavPassword) {
           throw new Error('Hetzner WebDAV credentials missing');
         }
 
         const parsed = new URL(item.original_url);
-        const webdavPath = decodeURIComponent(parsed.pathname);
+        const pathFromUrl = decodeURIComponent(parsed.pathname).replace(/^\/+/, '');
+        const candidatePaths = [
+          `items/${item.id}.jpg`,
+          pathFromUrl,
+          `items/${(item.original_name || `${item.id}.jpg`).replace(/[^\w.\-]+/g, '_')}`
+        ].filter(Boolean);
 
         const webdav = createWebdavClient(webdavUrl, {
           username: webdavUser,
           password: webdavPassword
         });
-
-        const webdavData = await webdav.getFileContents(webdavPath, { format: 'binary' });
-        fileBuffer = Buffer.isBuffer(webdavData) ? webdavData : Buffer.from(webdavData as ArrayBuffer);
+        let webdavError = '';
+        for (const webdavPath of candidatePaths) {
+          try {
+            const webdavData = await webdav.getFileContents(webdavPath, { format: 'binary' });
+            fileBuffer = Buffer.isBuffer(webdavData) ? webdavData : Buffer.from(webdavData as ArrayBuffer);
+            break;
+          } catch (e: any) {
+            webdavError = `${webdavError} [${webdavPath}: ${e?.message || 'failed'}]`;
+          }
+        }
+        if (!fileBuffer) {
+          throw new Error(`no matching WebDAV path${webdavError}`);
+        }
       } catch (e: any) {
         lastDownloadError = `${lastDownloadError}; webdav: ${e?.message || 'unknown error'}`;
       }
