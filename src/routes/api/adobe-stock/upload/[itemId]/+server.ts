@@ -4,11 +4,8 @@ import type { RequestHandler } from './$types';
 import { promises as fs } from 'fs';
 import os from 'os';
 import path from 'path';
-import { execFile } from 'child_process';
-import { promisify } from 'util';
+import SftpClient from 'ssh2-sftp-client';
 import { createClient as createWebdavClient } from 'webdav';
-
-const execFileAsync = promisify(execFile);
 
 function normalizeSftpHost(rawHost: string): string {
   const host = rawHost.trim();
@@ -168,45 +165,24 @@ export const POST: RequestHandler = async ({ params, request }) => {
 
     const remotePath = sftpRemoteDir ? `${sftpRemoteDir}/${safeName}` : safeName;
 
-    let batchPath = '';
-    let expectPath = '';
     try {
-      // Use system sftp + expect to support password auth in serverless environments
-      // where curl lacks SFTP protocol support.
-      batchPath = path.join(os.tmpdir(), `adobe-sftp-${item.id}-${Date.now()}.batch`);
-      expectPath = path.join(os.tmpdir(), `adobe-sftp-${item.id}-${Date.now()}.exp`);
-      const quotedLocal = localTempPath.replace(/"/g, '\\"');
-      const quotedRemote = remotePath.replace(/"/g, '\\"');
-      await fs.writeFile(batchPath, `put "${quotedLocal}" "${quotedRemote}"\nbye\n`, 'utf8');
+      const sftp = new SftpClient();
+      try {
+        await sftp.connect({
+          host: sftpHost,
+          port: 22,
+          username: sftpUser,
+          password: sftpPassword,
+          readyTimeout: 30000
+        });
 
-      const expectScript = [
-        'set timeout 90',
-        'set host $env(SFTP_HOST)',
-        'set user $env(SFTP_USER)',
-        'set pass $env(SFTP_PASS)',
-        'set batch $env(SFTP_BATCH)',
-        'spawn sftp -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -b $batch "$user@$host"',
-        'expect {',
-        '  -re "(?i)password:" { send -- "$pass\\r" }',
-        '  timeout { puts "SFTP password prompt timeout"; exit 20 }',
-        '}',
-        'expect eof',
-        'catch wait result',
-        'set exit_status [lindex $result 3]',
-        'exit $exit_status'
-      ].join('\n');
-      await fs.writeFile(expectPath, expectScript, 'utf8');
-
-      await execFileAsync('expect', [expectPath], {
-        env: {
-          ...process.env,
-          SFTP_HOST: sftpHost,
-          SFTP_USER: sftpUser,
-          SFTP_PASS: sftpPassword,
-          SFTP_BATCH: batchPath
-        },
-        timeout: 120000
-      });
+        if (sftpRemoteDir) {
+          await sftp.mkdir(sftpRemoteDir, true).catch(() => {});
+        }
+        await sftp.put(localTempPath, remotePath);
+      } finally {
+        await sftp.end().catch(() => {});
+      }
 
       const fallbackUrl = item.adobe_stock_url || profile.adobe_stock_profile_url || null;
       const { data: updatedItem, error: updateError } = await supabase
@@ -244,8 +220,6 @@ export const POST: RequestHandler = async ({ params, request }) => {
         details: uploadError?.message || 'Unbekannter Fehler'
       }, { status: 502 });
     } finally {
-      if (batchPath) await fs.unlink(batchPath).catch(() => {});
-      if (expectPath) await fs.unlink(expectPath).catch(() => {});
       await fs.unlink(localTempPath).catch(() => {});
     }
   } catch (error: any) {
