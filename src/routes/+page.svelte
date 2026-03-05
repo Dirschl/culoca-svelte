@@ -1412,17 +1412,35 @@
       
       gpsUpdateTimeout = setTimeout(() => {
         console.log('[GPS-Trigger] Executing delayed reset');
-        lastLoadedLat = effectiveLat;
-        lastLoadedLon = effectiveLon;
-        lastLoadedSource = gpsSource;
+
+        const hasPreviousLoad =
+          lastLoadedLat !== null &&
+          lastLoadedLon !== null &&
+          lastLoadedSource !== null;
+        const movedMeters = hasPreviousLoad
+          ? getDistanceInMeters(lastLoadedLat as number, lastLoadedLon as number, effectiveLat as number, effectiveLon as number)
+          : Number.POSITIVE_INFINITY;
         
         if (isManual3x3Mode) {
           // Mobile Mode: Keine Galerie-Reset, Mobile Galerie sortiert sich selbst reaktiv
+          lastLoadedLat = effectiveLat;
+          lastLoadedLon = effectiveLon;
+          lastLoadedSource = gpsSource;
           console.log('[GPS-Trigger] Mobile Mode: Skipping gallery reset, mobile gallery will sort itself');
         } else {
-          // Normal Mode: Mit GPS neu laden für Distanzsortierung aus der API
-          resetGallery({ lat: effectiveLat, lon: effectiveLon });
-          console.log('[GPS-Trigger] Normal Mode: Reloaded gallery with GPS coordinates');
+          const sourceChanged = gpsSource !== lastLoadedSource;
+          const shouldReloadNormal = sourceChanged || !hasPreviousLoad || movedMeters >= 40;
+
+          if (shouldReloadNormal) {
+            lastLoadedLat = effectiveLat;
+            lastLoadedLon = effectiveLon;
+            lastLoadedSource = gpsSource;
+            // Normal Mode: Mit GPS nur bei relevanter Änderung neu laden
+            resetGallery({ lat: effectiveLat, lon: effectiveLon });
+            console.log('[GPS-Trigger] Normal Mode: Reloaded gallery with GPS coordinates');
+          } else {
+            console.log(`[GPS-Trigger] Normal Mode: Skip reload (${Math.round(movedMeters)}m movement)`);
+          }
         }
         
         // Clientseitige Sortierung für bereits geladene Items (unabhängig vom Modus)
@@ -1535,16 +1553,20 @@
   }
 
   // Haversine-Formel für Entfernungsberechnung
-  function getDistanceFromLatLonInMeters(lat1: number, lon1: number, lat2: number, lon2: number): string {
-    const R = 6371e3; // Erdradius in Metern
+  function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    const R = 6371e3;
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-      Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    const distanceInMeters = R * c;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }
+
+  function getDistanceFromLatLonInMeters(lat1: number, lon1: number, lat2: number, lon2: number): string {
+    const distanceInMeters = getDistanceInMeters(lat1, lon1, lat2, lon2);
     
     // Formatierung: unter 1000m als Meter, darüber als Kilometer
     if (distanceInMeters < 1000) {
