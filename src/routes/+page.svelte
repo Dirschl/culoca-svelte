@@ -1530,6 +1530,13 @@
           // WICHTIG: GPS-Daten in localStorage speichern für Persistierung
           saveGPSData(userLat, userLon);
 
+          // Wenn der Standort-/Koordinatendialog offen ist, nach erfolgreicher GPS-Aktivierung schließen
+          if (showFullscreenMap && openMapWithSearch) {
+            showFullscreenMap = false;
+            openMapWithSearch = false;
+            console.log('[Mobile-Mode] GPS enabled - closed location dialog');
+          }
+
           // Wenn der User aus dem mobilen Modus-Flow kam: jetzt automatisch umschalten
           if (mobileModeLocationPromptPending && !isManual3x3Mode) {
             isManual3x3Mode = true;
