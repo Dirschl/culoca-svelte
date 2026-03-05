@@ -197,6 +197,7 @@
   let lastAnnouncedImageId = ''; // Track last announced image to prevent duplicates
   let scrollTimeout: number | null = null;
   const GPS_PROMPT_PREFERENCE_KEY = 'culoca-gps-preference';
+  let mobileModeLocationPromptPending = false;
   
   // Bot-Erkennung als globale Variable
   let isBot = data.isBot || false;
@@ -1118,8 +1119,9 @@
     // NEU: Lade gespeicherte GPS-Daten zuerst
     const hasLoadedGPS = loadGPSData();
     
-    // Intelligente GPS-Initialisierung
-    console.log('[App-Start] Starting GPS initialization...');
+    // GPS-Initialisierung beim App-Start deaktiviert:
+    // Standortabfrage wird erst beim Wechsel in den mobilen Modus ausgelöst.
+    console.log('[App-Start] Deferred GPS initialization until mobile mode is requested');
     
     // BOT-CHECK: Überspringe GPS-Initialisierung für Bots
     if (browser) {
@@ -1154,19 +1156,11 @@
       // WICHTIG: Keine GPS-Koordinaten setzen, keine filterStore-Updates
       // Bots sollen nur serverseitig gerenderten Newsflash sehen
     } else {
-      // Normale User: Lade gespeicherte GPS-Daten zuerst
-      console.log('[App-Start] Normal user - loading saved GPS data first');
-      
-      // Dann versuche live GPS zu starten (außer User hat "Ohne Standort fortfahren" gewählt)
-      if (skipGpsPrompt && !hasLoadedGPS) {
-        console.log('[App-Start] GPS prompt skipped by user preference');
-        gpsStatus = 'none';
-      } else if (navigator.geolocation) {
-        console.log('[App-Start] Geolocation available, initializing intelligently...');
-        initializeGPSIntelligently();
-      } else {
-        console.log('[App-Start] Geolocation not available');
-        gpsStatus = 'unavailable';
+      // Normale User: Verwende nur bereits gespeicherte GPS-Daten.
+      // Live-GPS startet erst, wenn der User bewusst in den mobilen Modus wechseln will.
+      console.log('[App-Start] Normal user - using saved GPS only until mobile mode request');
+      if (!hasLoadedGPS) {
+        gpsStatus = navigator.geolocation ? 'none' : 'unavailable';
       }
     }
     
@@ -1393,7 +1387,17 @@
     console.log('🎯 toggle3x3Mode Event empfangen!');
     console.log('🎯 Current state - isManual3x3Mode:', isManual3x3Mode);
     console.log('🎯 Location Filter active:', $filterStore.locationFilter !== null);
-    
+
+    const wantsEnableMobileMode = !isManual3x3Mode;
+    const hasCoordinates = userLat !== null && userLon !== null;
+    if (wantsEnableMobileMode && !hasCoordinates) {
+      mobileModeLocationPromptPending = true;
+      gpsStatus = 'none';
+      showStatusOverlay = false;
+      console.log('[Mobile-Mode] No GPS coordinates available - showing location prompt first');
+      return;
+    }
+
     isManual3x3Mode = !isManual3x3Mode;
     settingsIconRotation += 180; // Rotiere das Settings-Symbol um 180 Grad
     
@@ -1447,6 +1451,12 @@
     
     // Close the map
     showFullscreenMap = false;
+
+    if (mobileModeLocationPromptPending && !isManual3x3Mode) {
+      isManual3x3Mode = true;
+      mobileModeLocationPromptPending = false;
+      console.log('[Mobile-Mode] Location selected - switched to mobile gallery mode');
+    }
     
     // Trigger gallery reload with new coordinates
     if (galleryInitialized) {
@@ -1509,6 +1519,13 @@
           
           // WICHTIG: GPS-Daten in localStorage speichern für Persistierung
           saveGPSData(userLat, userLon);
+
+          // Wenn der User aus dem mobilen Modus-Flow kam: jetzt automatisch umschalten
+          if (mobileModeLocationPromptPending && !isManual3x3Mode) {
+            isManual3x3Mode = true;
+            mobileModeLocationPromptPending = false;
+            console.log('[Mobile-Mode] GPS available - switched to mobile gallery mode');
+          }
         },
         (error) => {
           console.warn("GPS-Fehler:", error.message, "Code:", error.code);
@@ -1526,6 +1543,11 @@
           }
           
           filterStore.updateGpsStatus(false);
+
+          // Dialog bleibt aktiv, damit der User alternativ Karte wählen kann
+          if (mobileModeLocationPromptPending) {
+            console.log('[Mobile-Mode] GPS failed while requesting mobile mode, keeping location prompt open');
+          }
         },
         {
           enableHighAccuracy: true,
@@ -1803,6 +1825,13 @@
 
   // Umschalt-Logik für Galerie/3x3-Modus
   function toggle3x3Mode() {
+    const wantsEnableMobileMode = !isManual3x3Mode;
+    const hasCoordinates = userLat !== null && userLon !== null;
+    if (wantsEnableMobileMode && !hasCoordinates) {
+      mobileModeLocationPromptPending = true;
+      gpsStatus = 'none';
+      return;
+    }
     isManual3x3Mode = !isManual3x3Mode;
   }
 
@@ -2040,7 +2069,7 @@
 
 </script>
 
-{#if browser && !skipGpsPrompt && (gpsStatus === 'denied' || gpsStatus === 'unavailable') && !userLat && !userLon && !isBot && typeof window !== 'undefined'}
+{#if browser && mobileModeLocationPromptPending && !showFullscreenMap && !userLat && !userLon && !isBot && typeof window !== 'undefined'}
   <div style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(30,30,30,0.92);z-index:10000;display:flex;flex-direction:column;align-items:center;justify-content:center;">
     <div style="background:#222;padding:2rem 2.5rem;border-radius:1rem;box-shadow:0 2px 16px #0008;max-width:90vw;text-align:center;">
       <h2 style="color:#fff;margin-bottom:1rem;">Standort auswählen</h2>
@@ -2080,6 +2109,8 @@
           }
           setGpsPromptPreference('skip');
           gpsStatus = 'none';
+          mobileModeLocationPromptPending = false;
+          isManual3x3Mode = false;
         }} style="padding: 0.9rem 2.2rem; font-size: 1.15rem; border-radius: 0.5rem; background: #666; color: #fff; border: none; cursor: pointer; font-weight:600;">
           Ohne Standort fortfahren
         </button>
@@ -2097,7 +2128,7 @@
       {/if}
     </div>
   </div>
-{:else if browser && gpsStatus === 'checking' && !isBot && typeof window !== 'undefined'}
+{:else if browser && mobileModeLocationPromptPending && gpsStatus === 'checking' && !isBot && typeof window !== 'undefined'}
   <!-- GPS wird geladen - zeige Ladeindikator -->
   <div style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(30,30,30,0.92);z-index:10000;display:flex;flex-direction:column;align-items:center;justify-content:center;">
     <div style="background:#222;padding:2rem 2.5rem;border-radius:1rem;box-shadow:0 2px 16px #0008;max-width:90vw;text-align:center;">
@@ -2325,6 +2356,12 @@
         // Close the map
         showFullscreenMap = false;
         openMapWithSearch = false;
+
+        if (mobileModeLocationPromptPending && !isManual3x3Mode) {
+          isManual3x3Mode = true;
+          mobileModeLocationPromptPending = false;
+          console.log('[Mobile-Mode] Fullscreen map location selected - switched to mobile gallery mode');
+        }
         
         // Trigger gallery reload with new coordinates
         if (galleryInitialized) {
