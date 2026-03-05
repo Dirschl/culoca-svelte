@@ -2368,6 +2368,8 @@
           tryInitializeGPS();
         } else {
           disableGPSFeatures();
+          showFullscreenMap = false;
+          openMapWithSearch = false;
         }
       }}
       on:imageClick={(event) => {
