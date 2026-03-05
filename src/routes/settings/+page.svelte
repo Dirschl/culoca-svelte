@@ -329,6 +329,23 @@
       welcomeVisible.set(false);
     }
   }
+
+  function applyGpsPreferenceImmediately() {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.setItem('culoca-gps-preference', gpsFeaturesEnabled ? 'ask' : 'skip');
+
+    if (!gpsFeaturesEnabled) {
+      localStorage.removeItem('gpsAllowed');
+      localStorage.removeItem('userGps');
+      localStorage.removeItem('userLat');
+      localStorage.removeItem('userLon');
+    }
+  }
+
+  function openLocationDialog() {
+    applyGpsPreferenceImmediately();
+    goto('/?locationDialog=true');
+  }
 </script>
 
 <svelte:head>
@@ -440,10 +457,22 @@
             </div>
             <div class="setting-control">
               <label class="toggle-switch" for="gps-features-toggle">
-                <input type="checkbox" id="gps-features-toggle" bind:checked={gpsFeaturesEnabled} />
+                <input type="checkbox" id="gps-features-toggle" bind:checked={gpsFeaturesEnabled} on:change={applyGpsPreferenceImmediately} />
                 <span class="toggle-slider"></span>
               </label>
               <span class="setting-status">{gpsFeaturesEnabled ? 'Aktiviert' : 'Deaktiviert'}</span>
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-info">
+              <label class="setting-label">Standort-Dialog</label>
+              <p class="setting-description">Standort auswählen öffnen, um GPS direkt zu aktivieren oder mit rotem Button wieder zu deaktivieren.</p>
+            </div>
+            <div class="setting-control">
+              <button type="button" class="location-dialog-btn" on:click={openLocationDialog}>
+                Standort auswählen öffnen
+              </button>
             </div>
           </div>
 
@@ -1001,6 +1030,21 @@
     transition: all 0.2s ease;
     min-width: 200px;
     justify-content: center;
+  }
+
+  .location-dialog-btn {
+    padding: 0.75rem 1rem;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease;
+  }
+
+  .location-dialog-btn:hover {
+    background: var(--border-color);
   }
 
   .save-btn {

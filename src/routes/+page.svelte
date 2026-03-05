@@ -973,10 +973,21 @@
     // URL-Parameter für mobilen Modus verarbeiten
     const urlParams = new URLSearchParams(window.location.search);
     const mobileParam = urlParams.get('mobile');
+    const locationDialogParam = (urlParams.get('locationDialog') || '').toLowerCase();
     const botParam = (urlParams.get('bot') || '').toLowerCase();
     if (mobileParam === 'true') {
       console.log('[onMount] Mobile mode detected via URL parameter');
       isManual3x3Mode = true;
+    }
+    if (locationDialogParam === '1' || locationDialogParam === 'true' || locationDialogParam === 'yes') {
+      showFullscreenMap = true;
+      openMapWithSearch = true;
+      mobileModeLocationPromptPending = false;
+      urlParams.delete('locationDialog');
+      const nextQuery = urlParams.toString();
+      const nextUrl = `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ''}${window.location.hash}`;
+      window.history.replaceState({}, '', nextUrl);
+      console.log('[onMount] Opening location dialog via URL parameter');
     }
     if (botParam === '1' || botParam === 'true' || botParam === 'yes') {
       isBot = true;

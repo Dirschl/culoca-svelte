@@ -1685,6 +1685,7 @@
         <button
           type="button"
           class="gps-toggle-btn"
+          class:is-enabled={isGpsEnabled}
           on:click={toggleGpsFromManualInput}
           disabled={gpsStatus === 'checking'}>
           {#if gpsStatus === 'checking'}
@@ -1968,6 +1969,10 @@
 
   .gps-toggle-btn:hover {
     filter: brightness(1.07);
+  }
+
+  .gps-toggle-btn.is-enabled {
+    background: #c92a2a;
   }
 
   .gps-toggle-btn:disabled {
