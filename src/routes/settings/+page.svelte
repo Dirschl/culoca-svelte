@@ -40,6 +40,7 @@
 
   let userLat: number | null = null;
   let userLon: number | null = null;
+  let gpsFeaturesEnabled = true;
 
   // GPS tracking variables
   let gpsWatchId: number | null = null;
@@ -86,6 +87,9 @@
         if (storedNewsFlash === 'aus' || storedNewsFlash === 'eigene' || storedNewsFlash === 'alle') {
           newsFlashMode = storedNewsFlash;
         }
+
+        const gpsPref = localStorage.getItem('culoca-gps-preference');
+        gpsFeaturesEnabled = gpsPref !== 'skip';
       }
     })();
     
@@ -187,6 +191,14 @@
     
         localStorage.setItem('newsFlashMode', newsFlashMode);
         localStorage.setItem('saveOriginals', saveOriginals ? 'true' : 'false');
+        localStorage.setItem('culoca-gps-preference', gpsFeaturesEnabled ? 'ask' : 'skip');
+
+        if (!gpsFeaturesEnabled) {
+          localStorage.removeItem('gpsAllowed');
+          localStorage.removeItem('userGps');
+          localStorage.removeItem('userLat');
+          localStorage.removeItem('userLon');
+        }
       }
 
       profile = profileData;
@@ -418,6 +430,20 @@
                 <span class="toggle-slider"></span>
               </label>
               <span class="setting-status">{showDistance ? 'Aktiviert' : 'Deaktiviert'}</span>
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-info">
+              <label class="setting-label" for="gps-features-toggle">GPS-Funktionen erlauben</label>
+              <p class="setting-description">Culoca Mobile Funktionen benötigen Ihren Standort. Dadurch können Items standortgenau angezeigt und getrackt werden. Sie können die Funktion auch direkt im Browser deaktivieren.</p>
+            </div>
+            <div class="setting-control">
+              <label class="toggle-switch" for="gps-features-toggle">
+                <input type="checkbox" id="gps-features-toggle" bind:checked={gpsFeaturesEnabled} />
+                <span class="toggle-slider"></span>
+              </label>
+              <span class="setting-status">{gpsFeaturesEnabled ? 'Aktiviert' : 'Deaktiviert'}</span>
             </div>
           </div>
 

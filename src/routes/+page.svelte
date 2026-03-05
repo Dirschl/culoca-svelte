@@ -1401,6 +1401,8 @@
     if (wantsEnableMobileMode && !hasCoordinates) {
       mobileModeLocationPromptPending = true;
       gpsStatus = 'none';
+      openMapWithSearch = true;
+      showFullscreenMap = true;
       showStatusOverlay = false;
       console.log('[Mobile-Mode] No GPS coordinates available - showing location prompt first');
       return;
@@ -1532,6 +1534,8 @@
           if (mobileModeLocationPromptPending && !isManual3x3Mode) {
             isManual3x3Mode = true;
             mobileModeLocationPromptPending = false;
+            showFullscreenMap = false;
+            openMapWithSearch = false;
             console.log('[Mobile-Mode] GPS available - switched to mobile gallery mode');
           }
         },
@@ -1838,6 +1842,8 @@
     if (wantsEnableMobileMode && !hasCoordinates) {
       mobileModeLocationPromptPending = true;
       gpsStatus = 'none';
+      openMapWithSearch = true;
+      showFullscreenMap = true;
       return;
     }
     isManual3x3Mode = !isManual3x3Mode;
@@ -2062,6 +2068,28 @@
     }
   }
 
+  function disableGPSFeatures() {
+    if (gpsWatchId !== null && navigator.geolocation) {
+      navigator.geolocation.clearWatch(gpsWatchId);
+      gpsWatchId = null;
+    }
+    gpsStatus = 'none';
+    userLat = null;
+    userLon = null;
+    filterStore.updateGpsStatus(false);
+    if (browser) {
+      localStorage.removeItem('gpsAllowed');
+      localStorage.removeItem('userGps');
+      localStorage.removeItem('userLat');
+      localStorage.removeItem('userLon');
+      setGpsPromptPreference('skip');
+    }
+    if (mobileModeLocationPromptPending) {
+      mobileModeLocationPromptPending = false;
+      isManual3x3Mode = false;
+    }
+  }
+
   // Funktion zum Aktualisieren der GPS-Position für mobile Galerie
   function updateGPSPosition(lat: number, lon: number) {
     console.log('[GPS-Update] Updating GPS position for mobile gallery:', { lat, lon });
@@ -2077,7 +2105,7 @@
 
 </script>
 
-{#if browser && mobileModeLocationPromptPending && !showFullscreenMap && !userLat && !userLon && !isBot && typeof window !== 'undefined'}
+{#if browser && mobileModeLocationPromptPending && !showFullscreenMap && !userLat && !userLon && !isBot && typeof window !== 'undefined' && false}
   <div style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(30,30,30,0.92);z-index:10000;display:flex;flex-direction:column;align-items:center;justify-content:center;">
     <div style="background:#222;padding:2rem 2.5rem;border-radius:1rem;box-shadow:0 2px 16px #0008;max-width:90vw;text-align:center;">
       <h2 style="color:#fff;margin-bottom:1rem;">Standort auswählen</h2>
@@ -2311,10 +2339,19 @@
     <FullscreenMap 
       userLat={effectiveLat}
       userLon={effectiveLon}
+      gpsStatus={gpsStatus}
       {deviceHeading}
       {isManual3x3Mode}
       openManualInput={openMapWithSearch}
       on:close={() => { showFullscreenMap = false; openMapWithSearch = false; }}
+      on:gpsToggle={(event) => {
+        const enable = !!event.detail?.enable;
+        if (enable) {
+          tryInitializeGPS();
+        } else {
+          disableGPSFeatures();
+        }
+      }}
       on:imageClick={(event) => {
         const imageSlug = event.detail.imageSlug || event.detail.slug || event.detail.imageId;
         window.location.href = `/item/${imageSlug}`;
@@ -2354,6 +2391,8 @@
         if (mobileModeLocationPromptPending && !isManual3x3Mode) {
           isManual3x3Mode = true;
           mobileModeLocationPromptPending = false;
+          showFullscreenMap = false;
+          openMapWithSearch = false;
           console.log('[Mobile-Mode] Fullscreen map location selected - switched to mobile gallery mode');
         }
         

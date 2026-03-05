@@ -16,6 +16,7 @@
   export let images: any[] = [];
   export let userLat: number | null = null;
   export let userLon: number | null = null;
+  export let gpsStatus: 'active' | 'cached' | 'none' | 'checking' | 'denied' | 'unavailable' = 'none';
   export let deviceHeading: number | null = null;
   export let isManual3x3Mode: boolean = false;
   export let openManualInput: boolean = false;
@@ -69,6 +70,8 @@
   let placeSearchLoading = false;
   let placeSearchError = '';
   let placeSearchTimeout: ReturnType<typeof setTimeout> | null = null;
+  let isGpsEnabled = false;
+  $: isGpsEnabled = gpsStatus === 'active' || gpsStatus === 'cached';
   
   // Previous position for movement tracking
   let previousPosition: { lat: number; lon: number; timestamp: number } | null = null;
@@ -892,6 +895,10 @@
     // Close the map
     dispatch('close');
   }
+
+  function toggleGpsFromManualInput() {
+    dispatch('gpsToggle', { enable: !isGpsEnabled });
+  }
   
   function toggleMapView() {
     if (!map || !streetLayer || !satelliteLayer) return;
@@ -1674,6 +1681,20 @@
     <div class="manual-input-overlay">
       <div class="manual-input-panel">
         <h3>Koordinaten manuell eingeben</h3>
+        <p class="gps-feature-hint">Culoca Mobile Funktionen benötigen Ihren Standort. Dadurch können Items standortgenau angezeigt und getrackt werden. Sie können die Funktion in Ihren Einstellungen deaktivieren.</p>
+        <button
+          type="button"
+          class="gps-toggle-btn"
+          on:click={toggleGpsFromManualInput}
+          disabled={gpsStatus === 'checking'}>
+          {#if gpsStatus === 'checking'}
+            GPS wird aktiviert...
+          {:else if isGpsEnabled}
+            GPS deaktivieren
+          {:else}
+            GPS aktivieren
+          {/if}
+        </button>
         <p class="manual-input-hint">Geben Sie GPS-Koordinaten im Dezimalformat ein</p>
         
         <div class="input-group">
@@ -1922,6 +1943,36 @@
     color: var(--text-secondary);
     font-size: 0.9rem;
     margin: 0 0 1.5rem 0;
+  }
+
+  .gps-feature-hint {
+    color: var(--text-secondary);
+    font-size: 0.92rem;
+    margin: 0 0 1rem 0;
+    line-height: 1.35;
+  }
+
+  .gps-toggle-btn {
+    width: 100%;
+    margin: 0 0 1rem 0;
+    padding: 0.85rem 1rem;
+    border: none;
+    border-radius: 10px;
+    background: #2f9e44;
+    color: #fff;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: filter 0.2s ease, opacity 0.2s ease;
+  }
+
+  .gps-toggle-btn:hover {
+    filter: brightness(1.07);
+  }
+
+  .gps-toggle-btn:disabled {
+    opacity: 0.75;
+    cursor: wait;
   }
   
   .input-group {
