@@ -214,6 +214,23 @@
     skipGpsPrompt = storedPreference === 'skip';
   }
 
+  function areGpsFeaturesAllowed() {
+    if (!browser) return !skipGpsPrompt;
+    const storedPreference = localStorage.getItem(GPS_PROMPT_PREFERENCE_KEY);
+    skipGpsPrompt = storedPreference === 'skip';
+    return !skipGpsPrompt;
+  }
+
+  function blockMobileModeDueToGpsSettings() {
+    mobileModeLocationPromptPending = false;
+    isManual3x3Mode = false;
+    showFullscreenMap = false;
+    openMapWithSearch = false;
+    statusOverlayMessage = 'GPS-Funktionen sind in den Einstellungen deaktiviert';
+    showStatusOverlay = true;
+    setTimeout(() => { showStatusOverlay = false; }, 2500);
+  }
+
 
 
   // Anonyme User bekommen justified Layout als Default
@@ -965,6 +982,10 @@
   
   onMount(() => {
     loadGpsPromptPreference();
+    if (!areGpsFeaturesAllowed()) {
+      disableGPSFeatures();
+      isManual3x3Mode = false;
+    }
 
     // Initialize filter store from URL parameters
     filterStore.initFromUrl($pageStore.url.searchParams);
@@ -1020,6 +1041,15 @@
       if (e.key === 'showImageCaptions' && e.newValue !== null) {
         showImageCaptions = e.newValue === 'true';
         console.log('[Storage] showImageCaptions changed to:', showImageCaptions);
+      }
+      if (e.key === GPS_PROMPT_PREFERENCE_KEY) {
+        skipGpsPrompt = e.newValue === 'skip';
+        if (skipGpsPrompt) {
+          disableGPSFeatures();
+          isManual3x3Mode = false;
+          showFullscreenMap = false;
+          openMapWithSearch = false;
+        }
       }
     };
     window.addEventListener('storage', onStorageChange);
@@ -1408,6 +1438,12 @@
     console.log('🎯 Location Filter active:', $filterStore.locationFilter !== null);
 
     const wantsEnableMobileMode = !isManual3x3Mode;
+    if (wantsEnableMobileMode && !areGpsFeaturesAllowed()) {
+      console.log('[Mobile-Mode] Blocked: GPS features disabled in settings');
+      blockMobileModeDueToGpsSettings();
+      return;
+    }
+
     const hasCoordinates = userLat !== null && userLon !== null;
     if (wantsEnableMobileMode && !hasCoordinates) {
       mobileModeLocationPromptPending = true;
@@ -1663,6 +1699,13 @@
   // Neue Funktion: Versuche GPS zu initialisieren mit besserer Fehlerbehandlung
   function tryInitializeGPS() {
     console.log('[GPS] User clicked "Standort verwenden" - trying to initialize GPS...');
+
+    if (!areGpsFeaturesAllowed()) {
+      console.log('[GPS] Blocked: GPS features disabled in settings');
+      blockMobileModeDueToGpsSettings();
+      return;
+    }
+
     setGpsPromptPreference('ask');
     
     if (!navigator.geolocation) {
@@ -1856,6 +1899,10 @@
   // Umschalt-Logik für Galerie/3x3-Modus
   function toggle3x3Mode() {
     const wantsEnableMobileMode = !isManual3x3Mode;
+    if (wantsEnableMobileMode && !areGpsFeaturesAllowed()) {
+      blockMobileModeDueToGpsSettings();
+      return;
+    }
     const hasCoordinates = userLat !== null && userLon !== null;
     if (wantsEnableMobileMode && !hasCoordinates) {
       mobileModeLocationPromptPending = true;
