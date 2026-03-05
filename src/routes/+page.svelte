@@ -232,6 +232,13 @@
     setTimeout(() => { showStatusOverlay = false; }, 2500);
   }
 
+  function ensureMobileGpsTracking() {
+    if (isBot || !areGpsFeaturesAllowed()) return;
+    if (gpsWatchId !== null || gpsStatus === 'active') return;
+    console.log('[Mobile-Mode] Starting live GPS tracking for mobile sorting');
+    tryInitializeGPS();
+  }
+
 
 
   // Anonyme User bekommen justified Layout als Default
@@ -1458,6 +1465,9 @@
     }
 
     isManual3x3Mode = !isManual3x3Mode;
+    if (isManual3x3Mode) {
+      ensureMobileGpsTracking();
+    }
     settingsIconRotation += 180; // Rotiere das Settings-Symbol um 180 Grad
     
     console.log('📱 New state - isManual3x3Mode:', isManual3x3Mode, 'Settings Rotation:', settingsIconRotation);
@@ -1907,6 +1917,9 @@
       return;
     }
     isManual3x3Mode = !isManual3x3Mode;
+    if (isManual3x3Mode) {
+      ensureMobileGpsTracking();
+    }
   }
 
   function toggleSimulationMode() {
