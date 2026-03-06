@@ -346,6 +346,9 @@ export async function loadContentPage(args: {
     }));
 
   const contextItem = rootItem.id === item.id ? item : rootItem;
+  const availableTypes = Array.from(typeMap.values())
+    .filter((candidate): candidate is Partial<ContentTypeDefinition> & { id: number } => typeof candidate?.id === 'number')
+    .sort((a, b) => (a.id || 0) - (b.id || 0));
 
   return {
     image: { ...item, profile: profileData.profile, full_name: profileData.full_name },
@@ -358,6 +361,7 @@ export async function loadContentPage(args: {
     rootCanonicalPath,
     contextItem,
     groupItems: siblings,
-    activeGroupItemId: item.id
+    activeGroupItemId: item.id,
+    availableTypes
   };
 }

@@ -76,6 +76,7 @@ let showRightsManager = false;
   let seoLinks = data?.seoLinks ?? { newer: null, older: null };
   let canonicalPath = data?.canonicalPath ?? (image?.slug ? `/item/${image.slug}` : '');
   let contentType = data?.type ?? null;
+  let availableTypes = data?.availableTypes ?? [];
   let rootItem = data?.rootItem ?? image;
   let contextItem = data?.contextItem ?? image;
   let groupItems = data?.groupItems ?? [];
@@ -97,6 +98,7 @@ let showRightsManager = false;
   $: itemSlug = $page.params.slug || image?.slug || '';
   $: canonicalPath = data?.canonicalPath ?? canonicalPath;
   $: contentType = data?.type ?? contentType;
+  $: availableTypes = data?.availableTypes ?? availableTypes;
   $: rootItem = data?.rootItem ?? image;
   $: contextItem = data?.contextItem ?? image;
   $: groupItems = data?.groupItems ?? [];
@@ -624,6 +626,26 @@ let showRightsManager = false;
   let filenameEditValue = '';
   let editingSlug = false;
   let slugEditValue = '';
+  let managementForm = {
+    type_id: 1,
+    group_slug: '',
+    group_root_item_id: null as string | null,
+    show_in_main_feed: true,
+    sort_order: '',
+    content: '',
+    starts_at: '',
+    ends_at: '',
+    external_url: '',
+    video_url: ''
+  };
+  let selectedRootItem: any = null;
+  let rootSearchQuery = '';
+  let rootSearchResults: any[] = [];
+  let rootSearchLoading = false;
+  let managementSavePending = false;
+  let managementSaveMessage = '';
+  let lastManagementImageId = '';
+  let latestRootSearchToken = 0;
 
   let showFullExif = false;
   let showHiddenItems = false;
@@ -667,6 +689,184 @@ let showRightsManager = false;
   function handleKey(e, fn) {
     if (e.key === 'Enter' || e.key === ' ') {
       fn();
+    }
+  }
+
+  function toDateTimeLocal(value: string | null | undefined) {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    const offset = date.getTimezoneOffset();
+    const localDate = new Date(date.getTime() - offset * 60_000);
+    return localDate.toISOString().slice(0, 16);
+  }
+
+  function toNullableIso(value: string) {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const date = new Date(trimmed);
+    return Number.isNaN(date.getTime()) ? null : date.toISOString();
+  }
+
+  function toNullableString(value: string) {
+    const trimmed = value.trim();
+    return trimmed ? trimmed : null;
+  }
+
+  function syncManagementFormFromImage() {
+    if (!image) return;
+
+    managementForm = {
+      type_id: image.type_id || contentType?.id || 1,
+      group_slug: image.group_slug || '',
+      group_root_item_id: image.group_root_item_id || null,
+      show_in_main_feed: image.show_in_main_feed ?? true,
+      sort_order: image.sort_order === null || image.sort_order === undefined ? '' : String(image.sort_order),
+      content: image.content || '',
+      starts_at: toDateTimeLocal(image.starts_at),
+      ends_at: toDateTimeLocal(image.ends_at),
+      external_url: image.external_url || '',
+      video_url: image.video_url || ''
+    };
+
+    if (image.group_root_item_id && rootItem && rootItem.id !== image.id) {
+      selectedRootItem = {
+        id: rootItem.id,
+        title: rootItem.title,
+        slug: rootItem.slug,
+        group_slug: rootItem.group_slug,
+        canonical_path: rootItem.canonical_path
+      };
+      rootSearchQuery = rootItem.title || rootItem.slug || rootItem.id;
+    } else {
+      selectedRootItem = null;
+      rootSearchQuery = '';
+    }
+
+    rootSearchResults = [];
+    managementSaveMessage = '';
+  }
+
+  $: if (image?.id && image.id !== lastManagementImageId) {
+    lastManagementImageId = image.id;
+    syncManagementFormFromImage();
+  }
+
+  async function loadRootCandidates(query: string) {
+    if (!browser || !image || !(isCreator || $unifiedRightsStore.rights?.edit)) return;
+
+    const searchToken = ++latestRootSearchToken;
+    rootSearchLoading = true;
+
+    try {
+      const sanitized = query.trim().replace(/[,%]/g, ' ');
+      let request = supabase
+        .from('items')
+        .select('id, title, slug, group_slug, canonical_path, created_at')
+        .is('group_root_item_id', null)
+        .neq('id', image.id)
+        .order('created_at', { ascending: false })
+        .limit(8);
+
+      if (sanitized) {
+        request = request.or(`title.ilike.%${sanitized}%,slug.ilike.%${sanitized}%,group_slug.ilike.%${sanitized}%`);
+      }
+
+      const { data: candidates, error: searchError } = await request;
+      if (searchToken !== latestRootSearchToken) return;
+
+      if (searchError) {
+        console.error('Failed to load root candidates:', searchError);
+        rootSearchResults = [];
+        return;
+      }
+
+      rootSearchResults = candidates || [];
+    } finally {
+      if (searchToken === latestRootSearchToken) {
+        rootSearchLoading = false;
+      }
+    }
+  }
+
+  function handleRootSearchInput(value: string) {
+    rootSearchQuery = value;
+    if (!value.trim()) {
+      rootSearchResults = [];
+      return;
+    }
+    loadRootCandidates(value);
+  }
+
+  function handleRootSearchFocus() {
+    if (!rootSearchResults.length) {
+      loadRootCandidates(rootSearchQuery);
+    }
+  }
+
+  function selectRootCandidate(candidate: any) {
+    selectedRootItem = candidate;
+    managementForm.group_root_item_id = candidate.id;
+    rootSearchQuery = candidate.title || candidate.slug || candidate.id;
+    rootSearchResults = [];
+  }
+
+  function clearRootCandidate() {
+    selectedRootItem = null;
+    managementForm.group_root_item_id = null;
+    rootSearchQuery = '';
+    rootSearchResults = [];
+  }
+
+  async function saveManagementFields() {
+    if (!image || !(isCreator || $unifiedRightsStore.rights?.edit) || managementSavePending) return;
+
+    managementSavePending = true;
+    managementSaveMessage = '';
+
+    const payload = {
+      type_id: Number(managementForm.type_id) || image.type_id || 1,
+      group_slug: toNullableString(managementForm.group_slug),
+      group_root_item_id: selectedRootItem?.id || null,
+      show_in_main_feed: !!managementForm.show_in_main_feed,
+      sort_order: managementForm.sort_order.trim() === '' ? null : Number(managementForm.sort_order),
+      content: toNullableString(managementForm.content),
+      starts_at: toNullableIso(managementForm.starts_at),
+      ends_at: toNullableIso(managementForm.ends_at),
+      external_url: toNullableString(managementForm.external_url),
+      video_url: toNullableString(managementForm.video_url)
+    };
+
+    try {
+      const res = await authFetch(`/api/item/${image.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        managementSaveMessage = errorText || 'Speichern fehlgeschlagen';
+        return;
+      }
+
+      const result = await res.json();
+      image = { ...image, ...result.item };
+      canonicalPath = result.item?.canonical_path || canonicalPath;
+      contentType = availableTypes.find((type) => type.id === result.item?.type_id) || contentType;
+      managementSaveMessage = 'Gespeichert';
+      syncManagementFormFromImage();
+
+      if (browser) {
+        const targetPath = result.item?.canonical_path || canonicalPath || window.location.pathname;
+        const targetUrl = `${targetPath}${window.location.search}`;
+        await goto(targetUrl, { invalidateAll: true, replaceState: true, noScroll: true });
+      }
+    } catch (err) {
+      console.error('Failed to save management fields:', err);
+      managementSaveMessage = 'Speichern fehlgeschlagen';
+    } finally {
+      managementSavePending = false;
     }
   }
 
@@ -1721,58 +1921,37 @@ let showRightsManager = false;
             </div>
           {/if}
         {/if}
-        <h2>File Details</h2>
-        <div class="filename" class:editable={isCreator || $unifiedRightsStore.rights?.edit} class:editing={editingFilename}>
-          {#if editingFilename}
-            <div class="filename-edit-container">
-              <input
-                id="filename-edit-input"
-                type="text"
-                bind:value={filenameEditValue}
-                maxlength="120"
-                on:keydown={handleFilenameKeydown}
-                on:blur={saveFilename}
-                class="filename-edit-input"
-                placeholder="Dateiname eingeben..."
-                autocomplete="off"
-                autocorrect="off"
-                autocapitalize="words"
-                inputmode="text"
-              />
-              <span class="char-count">{filenameEditValue.length}/120</span>
-            </div>
-          {:else}
-            <span class="filename-text" tabindex="0" role="button" on:click={startEditFilename} on:keydown={(e) => handleKey(e, startEditFilename)}>{image.original_name || 'Unbekannt'}</span>
-          {/if}
-        </div>
-        <div class="filename">{browser ? window.location.href : ''}</div>
-        {#if image.slug}
-          <div class="filename" class:editable={isCreator || $unifiedRightsStore.rights?.edit} class:editing={editingSlug}>
-            {#if editingSlug}
-              <div class="filename-edit-container">
-                <input
-                  id="slug-edit-input"
-                  type="text"
-                  bind:value={slugEditValue}
-                  maxlength="100"
-                  on:keydown={handleSlugKeydown}
-                  on:blur={saveSlug}
-                  class="filename-edit-input"
-                  placeholder="Slug eingeben..."
-                  autocomplete="off"
-                  autocorrect="off"
-                  autocapitalize="none"
-                  inputmode="text"
-                />
-                <span class="char-count">{slugEditValue.length}/100</span>
-              </div>
-            {:else}
-              <span class="filename-text" tabindex="0" role="button" on:click={startEditSlug} on:keydown={(e) => handleKey(e, startEditSlug)}>Slug: {image.slug}</span>
-            {/if}
-          </div>
-        {/if}
-        <div class="filename">ID: {image?.id}</div>
-        <div class="filename">64px: {fileSizes.size64 ? formatFileSize(fileSizes.size64) : 'unbekannt'}  |  512px: {fileSizes.size512 ? formatFileSize(fileSizes.size512) : 'unbekannt'}  |  2048px: {fileSizes.size2048 ? formatFileSize(fileSizes.size2048) : 'unbekannt'}</div>
+        <FileDetails
+          {image}
+          isCreator={isCreator || $unifiedRightsStore.rights?.edit}
+          {editingFilename}
+          bind:filenameEditValue
+          {startEditFilename}
+          {saveFilename}
+          {handleFilenameKeydown}
+          {editingSlug}
+          bind:slugEditValue
+          {startEditSlug}
+          {saveSlug}
+          {handleSlugKeydown}
+          {fileSizes}
+          {formatFileSize}
+          {browser}
+          {availableTypes}
+          resolvedTypeSlug={contentType?.slug || ''}
+          {managementForm}
+          {selectedRootItem}
+          {rootSearchQuery}
+          {rootSearchResults}
+          {rootSearchLoading}
+          managementSavePending={managementSavePending}
+          {managementSaveMessage}
+          onRootSearchInput={handleRootSearchInput}
+          onRootSearchFocus={handleRootSearchFocus}
+          selectRootItem={selectRootCandidate}
+          clearRootItem={clearRootCandidate}
+          {saveManagementFields}
+        />
 
         {#if isCreator}
           <div class="adobe-stock-card">
