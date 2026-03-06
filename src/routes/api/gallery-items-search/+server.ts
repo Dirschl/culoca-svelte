@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { supabase } from '$lib/supabaseClient';
 import { safeFunctionCall, logDatabaseOperation } from '$lib/databaseConfig';
+import { isVisibleInMainFeed } from '$lib/content/routing';
 
 export async function GET({ url }) {
   try {
@@ -39,7 +40,7 @@ export async function GET({ url }) {
       let query = supabase
         .from('items')
         .select(
-          'id, slug, title, description, lat, lon, path_512, path_2048, path_64, width, height, created_at, profile_id, user_id, is_private, gallery, keywords, original_name',
+          'id, slug, title, description, lat, lon, path_512, path_2048, path_64, width, height, created_at, profile_id, user_id, is_private, gallery, keywords, original_name, canonical_path, type_id, group_root_item_id, group_slug, show_in_main_feed, ends_at, external_url, video_url',
           { count: 'exact' }
         )
         .eq('gallery', true)
@@ -68,8 +69,8 @@ export async function GET({ url }) {
       }
 
       return json({
-        items: newestItems || [],
-        totalCount: count || 0,
+        items: (newestItems || []).filter((item) => isVisibleInMainFeed(item)),
+        totalCount: (newestItems || []).filter((item) => isVisibleInMainFeed(item)).length || count || 0,
         page,
         search,
         hasGPS: false,
@@ -127,7 +128,7 @@ export async function GET({ url }) {
     const items = data?.map(item => {
       const { total_count, ...itemWithoutTotalCount } = item;
       return itemWithoutTotalCount;
-    }) || [];
+    }).filter((item) => !('show_in_main_feed' in item) || isVisibleInMainFeed(item)) || [];
 
     const totalCount = data?.[0]?.total_count || 0;
 

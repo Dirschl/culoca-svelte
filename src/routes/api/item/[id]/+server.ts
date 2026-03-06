@@ -8,6 +8,25 @@ export const DELETE = async ({ params }) => {
     throw error(400, 'Missing id');
   }
 
+  const { count: childCount, error: childCountError } = await supabase
+    .from('items')
+    .select('id', { count: 'exact', head: true })
+    .eq('group_root_item_id', id);
+
+  if (childCountError) {
+    throw error(500, childCountError.message);
+  }
+
+  if ((childCount || 0) > 0) {
+    return json(
+      {
+        success: false,
+        error: 'Dieses Root-Item hat noch untergeordnete Inhalte. Bitte zuerst Gruppe aufloesen, neues Root waehlen oder die ganze Gruppe kontrolliert loeschen.'
+      },
+      { status: 409 }
+    );
+  }
+
   // 1. Hole Item aus DB
   const { data: item, error: fetchError } = await supabase
     .from('items')
@@ -90,6 +109,17 @@ export const PATCH = async ({ params, request, locals }) => {
     'lat',
     'lon',
     'slug',
+    'content',
+    'group_root_item_id',
+    'group_slug',
+    'sort_order',
+    'show_in_main_feed',
+    'canonical_path',
+    'starts_at',
+    'ends_at',
+    'external_url',
+    'video_url',
+    'type_id',
     'adobe_stock_status',
     'adobe_stock_uploaded_at',
     'adobe_stock_asset_id',

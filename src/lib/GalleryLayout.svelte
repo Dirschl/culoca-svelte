@@ -28,6 +28,7 @@
     distance?: number;
     title?: string;
     slug?: string; // Added slug to the interface
+    canonical_path?: string;
   }[] = [];
   export let layout: 'justified' | 'grid' = 'justified';
   export let containerWidth = 1200; // Set a reasonable default width
@@ -143,15 +144,21 @@
     };
   });
 
+  function getItemHref(item: { slug?: string; canonical_path?: string }) {
+    if (item.canonical_path) return item.canonical_path;
+    return item.slug ? `/item/${item.slug}` : '/';
+  }
+
   function handleImageClick(itemSlug: string) {
     const item = items.find(item => item.slug === itemSlug);
     if (item && item.slug) {
+      const href = getItemHref(item);
       console.log('[GalleryLayout] Click detected for item:', itemSlug);
       console.log('[GalleryLayout] Item found:', item);
-      console.log('[GalleryLayout] Attempting navigation to:', `/item/${item.slug}`);
+      console.log('[GalleryLayout] Attempting navigation to:', href);
       
       // Use SvelteKit goto for proper navigation (like main page)
-      goto(`/item/${item.slug}`);
+      goto(href);
       console.log('[GalleryLayout] goto() called successfully');
     } else {
       console.error('[GalleryLayout] Item not found for slug:', itemSlug);
@@ -163,11 +170,12 @@
       event.preventDefault();
       const item = items.find(item => item.slug === itemSlug);
       if (item && item.slug) {
+        const href = getItemHref(item);
         console.log('[GalleryLayout] Keyboard navigation for item:', itemSlug);
-        console.log('[GalleryLayout] Attempting navigation to:', `/item/${item.slug}`);
+        console.log('[GalleryLayout] Attempting navigation to:', href);
         
         // Use SvelteKit goto for proper navigation
-        goto(`/item/${item.slug}`);
+        goto(href);
         
         console.log('[GalleryLayout] goto() called successfully');
       } else {
@@ -422,7 +430,7 @@
           {#each items as item, index}
             {#if boxes[index]}
               <a 
-                href={`/item/${item.slug}`}
+                href={getItemHref(item)}
                 class="justified-pic-container" 
                 role="button" 
                 tabindex="0" 
@@ -432,10 +440,10 @@
                 on:click|preventDefault={async (e) => {
                   if (forceReload) {
                     // Force full page reload for detail page navigation
-                    window.location.href = `/item/${item.slug}`;
+                    window.location.href = getItemHref(item);
                   } else {
                     // Use SvelteKit navigation for main page navigation
-                    await goto(`/item/${item.slug}`, { invalidateAll: true });
+                    await goto(getItemHref(item), { invalidateAll: true });
                   }
                 }}
               >
@@ -518,7 +526,7 @@
     <div class="grid-layout">
       {#each items as item}
         <a 
-          href={`/item/${item.slug}`}
+          href={getItemHref(item)}
           class="grid-item" 
           tabindex="0" 
           role="button" 
@@ -528,10 +536,10 @@
             console.log('🔍 [GalleryLayout] Clicked item slug:', item.slug);
             if (forceReload) {
               // Force full page reload for detail page navigation
-              window.location.href = `/item/${item.slug}`;
+              window.location.href = getItemHref(item);
             } else {
               // Use SvelteKit navigation for main page navigation
-              await goto(`/item/${item.slug}`, { invalidateAll: true });
+              await goto(getItemHref(item), { invalidateAll: true });
             }
           }}
         >

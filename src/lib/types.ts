@@ -1,6 +1,7 @@
 export type NewsFlashImage = {
   id: string;
   slug?: string;
+  canonical_path?: string;
   path_512: string;
   path_2048?: string;
   original_name?: string;
@@ -12,4 +13,12 @@ export type NewsFlashImage = {
   lat?: number;
   lon?: number;
   keywords?: string[];
+  type_id?: number;
+  external_url?: string;
+  video_url?: string;
+  group_root_item_id?: string | null;
+  group_slug?: string | null;
+  show_in_main_feed?: boolean;
+  starts_at?: string | null;
+  ends_at?: string | null;
 }; 

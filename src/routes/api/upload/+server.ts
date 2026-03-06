@@ -330,7 +330,7 @@ export const POST = async ({ request }) => {
         if (formKeywords) keywords = formKeywords;
         if (formTypeId) {
           const typeId = parseInt(formTypeId);
-          if (typeId >= 1 && typeId <= 6) {
+          if (typeId >= 1 && typeId <= 8) {
             // type_id wird später in der Datenbank gespeichert
           }
         }

@@ -1,5 +1,10 @@
 import type { RequestHandler } from '@sveltejs/kit';
 import { supabase } from '$lib/supabaseClient';
+import {
+  getStoredOrComputedCanonicalPath,
+  isVisibleInMainFeed
+} from '$lib/content/routing';
+import { DEFAULT_CONTENT_TYPE_BY_ID } from '$lib/content/types';
 
 export const GET: RequestHandler = async () => {
   try {
@@ -23,6 +28,17 @@ export const GET: RequestHandler = async () => {
     // Entfernt: Keine Slug-Mappings mehr
     // Sitemap enthält nur korrekte Datenbank-Slugs
 
+    const { data: typeRows } = await supabase.from('types').select('*');
+    const typeMap = new Map<number, any>();
+    for (const typeRow of typeRows || []) {
+      typeMap.set(typeRow.id, typeRow);
+    }
+    for (const [id, typeDef] of DEFAULT_CONTENT_TYPE_BY_ID.entries()) {
+      if (!typeMap.has(id)) {
+        typeMap.set(id, typeDef);
+      }
+    }
+
     // Fetch all public items in batches to bypass limits
     let allItems: any[] = [];
     
@@ -39,7 +55,7 @@ export const GET: RequestHandler = async () => {
         
         const { data, error } = await supabase
           .from('items')
-          .select('slug, title, description, path_2048, path_512, created_at, updated_at')
+          .select('id, slug, title, description, path_2048, path_512, created_at, updated_at, type_id, group_root_item_id, group_slug, canonical_path, show_in_main_feed, is_private, ends_at')
           .not('slug', 'is', null)
           .not('path_512', 'is', null)
           // Public items include false and null (legacy rows)
@@ -80,7 +96,33 @@ export const GET: RequestHandler = async () => {
       // Continue with empty items array
     }
 
-    console.log(`[Sitemap] Found ${allItems.length} public items`);
+    const rootIds = Array.from(
+      new Set(
+        allItems
+          .map((item) => item.group_root_item_id)
+          .filter(Boolean)
+      )
+    );
+    const rootMap = new Map<string, any>();
+    if (rootIds.length > 0) {
+      const { data: rootRows } = await supabase
+        .from('items')
+        .select('id, slug, type_id, group_slug, canonical_path')
+        .in('id', rootIds);
+
+      for (const rootRow of rootRows || []) {
+        rootMap.set(rootRow.id, rootRow);
+      }
+    }
+
+    const sitemapItems = allItems.filter((item) => {
+      const rootItem = item.group_root_item_id ? rootMap.get(item.group_root_item_id) ?? null : null;
+      const type = item.type_id ? typeMap.get(item.type_id) ?? null : null;
+      const canonicalPath = getStoredOrComputedCanonicalPath({ item, rootItem, type });
+      return !!canonicalPath && isVisibleInMainFeed(item);
+    });
+
+    console.log(`[Sitemap] Found ${sitemapItems.length} public items`);
 
     // Generate XML
     let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
@@ -100,7 +142,7 @@ export const GET: RequestHandler = async () => {
 
     // Add crawlable pagination pages so bots can discover all item links
     const itemsPerPage = 50;
-    const totalPages = Math.max(1, Math.ceil(allItems.length / itemsPerPage));
+    const totalPages = Math.max(1, Math.ceil(sitemapItems.length / itemsPerPage));
     for (let p = 2; p <= totalPages; p++) {
       xml += '  <url>\n';
       xml += `    <loc>${baseUrl}/?page=${p}</loc>\n`;
@@ -112,10 +154,14 @@ export const GET: RequestHandler = async () => {
     }
 
     // Add item pages with optimized data (following Google's current guidelines)
-    for (const item of allItems) {
+    for (const item of sitemapItems) {
+      const rootItem = item.group_root_item_id ? rootMap.get(item.group_root_item_id) ?? null : null;
+      const type = item.type_id ? typeMap.get(item.type_id) ?? null : null;
+      const canonicalPath = getStoredOrComputedCanonicalPath({ item, rootItem, type });
+      if (!canonicalPath) continue;
+
       xml += '  <url>\n';
-      // Use trailing slash for consistent URLs
-      xml += `    <loc>${baseUrl}/item/${item.slug}/</loc>\n`;
+      xml += `    <loc>${baseUrl}${canonicalPath}</loc>\n`;
       
       // Verwende tatsächliches Änderungsdatum für bessere Crawl-Effizienz
       const lastModDate = item.updated_at || item.created_at;
@@ -153,7 +199,7 @@ export const GET: RequestHandler = async () => {
 
     xml += '</urlset>';
 
-    console.log(`[Sitemap] Generated sitemap with ${staticPages.length} static pages and ${allItems.length} items`);
+    console.log(`[Sitemap] Generated sitemap with ${staticPages.length} static pages and ${sitemapItems.length} items`);
     console.log(`[Sitemap] Items use their actual updated_at/created_at dates for better crawl efficiency`);
 
     return new Response(xml, {

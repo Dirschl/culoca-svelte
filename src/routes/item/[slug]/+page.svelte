@@ -74,6 +74,13 @@ let showRightsManager = false;
   let error = data?.error ?? '';
   let nearby: any[] = []; // Will be loaded client-side
   let seoLinks = data?.seoLinks ?? { newer: null, older: null };
+  let canonicalPath = data?.canonicalPath ?? (image?.slug ? `/item/${image.slug}` : '');
+  let contentType = data?.type ?? null;
+  let rootItem = data?.rootItem ?? image;
+  let contextItem = data?.contextItem ?? image;
+  let groupItems = data?.groupItems ?? [];
+  let activeGroupItemId = data?.activeGroupItemId ?? image?.id ?? null;
+  let canonicalUrl = '';
   let loading = !image;
   let profile = null;
   let metaTags = data?.metaTags ?? null;
@@ -88,6 +95,61 @@ let showRightsManager = false;
   // SEO/Meta: Slug statt ID verwenden - reaktiv auf URL-Parameter
   let itemSlug: string = '';
   $: itemSlug = $page.params.slug || image?.slug || '';
+  $: canonicalPath = data?.canonicalPath ?? canonicalPath;
+  $: contentType = data?.type ?? contentType;
+  $: rootItem = data?.rootItem ?? image;
+  $: contextItem = data?.contextItem ?? image;
+  $: groupItems = data?.groupItems ?? [];
+  $: activeGroupItemId = data?.activeGroupItemId ?? image?.id ?? null;
+  $: canonicalUrl = canonicalPath ? `https://culoca.com${canonicalPath}` : (image?.slug ? `https://culoca.com/item/${image.slug}/` : 'https://culoca.com');
+  $: effectiveContentHtml = contextItem?.content || image?.content || '';
+  $: hasVisibleGroupItems = Array.isArray(groupItems) && groupItems.length > 1;
+  $: hasDateRange = !!(contentType?.show_date_range && (contextItem?.starts_at || contextItem?.ends_at));
+  $: hasVideoEmbed = !!(contentType?.show_video_embed && image?.video_url);
+  $: hasExternalLink = !!(contentType?.show_external_link && image?.external_url);
+  $: shouldShowMainImage = contentType?.show_image !== false;
+  $: shouldShowNearbyGallery = !!(contentType?.show_nearby_gallery && image?.lat && image?.lon);
+  $: shouldShowMap = !!(contentType?.show_map && image?.lat && image?.lon);
+  $: shouldShowContentHtml = !!(contentType?.show_content_html && effectiveContentHtml);
+
+  function formatDateRange(start: string | null | undefined, end: string | null | undefined): string {
+    if (!start && !end) return '';
+    const format = (value: string) =>
+      new Date(value).toLocaleString('de-DE', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+
+    if (start && end) return `${format(start)} - ${format(end)}`;
+    if (start) return `Start: ${format(start)}`;
+    return `Ende: ${format(end as string)}`;
+  }
+
+  function getEmbedUrl(videoUrl: string | null | undefined): string {
+    if (!videoUrl) return '';
+
+    try {
+      const parsed = new URL(videoUrl);
+      if (parsed.hostname.includes('youtube.com')) {
+        const id = parsed.searchParams.get('v');
+        return id ? `https://www.youtube.com/embed/${id}` : videoUrl;
+      }
+      if (parsed.hostname === 'youtu.be') {
+        const id = parsed.pathname.replace('/', '');
+        return id ? `https://www.youtube.com/embed/${id}` : videoUrl;
+      }
+      if (parsed.hostname.includes('vimeo.com')) {
+        const id = parsed.pathname.split('/').filter(Boolean).pop();
+        return id ? `https://player.vimeo.com/video/${id}` : videoUrl;
+      }
+      return videoUrl;
+    } catch {
+      return videoUrl || '';
+    }
+  }
 
   // Dynamisches Favicon aktualisieren
   $: if (image && browser) {
@@ -942,7 +1004,8 @@ let showRightsManager = false;
       if (res.ok) {
         goto('/');
       } else {
-        alert('Löschen fehlgeschlagen.');
+        const payload = await res.json().catch(() => null);
+        alert(payload?.error || 'Löschen fehlgeschlagen.');
       }
     } catch (err) {
       alert('Fehler beim Löschen.');
@@ -1130,12 +1193,12 @@ let showRightsManager = false;
   <title>{image?.title || `Item ${itemSlug} - culoca.com`}</title>
   <meta name="description" content={image?.description || image?.caption || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
   
-  <link rel="canonical" href={`https://culoca.com/item/${itemSlug}/`}>
-  {#if seoLinks?.newer?.slug}
-    <link rel="prev" href={`https://culoca.com/item/${seoLinks.newer.slug}/`}>
+  <link rel="canonical" href={canonicalUrl}>
+  {#if seoLinks?.newer?.canonicalPath}
+    <link rel="prev" href={`https://culoca.com${seoLinks.newer.canonicalPath}`}>
   {/if}
-  {#if seoLinks?.older?.slug}
-    <link rel="next" href={`https://culoca.com/item/${seoLinks.older.slug}/`}>
+  {#if seoLinks?.older?.canonicalPath}
+    <link rel="next" href={`https://culoca.com${seoLinks.older.canonicalPath}`}>
   {/if}
   
   <!-- Robots -->
@@ -1148,7 +1211,7 @@ let showRightsManager = false;
   <meta property="og:locale" content="de_DE">
   <meta property="og:title" content={image?.title || `Item ${itemSlug} - culoca.com`}>
   <meta property="og:description" content={image?.description || image?.caption || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
-  <meta property="og:url" content={`https://culoca.com/item/${itemSlug}/`}> 
+  <meta property="og:url" content={canonicalUrl}> 
   <!-- Open Graph Image: Use SEO-friendly URL with size suffix (no query parameters) -->
   {#if image}
     {@const imagePathForExtension = image.path_2048 || image.path_512}
@@ -1203,7 +1266,7 @@ let showRightsManager = false;
   <!-- Strukturierte Daten (JSON-LD) für bessere SEO - Optimiert nach Google-Richtlinien -->
   {#if image}
     {@const itemName = image.title || image.original_name || `Bild ${image.id}`}
-    {@const itemUrl = `https://culoca.com/item/${image.slug}/`}
+    {@const itemUrl = canonicalUrl}
     {@const hasPath2048 = !!image.path_2048}
     {@const hasPath512 = !!image.path_512}
     {@const imagePathForExtension = image.path_2048 || image.path_512}
@@ -1351,28 +1414,38 @@ let showRightsManager = false;
       <div class="error">❌ Fehler: {error}</div>
     {:else if image}
     <div class="passepartout-container">
-      <figure>
-        <a href="/" class="image-link">
-          <img
-            src={imageSource}
-            srcset={imageSrcset || undefined}
-            sizes={imageSizes || undefined}
-            alt={image.title && image.description 
-              ? `${image.title} - ${image.description}` 
-              : image.title || image.description || image.caption || `Bild von ${image.original_name || 'unbekannt'}`}
-            class="main-image"
-            width={imageWidth2048}
-            height={imageHeight2048}
-            loading="eager"
-            decoding="async"
-            fetchpriority="high"
-          />
-        </a>
-        {#if image.caption}
-          <figcaption>{image.caption}</figcaption>
-        {/if}
-      </figure>
+      {#if shouldShowMainImage}
+        <figure>
+          <a href="/" class="image-link">
+            <img
+              src={imageSource}
+              srcset={imageSrcset || undefined}
+              sizes={imageSizes || undefined}
+              alt={image.title && image.description 
+                ? `${image.title} - ${image.description}` 
+                : image.title || image.description || image.caption || `Bild von ${image.original_name || 'unbekannt'}`}
+              class="main-image"
+              width={imageWidth2048}
+              height={imageHeight2048}
+              loading="eager"
+              decoding="async"
+              fetchpriority="high"
+            />
+          </a>
+          {#if image.caption}
+            <figcaption>{image.caption}</figcaption>
+          {/if}
+        </figure>
+      {/if}
       <div class="passepartout-info">
+        {#if contentType?.name}
+          <div class="content-type-chip">{contentType.name}</div>
+        {/if}
+        {#if rootItem?.id !== image?.id && rootItem?.title}
+          <p class="group-context-line">
+            Teil von <a href={data?.rootCanonicalPath || canonicalPath}>{rootItem.title}</a>
+          </p>
+        {/if}
         <h1 class="title" class:editable={isCreator || $unifiedRightsStore.rights?.edit} class:editing={editingTitle}>
           {#if editingTitle}
             <div class="title-edit-container">
@@ -1475,6 +1548,68 @@ let showRightsManager = false;
 
       </div>
     </div>
+    {#if hasDateRange}
+      <section class="content-panel">
+        <h2>Zeitraum</h2>
+        <p>{formatDateRange(contextItem?.starts_at, contextItem?.ends_at)}</p>
+      </section>
+    {/if}
+    {#if hasExternalLink}
+      <section class="content-panel">
+        <h2>Externer Link</h2>
+        <p><a href={image.external_url} target="_blank" rel="noopener noreferrer">{image.external_url}</a></p>
+      </section>
+    {/if}
+    {#if hasVideoEmbed}
+      <section class="content-panel">
+        <h2>Video</h2>
+        <div class="video-embed">
+          <iframe
+            src={getEmbedUrl(image.video_url)}
+            title={image.title || 'Video'}
+            loading="lazy"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowfullscreen
+          ></iframe>
+        </div>
+      </section>
+    {/if}
+    {#if shouldShowContentHtml}
+      <section class="content-panel content-html">
+        <h2>Inhalt</h2>
+        <div class="rich-content">
+          {@html effectiveContentHtml}
+        </div>
+      </section>
+    {/if}
+    {#if hasVisibleGroupItems}
+      <section class="content-panel group-panel" data-nosnippet>
+        <h2>{rootItem?.group_slug ? 'Gruppe' : 'Varianten'}</h2>
+        <div class="group-grid">
+          {#each groupItems as groupItem}
+            <a
+              class:active={groupItem.id === activeGroupItemId}
+              class="group-card"
+              href={groupItem.canonicalPath || `/item/${groupItem.slug}`}
+            >
+              {#if groupItem.path_64}
+                <img
+                  src={`https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/${groupItem.path_64}`}
+                  alt={groupItem.title || 'Variante'}
+                  loading="lazy"
+                />
+              {/if}
+              <div>
+                <strong>{groupItem.title}</strong>
+                {#if groupItem.description}
+                  <span>{groupItem.description}</span>
+                {/if}
+              </div>
+            </a>
+          {/each}
+        </div>
+      </section>
+    {/if}
     <ImageControlsSection
       {image}
       isCreator={isCreator}
@@ -1484,7 +1619,7 @@ let showRightsManager = false;
       onDownloadOriginal={downloadOriginal}
       onToggleGallery={toggleGallery}
     />
-    {#if image.lat && image.lon}
+    {#if shouldShowNearbyGallery}
       <div class="radius-control">
         <div class="radius-value" class:limit-reached={isAtItemLimit}>
           {formatRadius(radius)}
@@ -1503,19 +1638,21 @@ let showRightsManager = false;
         <input id="radius" type="range" min="50" max="2000" step="50" value={radius} on:input={onRadiusInput} on:change={onRadiusChange} class:limit-reached={isAtItemLimit}>
       </div>
     {/if}
-    <section class="nearby" data-nosnippet>
-      <NearbyGallery
-        nearby={visibleNearby}
-        isCreator={isCreator}
-        showImageCaptions={showImageCaptions}
-        userLat={image?.lat}
-        userLon={image?.lon}
-        getDistanceFromLatLonInMeters={getDistanceFromLatLonInMeters}
-        onGalleryToggle={handleNearbyGalleryToggle}
-        getGalleryStatus={getNearbyGalleryStatus}
-        layout={galleryLayout}
-      />
-    </section>
+    {#if shouldShowNearbyGallery}
+      <section class="nearby" data-nosnippet>
+        <NearbyGallery
+          nearby={visibleNearby}
+          isCreator={isCreator}
+          showImageCaptions={showImageCaptions}
+          userLat={image?.lat}
+          userLon={image?.lon}
+          getDistanceFromLatLonInMeters={getDistanceFromLatLonInMeters}
+          onGalleryToggle={handleNearbyGalleryToggle}
+          getGalleryStatus={getNearbyGalleryStatus}
+          layout={galleryLayout}
+        />
+      </section>
+    {/if}
     
     <!-- SEO-optimiert: Serverseitig gerenderte Links für Google -->
     {#if nearby && nearby.length > 0}
@@ -1524,7 +1661,7 @@ let showRightsManager = false;
         <ul>
           {#each nearby.slice(0, 300) as item}
             <li>
-              <a href="/item/{item.slug}" 
+              <a href={item.canonicalPath || `/item/${item.slug}`} 
                  title="{item.caption || item.description}"
                  alt="{item.title} ({Math.round(item.distance)}m)">
                 {item.title} ({Math.round(item.distance)}m)
@@ -1535,13 +1672,13 @@ let showRightsManager = false;
       </div>
     {/if}
 
-    {#if seoLinks?.newer?.slug || seoLinks?.older?.slug}
+    {#if seoLinks?.newer?.canonicalPath || seoLinks?.older?.canonicalPath}
       <nav class="item-seo-nav" aria-label="Weitere Bilder">
-        {#if seoLinks?.newer?.slug}
-          <a href={`/item/${seoLinks.newer.slug}`} rel="prev" class="item-seo-nav-link">Neueres Item</a>
+        {#if seoLinks?.newer?.canonicalPath}
+          <a href={seoLinks.newer.canonicalPath} rel="prev" class="item-seo-nav-link">Neueres Item</a>
         {/if}
-        {#if seoLinks?.older?.slug}
-          <a href={`/item/${seoLinks.older.slug}`} rel="next" class="item-seo-nav-link">Älteres Item</a>
+        {#if seoLinks?.older?.canonicalPath}
+          <a href={seoLinks.older.canonicalPath} rel="next" class="item-seo-nav-link">Älteres Item</a>
         {/if}
       </nav>
     {/if}
@@ -2987,5 +3124,101 @@ let showRightsManager = false;
 
   .adobe-error {
     color: #d64545;
+  }
+
+  .content-type-chip {
+    display: inline-flex;
+    align-items: center;
+    margin-bottom: 0.75rem;
+    padding: 0.2rem 0.55rem;
+    border-radius: 999px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+
+  .group-context-line {
+    margin: 0 0 0.75rem 0;
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+  }
+
+  .group-context-line a {
+    color: var(--accent-color);
+  }
+
+  .content-panel {
+    max-width: 1100px;
+    margin: 1rem auto;
+    padding: 1rem 1.1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    background: var(--bg-secondary);
+  }
+
+  .content-panel h2 {
+    margin: 0 0 0.75rem 0;
+  }
+
+  .rich-content :global(p:first-child) {
+    margin-top: 0;
+  }
+
+  .video-embed {
+    position: relative;
+    overflow: hidden;
+    width: 100%;
+    padding-top: 56.25%;
+    border-radius: 12px;
+  }
+
+  .video-embed iframe {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+  }
+
+  .group-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0.75rem;
+  }
+
+  .group-card {
+    display: grid;
+    grid-template-columns: 56px 1fr;
+    gap: 0.75rem;
+    align-items: center;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    color: inherit;
+    text-decoration: none;
+    background: var(--bg-primary);
+  }
+
+  .group-card.active {
+    border-color: var(--accent-color);
+  }
+
+  .group-card img {
+    width: 56px;
+    height: 56px;
+    object-fit: cover;
+    border-radius: 10px;
+  }
+
+  .group-card strong,
+  .group-card span {
+    display: block;
+  }
+
+  .group-card span {
+    margin-top: 0.25rem;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
   }
 </style> 
