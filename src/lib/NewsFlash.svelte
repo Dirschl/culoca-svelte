@@ -5,6 +5,7 @@ import type { NewsFlashImage } from './types';
 import { galleryStats } from './galleryStats';
 import { supabase } from './supabaseClient';
 import { getSeoImageUrl } from './utils/seoImageUrl';
+import { getPublicItemHref } from '$lib/content/routing';
 
 // Modus: 'eigene', 'alle', 'aus'
 export let mode: 'eigene' | 'alle' | 'aus' = 'alle';
@@ -36,6 +37,26 @@ let refreshInterval: number | null = null;
 let mounted = false;
 let usedInitialItems = false; // NEU: Merker, ob SSR-Items verwendet wurden
 
+async function attachCanonicalPaths<T extends { id: string }>(items: T[]): Promise<Array<T & { canonical_path?: string | null }>> {
+  if (!items.length) return [];
+
+  const { data, error } = await supabase
+    .from('items')
+    .select('id, canonical_path')
+    .in('id', items.map((item) => item.id));
+
+  if (error || !data) {
+    console.error('[NewsFlash] Failed to load canonical paths:', error);
+    return items;
+  }
+
+  const canonicalById = new Map(data.map((item) => [item.id, item.canonical_path]));
+  return items.map((item) => ({
+    ...item,
+    canonical_path: canonicalById.get(item.id) || null
+  }));
+}
+
 // Container references for auto-scroll
 let stripContainer: HTMLElement;
 let gridContainer: HTMLElement;
@@ -52,6 +73,7 @@ $: if (initialItems && initialItems.length > 0 && (images.length === 0 || curren
   images = initialItems.map(item => ({
     id: item.id,
     slug: item.slug,
+    canonical_path: item.canonical_path,
     lat: item.lat,
     lon: item.lon,
     path_512: item.path_512,
@@ -92,9 +114,10 @@ async function loadNewsFlashImagesDirectFromDB(): Promise<NewsFlashImage[]> {
       return [];
     }
     
-    const images = (data || []).map(item => ({
+    const images = await attachCanonicalPaths((data || []).map(item => ({
       id: item.id,
       slug: item.slug,
+      canonical_path: item.canonical_path,
       lat: item.lat,
       lon: item.lon,
       path_512: item.path_512!,
@@ -103,7 +126,7 @@ async function loadNewsFlashImagesDirectFromDB(): Promise<NewsFlashImage[]> {
       title: item.title,
       description: item.description,
       original_name: item.original_name
-    }));
+    })));
     
     console.log('[NewsFlash] Geladene Images:', images.slice(0, 5));
     console.log(`[NewsFlash DirectDB] Successfully loaded ${images.length} images`);
@@ -241,7 +264,7 @@ onDestroy(() => {
 
 function handleImageClick(img: NewsFlashImage) {
   console.log('[NewsFlash] handleImageClick:', img);
-  goto(`/item/${img.slug}`);
+  goto(getPublicItemHref(img));
 }
 
 function toggleMode() {
@@ -317,7 +340,7 @@ function handleScroll(event: Event) {
           {#each images as img (img.id)}
             {@const displayWidth = img.width && img.height ? Math.round(140 * img.width / img.height) : 140}
             {@const seoImageUrl = getSeoImageUrl(img.slug, img.path_512, '512')}
-            <a href={`/item/${img.slug}`} class="newsflash-thumb" tabindex="0" role="button" aria-label={img.title || img.original_name || 'Bild'} title={img.title || img.original_name || 'Bild'} style="width:{displayWidth}px;">
+            <a href={getPublicItemHref(img)} class="newsflash-thumb" tabindex="0" role="button" aria-label={img.title || img.original_name || 'Bild'} title={img.title || img.original_name || 'Bild'} style="width:{displayWidth}px;">
               <img src={seoImageUrl || `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${img.path_512}`} alt={img.title || img.original_name || 'Bild'} width={displayWidth} height="140" loading="lazy" />
               {#if showImageCaptions && (img.title || img.original_name)}
                 <div class="newsflash-caption-overlay">
@@ -350,7 +373,7 @@ function handleScroll(event: Event) {
           {/if}
           {#each images as img (img.id)}
             {@const seoGridImageUrl = getSeoImageUrl(img.slug, img.path_512, '512')}
-            <a href={`/item/${img.slug}`} class="newsflash-thumb" tabindex="0" role="button" aria-label={img.title || img.original_name || 'Bild'} title={img.title || img.original_name || 'Bild'}>
+            <a href={getPublicItemHref(img)} class="newsflash-thumb" tabindex="0" role="button" aria-label={img.title || img.original_name || 'Bild'} title={img.title || img.original_name || 'Bild'}>
               <img src={seoGridImageUrl || `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${img.path_512}`} alt={img.title || img.original_name || 'Bild'} />
               {#if showImageCaptions && (img.title || img.original_name)}
                 <div class="newsflash-caption-overlay">

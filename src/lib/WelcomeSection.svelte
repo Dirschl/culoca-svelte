@@ -5,6 +5,7 @@
   import { welcomeVisible, hideWelcome, dismissWelcome, isWelcomeDismissed } from '$lib/welcomeStore';
   import { sessionStore } from '$lib/sessionStore';
   import { get } from 'svelte/store';
+  import { getPublicItemHref } from '$lib/content/routing';
 
   const CREATOR_ID = '0ceb2320-0553-463b-971a-a0eef5ecdf09';
 
@@ -89,7 +90,7 @@
         <p class="featured-intro">Entdecke zufällige Locations und teile was dir gefällt</p>
         <div class="featured-items">
           {#each featuredItems as item}
-            <a href={`/item/${item.slug}`} class="featured-item">
+            <a href={getPublicItemHref(item)} class="featured-item">
               <div class="featured-image">
                 <img 
                   src={`/api/og-image/${item.slug}`}

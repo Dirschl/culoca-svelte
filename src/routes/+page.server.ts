@@ -54,9 +54,19 @@ export const load: PageServerLoad = async ({ url, request }) => {
     });
 
     if (!error && data) {
+      const canonicalRows = data.length
+        ? await supabase
+            .from('items')
+            .select('id, canonical_path')
+            .in('id', data.map((item) => item.id))
+        : { data: [], error: null };
+
+      const canonicalById = new Map((canonicalRows.data || []).map((item) => [item.id, item.canonical_path]));
+
       newsFlashItems = data.map(item => ({
         id: item.id,
         slug: item.slug,
+        canonical_path: canonicalById.get(item.id) || null,
         lat: item.lat,
         lon: item.lon,
         path_512: item.path_512,
@@ -131,7 +141,7 @@ export const load: PageServerLoad = async ({ url, request }) => {
       const promises = randomOffsets.map(offset => 
         supabase
           .from('items')
-          .select('id, title, slug, description')
+          .select('id, title, slug, description, canonical_path')
           .not('slug', 'is', null)
           .eq('is_private', false)
           .order('created_at', { ascending: false })
@@ -150,6 +160,7 @@ export const load: PageServerLoad = async ({ url, request }) => {
         featuredItems = fallbackData.map(item => ({
           id: item.id,
           slug: item.slug,
+          canonical_path: item.canonical_path,
           title: item.title || 'Unbenanntes Item',
           description: item.description || ''
         }));

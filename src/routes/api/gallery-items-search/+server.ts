@@ -3,6 +3,25 @@ import { supabase } from '$lib/supabaseClient';
 import { safeFunctionCall, logDatabaseOperation } from '$lib/databaseConfig';
 import { isVisibleInMainFeed } from '$lib/content/routing';
 
+async function attachCanonicalPaths(items: any[]) {
+  if (!items.length) return items;
+
+  const { data, error } = await supabase
+    .from('items')
+    .select('id, canonical_path')
+    .in('id', items.map((item) => item.id));
+
+  if (error || !data) {
+    return items;
+  }
+
+  const canonicalById = new Map(data.map((item) => [item.id, item.canonical_path]));
+  return items.map((item) => ({
+    ...item,
+    canonical_path: canonicalById.get(item.id) || item.canonical_path || null
+  }));
+}
+
 export async function GET({ url }) {
   try {
     const page = parseInt(url.searchParams.get('page') || '0');
@@ -125,7 +144,9 @@ export async function GET({ url }) {
     }
 
     // Nur total_count entfernen, distance behalten für Frontend-Sortierung
-    const items = data?.map(item => {
+    const itemsWithCanonical = await attachCanonicalPaths(data || []);
+
+    const items = itemsWithCanonical.map(item => {
       const { total_count, ...itemWithoutTotalCount } = item;
       return itemWithoutTotalCount;
     }).filter((item) => !('show_in_main_feed' in item) || isVisibleInMainFeed(item)) || [];

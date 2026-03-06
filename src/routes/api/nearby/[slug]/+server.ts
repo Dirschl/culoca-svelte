@@ -66,7 +66,7 @@ export async function GET({ params }) {
           
           const { data: fallbackData, error: fallbackError } = await supabase
             .from('items')
-            .select('id, slug, path_512, path_2048, path_64, original_name, title, description, caption, lat, lon, width, height, is_private, gallery')
+            .select('id, slug, canonical_path, path_512, path_2048, path_64, original_name, title, description, caption, lat, lon, width, height, is_private, gallery')
             .not('lat', 'is', null)
             .not('lon', 'is', null)
             .not('path_512', 'is', null)
@@ -90,6 +90,7 @@ export async function GET({ params }) {
                 return {
                   id: item.id,
                   slug: item.slug,
+                  canonical_path: item.canonical_path,
                   lat: item.lat,
                   lon: item.lon,
                   distance,
@@ -120,6 +121,7 @@ export async function GET({ params }) {
               return {
                 id: item.id,
                 slug: item.slug,
+                canonical_path: item.canonical_path,
                 lat: item.lat,
                 lon: item.lon,
                 distance: item.distance,

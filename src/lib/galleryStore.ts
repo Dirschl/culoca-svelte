@@ -203,6 +203,7 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
           title: item.title,
           distance: item.distance,
           description: item.description,
+          canonical_path: item.canonical_path,
           profile_id: item.profile_id,
           isSourceItem: item.isSourceItem,
           path_64: item.path_64,

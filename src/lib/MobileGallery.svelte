@@ -120,6 +120,7 @@
       return {
         id: img.id,
         slug: img.slug,
+        canonical_path: img.canonical_path,
         src: seoSrc || fallbackSrc,
         srcHD: seoSrcHD || fallbackSrcHD,
         width: img.width && img.width > 0 ? img.width : 400,
@@ -209,6 +210,7 @@
           return {
             id: img.id,
             slug: img.slug,
+            canonical_path: img.canonical_path,
             src: seoSrc || fallbackSrc,
             srcHD: seoSrcHD || fallbackSrcHD,
             width: img.width && img.width > 0 ? img.width : 400,

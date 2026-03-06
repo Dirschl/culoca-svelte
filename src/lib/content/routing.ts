@@ -76,6 +76,16 @@ export function getStoredOrComputedCanonicalPath(args: {
   return normalizePath(args.item.canonical_path || computed || '');
 }
 
+export function getPublicItemHref(item: {
+  slug?: string | null;
+  canonical_path?: string | null;
+  canonicalPath?: string | null;
+}): string {
+  const canonicalPath = item.canonicalPath || item.canonical_path;
+  if (canonicalPath) return normalizePath(canonicalPath);
+  return item.slug ? `/item/${item.slug}` : '/';
+}
+
 export function isEventExpired(item: Pick<ContentItemLike, 'type_id' | 'ends_at'>): boolean {
   const type = getTypeForItem(item);
   if (type?.slug !== 'event' || !item.ends_at) return false;

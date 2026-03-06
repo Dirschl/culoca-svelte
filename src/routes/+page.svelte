@@ -2306,7 +2306,7 @@
   {#if isBot && data.newsFlashItems?.length}
     <section class="bot-gallery" aria-label="Bot Gallery">
       {#each data.newsFlashItems as img}
-        <a class="bot-gallery-item" href={`/item/${img.slug}/`} rel="follow">
+        <a class="bot-gallery-item" href={img.canonical_path || `/item/${img.slug}/`} rel="follow">
           <span class="bot-gallery-title">{img.title || img.original_name || img.slug}</span>
         </a>
       {/each}
@@ -2450,8 +2450,8 @@
         }
       }}
       on:imageClick={(event) => {
-        const imageSlug = event.detail.imageSlug || event.detail.slug || event.detail.imageId;
-        window.location.href = `/item/${imageSlug}`;
+        const imageHref = event.detail.canonicalPath || event.detail.canonical_path || (event.detail.imageSlug || event.detail.slug ? `/item/${event.detail.imageSlug || event.detail.slug}` : '/');
+        window.location.href = imageHref;
       }}
       on:locationSelected={(event) => {
         const { lat, lon } = event.detail;

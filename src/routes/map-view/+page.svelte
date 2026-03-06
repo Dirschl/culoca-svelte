@@ -87,8 +87,8 @@
       on:mapReady={handleMapReady}
       on:close={handleMapClose}
       on:imageClick={(event) => {
-        const imageSlug = event.detail.imageSlug || event.detail.slug || event.detail.imageId;
-        window.location.href = `/item/${imageSlug}`;
+        const imageHref = event.detail.canonicalPath || event.detail.canonical_path || (event.detail.imageSlug || event.detail.slug ? `/item/${event.detail.imageSlug || event.detail.slug}` : '/');
+        window.location.href = imageHref;
       }}
       on:locationSelected={(event) => {
         // Navigate back to main page with location

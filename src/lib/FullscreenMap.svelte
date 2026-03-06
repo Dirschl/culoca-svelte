@@ -719,7 +719,7 @@
       
       // Click handler for navigation
       marker.on('click', () => {
-        dispatch('imageClick', { imageSlug: image.slug, imageId: image.id });
+        dispatch('imageClick', { imageSlug: image.slug, imageId: image.id, canonicalPath: image.canonical_path || null });
       });
       
       // Store reference to image data

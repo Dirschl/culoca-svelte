@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import justifiedLayout from 'justified-layout';
+  import { getPublicItemHref } from '$lib/content/routing';
 
   // Types for justified-layout
   interface LayoutBox {
@@ -145,8 +146,7 @@
   });
 
   function getItemHref(item: { slug?: string; canonical_path?: string }) {
-    if (item.canonical_path) return item.canonical_path;
-    return item.slug ? `/item/${item.slug}` : '/';
+    return getPublicItemHref(item);
   }
 
   function handleImageClick(itemSlug: string) {

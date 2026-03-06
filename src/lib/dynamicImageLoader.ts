@@ -218,6 +218,7 @@ export class DynamicImageLoader {
         .select(`
           id,
           slug,
+          canonical_path,
           title,
           description,
           keywords,

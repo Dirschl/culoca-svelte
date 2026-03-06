@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import justifiedLayout from 'justified-layout';
+  import { getPublicItemHref } from '$lib/content/routing';
 
   // Typen für justified-layout
   interface LayoutBox {
@@ -17,7 +18,7 @@
     boxes: LayoutBox[];
   }
 
-  export let items: { src: string; width: number; height: number; id: string; lat?: number; lon?: number; distance?: number }[] = [];
+  export let items: { src: string; width: number; height: number; id: string; slug?: string; canonical_path?: string; lat?: number; lon?: number; distance?: number }[] = [];
   
   // Debug: Log items when they change
   $: if (items.length > 0) {
@@ -143,7 +144,8 @@
   function handleImageClick(slug: string) {
     // Use SvelteKit navigation
     if (typeof window !== 'undefined') {
-      window.location.href = `/item/${slug}`;
+      const item = items.find((candidate) => candidate.slug === slug);
+      window.location.href = getPublicItemHref(item || { slug });
     }
   }
 
