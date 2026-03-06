@@ -8,6 +8,7 @@
   import { onMount } from 'svelte';
   import { supabase } from '$lib/supabaseClient';
   import InfoPageLayout from '$lib/InfoPageLayout.svelte';
+  import { getPublicItemHref } from '$lib/content/routing';
 
   let isLoading = true;
   let isAdmin = false;
@@ -81,7 +82,7 @@
         const { data, error } = await supabase
           .from('items')
           .select(`
-            id, title, slug, created_at, lat, lon, is_private, user_id, width, height, path_512,
+            id, title, slug, canonical_path, created_at, lat, lon, is_private, user_id, width, height, path_512,
             profiles(accountname, full_name)
           `)
           .order('created_at', { ascending: false })
@@ -117,7 +118,7 @@
           const { data: fallbackData, error: fallbackError } = await supabase
             .from('items')
             .select(`
-              id, title, slug, created_at, lat, lon, is_private, user_id, width, height, path_512,
+              id, title, slug, canonical_path, created_at, lat, lon, is_private, user_id, width, height, path_512,
               profiles(accountname, full_name)
             `)
             .or(`title.ilike.%${searchTerm}%,slug.ilike.%${searchTerm}%,profiles.accountname.ilike.%${searchTerm}%`)
@@ -432,7 +433,7 @@
                         {item.title || 'Unbenannt'}
                       </div>
                       <a 
-                        href="/item/{item.slug}" 
+                        href={getPublicItemHref(item)} 
                         style="color: #f59e0b; text-decoration: none; font-size: 0.875rem;"
                         target="_blank"
                       >
@@ -534,7 +535,7 @@
                   {item.title || 'Unbenannt'}
                 </div>
                 <a 
-                  href="/item/{item.slug}" 
+                  href={getPublicItemHref(item)} 
                   style="color: #f59e0b; text-decoration: none; font-size: 0.875rem;"
                   target="_blank"
                 >

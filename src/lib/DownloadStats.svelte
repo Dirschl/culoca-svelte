@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { authFetch } from '$lib/authFetch';
+  import { getPublicItemHref } from '$lib/content/routing';
 
   export let itemId: string | null = null; // null = all items, specific UUID = single item
 
@@ -205,7 +206,7 @@
                   {#if !itemId}
                     <td class="item-info">
                       {#if history.items}
-                        <a href={`/item/${history.items.slug}`} class="item-link" target="_blank">
+                        <a href={getPublicItemHref(history.items)} class="item-link" target="_blank">
                           {history.items.title || 'Unbenannt'}
                         </a>
                         <div class="item-id">ID: {history.item_id.slice(0, 8)}...</div>

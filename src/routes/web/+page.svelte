@@ -111,6 +111,7 @@
   //import FloatingActionButtons from '$lib/FloatingActionButtons.svelte';
   import { goto } from '$app/navigation';
   import InfoPageLayout from '$lib/InfoPageLayout.svelte';
+  import { getPublicItemHref } from '$lib/content/routing';
 
   let stats = {
     totalItems: 0,
@@ -473,7 +474,7 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
 
     // Remove URL validation - allow any URL for testing
     // if (!testUrl.includes('culoca.com')) {
-    //   error = 'Fehler: Bitte gib eine gültige Culoca Item URL ein (z.B. https://culoca.com/item/...)';
+    //   error = 'Fehler: Bitte gib eine gültige Culoca URL ein (z.B. https://culoca.com/foto/...)';
     //   return;
     // }
 
@@ -552,7 +553,7 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
   // Auto-execute first example on page load
   onMount(async () => {
     // Set the example URL and execute it automatically
-    testUrl = 'https://culoca.com/item/nachts-in-mitterskirchen-herbstbild-rottal-inn-johann-dirschl';
+    testUrl = 'https://culoca.com/foto/nachts-in-mitterskirchen-herbstbild-rottal-inn-johann-dirschl';
     await fetchHeadData();
     
     // Check URL for bot_mode parameter
@@ -654,7 +655,7 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
         // Banner-Bild laden (zufälliges Querformat-Foto mit breitestem Seitenverhältnis)
         const { data: bannerData, error: bannerError } = await supabase
           .from('items')
-          .select('id, title, slug, path_2048, width, height, profile_id')
+          .select('id, title, slug, canonical_path, path_2048, width, height, profile_id')
           .not('path_2048', 'is', null)
           .not('width', 'is', null)
           .not('height', 'is', null)
@@ -696,7 +697,7 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
           // Fallback: Jedes Bild mit path_2048
           const { data: fallbackData, error: fallbackError } = await supabase
             .from('items')
-            .select('id, title, slug, path_2048, width, height, profile_id')
+            .select('id, title, slug, canonical_path, path_2048, width, height, profile_id')
             .not('path_2048', 'is', null)
             .order('created_at', { ascending: false })
             .limit(10);
@@ -730,7 +731,7 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
         // OG Examples laden - genau 1 Hochformat, 1 Querformat und 1 Map Share
         const { data: allItems, error: itemsError } = await supabase
           .from('items')
-          .select('id, title, slug, width, height, profile_id, description')
+          .select('id, title, slug, canonical_path, width, height, profile_id, description')
           .not('slug', 'is', null)
           .not('width', 'is', null)
           .not('height', 'is', null)
@@ -821,7 +822,7 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
         // Neueste Items
         const { data: latestItems } = await supabase
           .from('items')
-          .select('id, title, slug, created_at, path_512')
+          .select('id, title, slug, canonical_path, created_at, path_512')
           .order('created_at', { ascending: false })
           .limit(5);
 
@@ -837,8 +838,8 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
     }
   });
 
-  function goToDetail(slug: string) {
-    goto(`/item/${slug}`);
+  function goToDetail(item: { slug?: string | null; canonical_path?: string | null; canonicalPath?: string | null }) {
+    goto(getPublicItemHref(item));
   }
 </script>
 
@@ -851,7 +852,7 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
   <svelte:fragment slot="fullwidth">
     {#if bannerImage}
     <div class="banner-section-fullwidth">
-      <div class="banner-image-container" on:click={() => goToDetail(bannerImage.slug)}>
+      <div class="banner-image-container" on:click={() => goToDetail(bannerImage)}>
         <img 
           src="https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/{bannerImage.path_2048}" 
           alt={bannerImage.title || 'Banner Bild'} 
@@ -930,7 +931,7 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
       
       <div class="items-grid">
         {#each stats.latestItems as item}
-        <a href="/item/{item.slug}" class="item-card-link">
+        <a href={getPublicItemHref(item)} class="item-card-link">
           <div class="item-card">
             <img src="https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/{item.path_512}" 
                  alt={item.title || 'Foto'} class="item-thumbnail" />
@@ -1132,7 +1133,7 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
     
     <div class="og-examples">
       {#each ogExamples as item}
-      <a href={item.id === 'map-share' ? `/map-view-share/${item.slug}` : `/item/${item.slug}`} class="og-example-link">
+      <a href={item.id === 'map-share' ? `/map-view-share/${item.slug}` : getPublicItemHref(item)} class="og-example-link">
         <div class="og-example">
           <div class="og-preview">
             {#if item.id === 'map-share'}
@@ -1154,7 +1155,7 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
             <div class="og-text">
               <h5>{item.title || 'Ohne Titel'}{item.id !== 'map-share' ? ', ' + item.creator : ''}</h5>
               <p>{item.description || 'Keine Beschreibung verfügbar.'}</p>
-              <span class="og-link">https://culoca.com/{item.id === 'map-share' ? 'map-view-share/' + item.slug : 'item/' + item.slug}</span>
+              <span class="og-link">https://culoca.com{item.id === 'map-share' ? `/map-view-share/${item.slug}` : getPublicItemHref(item)}</span>
             </div>
           </div>
         </div>
@@ -1194,7 +1195,7 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
         <input 
           type="text" 
           bind:value={testUrl}
-          placeholder="https://example.com oder https://culoca.com/item/..."
+          placeholder="https://example.com oder https://culoca.com/foto/..."
           on:click={clearInput}
           on:keydown={handleUrlSubmit}
           class="url-input"

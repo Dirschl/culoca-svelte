@@ -11,6 +11,7 @@
   import { darkMode } from '$lib/darkMode';
   import InfoPageLayout from '$lib/InfoPageLayout.svelte';
   import DownloadStats from '$lib/DownloadStats.svelte';
+  import { getPublicItemHref } from '$lib/content/routing';
 
   let isLoading = true;
   let isAdmin = false;
@@ -274,8 +275,12 @@
     }
   }
 
-  function getItemUrl(itemId: string): string {
-    return `/item/${itemId}`;
+  function getItemUrl(item: { canonical_path?: string | null; item_slug?: string | null; slug?: string | null }): string {
+    return getPublicItemHref({
+      canonical_path: item.canonical_path,
+      canonicalPath: item.canonical_path,
+      slug: item.item_slug || item.slug || null
+    });
   }
 
   function showItemDownloadStats(itemId: string) {
@@ -479,7 +484,7 @@
                         🖼️
                       </div>
                       <div>
-                        <a href={`/item/${item.item_slug}`} class="admin-item-link" target="_blank">
+                        <a href={getItemUrl(item)} class="admin-item-link" target="_blank">
                           {item.item_title || 'Unbenannt'}
                         </a>
                         <div style="font-size: 0.75rem; color: var(--text-secondary);">ID: {item.item_id.slice(0, 8)}...</div>
@@ -496,7 +501,7 @@
                   <td>{formatNumber(item.views_this_week)}</td>
                   <td>
                     <div style="display: flex; gap: 0.5rem;">
-                      <a href={`/item/${item.item_slug}`} class="admin-action-btn admin-action-btn-primary" target="_blank">
+                      <a href={getItemUrl(item)} class="admin-action-btn admin-action-btn-primary" target="_blank">
                         👁️ Ansehen
                       </a>
                       <button 

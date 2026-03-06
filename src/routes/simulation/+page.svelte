@@ -6,6 +6,7 @@
   import NewsFlash from '$lib/NewsFlash.svelte';
   import { darkMode } from '$lib/darkMode';
   import FloatingActionButtons from '$lib/FloatingActionButtons.svelte';
+  import { getPublicItemHref } from '$lib/content/routing';
 
   // Simulation state
   let simulationActive = false;
@@ -194,7 +195,7 @@
         
         let query = supabase
           .from('items')
-          .select('id, lat, lon, path_512, path_2048, path_64, title, description, width, height, is_private, profile_id, keywords, original_name')
+          .select('id, slug, canonical_path, lat, lon, path_512, path_2048, path_64, title, description, width, height, is_private, profile_id, keywords, original_name')
           .not('path_512', 'is', null)
           .eq('gallery', true) // Only show images with gallery = true
           .range(offset, offset + batchSize - 1);
@@ -235,6 +236,8 @@
         path_512: item.path_512!,
         path_64: item.path_64 || item.path_512, // Fallback to 512 if 64 not available
         keywords: item.keywords || [],
+        slug: item.slug,
+        canonical_path: item.canonical_path,
         title: item.title || item.original_name || 'Untitled',
         description: item.description || ''
       }));
@@ -625,7 +628,7 @@
 
       marker.on('click', () => {
         // Navigate to image detail page with anchor parameter
-        const url = new URL(`/item/${img.slug}`, window.location.origin);
+        const url = new URL(getPublicItemHref(img), window.location.origin);
         window.open(url.toString(), '_blank');
       });
 
@@ -1110,7 +1113,7 @@
       </div>
       <div class="compact-list">
         {#each noGpsImagesList as img}
-          <div class="compact-item" on:click={() => { const url = new URL(`/item/${img.slug}`, window.location.origin); url.searchParams.set('anchor', img.id); window.open(url.toString(), '_blank'); }}>
+          <div class="compact-item" on:click={() => { const url = new URL(getPublicItemHref(img), window.location.origin); url.searchParams.set('anchor', img.id); window.open(url.toString(), '_blank'); }}>
             <img 
               src="https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/{img.path_64 || img.path_512}"
               alt={img.title || 'Bild'}
@@ -1138,7 +1141,7 @@
       </div>
       <div class="compact-list">
         {#each incompleteImagesList as img}
-          <div class="compact-item" on:click={() => { const url = new URL(`/item/${img.slug}`, window.location.origin); url.searchParams.set('anchor', img.id); window.open(url.toString(), '_blank'); }}>
+          <div class="compact-item" on:click={() => { const url = new URL(getPublicItemHref(img), window.location.origin); url.searchParams.set('anchor', img.id); window.open(url.toString(), '_blank'); }}>
             <img 
               src="https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/{img.path_64 || img.path_512}"
               alt={img.title || 'Bild'}

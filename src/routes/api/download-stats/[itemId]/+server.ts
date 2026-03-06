@@ -115,7 +115,7 @@ export const GET: RequestHandler = async ({ params, request }) => {
           user_id,
           item_id,
           profiles!inner(full_name, accountname),
-          items!inner(title, slug)
+          items!inner(title, slug, canonical_path)
         `)
         .order('created_at', { ascending: false })
         .limit(100); // Limit to last 100 downloads

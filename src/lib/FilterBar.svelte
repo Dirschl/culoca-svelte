@@ -10,6 +10,7 @@
 	import { browser } from '$app/environment';
 	import { X } from 'lucide-svelte';
 	import { resetGallery } from './galleryStore';
+	import { getPublicItemHref } from '$lib/content/routing';
 
 
 	export let showOnMap = false; // Different styling for map vs gallery
@@ -119,6 +120,18 @@
 		accountName: $activeUserFilter.accountName,
 		canRemove: $customerBranding?.privacyMode !== 'private' && $customerBranding?.privacyMode !== 'closed'
 	} : null;
+
+	function getPermalinkHref() {
+		if (!permalinkImageId) return null;
+		return getPublicItemHref({ slug: permalinkImageId });
+	}
+
+	function navigateToPermalink() {
+		const href = getPermalinkHref();
+		if (!href || typeof window === 'undefined') return;
+		const url = new URL(href, window.location.origin);
+		window.location.href = url.toString();
+	}
 </script>
 
 <!-- Show filter bar when customer branding should be shown, when other filters are present, or always show Culoca logo -->
@@ -141,7 +154,7 @@
 								{userFilterInfo.name.charAt(0).toUpperCase()}
 							</div>
 						{/if}
-						<span class="user-name" class:clickable={isPermalinkMode} on:click={() => isPermalinkMode && permalinkImageId && (() => { const url = new URL(`/item/${permalinkImageId}`, window.location.origin); window.location.href = url.toString(); })()}>
+						<span class="user-name" class:clickable={isPermalinkMode} on:click={() => isPermalinkMode && navigateToPermalink()}>
 							{userFilterInfo.name}
 						</span>
 						<!-- Show X button if removal is allowed -->
@@ -169,7 +182,7 @@
 								{$userFilter.username.charAt(0).toUpperCase()}
 							</div>
 						{/if}
-						<span class="user-name" class:clickable={isPermalinkMode} on:click={() => isPermalinkMode && permalinkImageId && (() => { const url = new URL(`/item/${permalinkImageId}`, window.location.origin); window.location.href = url.toString(); })()}>
+						<span class="user-name" class:clickable={isPermalinkMode} on:click={() => isPermalinkMode && navigateToPermalink()}>
 							{$userFilter.accountName || $userFilter.username}
 						</span>
 						<button 
@@ -194,7 +207,7 @@
 								{customerBrandInfo.name.charAt(0).toUpperCase()}
 							</div>
 						{/if}
-						<span class="customer-name" class:clickable={isPermalinkMode} on:click={() => isPermalinkMode && permalinkImageId && (() => { const url = new URL(`/item/${permalinkImageId}`, window.location.origin); window.location.href = url.toString(); })()}>
+						<span class="customer-name" class:clickable={isPermalinkMode} on:click={() => isPermalinkMode && navigateToPermalink()}>
 							{customerBrandInfo.name}
 						</span>
 						<!-- Show X button if removal is allowed -->
@@ -250,11 +263,8 @@
 								console.log('[FilterBar] permalinkImageId:', permalinkImageId);
 								console.log('[FilterBar] isManual3x3Mode:', isManual3x3Mode);
 								
-								if (isPermalinkMode && permalinkImageId) {
-									        // Use SvelteKit navigation
-        if (typeof window !== 'undefined') {
-          window.location.href = `/item/${permalinkImageId}`;
-        }
+								if (isPermalinkMode && getPermalinkHref()) {
+									navigateToPermalink();
 								} else {
 									console.log('[FilterBar] Clearing location filter');
 									filterStore.clearLocationFilter();
