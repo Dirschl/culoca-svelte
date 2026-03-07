@@ -1,4 +1,4 @@
-const ALLOWED_TAGS = new Set(['h2', 'h3', 'h4', 'h5', 'p', 'br', 'li', 'strong', 'a']);
+const ALLOWED_TAGS = new Set(['h2', 'h3', 'h4', 'h5', 'p', 'br', 'ul', 'ol', 'li', 'strong', 'a']);
 const SELF_CLOSING_TAGS = new Set(['br']);
 const HREF_PATTERN = /href\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/i;
 

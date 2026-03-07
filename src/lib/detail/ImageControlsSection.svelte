@@ -28,6 +28,8 @@
     { label: 'H2', title: 'Zwischenueberschrift H2', start: '<h2>', end: '</h2>', placeholder: 'Zwischenueberschrift' },
     { label: 'H3', title: 'Zwischenueberschrift H3', start: '<h3>', end: '</h3>', placeholder: 'Abschnitt' },
     { label: 'P', title: 'Absatz', start: '<p>', end: '</p>', placeholder: 'Text' },
+    { label: 'UL', title: 'Unsortierte Liste', start: '<ul>\n  <li>', end: '</li>\n</ul>', placeholder: 'Punkt' },
+    { label: 'OL', title: 'Nummerierte Liste', start: '<ol>\n  <li>', end: '</li>\n</ol>', placeholder: 'Punkt' },
     { label: 'Strong', title: 'Fett', start: '<strong>', end: '</strong>', placeholder: 'Wichtig' },
     { label: 'LI', title: 'Listenpunkt', start: '<li>', end: '</li>', placeholder: 'Punkt' },
     { label: 'Link', title: 'Link', start: '<a href="https://">', end: '</a>', placeholder: 'Linktext' },
@@ -155,8 +157,8 @@
 
       <div class="content-editor-row">
         <div class="content-editor-header">
-          <label class="external-url-label" for="content-html-input">HTML Inhalt</label>
-          <span class="content-editor-hint">Erlaubt: h2, h3, h4, h5, p, br, li, strong, a</span>
+          <label class="external-url-label" for="content-html-input">HTML</label>
+          <span class="content-editor-hint">Erlaubt: h2, h3, h4, h5, p, br, ul, ol, li, strong, a</span>
         </div>
         <div class="content-toolbar" aria-label="HTML Werkzeuge">
           {#each htmlTools as tool}
@@ -297,14 +299,15 @@
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
-    justify-content: center;
+    justify-content: flex-start;
+    padding: 0.35rem 0.15rem 0;
   }
   .content-tool-btn {
     border: 1px solid var(--border-color);
     background: var(--bg-secondary);
     color: var(--text-primary);
-    border-radius: 999px;
-    padding: 0.35rem 0.7rem;
+    border-radius: 10px;
+    padding: 0.45rem 0.8rem;
     font: inherit;
     font-size: 0.85rem;
     cursor: pointer;
@@ -313,10 +316,13 @@
   .content-tool-btn:hover {
     border-color: var(--culoca-orange);
     color: var(--culoca-orange);
+    background: color-mix(in srgb, var(--culoca-orange) 8%, var(--bg-secondary));
   }
   .content-editor-row textarea {
-    min-height: 10rem;
+    min-height: 12rem;
     resize: vertical;
+    line-height: 1.6;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   }
   .location-filter-btn {
     background: var(--bg-secondary);

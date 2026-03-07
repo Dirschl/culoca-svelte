@@ -2057,7 +2057,6 @@ let showRightsManager = false;
     />
     {#if shouldShowContentHtml}
       <section class="content-panel content-html">
-        <h2>Inhalt</h2>
         <div class="rich-content">
           {@html effectiveContentHtml}
         </div>
@@ -3730,8 +3729,73 @@ let showRightsManager = false;
     margin: 0 0 0.75rem 0;
   }
 
-  .rich-content :global(p:first-child) {
+  .content-html {
+    padding-top: 1.2rem;
+  }
+
+  .rich-content {
+    color: var(--text-primary);
+    font-size: 1rem;
+    line-height: 1.75;
+  }
+
+  .rich-content :global(h2),
+  .rich-content :global(h3),
+  .rich-content :global(h4),
+  .rich-content :global(h5) {
+    margin: 1.5rem 0 0.55rem;
+    line-height: 1.25;
+    color: var(--text-primary);
+  }
+
+  .rich-content :global(h2) {
+    font-size: 1.45rem;
+  }
+
+  .rich-content :global(h3) {
+    font-size: 1.28rem;
+  }
+
+  .rich-content :global(h4) {
+    font-size: 1.14rem;
+  }
+
+  .rich-content :global(h5) {
+    font-size: 1.02rem;
+    letter-spacing: 0.01em;
+  }
+
+  .rich-content :global(p),
+  .rich-content :global(ul),
+  .rich-content :global(ol) {
+    margin: 0 0 1rem 0;
+  }
+
+  .rich-content :global(ul),
+  .rich-content :global(ol) {
+    padding-left: 1.35rem;
+  }
+
+  .rich-content :global(li) {
+    margin: 0.35rem 0;
+    padding-left: 0.1rem;
+  }
+
+  .rich-content :global(a) {
+    color: var(--accent-color);
+    text-underline-offset: 0.14em;
+  }
+
+  .rich-content :global(strong) {
+    font-weight: 700;
+  }
+
+  .rich-content :global(*:first-child) {
     margin-top: 0;
+  }
+
+  .rich-content :global(*:last-child) {
+    margin-bottom: 0;
   }
 
   .video-embed {
