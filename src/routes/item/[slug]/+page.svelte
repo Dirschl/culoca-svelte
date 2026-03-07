@@ -2013,6 +2013,7 @@ let showRightsManager = false;
       isCreator={isCreator}
       editMode={canEditItem && editMode}
       bind:externalUrl={managementForm.external_url}
+      showGalleryToggle={shouldShowNearbyGallery}
       onSetLocationFilter={setLocationFilter}
       onCopyLink={copyCurrentLink}
       onDeleteImage={deleteImage}

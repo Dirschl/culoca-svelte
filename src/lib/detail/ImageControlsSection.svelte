@@ -10,6 +10,7 @@
   export let onToggleGallery: () => void;
   export let editMode: boolean = false;
   export let externalUrl: string = '';
+  export let showGalleryToggle: boolean = true;
   export let darkMode: boolean = false;
   export let rotating: boolean = false;
 
@@ -45,8 +46,10 @@
     <div class="action-buttons">
       {#if externalUrl?.trim()}
         <a class="square-btn website-btn" href={externalUrl} target="_blank" rel="noopener noreferrer" title="Webseite öffnen">
-          <svg width="35" height="35" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2Zm6.93 9h-3.26a15.8 15.8 0 0 0-1.38-5.01A8.03 8.03 0 0 1 18.93 11ZM12 4.04c.83 1.2 1.87 3.53 2.32 6.96H9.68C10.13 7.57 11.17 5.24 12 4.04ZM4.26 14h3.28c.16 1.81.62 3.55 1.35 5.06A8.03 8.03 0 0 1 4.26 14Zm0-4A8.03 8.03 0 0 1 8.89 4.94 15.7 15.7 0 0 0 7.54 10H4.26Zm3.28 1h4.46v2H7.54c-.03-.33-.04-.66-.04-1s.01-.67.04-1Zm.46 3H11.99v5.96c-1.33-1.76-2.37-4.03-2.89-5.96Zm4.99 5.96V14h2.99c-.52 1.93-1.56 4.2-2.99 5.96ZM16.46 13H12v-2h4.46c.03.33.04.66.04 1s-.01.67-.04 1Zm-.35 6.06c.73-1.51 1.19-3.25 1.35-5.06h3.28a8.03 8.03 0 0 1-4.63 5.06Z" fill="currentColor"/>
+          <svg width="35" height="35" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/>
+            <path d="M3.5 12h17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M12 3c2.4 2.2 3.8 5.4 3.8 9s-1.4 6.8-3.8 9c-2.4-2.2-3.8-5.4-3.8-9S9.6 5.2 12 3Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
           </svg>
         </a>
       {/if}
@@ -96,7 +99,7 @@
       </button>
       -->
       
-      {#if rights?.edit || isCreator}
+      {#if showGalleryToggle && (rights?.edit || isCreator)}
         <button class="square-btn gallery-toggle-btn" on:click={onToggleGallery} title="Aus Galerie entfernen/hinzufügen" class:active={image.gallery ?? true} disabled={loading}>
           {#if image.gallery ?? true}
             <svg width="25" height="25" viewBox="0 0 24 24" fill="currentColor">
@@ -195,7 +198,9 @@
     fill: currentColor;
   }
   .website-btn:hover {
-    color: var(--accent-color);
+    background: var(--culoca-orange);
+    border-color: var(--culoca-orange);
+    color: #fff;
   }
   .gmaps-btn:hover .google-logo .google-blue { fill: #4285F4; }
   .gmaps-btn:hover .google-logo .google-green { fill: #34A853; }
@@ -254,18 +259,16 @@
     background: var(--bg-secondary);
     color: var(--text-primary);
   }
-  .gallery-toggle-btn:hover {
-    background: var(--bg-tertiary);
-    border-color: var(--text-primary);
-  }
-  .gallery-toggle-btn.active {
+  .gallery-toggle-btn:hover,
+  .gallery-toggle-btn.active:hover {
     background: #007bff;
-    color: white;
+    color: #fff;
     border-color: #007bff;
   }
-  .gallery-toggle-btn.active:hover {
-    background: #0056b3;
-    border-color: #0056b3;
+  .gallery-toggle-btn.active {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border-color: var(--border-color);
   }
   .radius-control {
     width: 100%;
