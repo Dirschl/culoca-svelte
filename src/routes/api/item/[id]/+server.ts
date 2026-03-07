@@ -120,6 +120,7 @@ export const PATCH = async ({ params, request, locals }) => {
     'ends_at',
     'external_url',
     'video_url',
+    'page_settings',
     'type_id',
     'adobe_stock_status',
     'adobe_stock_uploaded_at',
@@ -158,6 +159,17 @@ export const PATCH = async ({ params, request, locals }) => {
       if (existingGroupSlug) {
         throw error(409, 'Group slug already exists. Please choose a different group slug.');
       }
+    }
+  }
+
+  if (updateData.page_settings !== undefined) {
+    if (updateData.page_settings === null) {
+      updateData.page_settings = {};
+    } else if (
+      typeof updateData.page_settings !== 'object' ||
+      Array.isArray(updateData.page_settings)
+    ) {
+      throw error(400, 'page_settings must be an object');
     }
   }
 

@@ -111,9 +111,46 @@ let showRightsManager = false;
   $: hasDateRange = !!(contentType?.show_date_range && (contextItem?.starts_at || contextItem?.ends_at));
   $: hasVideoEmbed = !!(contentType?.show_video_embed && image?.video_url);
   $: shouldShowMainImage = contentType?.show_image !== false;
-  $: shouldShowNearbyGallery = !!(contentType?.show_nearby_gallery && image?.lat && image?.lon);
+  $: nearbyGalleryOverride = getPageSettingBoolean(image?.page_settings, 'show_nearby_gallery');
+  $: shouldShowNearbyGallery = !!((nearbyGalleryOverride ?? contentType?.show_nearby_gallery) && image?.lat && image?.lon);
   $: shouldShowMap = !!(contentType?.show_map && image?.lat && image?.lon);
   $: shouldShowContentHtml = !!(contentType?.show_content_html && effectiveContentHtml);
+
+  function getPageSettingBoolean(
+    settings: Record<string, unknown> | null | undefined,
+    key: string
+  ): boolean | null {
+    if (!settings || typeof settings !== 'object' || Array.isArray(settings)) return null;
+    const value = settings[key];
+    return typeof value === 'boolean' ? value : null;
+  }
+
+  function getNearbyGalleryMode(settings: Record<string, unknown> | null | undefined) {
+    const value = getPageSettingBoolean(settings, 'show_nearby_gallery');
+    if (value === true) return 'enabled';
+    if (value === false) return 'disabled';
+    return 'default';
+  }
+
+  function buildPageSettings(
+    currentSettings: Record<string, unknown> | null | undefined,
+    nearbyGalleryMode: string
+  ) {
+    const nextSettings =
+      currentSettings && typeof currentSettings === 'object' && !Array.isArray(currentSettings)
+        ? { ...currentSettings }
+        : {};
+
+    if (nearbyGalleryMode === 'enabled') {
+      nextSettings.show_nearby_gallery = true;
+    } else if (nearbyGalleryMode === 'disabled') {
+      nextSettings.show_nearby_gallery = false;
+    } else {
+      delete nextSettings.show_nearby_gallery;
+    }
+
+    return nextSettings;
+  }
 
   function formatDateRange(start: string | null | undefined, end: string | null | undefined): string {
     if (!start && !end) return '';
@@ -633,6 +670,7 @@ let showRightsManager = false;
     group_slug: '',
     group_root_item_id: null as string | null,
     show_in_main_feed: true,
+    nearby_gallery_mode: 'default',
     sort_order: '',
     content: '',
     starts_at: '',
@@ -736,6 +774,7 @@ let showRightsManager = false;
       group_slug: image.group_slug || '',
       group_root_item_id: image.group_root_item_id || null,
       show_in_main_feed: image.show_in_main_feed ?? true,
+      nearby_gallery_mode: getNearbyGalleryMode(image.page_settings),
       sort_order: image.sort_order === null || image.sort_order === undefined ? '' : String(image.sort_order),
       content: image.content || '',
       starts_at: toDateTimeLocal(image.starts_at),
@@ -919,6 +958,7 @@ let showRightsManager = false;
       group_slug: toNullableString(slugifySegment(managementForm.group_slug)),
       group_root_item_id: selectedRootItem?.id || null,
       show_in_main_feed: !!managementForm.show_in_main_feed,
+      page_settings: buildPageSettings(image.page_settings, managementForm.nearby_gallery_mode),
       sort_order: managementForm.sort_order.trim() === '' ? null : Number(managementForm.sort_order),
       content: toNullableString(managementForm.content),
       starts_at: toNullableIso(managementForm.starts_at),

@@ -38,6 +38,7 @@ type ItemRecord = ContentItemLike & {
   sort_order?: number | null;
   external_url?: string | null;
   video_url?: string | null;
+  page_settings?: Record<string, unknown> | null;
   adobe_stock_status?: string | null;
   adobe_stock_uploaded_at?: string | null;
   adobe_stock_asset_id?: string | null;
@@ -103,7 +104,8 @@ const ITEM_SELECT = `
   starts_at,
   ends_at,
   external_url,
-  video_url
+  video_url,
+  page_settings
 `;
 
 async function getTypeMap(supabase: ReturnType<typeof createServerSupabase>) {

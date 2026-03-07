@@ -12,6 +12,7 @@
     group_slug: string;
     group_root_item_id: string | null;
     show_in_main_feed: boolean;
+    nearby_gallery_mode: string;
     sort_order: string;
     content: string;
     starts_at: string;
@@ -181,6 +182,15 @@
     <label class="field checkbox-field">
       <span class="field-label">Show In Main Feed</span>
       <input type="checkbox" bind:checked={managementForm.show_in_main_feed} disabled={!isCreator} />
+    </label>
+
+    <label class="field">
+      <span class="field-label">NearBy Galerie</span>
+      <select bind:value={managementForm.nearby_gallery_mode} disabled={!isCreator}>
+        <option value="default">Type Default</option>
+        <option value="enabled">Aktiviert</option>
+        <option value="disabled">Deaktiviert</option>
+      </select>
     </label>
 
     <label class="field">
