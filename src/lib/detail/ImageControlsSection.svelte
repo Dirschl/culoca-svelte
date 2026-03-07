@@ -47,9 +47,9 @@
       {#if externalUrl?.trim()}
         <a class="square-btn website-btn" href={externalUrl} target="_blank" rel="noopener noreferrer" title="Webseite öffnen">
           <svg width="35" height="35" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/>
-            <path d="M3.5 12h17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-            <path d="M12 3c2.4 2.2 3.8 5.4 3.8 9s-1.4 6.8-3.8 9c-2.4-2.2-3.8-5.4-3.8-9S9.6 5.2 12 3Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+            <path d="M14 4h6v6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M20 4l-9 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M10 6H7a3 3 0 0 0-3 3v8a3 3 0 0 0 3 3h8a3 3 0 0 0 3-3v-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </a>
       {/if}
