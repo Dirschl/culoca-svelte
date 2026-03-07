@@ -927,6 +927,7 @@
         formData.append('title', image.title);
         formData.append('description', image.description);
         formData.append('keywords', image.keywords);
+        formData.append('type_id', image.typeId.toString());
         if (image.lat !== null) formData.append('lat', image.lat.toString());
         if (image.lon !== null) formData.append('lon', image.lon.toString());
         
@@ -1008,6 +1009,7 @@
         formData.append('title', image.title);
         formData.append('description', image.description);
         formData.append('keywords', image.keywords);
+        formData.append('type_id', image.typeId.toString());
         if (image.lat !== null) formData.append('lat', image.lat.toString());
         if (image.lon !== null) formData.append('lon', image.lon.toString());
         
