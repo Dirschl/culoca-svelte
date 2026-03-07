@@ -9,6 +9,7 @@
   import { authFetch } from '$lib/authFetch';
   import { browser } from '$app/environment';
   import { supabase } from '$lib/supabaseClient';
+  import { getStoredOrComputedCanonicalPath, slugifySegment } from '$lib/content/routing';
 
   // Client-seitige Umleitung für bekannte Fälle (nur für User, nicht für Bots)
   if (browser) {
@@ -646,6 +647,7 @@ let showRightsManager = false;
   let rootSearchLoading = false;
   let groupSlugSuggestions: string[] = [];
   let groupSlugSuggestionsLoading = false;
+  let showGroupSlugInfo = false;
   let managementSavePending = false;
   let managementSaveMessage = '';
   let lastManagementImageId = '';
@@ -848,14 +850,14 @@ let showRightsManager = false;
   }
 
   function handleGroupSlugInput(value: string) {
-    managementForm.group_slug = value;
+    managementForm.group_slug = slugifySegment(value);
 
-    if (!value.trim()) {
+    if (!managementForm.group_slug.trim()) {
       groupSlugSuggestions = [];
       return;
     }
 
-    loadGroupSlugSuggestions(value);
+    loadGroupSlugSuggestions(managementForm.group_slug);
   }
 
   function handleGroupSlugInputEvent(event: Event) {
@@ -864,13 +866,17 @@ let showRightsManager = false;
   }
 
   function applyGroupSlugSuggestion(value: string) {
-    managementForm.group_slug = value;
+    managementForm.group_slug = slugifySegment(value);
     groupSlugSuggestions = [];
   }
 
   function clearGroupSlug() {
     managementForm.group_slug = '';
     groupSlugSuggestions = [];
+  }
+
+  function toggleGroupSlugInfo() {
+    showGroupSlugInfo = !showGroupSlugInfo;
   }
 
   function handleRootSearchInput(value: string) {
@@ -911,7 +917,7 @@ let showRightsManager = false;
 
     const payload = {
       type_id: Number(managementForm.type_id) || image.type_id || 1,
-      group_slug: toNullableString(managementForm.group_slug),
+      group_slug: toNullableString(slugifySegment(managementForm.group_slug)),
       group_root_item_id: selectedRootItem?.id || null,
       show_in_main_feed: !!managementForm.show_in_main_feed,
       sort_order: managementForm.sort_order.trim() === '' ? null : Number(managementForm.sort_order),
@@ -937,13 +943,25 @@ let showRightsManager = false;
 
       const result = await res.json();
       image = { ...image, ...result.item };
-      canonicalPath = result.item?.canonical_path || canonicalPath;
+      const nextRootItem =
+        (result.item?.group_root_item_id ? selectedRootItem || rootItem : { ...rootItem, ...result.item, group_slug: result.item?.group_slug ?? null }) ||
+        rootItem;
+      const nextType =
+        availableTypes.find((type) => type.id === result.item?.type_id) || contentType;
+      const resolvedCanonicalPath =
+        getStoredOrComputedCanonicalPath({
+          item: result.item,
+          rootItem: nextRootItem,
+          type: nextType
+        }) || canonicalPath;
+
+      canonicalPath = resolvedCanonicalPath;
       contentType = availableTypes.find((type) => type.id === result.item?.type_id) || contentType;
       managementSaveMessage = 'Gespeichert';
       syncManagementFormFromImage();
 
       if (browser && navigate) {
-        const targetPath = result.item?.canonical_path || canonicalPath || window.location.pathname;
+        const targetPath = resolvedCanonicalPath || window.location.pathname;
         const targetUrl = `${targetPath}${window.location.search}`;
         await goto(targetUrl, { invalidateAll: true, replaceState: true, noScroll: true });
       }
@@ -973,7 +991,14 @@ let showRightsManager = false;
     editMode = false;
 
     if (browser) {
-      const targetPath = image?.canonical_path || canonicalPath || window.location.pathname;
+      const targetPath =
+        getStoredOrComputedCanonicalPath({
+          item: image,
+          rootItem: image?.group_root_item_id ? selectedRootItem || rootItem : { ...rootItem, ...image },
+          type: contentType
+        }) ||
+        canonicalPath ||
+        window.location.pathname;
       await goto(`${targetPath}${window.location.search}`, {
         invalidateAll: true,
         replaceState: true,
@@ -1764,8 +1789,9 @@ let showRightsManager = false;
               <button
                 type="button"
                 class="info-icon-btn"
-                title="Optionaler Gruppen-Slug fuer Events, Alben oder Serien. Er muss global eindeutig sein und erzeugt den sichtbaren Gruppenpfad."
                 aria-label="Info zum Gruppen-Slug"
+                aria-expanded={showGroupSlugInfo}
+                on:click={toggleGroupSlugInfo}
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <circle cx="12" cy="12" r="10"/>
@@ -1774,6 +1800,11 @@ let showRightsManager = false;
                 </svg>
               </button>
             </div>
+            {#if showGroupSlugInfo}
+              <div class="group-slug-info-box">
+                Vergeben sie einen eindeutigen Gruppen Slug, falls Unterelemente hinzugefuegt werden sollen. Sie erhalten dann eine eigene Landingpage fuer z.B. Musikalben, Bildergalerien etc...
+              </div>
+            {/if}
             <div class="title-group-slug-input-row">
               <input
                 id="title-group-slug"
@@ -3595,6 +3626,18 @@ let showRightsManager = false;
     background: var(--bg-secondary);
     color: var(--text-primary);
     font: inherit;
+  }
+
+  .group-slug-info-box {
+    width: 100%;
+    padding: 0.75rem 0.9rem;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    line-height: 1.45;
+    text-align: left;
   }
 
   .group-slug-hint {

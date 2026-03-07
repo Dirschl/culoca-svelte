@@ -23,6 +23,17 @@ export function normalizePath(path: string): string {
   return value !== '/' && value.endsWith('/') ? value.slice(0, -1) : value;
 }
 
+export function slugifySegment(value: string): string {
+  return value
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/ß/g, 'ss')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .replace(/-{2,}/g, '-');
+}
+
 export function getTypeForItem(
   item: Pick<ContentItemLike, 'type_id'>,
   explicitType?: Partial<ContentTypeDefinition> | null

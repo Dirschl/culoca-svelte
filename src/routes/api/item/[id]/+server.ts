@@ -1,6 +1,7 @@
 import { json, error } from '@sveltejs/kit';
 import { supabase } from '$lib/supabaseClient';
 import { createClient } from 'webdav';
+import { slugifySegment } from '$lib/content/routing';
 
 export const DELETE = async ({ params }) => {
   const { id } = params;
@@ -138,7 +139,7 @@ export const PATCH = async ({ params, request, locals }) => {
 
   if (updateData.group_slug !== undefined) {
     const normalizedGroupSlug =
-      typeof updateData.group_slug === 'string' ? updateData.group_slug.trim() : updateData.group_slug;
+      typeof updateData.group_slug === 'string' ? slugifySegment(updateData.group_slug) : updateData.group_slug;
     updateData.group_slug = normalizedGroupSlug || null;
 
     if (normalizedGroupSlug) {
