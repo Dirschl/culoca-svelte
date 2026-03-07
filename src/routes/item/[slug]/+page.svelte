@@ -2000,20 +2000,6 @@ let showRightsManager = false;
         <p>{formatDateRange(contextItem?.starts_at, contextItem?.ends_at)}</p>
       </section>
     {/if}
-    {#if hasVideoEmbed}
-      <section class="content-panel">
-        <h2>Video</h2>
-        <div class="video-embed">
-          <iframe
-            src={getEmbedUrl(image.video_url)}
-            title={image.title || 'Video'}
-            loading="lazy"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-            allowfullscreen
-          ></iframe>
-        </div>
-      </section>
-    {/if}
     {#if hasVisibleGroupItems}
       <section class="content-panel group-panel" data-nosnippet>
         <h2>{rootItem?.group_slug ? 'Gruppe' : 'Varianten'}</h2>
@@ -2057,6 +2043,20 @@ let showRightsManager = false;
       onDownloadOriginal={downloadOriginal}
       onToggleGallery={toggleGallery}
     />
+    {#if hasVideoEmbed}
+      <section class="content-panel">
+        <h2>Video</h2>
+        <div class="video-embed">
+          <iframe
+            src={getEmbedUrl(image.video_url)}
+            title={image.title || 'Video'}
+            loading="lazy"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowfullscreen
+          ></iframe>
+        </div>
+      </section>
+    {/if}
     {#if shouldShowContentHtml && !(canEditItem && editMode)}
       <section class="content-panel content-html">
         <div class="rich-content">
@@ -2116,20 +2116,6 @@ let showRightsManager = false;
         </ul>
       </div>
     {/if}
-
-    {#if seoLinks?.newer?.canonicalPath || seoLinks?.older?.canonicalPath}
-      <nav class="item-seo-nav" aria-label="Weitere Bilder">
-        {#if seoLinks?.newer?.canonicalPath}
-          <a href={seoLinks.newer.canonicalPath} rel="prev" class="item-seo-nav-link">Neueres Item</a>
-        {/if}
-        {#if seoLinks?.older?.canonicalPath}
-          <a href={seoLinks.older.canonicalPath} rel="next" class="item-seo-nav-link">Älteres Item</a>
-        {/if}
-      </nav>
-    {/if}
-
-
-    
     <div class="meta-section single-exif">
       <!-- Column 1: Keywords -->
       <div class="keywords-column">
@@ -3470,28 +3456,6 @@ let showRightsManager = false;
     padding: 0;
     max-height: calc(90vh - 80px);
     overflow-y: auto;
-  }
-
-  .item-seo-nav {
-    display: flex;
-    gap: 0.75rem;
-    margin: 1rem 0 0.5rem;
-    flex-wrap: wrap;
-  }
-
-  .item-seo-nav-link {
-    display: inline-block;
-    padding: 0.4rem 0.7rem;
-    border-radius: 6px;
-    background: var(--bg-secondary);
-    color: var(--text-primary);
-    text-decoration: none;
-    border: 1px solid var(--border-color);
-    font-size: 0.9rem;
-  }
-
-  .item-seo-nav-link:hover {
-    border-color: var(--accent-color);
   }
 
   /* FAB Position für Rights Manager */
