@@ -644,10 +644,13 @@ let showRightsManager = false;
   let rootSearchQuery = '';
   let rootSearchResults: any[] = [];
   let rootSearchLoading = false;
+  let groupSlugSuggestions: string[] = [];
+  let groupSlugSuggestionsLoading = false;
   let managementSavePending = false;
   let managementSaveMessage = '';
   let lastManagementImageId = '';
   let latestRootSearchToken = 0;
+  let latestGroupSlugToken = 0;
 
   let showFullExif = false;
   let showHiddenItems = false;
@@ -755,6 +758,7 @@ let showRightsManager = false;
     }
 
     rootSearchResults = [];
+    groupSlugSuggestions = [];
     managementSaveMessage = '';
   }
 
@@ -798,6 +802,75 @@ let showRightsManager = false;
         rootSearchLoading = false;
       }
     }
+  }
+
+  async function loadGroupSlugSuggestions(query: string) {
+    if (!browser || !image || !canEditItem) return;
+
+    const searchToken = ++latestGroupSlugToken;
+    groupSlugSuggestionsLoading = true;
+
+    try {
+      const sanitized = query.trim().replace(/[,%]/g, ' ');
+      let request = supabase
+        .from('items')
+        .select('group_slug')
+        .not('group_slug', 'is', null)
+        .neq('id', image.id)
+        .order('group_slug')
+        .limit(10);
+
+      if (sanitized) {
+        request = request.ilike('group_slug', `%${sanitized}%`);
+      }
+
+      const { data, error: suggestionError } = await request;
+      if (searchToken !== latestGroupSlugToken) return;
+
+      if (suggestionError) {
+        console.error('Failed to load group slug suggestions:', suggestionError);
+        groupSlugSuggestions = [];
+        return;
+      }
+
+      groupSlugSuggestions = Array.from(
+        new Set(
+          (data || [])
+            .map((item) => item.group_slug?.trim())
+            .filter((value): value is string => !!value)
+        )
+      );
+    } finally {
+      if (searchToken === latestGroupSlugToken) {
+        groupSlugSuggestionsLoading = false;
+      }
+    }
+  }
+
+  function handleGroupSlugInput(value: string) {
+    managementForm.group_slug = value;
+
+    if (!value.trim()) {
+      groupSlugSuggestions = [];
+      return;
+    }
+
+    loadGroupSlugSuggestions(value);
+  }
+
+  function handleGroupSlugInputEvent(event: Event) {
+    const target = event.currentTarget as HTMLInputElement;
+    handleGroupSlugInput(target.value);
+  }
+
+  function applyGroupSlugSuggestion(value: string) {
+    managementForm.group_slug = value;
+    groupSlugSuggestions = [];
+  }
+
+  function clearGroupSlug() {
+    managementForm.group_slug = '';
+    groupSlugSuggestions = [];
   }
 
   function handleRootSearchInput(value: string) {
@@ -1684,6 +1757,62 @@ let showRightsManager = false;
                 {/if}
               {/each}
             </select>
+          </div>
+          <div class="title-group-slug-field">
+            <div class="title-group-slug-header">
+              <label for="title-group-slug">Group Slug</label>
+              <button
+                type="button"
+                class="info-icon-btn"
+                title="Optionaler Gruppen-Slug fuer Events, Alben oder Serien. Er muss global eindeutig sein und erzeugt den sichtbaren Gruppenpfad."
+                aria-label="Info zum Gruppen-Slug"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <path d="M12 16v-4"/>
+                  <path d="M12 8h.01"/>
+                </svg>
+              </button>
+            </div>
+            <div class="title-group-slug-input-row">
+              <input
+                id="title-group-slug"
+                type="text"
+                bind:value={managementForm.group_slug}
+                placeholder="optional, eindeutig"
+                autocomplete="off"
+                autocorrect="off"
+                autocapitalize="none"
+                inputmode="text"
+                on:input={handleGroupSlugInputEvent}
+              />
+              {#if managementForm.group_slug}
+                <button
+                  type="button"
+                  class="clear-group-slug-btn"
+                  on:click={clearGroupSlug}
+                  aria-label="Group Slug leeren"
+                  title="Group Slug leeren"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18 6L6 18M6 6l12 12"/>
+                  </svg>
+                </button>
+              {/if}
+            </div>
+            {#if groupSlugSuggestionsLoading}
+              <div class="group-slug-hint">Suche vorhandene Gruppen-Slugs...</div>
+            {:else if groupSlugSuggestions.length > 0}
+              <div class="group-slug-suggestions">
+                {#each groupSlugSuggestions as slug}
+                  <button type="button" class="group-slug-suggestion" on:click={() => applyGroupSlugSuggestion(slug)}>
+                    {slug}
+                  </button>
+                {/each}
+              </div>
+            {:else}
+              <div class="group-slug-hint">Leer lassen, wenn kein sichtbarer Gruppenpfad gebraucht wird.</div>
+            {/if}
           </div>
         {/if}
         {#if rootItem?.id !== image?.id && rootItem?.title}
@@ -3405,6 +3534,95 @@ let showRightsManager = false;
     background: var(--bg-secondary);
     color: var(--text-primary);
     font: inherit;
+  }
+
+  .title-group-slug-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    align-items: center;
+    margin: 0 auto 1rem;
+    max-width: 440px;
+  }
+
+  .title-group-slug-header {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+  }
+
+  .title-group-slug-header label {
+    font-size: 0.78rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+  }
+
+  .info-icon-btn,
+  .clear-group-slug-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 999px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0;
+  }
+
+  .info-icon-btn:hover,
+  .clear-group-slug-btn:hover {
+    color: var(--text-primary);
+    border-color: var(--accent-color);
+  }
+
+  .title-group-slug-input-row {
+    display: flex;
+    gap: 0.5rem;
+    width: 100%;
+    align-items: center;
+  }
+
+  .title-group-slug-input-row input {
+    flex: 1;
+    min-width: 0;
+    padding: 0.55rem 0.75rem;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font: inherit;
+  }
+
+  .group-slug-hint {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    text-align: center;
+  }
+
+  .group-slug-suggestions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    justify-content: center;
+  }
+
+  .group-slug-suggestion {
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    padding: 0.35rem 0.7rem;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .group-slug-suggestion:hover {
+    border-color: var(--accent-color);
+    color: var(--accent-color);
   }
 
   .group-context-line {

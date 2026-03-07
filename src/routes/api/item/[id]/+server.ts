@@ -136,6 +136,30 @@ export const PATCH = async ({ params, request, locals }) => {
     throw error(400, 'No valid fields to update');
   }
 
+  if (updateData.group_slug !== undefined) {
+    const normalizedGroupSlug =
+      typeof updateData.group_slug === 'string' ? updateData.group_slug.trim() : updateData.group_slug;
+    updateData.group_slug = normalizedGroupSlug || null;
+
+    if (normalizedGroupSlug) {
+      const { data: existingGroupSlug, error: groupSlugError } = await supabase
+        .from('items')
+        .select('id')
+        .ilike('group_slug', normalizedGroupSlug)
+        .neq('id', id)
+        .limit(1)
+        .maybeSingle();
+
+      if (groupSlugError) {
+        throw error(500, groupSlugError.message);
+      }
+
+      if (existingGroupSlug) {
+        throw error(409, 'Group slug already exists. Please choose a different group slug.');
+      }
+    }
+  }
+
   // Optional: Authentifizierung und Besitz prüfen (hier nur als Beispiel, ggf. anpassen)
   // const user = locals.user; // oder aus JWT, falls vorhanden
   // const { data: item } = await supabase.from('items').select('profile_id').eq('id', id).single();
@@ -153,6 +177,10 @@ export const PATCH = async ({ params, request, locals }) => {
     console.error('Database update error:', updateError);
     
     // Spezielle Behandlung für Slug-Konflikte
+    if (updateError.code === '23505' && updateError.message.includes('group_slug')) {
+      throw error(409, 'Group slug already exists. Please choose a different group slug.');
+    }
+
     if (updateError.code === '23505' && updateError.message.includes('slug')) {
       throw error(409, 'Slug already exists. Please choose a different slug.');
     }

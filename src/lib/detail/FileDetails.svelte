@@ -146,16 +146,6 @@
   </div>
 
   <div class="management-grid">
-    <label class="field">
-      <span class="field-label">Group Slug</span>
-      <input
-        type="text"
-        bind:value={managementForm.group_slug}
-        placeholder="leer = keine sichtbare Gruppe"
-        disabled={!isCreator}
-      />
-    </label>
-
     <div class="field root-field">
       <span class="field-label">Group Root Item</span>
       <input
