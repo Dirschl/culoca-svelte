@@ -226,8 +226,7 @@
   }
 
   .filename.editable {
-    cursor: pointer;
-    color: var(--accent-color);
+    cursor: default;
   }
 
   .filename.editing,
@@ -270,8 +269,7 @@
   }
 
   .filename-text {
-    cursor: pointer;
-    transition: color 0.2s;
+    cursor: default;
     display: inline-block;
     padding: 0.25rem 0.5rem;
     border-radius: 4px;
@@ -283,7 +281,7 @@
   }
 
   .filename-text:hover {
-    color: var(--accent-color);
+    color: inherit;
   }
 
   .meta-grid {
