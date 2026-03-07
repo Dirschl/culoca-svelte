@@ -10,6 +10,7 @@
   export let onToggleGallery: () => void;
   export let editMode = false;
   export let externalUrl = '';
+  export let videoUrl = '';
   export let contentHtml = '';
   export let nearbyGalleryMode = 'default';
   export let showGalleryToggle = true;
@@ -28,12 +29,12 @@
     { label: 'H2', title: 'Zwischenueberschrift H2', start: '<h2>', end: '</h2>', placeholder: 'Zwischenueberschrift' },
     { label: 'H3', title: 'Zwischenueberschrift H3', start: '<h3>', end: '</h3>', placeholder: 'Abschnitt' },
     { label: 'P', title: 'Absatz', start: '<p>', end: '</p>', placeholder: 'Text' },
+    { label: 'BR', title: 'Zeilenumbruch', start: '<br>' },
     { label: 'UL', title: 'Unsortierte Liste', start: '<ul>\n  <li>', end: '</li>\n</ul>', placeholder: 'Punkt' },
     { label: 'OL', title: 'Nummerierte Liste', start: '<ol>\n  <li>', end: '</li>\n</ol>', placeholder: 'Punkt' },
-    { label: 'Strong', title: 'Fett', start: '<strong>', end: '</strong>', placeholder: 'Wichtig' },
     { label: 'LI', title: 'Listenpunkt', start: '<li>', end: '</li>', placeholder: 'Punkt' },
+    { label: 'Strong', title: 'Fett', start: '<strong>', end: '</strong>', placeholder: 'Wichtig' },
     { label: 'Link', title: 'Link', start: '<a href="https://">', end: '</a>', placeholder: 'Linktext' },
-    { label: 'BR', title: 'Zeilenumbruch', start: '<br>' }
   ];
 
   let contentTextarea: HTMLTextAreaElement | null = null;
@@ -148,6 +149,20 @@
           type="url"
           bind:value={externalUrl}
           placeholder="https://..."
+          autocomplete="off"
+          autocorrect="off"
+          autocapitalize="none"
+          inputmode="url"
+        />
+      </div>
+
+      <div class="content-editor-row">
+        <label class="external-url-label" for="video-url-input">Video URL</label>
+        <input
+          id="video-url-input"
+          type="url"
+          bind:value={videoUrl}
+          placeholder="https://youtube.com/... oder https://vimeo.com/..."
           autocomplete="off"
           autocorrect="off"
           autocapitalize="none"

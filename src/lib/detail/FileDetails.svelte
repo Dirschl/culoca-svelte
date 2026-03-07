@@ -199,11 +199,6 @@
       <input type="datetime-local" bind:value={managementForm.ends_at} disabled={!isCreator} />
     </label>
 
-    <label class="field field-wide">
-      <span class="field-label">Video URL</span>
-      <input type="url" bind:value={managementForm.video_url} placeholder="https://..." disabled={!isCreator} />
-    </label>
-
   </div>
 </div>
 {/if}

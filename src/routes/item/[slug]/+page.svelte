@@ -2046,6 +2046,7 @@ let showRightsManager = false;
       isCreator={isCreator}
       editMode={canEditItem && editMode}
       bind:externalUrl={managementForm.external_url}
+      bind:videoUrl={managementForm.video_url}
       bind:contentHtml={managementForm.content}
       bind:nearbyGalleryMode={managementForm.nearby_gallery_mode}
       showGalleryToggle={shouldShowNearbyGallery}
@@ -2055,7 +2056,7 @@ let showRightsManager = false;
       onDownloadOriginal={downloadOriginal}
       onToggleGallery={toggleGallery}
     />
-    {#if shouldShowContentHtml}
+    {#if shouldShowContentHtml && !(canEditItem && editMode)}
       <section class="content-panel content-html">
         <div class="rich-content">
           {@html effectiveContentHtml}
@@ -3769,6 +3770,7 @@ let showRightsManager = false;
   .rich-content :global(ul),
   .rich-content :global(ol) {
     margin: 0 0 1rem 0;
+    list-style-position: outside;
   }
 
   .rich-content :global(ul),
@@ -3776,13 +3778,24 @@ let showRightsManager = false;
     padding-left: 1.35rem;
   }
 
+  .rich-content :global(ul) {
+    list-style-type: disc;
+  }
+
+  .rich-content :global(ol) {
+    list-style-type: decimal;
+  }
+
   .rich-content :global(li) {
     margin: 0.35rem 0;
     padding-left: 0.1rem;
+    display: list-item;
   }
 
   .rich-content :global(a) {
-    color: var(--accent-color);
+    color: var(--culoca-orange);
+    font-size: 1.06rem;
+    font-weight: 600;
     text-underline-offset: 0.14em;
   }
 
