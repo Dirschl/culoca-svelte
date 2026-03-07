@@ -86,6 +86,7 @@ let showRightsManager = false;
   let profile = null;
   let metaTags = data?.metaTags ?? null;
   let showImageCaptions = true; // Default to true
+  let editMode = false;
   let adobeStockUrlEdit = '';
   let adobeStockAssetIdEdit = '';
   let adobeUploadLoading = false;
@@ -231,6 +232,7 @@ let showRightsManager = false;
     ? { id: $sessionStore.userId }
     : null;
   $: isCreator = !!currentUser && (currentUser.id === image?.profile_id || currentUser.id === '0ceb2320-0553-463b-971a-a0eef5ecdf09');
+  $: canEditItem = !!(isCreator || $unifiedRightsStore.rights?.edit);
   
   // Admin-Berechtigung prüfen
   $: isAdmin = $sessionStore.permissions?.admin || false;
@@ -692,6 +694,15 @@ let showRightsManager = false;
     }
   }
 
+  async function saveOpenEditors() {
+    if (editingTitle) await saveTitle();
+    if (editingDescription) await saveDescription();
+    if (editingCaption) await saveCaption();
+    if (editingKeywords) await saveKeywords();
+    if (editingFilename) await saveFilename();
+    if (editingSlug) await saveSlug();
+  }
+
   function toDateTimeLocal(value: string | null | undefined) {
     if (!value) return '';
     const date = new Date(value);
@@ -818,8 +829,9 @@ let showRightsManager = false;
     rootSearchResults = [];
   }
 
-  async function saveManagementFields() {
-    if (!image || !(isCreator || $unifiedRightsStore.rights?.edit) || managementSavePending) return;
+  async function saveManagementFields(options: { navigate?: boolean } = {}) {
+    const navigate = options.navigate ?? true;
+    if (!image || !canEditItem || managementSavePending) return false;
 
     managementSavePending = true;
     managementSaveMessage = '';
@@ -847,7 +859,7 @@ let showRightsManager = false;
       if (!res.ok) {
         const errorText = await res.text();
         managementSaveMessage = errorText || 'Speichern fehlgeschlagen';
-        return;
+        return false;
       }
 
       const result = await res.json();
@@ -857,23 +869,50 @@ let showRightsManager = false;
       managementSaveMessage = 'Gespeichert';
       syncManagementFormFromImage();
 
-      if (browser) {
+      if (browser && navigate) {
         const targetPath = result.item?.canonical_path || canonicalPath || window.location.pathname;
         const targetUrl = `${targetPath}${window.location.search}`;
         await goto(targetUrl, { invalidateAll: true, replaceState: true, noScroll: true });
       }
+      return true;
     } catch (err) {
       console.error('Failed to save management fields:', err);
       managementSaveMessage = 'Speichern fehlgeschlagen';
+      return false;
     } finally {
       managementSavePending = false;
+    }
+  }
+
+  async function toggleEditMode() {
+    if (!canEditItem) return;
+
+    if (!editMode) {
+      editMode = true;
+      managementSaveMessage = '';
+      return;
+    }
+
+    await saveOpenEditors();
+    const managementSaved = await saveManagementFields({ navigate: false });
+    if (!managementSaved) return;
+
+    editMode = false;
+
+    if (browser) {
+      const targetPath = image?.canonical_path || canonicalPath || window.location.pathname;
+      await goto(`${targetPath}${window.location.search}`, {
+        invalidateAll: true,
+        replaceState: true,
+        noScroll: true
+      });
     }
   }
 
   // User-Initialisierung (wie im Backup)
   // --- Title ---
   function startEditTitle() {
-    if (currentUser && image && (isCreator || $unifiedRightsStore.rights?.edit)) {
+    if (currentUser && image && canEditItem && editMode) {
       editingTitle = true;
       titleEditValue = image.title || '';
       setTimeout(() => {
@@ -908,7 +947,7 @@ let showRightsManager = false;
   }
   // --- Description ---
   function startEditDescription() {
-    if (currentUser && image && (isCreator || $unifiedRightsStore.rights?.edit)) {
+    if (currentUser && image && canEditItem && editMode) {
       editingDescription = true;
       descriptionEditValue = image.description || '';
       setTimeout(() => {
@@ -943,7 +982,7 @@ let showRightsManager = false;
   }
   // --- Caption ---
   function startEditCaption() {
-    if (currentUser && image && (isCreator || $unifiedRightsStore.rights?.edit)) {
+    if (currentUser && image && canEditItem && editMode) {
       editingCaption = true;
       captionEditValue = image.caption || '';
       setTimeout(() => {
@@ -984,7 +1023,7 @@ let showRightsManager = false;
   }
   // --- Keywords ---
   function startEditKeywords() {
-    if (currentUser && image && (isCreator || $unifiedRightsStore.rights?.edit)) {
+    if (currentUser && image && canEditItem && editMode) {
       editingKeywords = true;
       keywordsEditValue = (image.keywords || []).join(', ');
       setTimeout(() => {
@@ -1031,7 +1070,7 @@ let showRightsManager = false;
   }
   // --- Filename ---
   function startEditFilename() {
-    if (currentUser && image && (isCreator || $unifiedRightsStore.rights?.edit)) {
+    if (currentUser && image && canEditItem && editMode) {
       editingFilename = true;
       filenameEditValue = image.original_name || '';
       setTimeout(() => {
@@ -1066,7 +1105,7 @@ let showRightsManager = false;
   }
   // --- Slug ---
   function startEditSlug() {
-    if (currentUser && image && (isCreator || $unifiedRightsStore.rights?.edit)) {
+    if (currentUser && image && canEditItem && editMode) {
       editingSlug = true;
       slugEditValue = image.slug || '';
       setTimeout(() => {
@@ -1632,21 +1671,27 @@ let showRightsManager = false;
               fetchpriority="high"
             />
           </a>
-          {#if image.caption}
-            <figcaption>{image.caption}</figcaption>
-          {/if}
         </figure>
       {/if}
       <div class="passepartout-info">
-        {#if contentType?.name}
-          <div class="content-type-chip">{contentType.name}</div>
+        {#if canEditItem && editMode}
+          <div class="title-type-select">
+            <label for="title-type-select">Typ</label>
+            <select id="title-type-select" bind:value={managementForm.type_id}>
+              {#each availableTypes as type}
+                {#if type.id}
+                  <option value={type.id}>{type.name}</option>
+                {/if}
+              {/each}
+            </select>
+          </div>
         {/if}
         {#if rootItem?.id !== image?.id && rootItem?.title}
           <p class="group-context-line">
             Teil von <a href={data?.rootCanonicalPath || canonicalPath}>{rootItem.title}</a>
           </p>
         {/if}
-        <h1 class="title" class:editable={isCreator || $unifiedRightsStore.rights?.edit} class:editing={editingTitle}>
+        <h1 class="title" class:editable={canEditItem && editMode} class:editing={editingTitle}>
           {#if editingTitle}
             <div class="title-edit-container">
               <input
@@ -1669,13 +1714,13 @@ let showRightsManager = false;
               </span>
             </div>
           {:else}
-            <span class="title-text" tabindex="0" role="button" on:click={startEditTitle} on:keydown={(e) => handleKey(e, startEditTitle)}>
+            <span class="title-text" on:click={startEditTitle}>
               {image.title || image.original_name || `Bild ${image.id?.substring(0, 8)}...`}
             </span>
           {/if}
         </h1>
-        {#if isCreator || $unifiedRightsStore.rights?.edit}
-          <p class="caption" class:editable={isCreator || $unifiedRightsStore.rights?.edit} class:editing={editingCaption}>
+        {#if canEditItem}
+          <p class="caption" class:editable={canEditItem && editMode} class:editing={editingCaption}>
             {#if editingCaption}
               <div class="caption-edit-container">
                 <textarea
@@ -1698,7 +1743,7 @@ let showRightsManager = false;
                 </span>
               </div>
             {:else}
-              <span class="caption-text" tabindex="0" role="button" on:click={startEditCaption} on:keydown={(e) => handleKey(e, startEditCaption)}>
+              <span class="caption-text" on:click={startEditCaption}>
                 {#if image.caption}
                   <em>{@html image.caption.replace(/\\n/g, '<br>').replace(/\n/g, '<br>')}</em>
                 {:else}
@@ -1714,7 +1759,7 @@ let showRightsManager = false;
             </span>
           </p>
         {/if}
-        <p class="description" class:editable={isCreator || $unifiedRightsStore.rights?.edit} class:editing={editingDescription}>
+        <p class="description" class:editable={canEditItem && editMode} class:editing={editingDescription}>
           {#if editingDescription}
             <div class="description-edit-container">
               <textarea
@@ -1736,8 +1781,8 @@ let showRightsManager = false;
                 {descriptionEditValue.length}/160
               </span>
             </div>
-                      {:else}
-              <span class="description-text" tabindex="0" role="button" on:click={startEditDescription} on:keydown={(e) => handleKey(e, startEditDescription)}>
+          {:else}
+            <span class="description-text" on:click={startEditDescription}>
                 {#if image.description}
                   {image.description}
                 {:else}
@@ -1888,7 +1933,7 @@ let showRightsManager = false;
     <div class="meta-section single-exif">
       <!-- Column 1: Keywords -->
       <div class="keywords-column">
-        <h2 class="keywords-title" class:editable={isCreator || $unifiedRightsStore.rights?.edit} class:editing={editingKeywords} on:click={startEditKeywords}>
+        <h2 class="keywords-title" class:editable={canEditItem && editMode} class:editing={editingKeywords} on:click={startEditKeywords}>
           Keywords
         </h2>
         {#if editingKeywords}
@@ -1923,7 +1968,8 @@ let showRightsManager = false;
         {/if}
         <FileDetails
           {image}
-          isCreator={isCreator || $unifiedRightsStore.rights?.edit}
+          isCreator={canEditItem}
+          {editMode}
           {editingFilename}
           bind:filenameEditValue
           {startEditFilename}
@@ -1937,20 +1983,16 @@ let showRightsManager = false;
           {fileSizes}
           {formatFileSize}
           {browser}
-          {availableTypes}
-          resolvedTypeSlug={contentType?.slug || ''}
           {managementForm}
           {selectedRootItem}
           {rootSearchQuery}
           {rootSearchResults}
           {rootSearchLoading}
-          managementSavePending={managementSavePending}
           {managementSaveMessage}
           onRootSearchInput={handleRootSearchInput}
           onRootSearchFocus={handleRootSearchFocus}
           selectRootItem={selectRootCandidate}
           clearRootItem={clearRootCandidate}
-          {saveManagementFields}
         />
 
         {#if isCreator}
@@ -2199,6 +2241,29 @@ let showRightsManager = false;
     {/if}
   {:else}
     <div class="error">❌ Bild nicht gefunden</div>
+  {/if}
+
+  {#if canEditItem}
+    <button
+      class="fab-button edit-toggle"
+      class:active={editMode}
+      on:click={toggleEditMode}
+      title={editMode ? 'Aenderungen speichern' : 'Editmodus aktivieren'}
+      aria-label={editMode ? 'Aenderungen speichern' : 'Editmodus aktivieren'}
+    >
+      {#if editMode}
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 3h11l3 3v15H5z"/>
+          <path d="M9 3v6h6"/>
+          <path d="M9 14h6"/>
+        </svg>
+      {:else}
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 20h9"/>
+          <path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/>
+        </svg>
+      {/if}
+    </button>
   {/if}
   
   <!-- Zur Galerie zurückkehren FAB -->
@@ -3234,6 +3299,14 @@ let showRightsManager = false;
     bottom: 12rem; /* Über dem Gallery Back FAB */
   }
 
+  .fab-button.edit-toggle {
+    bottom: 17rem;
+  }
+
+  .fab-button.edit-toggle.active {
+    background: rgba(46, 125, 50, 0.28);
+  }
+
   @media (max-width: 768px) {
     .rights-modal {
       width: 95vw;
@@ -3246,6 +3319,10 @@ let showRightsManager = false;
 
     .fab-button.rights-manager {
       bottom: 10rem;
+    }
+
+    .fab-button.edit-toggle {
+      bottom: 14rem;
     }
   }
 
@@ -3305,16 +3382,29 @@ let showRightsManager = false;
     color: #d64545;
   }
 
-  .content-type-chip {
-    display: inline-flex;
+  .title-type-select {
+    display: flex;
+    flex-direction: column;
     align-items: center;
-    margin-bottom: 0.75rem;
-    padding: 0.2rem 0.55rem;
-    border-radius: 999px;
-    background: var(--bg-secondary);
+    gap: 0.35rem;
+    margin-bottom: 0.9rem;
+  }
+
+  .title-type-select label {
+    font-size: 0.78rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+  }
+
+  .title-type-select select {
+    min-width: 180px;
+    padding: 0.55rem 0.75rem;
+    border-radius: 8px;
     border: 1px solid var(--border-color);
-    font-size: 0.85rem;
-    font-weight: 600;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font: inherit;
   }
 
   .group-context-line {

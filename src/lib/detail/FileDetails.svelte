@@ -1,6 +1,4 @@
 <script lang="ts">
-  import type { ContentTypeDefinition } from '$lib/content/types';
-
   type RootCandidate = {
     id: string;
     title?: string | null;
@@ -24,6 +22,7 @@
 
   export let image: any;
   export let isCreator: boolean;
+  export let editMode = false;
   export let editingFilename: boolean;
   export let filenameEditValue: string;
   export let startEditFilename: () => void;
@@ -37,20 +36,16 @@
   export let fileSizes: { size64: number | null; size512: number | null; size2048: number | null };
   export let formatFileSize: (bytes: number) => string;
   export let browser: boolean;
-  export let availableTypes: Partial<ContentTypeDefinition>[] = [];
-  export let resolvedTypeSlug = '';
   export let managementForm: ManagementForm;
   export let selectedRootItem: RootCandidate | null = null;
   export let rootSearchQuery = '';
   export let rootSearchResults: RootCandidate[] = [];
   export let rootSearchLoading = false;
-  export let managementSavePending = false;
   export let managementSaveMessage = '';
   export let onRootSearchInput: (value: string) => void;
   export let onRootSearchFocus: () => void;
   export let selectRootItem: (item: RootCandidate) => void;
   export let clearRootItem: () => void;
-  export let saveManagementFields: () => void;
 
   function rootLabel(item: RootCandidate | null) {
     if (!item) return 'Kein Root ausgewaehlt';
@@ -65,7 +60,7 @@
 
 <h2>File Details</h2>
 
-<div class="filename" class:editable={isCreator} class:editing={editingFilename}>
+<div class="filename" class:editable={isCreator && editMode} class:editing={editingFilename}>
   {#if editingFilename}
     <div class="filename-edit-container">
       <input
@@ -87,7 +82,7 @@
       </span>
     </div>
   {:else}
-    <button type="button" class="filename-text" on:click={startEditFilename}>
+    <button type="button" class="filename-text" on:click={startEditFilename} disabled={!isCreator || !editMode}>
       {image.original_name || 'Unbekannt'}
     </button>
   {/if}
@@ -96,7 +91,7 @@
 <div class="filename">{browser ? window.location.href : ''}</div>
 
 {#if image.slug}
-  <div class="filename" class:editable={isCreator} class:editing={editingSlug}>
+  <div class="filename" class:editable={isCreator && editMode} class:editing={editingSlug}>
     {#if editingSlug}
       <div class="filename-edit-container">
         <input
@@ -118,7 +113,7 @@
         </span>
       </div>
     {:else}
-      <button type="button" class="filename-text" on:click={startEditSlug}>
+      <button type="button" class="filename-text" on:click={startEditSlug} disabled={!isCreator || !editMode}>
         Slug: {image.slug}
       </button>
     {/if}
@@ -137,12 +132,9 @@
     <span class="meta-label">Canonical Path</span>
     <span class="meta-value">{image?.canonical_path || '-'}</span>
   </div>
-  <div class="meta-row">
-    <span class="meta-label">Resolved Type Slug</span>
-    <span class="meta-value">{resolvedTypeSlug || '-'}</span>
-  </div>
 </div>
 
+{#if isCreator && editMode}
 <div class="management-card">
   <div class="management-header">
     <h3>Content Management</h3>
@@ -154,17 +146,6 @@
   </div>
 
   <div class="management-grid">
-    <label class="field">
-      <span class="field-label">Typ</span>
-      <select bind:value={managementForm.type_id} disabled={!isCreator}>
-        {#each availableTypes as type}
-          {#if type.id}
-            <option value={type.id}>{type.name} ({type.slug})</option>
-          {/if}
-        {/each}
-      </select>
-    </label>
-
     <label class="field">
       <span class="field-label">Group Slug</span>
       <input
@@ -243,15 +224,8 @@
       <textarea bind:value={managementForm.content} rows="8" placeholder="<p>HTML-Inhalt</p>" disabled={!isCreator}></textarea>
     </label>
   </div>
-
-  {#if isCreator}
-    <div class="management-actions">
-      <button type="button" class="save-btn" on:click={saveManagementFields} disabled={managementSavePending}>
-        {managementSavePending ? 'Speichert...' : 'Management-Felder speichern'}
-      </button>
-    </div>
-  {/if}
 </div>
+{/if}
 
 <style>
   h2 {
@@ -432,7 +406,6 @@
   }
 
   .secondary-btn,
-  .save-btn,
   .root-result {
     border-radius: 8px;
     border: 1px solid var(--border-color, #ccc);
@@ -441,17 +414,6 @@
     padding: 0.55rem 0.75rem;
     font: inherit;
     cursor: pointer;
-  }
-
-  .save-btn {
-    background: var(--accent-color);
-    color: #fff;
-    border-color: transparent;
-  }
-
-  .save-btn:disabled {
-    opacity: 0.7;
-    cursor: wait;
   }
 
   .root-results {
@@ -471,13 +433,6 @@
   .field-hint {
     color: var(--text-secondary);
   }
-
-  .management-actions {
-    margin-top: 1rem;
-    display: flex;
-    justify-content: flex-end;
-  }
-
   .save-message {
     font-size: 0.85rem;
   }
