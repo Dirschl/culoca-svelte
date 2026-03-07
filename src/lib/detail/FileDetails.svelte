@@ -185,15 +185,6 @@
     </label>
 
     <label class="field">
-      <span class="field-label">NearBy Galerie</span>
-      <select bind:value={managementForm.nearby_gallery_mode} disabled={!isCreator}>
-        <option value="default">Type Default</option>
-        <option value="enabled">Aktiviert</option>
-        <option value="disabled">Deaktiviert</option>
-      </select>
-    </label>
-
-    <label class="field">
       <span class="field-label">Sort Order</span>
       <input type="number" bind:value={managementForm.sort_order} placeholder="optional" disabled={!isCreator} />
     </label>

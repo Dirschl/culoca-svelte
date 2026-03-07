@@ -2053,6 +2053,7 @@ let showRightsManager = false;
       isCreator={isCreator}
       editMode={canEditItem && editMode}
       bind:externalUrl={managementForm.external_url}
+      bind:nearbyGalleryMode={managementForm.nearby_gallery_mode}
       showGalleryToggle={shouldShowNearbyGallery}
       onSetLocationFilter={setLocationFilter}
       onCopyLink={copyCurrentLink}

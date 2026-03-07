@@ -10,6 +10,7 @@
   export let onToggleGallery: () => void;
   export let editMode: boolean = false;
   export let externalUrl: string = '';
+  export let nearbyGalleryMode: string = 'default';
   export let showGalleryToggle: boolean = true;
   export let darkMode: boolean = false;
   export let rotating: boolean = false;
@@ -135,6 +136,17 @@
           inputmode="url"
         />
       </div>
+      <div class="external-url-row">
+        <label class="external-url-label" for="nearby-gallery-mode">NearBy Galerie</label>
+        <select
+          id="nearby-gallery-mode"
+          bind:value={nearbyGalleryMode}
+        >
+          <option value="default">Type Default</option>
+          <option value="enabled">Aktiviert</option>
+          <option value="disabled">Deaktiviert</option>
+        </select>
+      </div>
     {/if}
   {/if}
 </div>
@@ -222,6 +234,15 @@
     text-align: center;
   }
   .external-url-row input {
+    width: 100%;
+    padding: 0.55rem 0.75rem;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font: inherit;
+  }
+  .external-url-row select {
     width: 100%;
     padding: 0.55rem 0.75rem;
     border-radius: 8px;
