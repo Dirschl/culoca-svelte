@@ -16,7 +16,6 @@
     content: string;
     starts_at: string;
     ends_at: string;
-    external_url: string;
     video_url: string;
   };
 
@@ -197,11 +196,6 @@
     <label class="field">
       <span class="field-label">Ends At</span>
       <input type="datetime-local" bind:value={managementForm.ends_at} disabled={!isCreator} />
-    </label>
-
-    <label class="field field-wide">
-      <span class="field-label">External URL</span>
-      <input type="url" bind:value={managementForm.external_url} placeholder="https://..." disabled={!isCreator} />
     </label>
 
     <label class="field field-wide">

@@ -110,7 +110,6 @@ let showRightsManager = false;
   $: hasVisibleGroupItems = Array.isArray(groupItems) && groupItems.length > 1;
   $: hasDateRange = !!(contentType?.show_date_range && (contextItem?.starts_at || contextItem?.ends_at));
   $: hasVideoEmbed = !!(contentType?.show_video_embed && image?.video_url);
-  $: hasExternalLink = !!(contentType?.show_external_link && image?.external_url);
   $: shouldShowMainImage = contentType?.show_image !== false;
   $: shouldShowNearbyGallery = !!(contentType?.show_nearby_gallery && image?.lat && image?.lon);
   $: shouldShowMap = !!(contentType?.show_map && image?.lat && image?.lon);
@@ -1959,12 +1958,6 @@ let showRightsManager = false;
         <p>{formatDateRange(contextItem?.starts_at, contextItem?.ends_at)}</p>
       </section>
     {/if}
-    {#if hasExternalLink}
-      <section class="content-panel">
-        <h2>Externer Link</h2>
-        <p><a href={image.external_url} target="_blank" rel="noopener noreferrer">{image.external_url}</a></p>
-      </section>
-    {/if}
     {#if hasVideoEmbed}
       <section class="content-panel">
         <h2>Video</h2>
@@ -2018,6 +2011,8 @@ let showRightsManager = false;
     <ImageControlsSection
       {image}
       isCreator={isCreator}
+      editMode={canEditItem && editMode}
+      bind:externalUrl={managementForm.external_url}
       onSetLocationFilter={setLocationFilter}
       onCopyLink={copyCurrentLink}
       onDeleteImage={deleteImage}
