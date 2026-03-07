@@ -204,10 +204,6 @@
       <input type="url" bind:value={managementForm.video_url} placeholder="https://..." disabled={!isCreator} />
     </label>
 
-    <label class="field field-full">
-      <span class="field-label">Content</span>
-      <textarea bind:value={managementForm.content} rows="8" placeholder="<p>HTML-Inhalt</p>" disabled={!isCreator}></textarea>
-    </label>
   </div>
 </div>
 {/if}

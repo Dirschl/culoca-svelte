@@ -2,6 +2,7 @@ import { json, error } from '@sveltejs/kit';
 import { supabase } from '$lib/supabaseClient';
 import { createClient } from 'webdav';
 import { slugifySegment } from '$lib/content/routing';
+import { sanitizeContentHtml } from '$lib/content/html';
 
 export const DELETE = async ({ params }) => {
   const { id } = params;
@@ -171,6 +172,13 @@ export const PATCH = async ({ params, request, locals }) => {
     ) {
       throw error(400, 'page_settings must be an object');
     }
+  }
+
+  if (updateData.content !== undefined) {
+    updateData.content =
+      typeof updateData.content === 'string'
+        ? sanitizeContentHtml(updateData.content)
+        : updateData.content;
   }
 
   // Optional: Authentifizierung und Besitz prüfen (hier nur als Beispiel, ggf. anpassen)

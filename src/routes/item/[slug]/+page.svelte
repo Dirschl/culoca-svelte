@@ -10,6 +10,7 @@
   import { browser } from '$app/environment';
   import { supabase } from '$lib/supabaseClient';
   import { getStoredOrComputedCanonicalPath, slugifySegment } from '$lib/content/routing';
+  import { sanitizeContentHtml } from '$lib/content/html';
 
   // Client-seitige Umleitung für bekannte Fälle (nur für User, nicht für Bots)
   if (browser) {
@@ -106,7 +107,7 @@ let showRightsManager = false;
   $: groupItems = data?.groupItems ?? [];
   $: activeGroupItemId = data?.activeGroupItemId ?? image?.id ?? null;
   $: canonicalUrl = canonicalPath ? `https://culoca.com${canonicalPath}` : (image?.slug ? `https://culoca.com/item/${image.slug}/` : 'https://culoca.com');
-  $: effectiveContentHtml = contextItem?.content || image?.content || '';
+  $: effectiveContentHtml = sanitizeContentHtml(contextItem?.content || image?.content || '');
   $: hasVisibleGroupItems = Array.isArray(groupItems) && groupItems.length > 1;
   $: hasDateRange = !!(contentType?.show_date_range && (contextItem?.starts_at || contextItem?.ends_at));
   $: hasVideoEmbed = !!(contentType?.show_video_embed && image?.video_url);
@@ -2012,14 +2013,6 @@ let showRightsManager = false;
         </div>
       </section>
     {/if}
-    {#if shouldShowContentHtml}
-      <section class="content-panel content-html">
-        <h2>Inhalt</h2>
-        <div class="rich-content">
-          {@html effectiveContentHtml}
-        </div>
-      </section>
-    {/if}
     {#if hasVisibleGroupItems}
       <section class="content-panel group-panel" data-nosnippet>
         <h2>{rootItem?.group_slug ? 'Gruppe' : 'Varianten'}</h2>
@@ -2053,6 +2046,7 @@ let showRightsManager = false;
       isCreator={isCreator}
       editMode={canEditItem && editMode}
       bind:externalUrl={managementForm.external_url}
+      bind:contentHtml={managementForm.content}
       bind:nearbyGalleryMode={managementForm.nearby_gallery_mode}
       showGalleryToggle={shouldShowNearbyGallery}
       onSetLocationFilter={setLocationFilter}
@@ -2061,6 +2055,14 @@ let showRightsManager = false;
       onDownloadOriginal={downloadOriginal}
       onToggleGallery={toggleGallery}
     />
+    {#if shouldShowContentHtml}
+      <section class="content-panel content-html">
+        <h2>Inhalt</h2>
+        <div class="rich-content">
+          {@html effectiveContentHtml}
+        </div>
+      </section>
+    {/if}
     {#if shouldShowNearbyGallery}
       <div class="radius-control">
         <div class="radius-value" class:limit-reached={isAtItemLimit}>

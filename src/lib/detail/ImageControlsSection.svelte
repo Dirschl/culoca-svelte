@@ -1,6 +1,6 @@
 <script lang="ts">
   import { unifiedRightsStore } from '$lib/unifiedRightsStore';
-  
+
   export let image: any;
   export let isCreator: boolean;
   export let onSetLocationFilter: () => void;
@@ -8,120 +8,136 @@
   export let onDeleteImage: () => void;
   export let onDownloadOriginal: (id: string, name: string) => void;
   export let onToggleGallery: () => void;
-  export let editMode: boolean = false;
-  export let externalUrl: string = '';
-  export let nearbyGalleryMode: string = 'default';
-  export let showGalleryToggle: boolean = true;
-  export let darkMode: boolean = false;
-  export let rotating: boolean = false;
+  export let editMode = false;
+  export let externalUrl = '';
+  export let contentHtml = '';
+  export let nearbyGalleryMode = 'default';
+  export let showGalleryToggle = true;
+  export let darkMode = false;
+  export let rotating = false;
 
-  // Subscribe to unified rights store
+  type HtmlSnippet = {
+    label: string;
+    title: string;
+    start: string;
+    end?: string;
+    placeholder?: string;
+  };
+
+  const htmlTools: HtmlSnippet[] = [
+    { label: 'H2', title: 'Zwischenueberschrift H2', start: '<h2>', end: '</h2>', placeholder: 'Zwischenueberschrift' },
+    { label: 'H3', title: 'Zwischenueberschrift H3', start: '<h3>', end: '</h3>', placeholder: 'Abschnitt' },
+    { label: 'P', title: 'Absatz', start: '<p>', end: '</p>', placeholder: 'Text' },
+    { label: 'Strong', title: 'Fett', start: '<strong>', end: '</strong>', placeholder: 'Wichtig' },
+    { label: 'LI', title: 'Listenpunkt', start: '<li>', end: '</li>', placeholder: 'Punkt' },
+    { label: 'Link', title: 'Link', start: '<a href="https://">', end: '</a>', placeholder: 'Linktext' },
+    { label: 'BR', title: 'Zeilenumbruch', start: '<br>' }
+  ];
+
+  let contentTextarea: HTMLTextAreaElement | null = null;
+
   $: rights = $unifiedRightsStore.rights;
   $: loading = $unifiedRightsStore.loading;
-  $: error = $unifiedRightsStore.error;
-  $: isOwner = $unifiedRightsStore.isOwner;
+  $: hasMapLocation = !!(image?.lat && image?.lon);
+  $: showControls = hasMapLocation || (isCreator && editMode);
 
-  // Debug logging
-  $: {
-    console.log('🔍 [ImageControlsSection] Rights updated:', {
-      rights,
-      loading,
-      error,
-      isOwner,
-      isCreator,
-      imageId: image?.id
-    });
-    
-    if (rights) {
-      console.log('🔍 [ImageControlsSection] Button visibility decisions:', {
-        deleteButton: rights.delete || isCreator,
-        downloadButton: rights.download || rights.download_original || isCreator,
-        galleryButton: rights.edit || isCreator
-      });
+  function insertHtmlSnippet(tool: HtmlSnippet) {
+    if (!contentTextarea) {
+      const value = tool.end ? `${tool.start}${tool.placeholder || ''}${tool.end}` : tool.start;
+      contentHtml = `${contentHtml}${contentHtml ? '\n' : ''}${value}`;
+      return;
     }
+
+    const start = contentTextarea.selectionStart ?? contentHtml.length;
+    const end = contentTextarea.selectionEnd ?? start;
+    const selected = contentHtml.slice(start, end);
+    const middle = selected || tool.placeholder || '';
+    const snippet = tool.end ? `${tool.start}${middle}${tool.end}` : tool.start;
+
+    contentHtml = `${contentHtml.slice(0, start)}${snippet}${contentHtml.slice(end)}`;
+
+    requestAnimationFrame(() => {
+      if (!contentTextarea) return;
+      const cursorStart = start + tool.start.length;
+      const cursorEnd = tool.end ? cursorStart + middle.length : start + snippet.length;
+      contentTextarea.focus();
+      contentTextarea.setSelectionRange(cursorStart, cursorEnd);
+    });
   }
 </script>
 
 <div class="controls-section" class:dark={darkMode}>
-  {#if image.lat && image.lon}
-    <div class="action-buttons">
-      {#if externalUrl?.trim()}
-        <a class="square-btn website-btn" href={externalUrl} target="_blank" rel="noopener noreferrer" title="Webseite öffnen">
-          <svg width="35" height="35" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M14 4h6v6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M20 4l-9 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M10 6H7a3 3 0 0 0-3 3v8a3 3 0 0 0 3 3h8a3 3 0 0 0 3-3v-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  {#if showControls}
+    {#if hasMapLocation}
+      <div class="action-buttons">
+        {#if externalUrl?.trim()}
+          <a class="square-btn website-btn" href={externalUrl} target="_blank" rel="noopener noreferrer" title="Webseite öffnen">
+            <svg width="35" height="35" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M14 4h6v6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M20 4l-9 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M10 6H7a3 3 0 0 0-3 3v8a3 3 0 0 0 3 3h8a3 3 0 0 0 3-3v-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </a>
+        {/if}
+        <a class="square-btn gmaps-btn" href={`https://www.google.com/maps?q=${image.lat},${image.lon}`} target="_blank" rel="noopener" title="Google Maps öffnen">
+          <svg width="35" height="35" viewBox="0 0 24 24" class="google-logo">
+            <path class="google-blue" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="currentColor"/>
+            <path class="google-green" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="currentColor"/>
+            <path class="google-yellow" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="currentColor"/>
+            <path class="google-red" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="currentColor"/>
           </svg>
         </a>
-      {/if}
-      <a class="square-btn gmaps-btn" href={`https://www.google.com/maps?q=${image.lat},${image.lon}`} target="_blank" rel="noopener" title="Google Maps öffnen">
-        <!-- Google Logo SVG -->
-        <svg width="35" height="35" viewBox="0 0 24 24" class="google-logo">
-          <path class="google-blue" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="currentColor"/>
-          <path class="google-green" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="currentColor"/>
-          <path class="google-yellow" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="currentColor"/>
-          <path class="google-red" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="currentColor"/>
-        </svg>
-      </a>
-      <button class="square-btn location-filter-btn" on:click={onSetLocationFilter} title="Als Location-Filter setzen">
-        <!-- Culoca O Icon SVG -->
-        <svg width="35" height="35" viewBox="0 0 83.86 100.88" fill="currentColor">
-          <path d="M0,41.35c0-5.67,1.1-11.03,3.29-16.07,2.19-5.04,5.19-9.43,8.98-13.17,3.79-3.74,8.25-6.69,13.36-8.86,5.11-2.17,10.54-3.25,16.29-3.25s11.18,1.08,16.29,3.25c5.11,2.17,9.56,5.12,13.36,8.86,3.79,3.74,6.79,8.13,8.98,13.17,2.19,5.04,3.29,10.4,3.29,16.07s-1.1,11.03-3.29,16.07c-2.2,5.04-5.19,9.43-8.98,13.17-3.8,3.74-8.25,6.7-13.36,8.86-5.11,2.17-9.49,21.42-15.25,21.42s-12.23-19.25-17.34-21.42c-5.11-2.17-9.56-5.12-13.36-8.86-3.79-3.74-6.79-8.13-8.98-13.17-2.2-5.04-3.29-10.4-3.29-16.07ZM25.16,41.35c0,2.29.44,4.43,1.32,6.44.88,2.01,2.07,3.76,3.59,5.26,1.52,1.5,3.29,2.68,5.33,3.55,2.04.87,4.21,1.3,6.53,1.3s4.49-.43,6.53-1.3c2.04-.87,3.81-2.05,5.33-3.55,1.52-1.5,2.71-3.25,3.59-5.26.88-2.01,1.32-4.15,1.32-6.44s-.44-4.43-1.32-6.44c-.88-2.01-2.08-3.76-3.59-5.26-1.52-1.5-3.29-2.68-5.33-3.55-2.03-.87-4.21-1.3-6.53-1.3s-4.49.43-6.53,1.3c-2.04.87-3.81,2.05-5.33,3.55-1.52,1.5-2.72,3.25-3.59,5.26-.88,2.01-1.32,4.16-1.32,6.44Z"/>
-        </svg>
-      </button>
-      <button class="square-btn share-btn" on:click={onCopyLink} title="Link kopieren">
-        <svg width="35" height="35" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
-        </svg>
-      </button>
-      
-      {#if rights?.delete || isCreator}
-        <button class="square-btn delete-btn" on:click={onDeleteImage} title="Bild löschen" disabled={loading}>
+        <button class="square-btn location-filter-btn" on:click={onSetLocationFilter} title="Als Location-Filter setzen">
+          <svg width="35" height="35" viewBox="0 0 83.86 100.88" fill="currentColor">
+            <path d="M0,41.35c0-5.67,1.1-11.03,3.29-16.07,2.19-5.04,5.19-9.43,8.98-13.17,3.79-3.74,8.25-6.69,13.36-8.86,5.11-2.17,10.54-3.25,16.29-3.25s11.18,1.08,16.29,3.25c5.11,2.17,9.56,5.12,13.36,8.86,3.79,3.74,6.79,8.13,8.98,13.17,2.19,5.04,3.29,10.4,3.29,16.07s-1.1,11.03-3.29,16.07c-2.2,5.04-5.19,9.43-8.98,13.17-3.8,3.74-8.25,6.7-13.36,8.86-5.11,2.17-9.49,21.42-15.25,21.42s-12.23-19.25-17.34-21.42c-5.11-2.17-9.56-5.12-13.36-8.86-3.79-3.74-6.79-8.13-8.98-13.17-2.2-5.04-3.29-10.4-3.29-16.07ZM25.16,41.35c0,2.29.44,4.43,1.32,6.44.88,2.01,2.07,3.76,3.59,5.26,1.52,1.5,3.29,2.68,5.33,3.55,2.04.87,4.21,1.3,6.53,1.3s4.49-.43,6.53-1.3c2.04-.87,3.81-2.05,5.33-3.55,1.52-1.5,2.71-3.25,3.59-5.26.88-2.01,1.32-4.15,1.32-6.44s-.44-4.43-1.32-6.44c-.88-2.01-2.08-3.76-3.59-5.26-1.52-1.5-3.29-2.68-5.33-3.55-2.03-.87-4.21-1.3-6.53-1.3s-4.49.43-6.53,1.3c-2.04.87-3.81,2.05-5.33,3.55-1.52,1.5-2.72,3.25-3.59,5.26-.88,2.01-1.32,4.16-1.32,6.44Z"/>
+          </svg>
+        </button>
+        <button class="square-btn share-btn" on:click={onCopyLink} title="Link kopieren">
           <svg width="35" height="35" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+            <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
           </svg>
         </button>
-      {/if}
-      
-      {#if rights?.download || rights?.download_original || isCreator}
-        <button class="square-btn download-btn" data-download-id={image.id} on:click={() => onDownloadOriginal(image.id, image.original_name)} title="Original herunterladen" disabled={rotating || loading}>
-          <svg width="35" height="35" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 6v7m0 0l-3-3m3 3l3-3M6 18h12"/>
-          </svg>
-        </button>
-      {/if}
-      
-      <!-- Rotate button auskommentiert - gefährlich -->
-      <!--
-      <button class="square-btn rotate-btn" on:click={rotateImage} title="Bild 90° nach links drehen" disabled={rotating}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/>
-        </svg>
-      </button>
-      -->
-      
-      {#if showGalleryToggle && (rights?.edit || isCreator)}
-        <button class="square-btn gallery-toggle-btn" on:click={onToggleGallery} title="Aus Galerie entfernen/hinzufügen" class:active={image.gallery ?? true} disabled={loading}>
-          {#if image.gallery ?? true}
-            <svg width="25" height="25" viewBox="0 0 24 24" fill="currentColor">
-              <rect x="3" y="3" width="4" height="4"/>
-              <rect x="10" y="3" width="4" height="4"/>
-              <rect x="17" y="3" width="4" height="4"/>
-              <rect x="3" y="10" width="4" height="4"/>
-              <rect x="10" y="10" width="4" height="4"/>
-              <rect x="17" y="10" width="4" height="4"/>
-              <rect x="3" y="17" width="4" height="4"/>
-              <rect x="10" y="17" width="4" height="4"/>
-              <rect x="17" y="17" width="4" height="4"/>
+
+        {#if rights?.delete || isCreator}
+          <button class="square-btn delete-btn" on:click={onDeleteImage} title="Bild löschen" disabled={loading}>
+            <svg width="35" height="35" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
             </svg>
-          {:else}
-            <svg width="25" height="25" viewBox="0 0 24 24" fill="currentColor">
-              <rect x="4" y="4" width="16" height="16" stroke="currentColor" stroke-width="1" fill="none"/>
+          </button>
+        {/if}
+
+        {#if rights?.download || rights?.download_original || isCreator}
+          <button class="square-btn download-btn" data-download-id={image.id} on:click={() => onDownloadOriginal(image.id, image.original_name)} title="Original herunterladen" disabled={rotating || loading}>
+            <svg width="35" height="35" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 6v7m0 0l-3-3m3 3l3-3M6 18h12"/>
             </svg>
-          {/if}
-        </button>
-      {/if}
-    </div>
+          </button>
+        {/if}
+
+        {#if showGalleryToggle && (rights?.edit || isCreator)}
+          <button class="square-btn gallery-toggle-btn" on:click={onToggleGallery} title="Aus Galerie entfernen/hinzufügen" class:active={image.gallery ?? true} disabled={loading}>
+            {#if image.gallery ?? true}
+              <svg width="25" height="25" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="3" y="3" width="4" height="4"/>
+                <rect x="10" y="3" width="4" height="4"/>
+                <rect x="17" y="3" width="4" height="4"/>
+                <rect x="3" y="10" width="4" height="4"/>
+                <rect x="10" y="10" width="4" height="4"/>
+                <rect x="17" y="10" width="4" height="4"/>
+                <rect x="3" y="17" width="4" height="4"/>
+                <rect x="10" y="17" width="4" height="4"/>
+                <rect x="17" y="17" width="4" height="4"/>
+              </svg>
+            {:else}
+              <svg width="25" height="25" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="4" y="4" width="16" height="16" stroke="currentColor" stroke-width="1" fill="none"/>
+              </svg>
+            {/if}
+          </button>
+        {/if}
+      </div>
+    {/if}
+
     {#if isCreator && editMode}
       <div class="external-url-row">
         <label class="external-url-label" for="external-url-input">Webseite</label>
@@ -136,12 +152,32 @@
           inputmode="url"
         />
       </div>
+
+      <div class="content-editor-row">
+        <div class="content-editor-header">
+          <label class="external-url-label" for="content-html-input">HTML Inhalt</label>
+          <span class="content-editor-hint">Erlaubt: h2, h3, h4, h5, p, br, li, strong, a</span>
+        </div>
+        <div class="content-toolbar" aria-label="HTML Werkzeuge">
+          {#each htmlTools as tool}
+            <button type="button" class="content-tool-btn" title={tool.title} on:click={() => insertHtmlSnippet(tool)}>
+              {tool.label}
+            </button>
+          {/each}
+        </div>
+        <textarea
+          id="content-html-input"
+          bind:this={contentTextarea}
+          bind:value={contentHtml}
+          rows="8"
+          placeholder="<p>Kurzer, sicherer HTML-Inhalt</p>"
+          spellcheck="false"
+        ></textarea>
+      </div>
+
       <div class="external-url-row">
         <label class="external-url-label" for="nearby-gallery-mode">NearBy Galerie</label>
-        <select
-          id="nearby-gallery-mode"
-          bind:value={nearbyGalleryMode}
-        >
+        <select id="nearby-gallery-mode" bind:value={nearbyGalleryMode}>
           <option value="default">Type Default</option>
           <option value="enabled">Aktiviert</option>
           <option value="disabled">Deaktiviert</option>
@@ -170,6 +206,7 @@
     margin-top: 0;
     margin-bottom: 0.2rem;
     background: transparent;
+    flex-wrap: wrap;
   }
   .square-btn {
     width: 50px;
@@ -218,9 +255,10 @@
   .gmaps-btn:hover .google-logo .google-green { fill: #34A853; }
   .gmaps-btn:hover .google-logo .google-yellow { fill: #FBBC05; }
   .gmaps-btn:hover .google-logo .google-red { fill: #EA4335; }
-  .external-url-row {
+  .external-url-row,
+  .content-editor-row {
     width: 100%;
-    max-width: 420px;
+    max-width: 640px;
     display: flex;
     flex-direction: column;
     gap: 0.35rem;
@@ -233,7 +271,9 @@
     color: var(--text-secondary);
     text-align: center;
   }
-  .external-url-row input {
+  .external-url-row input,
+  .external-url-row select,
+  .content-editor-row textarea {
     width: 100%;
     padding: 0.55rem 0.75rem;
     border-radius: 8px;
@@ -242,14 +282,41 @@
     color: var(--text-primary);
     font: inherit;
   }
-  .external-url-row select {
-    width: 100%;
-    padding: 0.55rem 0.75rem;
-    border-radius: 8px;
+  .content-editor-header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    align-items: center;
+  }
+  .content-editor-hint {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    text-align: center;
+  }
+  .content-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: center;
+  }
+  .content-tool-btn {
     border: 1px solid var(--border-color);
     background: var(--bg-secondary);
     color: var(--text-primary);
+    border-radius: 999px;
+    padding: 0.35rem 0.7rem;
     font: inherit;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .content-tool-btn:hover {
+    border-color: var(--culoca-orange);
+    color: var(--culoca-orange);
+  }
+  .content-editor-row textarea {
+    min-height: 10rem;
+    resize: vertical;
   }
   .location-filter-btn {
     background: var(--bg-secondary);
@@ -340,12 +407,10 @@
     background: transparent;
     -webkit-appearance: none;
     appearance: none;
-    --thumb: 30px;      /* Thumb-Größe */
-    --track: 2px;       /* Track-Höhe */
-    --pct: 0%;          /* wird per JS gesetzt */
+    --thumb: 30px;
+    --track: 2px;
+    --pct: 0%;
   }
-
-  /* ===== WebKit (Chrome/Safari/Edge) ===== */
   .radius-control input[type="range"]::-webkit-slider-runnable-track {
     height: var(--track);
     border-radius: 999px;
@@ -365,12 +430,9 @@
     background: var(--accent-color);
     border: 2px solid var(--bg-primary);
     cursor: pointer;
-    /* Track mittig unter dem Thumb ausrichten */
     margin-top: calc((var(--track) - var(--thumb)) / 2);
     transition: transform .1s ease;
   }
-
-  /* ===== Firefox ===== */
   .radius-control input[type="range"]::-moz-range-track {
     height: var(--track);
     background: #e5e7eb;
@@ -390,10 +452,19 @@
     cursor: pointer;
     transition: transform .1s ease;
   }
-
-  /* (optional) kleine Interaktions-Details */
   .radius-control input[type="range"]:hover::-webkit-slider-thumb,
-  .radius-control input[type="range"]:hover::-moz-range-thumb { 
-    transform: scale(.98); 
+  .radius-control input[type="range"]:hover::-moz-range-thumb {
+    transform: scale(.98);
   }
-</style> 
+
+  @media (max-width: 700px) {
+    .external-url-row,
+    .content-editor-row {
+      max-width: 100%;
+    }
+
+    .square-btn {
+      margin-left: 0;
+    }
+  }
+</style>
