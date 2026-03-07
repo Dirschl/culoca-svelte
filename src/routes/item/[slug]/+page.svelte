@@ -1318,33 +1318,63 @@ let showRightsManager = false;
   // Dateigrößen für 64px, 512px, 2048px
   let fileSizes = { size64: null, size512: null, size2048: null };
 
-  async function fetchFileSizes() {
-    if (!image || !browser) return;
+  function buildPublicStorageUrl(bucket: string, path: string | null | undefined) {
+    if (!path) return null;
+    return `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/${bucket}/${path}`;
+  }
+
+  function buildSeoSizedImageUrl(size: '512' | '2048') {
+    if (!image?.slug) return null;
+
+    const imagePath = size === '2048' ? image.path_2048 || image.path_512 : image.path_512;
+    if (!imagePath) return null;
+
+    const extensionMatch = imagePath.match(/\.(jpg|jpeg|webp|png)$/i);
+    const fileExtension = extensionMatch ? extensionMatch[0].toLowerCase() : '.jpg';
+
+    return `https://culoca.com/images/${image.slug}-${size}${fileExtension}`;
+  }
+
+  async function fetchRemoteFileSize(url: string | null) {
+    if (!url) return null;
+
     try {
-      const img64 = document.querySelector('img[src*="images-64"]') as HTMLImageElement;
-      const img512 = document.querySelector('img[src*="images-512"]') as HTMLImageElement;
-      const img2048 = document.querySelector('img[src*="images-2048"]') as HTMLImageElement;
-      if (img64) {
-        const response = await fetch(img64.src);
-        const blob = await response.blob();
-        fileSizes.size64 = blob.size;
+      const headResponse = await fetch(url, { method: 'HEAD' });
+      const contentLength = headResponse.headers.get('content-length');
+      if (headResponse.ok && contentLength) {
+        const parsed = Number(contentLength);
+        if (!Number.isNaN(parsed) && parsed > 0) {
+          return parsed;
+        }
       }
-      if (img512) {
-        const response = await fetch(img512.src);
-        const blob = await response.blob();
-        fileSizes.size512 = blob.size;
-      }
-      if (img2048) {
-        const response = await fetch(img2048.src);
-        const blob = await response.blob();
-        fileSizes.size2048 = blob.size;
-      }
-    } catch (error) {
-      console.error('Error fetching file sizes:', error);
+    } catch {
+      // Fallback to GET below when HEAD is unavailable.
+    }
+
+    try {
+      const response = await fetch(url);
+      if (!response.ok) return null;
+      const blob = await response.blob();
+      return blob.size;
+    } catch {
+      return null;
     }
   }
 
+  async function fetchFileSizes() {
+    if (!image || !browser) return;
+
+    const [size64, size512, size2048] = await Promise.all([
+      fetchRemoteFileSize(buildPublicStorageUrl('images-64', image.path_64)),
+      fetchRemoteFileSize(buildSeoSizedImageUrl('512') || buildPublicStorageUrl('images-512', image.path_512)),
+      fetchRemoteFileSize(buildSeoSizedImageUrl('2048') || buildPublicStorageUrl('images-2048', image.path_2048))
+    ]);
+
+    fileSizes = { size64, size512, size2048 };
+  }
+
   $: if (image && browser) {
+    fileSizes = { size64: null, size512: null, size2048: null };
     setTimeout(fetchFileSizes, 1000);
   }
 
