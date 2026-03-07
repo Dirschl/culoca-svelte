@@ -341,15 +341,17 @@ function handleScroll(event: Event) {
             {@const displayWidth = img.width && img.height ? Math.round(140 * img.width / img.height) : 140}
             {@const seoImageUrl = getSeoImageUrl(img.slug, img.path_512, '512')}
             <a href={getPublicItemHref(img)} class="newsflash-thumb" tabindex="0" role="button" aria-label={img.title || img.original_name || 'Bild'} title={img.title || img.original_name || 'Bild'} style="width:{displayWidth}px;">
-              <img src={seoImageUrl || `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${img.path_512}`} alt={img.title || img.original_name || 'Bild'} width={displayWidth} height="140" loading="lazy" />
+              <div class="newsflash-image-frame">
+                <img src={seoImageUrl || `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${img.path_512}`} alt={img.title || img.original_name || 'Bild'} width={displayWidth} height="140" loading="lazy" />
+                {#if showDistance && userLat !== null && userLon !== null && img.lat && img.lon && getDistanceFromLatLonInMeters}
+                  <div class="newsflash-distance-topright">
+                    {getDistanceFromLatLonInMeters(userLat, userLon, img.lat, img.lon)}
+                  </div>
+                {/if}
+              </div>
               {#if showImageCaptions && (img.title || img.original_name)}
-                <div class="newsflash-caption-overlay">
+                <div class="newsflash-caption-below">
                   {img.title || img.original_name}
-                </div>
-              {/if}
-              {#if showDistance && userLat !== null && userLon !== null && img.lat && img.lon && getDistanceFromLatLonInMeters}
-                <div class="newsflash-distance-topright">
-                  {getDistanceFromLatLonInMeters(userLat, userLon, img.lat, img.lon)}
                 </div>
               {/if}
             </a>
@@ -374,15 +376,17 @@ function handleScroll(event: Event) {
           {#each images as img (img.id)}
             {@const seoGridImageUrl = getSeoImageUrl(img.slug, img.path_512, '512')}
             <a href={getPublicItemHref(img)} class="newsflash-thumb" tabindex="0" role="button" aria-label={img.title || img.original_name || 'Bild'} title={img.title || img.original_name || 'Bild'}>
-              <img src={seoGridImageUrl || `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${img.path_512}`} alt={img.title || img.original_name || 'Bild'} />
+              <div class="newsflash-image-frame">
+                <img src={seoGridImageUrl || `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${img.path_512}`} alt={img.title || img.original_name || 'Bild'} />
+                {#if showDistance && userLat !== null && userLon !== null && img.lat && img.lon && getDistanceFromLatLonInMeters}
+                  <div class="newsflash-distance-topright">
+                    {getDistanceFromLatLonInMeters(userLat, userLon, img.lat, img.lon)}
+                  </div>
+                {/if}
+              </div>
               {#if showImageCaptions && (img.title || img.original_name)}
-                <div class="newsflash-caption-overlay">
+                <div class="newsflash-caption-below">
                   {img.title || img.original_name}
-                </div>
-              {/if}
-              {#if showDistance && userLat !== null && userLon !== null && img.lat && img.lon && getDistanceFromLatLonInMeters}
-                <div class="newsflash-distance-topright">
-                  {getDistanceFromLatLonInMeters(userLat, userLon, img.lat, img.lon)}
                 </div>
               {/if}
             </a>
@@ -623,7 +627,8 @@ function handleScroll(event: Event) {
 }
 .newsflash-thumb {
   background: #222;
-  display: inline-block;
+  display: inline-flex;
+  flex-direction: column;
   cursor: pointer;
   border: none;
   transition: border 0.2s;
@@ -635,24 +640,27 @@ function handleScroll(event: Event) {
   text-decoration: none;
   color: inherit;
   vertical-align: bottom;
-  height: 140px;
 }
 
-.newsflash-caption-overlay {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: var(--bg-overlay);
-  color: var(--text-overlay);
+.newsflash-image-frame {
+  position: relative;
+  width: 100%;
+  height: 140px;
+  overflow: hidden;
+  background: #222;
+}
+
+.newsflash-caption-below {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
   font-size: 0.7rem;
-  padding: 4px 6px;
+  line-height: 1.35;
+  padding: 5px 6px 6px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   pointer-events: none;
-  -webkit-backdrop-filter: blur(var(--overlay-blur));
-  backdrop-filter: blur(var(--overlay-blur));
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .newsflash-distance-topright {
@@ -674,7 +682,8 @@ function handleScroll(event: Event) {
   border: none !important;
 }
 .newsflash-thumb img {
-  width: auto;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
   display: block;
   background: #222;
