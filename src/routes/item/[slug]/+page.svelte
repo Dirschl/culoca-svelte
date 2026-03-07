@@ -2043,7 +2043,7 @@ let showRightsManager = false;
       onDownloadOriginal={downloadOriginal}
       onToggleGallery={toggleGallery}
     />
-    {#if hasVideoEmbed}
+    {#if hasVideoEmbed && !(canEditItem && editMode)}
       <section class="content-panel">
         <h2>Video</h2>
         <div class="video-embed">
