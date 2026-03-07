@@ -110,7 +110,8 @@ let showRightsManager = false;
   $: effectiveContentHtml = sanitizeContentHtml(contextItem?.content || image?.content || '');
   $: hasVisibleGroupItems = Array.isArray(groupItems) && groupItems.length > 1;
   $: hasDateRange = !!(contentType?.show_date_range && (contextItem?.starts_at || contextItem?.ends_at));
-  $: hasVideoEmbed = !!(contentType?.show_video_embed && image?.video_url);
+  // A configured video URL should always render, even if the current type default disables embeds.
+  $: hasVideoEmbed = !!image?.video_url;
   $: shouldShowMainImage = contentType?.show_image !== false;
   $: nearbyGalleryOverride = getPageSettingBoolean(image?.page_settings, 'show_nearby_gallery');
   $: shouldShowNearbyGallery = !!((nearbyGalleryOverride ?? contentType?.show_nearby_gallery) && image?.lat && image?.lon);
