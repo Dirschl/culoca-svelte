@@ -347,12 +347,11 @@
     color: var(--text-primary);
     font-size: 0.75rem;
     line-height: 1.35;
-    padding: 7px 8px 8px;
+    padding: 1px 4px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     pointer-events: none;
-    border-top: 1px solid rgba(255, 255, 255, 0.06);
   }
 
   .gallery-distance-topright {
