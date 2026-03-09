@@ -414,7 +414,8 @@
   }
 
   .gallery-variant-count.with-toggle {
-    top: 22px;
+    top: 0;
+    left: 22px;
   }
 
   .gallery-toggle-btn:hover {
@@ -535,7 +536,7 @@
                   {/if}
                   {#if (item.child_count || 0) > 0}
                     <div class:with-toggle={showGalleryToggle} class="gallery-variant-count">
-                      {item.child_count}
+                      +{item.child_count}
                     </div>
                   {/if}
                 </div>
@@ -623,7 +624,7 @@
             {/if}
             {#if (item.child_count || 0) > 0}
               <div class:with-toggle={showGalleryToggle} class="gallery-variant-count">
-                {item.child_count}
+                +{item.child_count}
               </div>
             {/if}
           </div>
