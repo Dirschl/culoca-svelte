@@ -7,7 +7,6 @@ export type EventSettings = {
   booking_url: string;
   is_free: boolean;
   price_text: string;
-  online_url: string;
 };
 
 export const DEFAULT_EVENT_SETTINGS: EventSettings = {
@@ -16,8 +15,7 @@ export const DEFAULT_EVENT_SETTINGS: EventSettings = {
   location_name: '',
   booking_url: '',
   is_free: false,
-  price_text: '',
-  online_url: ''
+  price_text: ''
 };
 
 export type EventLike = {
@@ -53,8 +51,7 @@ export function getEventSettings(pageSettings: Record<string, unknown> | null | 
     location_name: typeof event.location_name === 'string' ? event.location_name : '',
     booking_url: typeof event.booking_url === 'string' ? event.booking_url : '',
     is_free: event.is_free === true,
-    price_text: typeof event.price_text === 'string' ? event.price_text : '',
-    online_url: typeof event.online_url === 'string' ? event.online_url : ''
+    price_text: typeof event.price_text === 'string' ? event.price_text : ''
   };
 }
 
@@ -79,8 +76,7 @@ export function buildEventPageSettings(
     location_name: eventSettings.location_name.trim(),
     booking_url: eventSettings.booking_url.trim(),
     is_free: eventSettings.is_free,
-    price_text: eventSettings.price_text.trim(),
-    online_url: eventSettings.online_url.trim()
+    price_text: eventSettings.price_text.trim()
   };
 
   return nextSettings;

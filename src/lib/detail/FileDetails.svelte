@@ -16,7 +16,6 @@
     event_booking_url: string;
     event_is_free: boolean;
     event_price_text: string;
-    event_online_url: string;
   };
 
   export let image: any;

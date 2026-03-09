@@ -128,7 +128,7 @@ let showRightsManager = false;
   $: isEventItem = isEventType(image);
   $: eventSettings = getEventSettings(image?.page_settings);
   $: eventScheduleText = formatEventSchedule(contextItem || image || {}, eventSettings);
-  $: hasEventDetails = isEventItem && !!(eventScheduleText || eventSettings.location_name || eventSettings.booking_url || eventSettings.online_url || eventSettings.is_free || eventSettings.price_text);
+  $: hasEventDetails = isEventItem && !!(eventScheduleText || eventSettings.location_name || eventSettings.booking_url || eventSettings.is_free || eventSettings.price_text);
   // A configured video URL should always render, even if the current type default disables embeds.
   $: hasVideoEmbed = !!image?.video_url;
   $: shouldShowMainImage = contentType?.show_image !== false;
@@ -714,8 +714,7 @@ let showRightsManager = false;
     event_location_name: '',
     event_booking_url: '',
     event_is_free: false,
-    event_price_text: '',
-    event_online_url: ''
+    event_price_text: ''
   };
   let selectedRootItem: any = null;
   let rootSearchQuery = '';
@@ -826,8 +825,7 @@ let showRightsManager = false;
       event_location_name: nextEventSettings.location_name,
       event_booking_url: nextEventSettings.booking_url,
       event_is_free: nextEventSettings.is_free,
-      event_price_text: nextEventSettings.price_text,
-      event_online_url: nextEventSettings.online_url
+      event_price_text: nextEventSettings.price_text
     };
 
     if (image.group_root_item_id && rootItem && rootItem.id !== image.id) {
@@ -1018,8 +1016,7 @@ let showRightsManager = false;
           location_name: managementForm.event_location_name,
           booking_url: managementForm.event_booking_url,
           is_free: managementForm.event_is_free,
-          price_text: managementForm.event_price_text,
-          online_url: managementForm.event_online_url
+          price_text: managementForm.event_price_text
         },
         Number(managementForm.type_id) === 2
       )
@@ -1984,6 +1981,16 @@ let showRightsManager = false;
               <div class="title-event-details-header">Termin Details</div>
               <div class="title-event-details-grid">
                 <label class="title-event-field">
+                  <span>Von</span>
+                  <input type="datetime-local" bind:value={managementForm.starts_at} />
+                </label>
+
+                <label class="title-event-field">
+                  <span>Bis</span>
+                  <input type="datetime-local" bind:value={managementForm.ends_at} />
+                </label>
+
+                <label class="title-event-field">
                   <span>Terminart</span>
                   <select bind:value={managementForm.event_display_mode}>
                     <option value="single_day">Einzeltag</option>
@@ -2014,11 +2021,6 @@ let showRightsManager = false;
                 <label class="title-event-field">
                   <span>Preistext</span>
                   <input type="text" bind:value={managementForm.event_price_text} placeholder="z.B. 12 EUR" />
-                </label>
-
-                <label class="title-event-field title-event-field-full">
-                  <span>Online-Link</span>
-                  <input type="url" bind:value={managementForm.event_online_url} placeholder="https://..." autocomplete="off" autocorrect="off" autocapitalize="none" inputmode="url" />
                 </label>
               </div>
             </div>
@@ -2193,7 +2195,7 @@ let showRightsManager = false;
 
       </div>
     </div>
-    {#if hasDateRange}
+    {#if hasDateRange && !isEventItem}
       <section class="content-panel">
         <h2>Zeitraum</h2>
         <p>{formatDateRange(contextItem?.starts_at, contextItem?.ends_at)}</p>
@@ -2226,11 +2228,6 @@ let showRightsManager = false;
           {#if eventSettings.booking_url}
             <a class="event-link-btn" href={eventSettings.booking_url} target="_blank" rel="noopener noreferrer">
               Buchungslink
-            </a>
-          {/if}
-          {#if eventSettings.online_url}
-            <a class="event-link-btn" href={eventSettings.online_url} target="_blank" rel="noopener noreferrer">
-              Online-Event
             </a>
           {/if}
         </div>
