@@ -1062,7 +1062,7 @@ let showRightsManager = false;
   // User-Initialisierung (wie im Backup)
   // --- Title ---
   function startEditTitle() {
-    if (currentUser && image && canEditItem && editMode) {
+    if (currentUser && image && canEditItem) {
       editingTitle = true;
       titleEditValue = image.title || '';
       setTimeout(() => {
@@ -1097,7 +1097,7 @@ let showRightsManager = false;
   }
   // --- Description ---
   function startEditDescription() {
-    if (currentUser && image && canEditItem && editMode) {
+    if (currentUser && image && canEditItem) {
       editingDescription = true;
       descriptionEditValue = image.description || '';
       setTimeout(() => {
@@ -1132,7 +1132,7 @@ let showRightsManager = false;
   }
   // --- Caption ---
   function startEditCaption() {
-    if (currentUser && image && canEditItem && editMode) {
+    if (currentUser && image && canEditItem) {
       editingCaption = true;
       captionEditValue = image.caption || '';
       setTimeout(() => {
@@ -2002,7 +2002,7 @@ let showRightsManager = false;
             Teil von <a href={data?.rootCanonicalPath || canonicalPath}>{rootItem.title}</a>
           </p>
         {/if}
-        <h1 class="title" class:editable={canEditItem && editMode} class:editing={editingTitle}>
+        <h1 class="title" class:editable={canEditItem} class:editing={editingTitle}>
           {#if editingTitle}
             <div class="title-edit-container">
               <input
@@ -2031,7 +2031,7 @@ let showRightsManager = false;
           {/if}
         </h1>
         {#if canEditItem}
-          <p class="caption" class:editable={canEditItem && editMode} class:editing={editingCaption}>
+          <p class="caption" class:editable={canEditItem} class:editing={editingCaption}>
             {#if editingCaption}
               <div class="caption-edit-container">
                 <textarea
@@ -2070,7 +2070,7 @@ let showRightsManager = false;
             </span>
           </p>
         {/if}
-        <p class="description" class:editable={canEditItem && editMode} class:editing={editingDescription}>
+        <p class="description" class:editable={canEditItem} class:editing={editingDescription}>
           {#if editingDescription}
             <div class="description-edit-container">
               <textarea
