@@ -200,11 +200,7 @@ let showRightsManager = false;
   }
 
   $: calendarUrl =
-    browser && image?.id
-      ? `webcal://${window.location.host}/api/events/${image.id}/ics`
-      : image?.id
-        ? `/api/events/${image.id}/ics`
-        : null;
+    image?.id ? `/api/events/${image.id}/ics` : null;
 
   function getEmbedUrl(videoUrl: string | null | undefined): string {
     if (!videoUrl) return '';
