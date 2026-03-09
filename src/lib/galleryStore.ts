@@ -107,12 +107,14 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
   // Normale Limits für alle Filter
   const effectiveLimit = limit; // Normale Limits für alle Filter
 
+  const requestedPage = Math.floor(offset / effectiveLimit);
+
   // NEU: Gallery-Items-Normal API verwenden
   let url;
   if (mergedParams.search) {
     // Suche: Verwende gallery-items-search API
     url = new URL('/api/gallery-items-search', window.location.origin);
-    url.searchParams.set('page', String(Math.floor(offset / effectiveLimit)));
+    url.searchParams.set('page', String(requestedPage));
     url.searchParams.set('search', mergedParams.search);
     if (mergedParams.lat !== null && mergedParams.lon !== null) {
       url.searchParams.set('lat', String(mergedParams.lat));
@@ -130,7 +132,7 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
   } else {
     // Normale Galerie: Verwende gallery-items-normal API
     url = new URL('/api/gallery-items-normal', window.location.origin);
-    url.searchParams.set('page', String(Math.floor(offset / effectiveLimit)));
+    url.searchParams.set('page', String(requestedPage));
     // WICHTIG: Immer lat/lon setzen, auch wenn 0 (für Fallback ohne GPS)
     url.searchParams.set('lat', String(mergedParams.lat ?? 0));
     url.searchParams.set('lon', String(mergedParams.lon ?? 0));
@@ -246,9 +248,10 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
       galleryItems.update((existingItems) => dedupeById([...existingItems, ...mapped]));
     }
     
-                    // Normale Paginierung für alle Filter (auch Location Filter)
-                offset += mapped.length;
-                hasMoreGalleryItems.set(offset < (data.totalCount || 0));
+    // Seitennummer immer über die angeforderte Page fortschreiben.
+    // Sichtbar gemappte Treffer koennen durch Varianten-/Source-Filter kleiner sein.
+    offset = (requestedPage + 1) * effectiveLimit;
+    hasMoreGalleryItems.set(offset < (data.totalCount || 0));
     
     // FALLBACK: Falls totalCount nicht gesetzt ist, verwende die Anzahl der geladenen Items
     const effectiveTotalCount = data.totalCount || mapped.length;
