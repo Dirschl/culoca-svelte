@@ -126,7 +126,13 @@ let showRightsManager = false;
   $: shouldShowContentHtml = !!(contentType?.show_content_html && effectiveContentHtml);
   $: currentVariantRootId = image?.group_root_item_id ? rootItem?.id || image.group_root_item_id : image?.id || null;
   $: hasVariantStrip = Array.isArray(groupItems) && groupItems.length > 1;
-  $: variantStripItems = hasVariantStrip ? groupItems : [];
+  $: variantStripItems = hasVariantStrip
+    ? [...groupItems].sort((a, b) => {
+        if (a.id === rootItem?.id) return -1;
+        if (b.id === rootItem?.id) return 1;
+        return 0;
+      })
+    : [];
 
   function getPageSettingBoolean(
     settings: Record<string, unknown> | null | undefined,
@@ -2012,7 +2018,7 @@ let showRightsManager = false;
             {/if}
           </div>
         {/if}
-        {#if rootItem?.id !== image?.id && rootItem?.title}
+        {#if rootItem?.id !== image?.id && rootItem?.title && !hasVariantStrip}
           <p class="group-context-line">
             Teil von <a href={data?.rootCanonicalPath || canonicalPath}>{rootItem.title}</a>
           </p>
