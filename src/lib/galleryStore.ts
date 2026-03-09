@@ -231,11 +231,19 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
 
     console.log('[GalleryStore] Mapped images:', mapped.length);
 
+    const dedupeById = (entries: any[]) => {
+      const seen = new Set<string>();
+      return entries.filter((entry) => {
+        if (!entry?.id || seen.has(entry.id)) return false;
+        seen.add(entry.id);
+        return true;
+      });
+    };
+
     if (offset === 0) {
-      galleryItems.set(mapped);
+      galleryItems.set(dedupeById(mapped));
     } else {
-        // Progressives Hinzufügen für flüssigere UX
-      galleryItems.update(items => [...items, ...mapped]);
+      galleryItems.update((existingItems) => dedupeById([...existingItems, ...mapped]));
     }
     
                     // Normale Paginierung für alle Filter (auch Location Filter)
