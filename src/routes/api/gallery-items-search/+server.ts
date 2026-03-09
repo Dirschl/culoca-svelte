@@ -51,6 +51,68 @@ async function attachCanonicalPaths(items: any[]) {
   }));
 }
 
+async function fetchVisibleRpcPage({
+  startPage,
+  pageSize,
+  lat,
+  lon,
+  effectiveUserId,
+  searchTerm
+}: {
+  startPage: number;
+  pageSize: number;
+  lat: number;
+  lon: number;
+  effectiveUserId: string | null;
+  searchTerm: string | null;
+}) {
+  const collected: any[] = [];
+  let rawPage = startPage;
+  let totalCount = 0;
+  let reachedEnd = false;
+  let iterations = 0;
+  const maxIterations = 6;
+
+  while (collected.length < pageSize && !reachedEnd && iterations < maxIterations) {
+    const { data, error } = await safeFunctionCall(supabase, 'gallery_items_search_postgis', {
+      user_lat: lat || 0,
+      user_lon: lon || 0,
+      page_value: rawPage,
+      page_size_value: pageSize,
+      current_user_id: effectiveUserId,
+      search_term: searchTerm
+    });
+
+    if (error) {
+      return { error, items: [], totalCount: 0, nextPage: rawPage };
+    }
+
+    const batch = data || [];
+    if (!totalCount) totalCount = batch[0]?.total_count || 0;
+
+    const itemsWithCanonical = await attachCanonicalPaths(batch);
+    const visibleItems = itemsWithCanonical
+      .map((item) => {
+        const { total_count, ...itemWithoutTotalCount } = item;
+        return itemWithoutTotalCount;
+      })
+      .filter((item) => item.group_root_item_id == null && (!('show_in_main_feed' in item) || isVisibleInMainFeed(item)));
+
+    collected.push(...visibleItems);
+
+    reachedEnd = batch.length < pageSize;
+    rawPage += 1;
+    iterations += 1;
+  }
+
+  return {
+    error: null,
+    items: collected.slice(0, pageSize),
+    totalCount,
+    nextPage: rawPage
+  };
+}
+
 export async function GET({ url }: any) {
   try {
     const page = parseInt(url.searchParams.get('page') || '0');
@@ -123,6 +185,7 @@ export async function GET({ url }: any) {
       return json({
         items: visibleItems,
         totalCount: count || visibleItems.length,
+        nextPage: page + 1,
         page,
         search,
         hasGPS: false,
@@ -132,17 +195,16 @@ export async function GET({ url }: any) {
       });
     }
     
-    // Parameter für die Suchfunktion
-    const functionParams = {
+    const searchTerm = search.trim() || null;
+
+    console.log('[Search API] Function params:', {
       user_lat: lat || 0,
       user_lon: lon || 0,
       page_value: page,
       page_size_value: 50,
       current_user_id: effectiveUserId,
-      search_term: search.trim() || null
-    };
-    
-    console.log('[Search API] Function params:', functionParams);
+      search_term: searchTerm
+    });
     console.log('[Search API] User filter logic:', { 
       userId, 
       currentUserId, 
@@ -152,18 +214,25 @@ export async function GET({ url }: any) {
       hasSearchTerm: !!(search && search.trim() !== '')
     });
     
-    const { data, error } = await safeFunctionCall(supabase, 'gallery_items_search_postgis', functionParams);
+    const rpcPage = await fetchVisibleRpcPage({
+      startPage: page,
+      pageSize,
+      lat,
+      lon,
+      effectiveUserId,
+      searchTerm
+    });
 
-    if (error) {
-      console.error('[Search API] gallery_items_search_postgis RPC error:', error);
-      return json({ error: 'Failed to fetch gallery items', details: error }, { status: 500 });
+    if (rpcPage.error) {
+      console.error('[Search API] gallery_items_search_postgis RPC error:', rpcPage.error);
+      return json({ error: 'Failed to fetch gallery items', details: rpcPage.error }, { status: 500 });
     }
 
-    console.log('[Search API] gallery_items_search_postgis RPC success, items:', data?.length || 0);
+    console.log('[Search API] gallery_items_search_postgis RPC success, items:', rpcPage.items?.length || 0);
     
     // Debug: Zeige erste paar Items mit Entfernungen
-    if (data && data.length > 0) {
-      console.log('[Search API] Sample items with distances:', data.slice(0, 3).map(item => ({
+    if (rpcPage.items && rpcPage.items.length > 0) {
+      console.log('[Search API] Sample items with distances:', rpcPage.items.slice(0, 3).map(item => ({
         id: item.id,
         title: item.title,
         distance: item.distance,
@@ -176,17 +245,9 @@ export async function GET({ url }: any) {
       console.log('[Search API] No items returned from gallery_items_search_postgis');
     }
 
-    // Nur total_count entfernen, distance behalten für Frontend-Sortierung
-    const itemsWithCanonical = await attachCanonicalPaths(data || []);
+    const itemsWithChildCounts = await attachChildCounts(rpcPage.items);
 
-    const items = itemsWithCanonical.map(item => {
-      const { total_count, ...itemWithoutTotalCount } = item;
-      return itemWithoutTotalCount;
-    }).filter((item) => item.group_root_item_id == null && (!('show_in_main_feed' in item) || isVisibleInMainFeed(item))) || [];
-
-    const itemsWithChildCounts = await attachChildCounts(items);
-
-    let totalCount = data?.[0]?.total_count || 0;
+    let totalCount = rpcPage.totalCount || 0;
     let visibleCountQuery = supabase
       .from('items')
       .select('id', { count: 'exact', head: true })
@@ -226,6 +287,7 @@ export async function GET({ url }: any) {
     return json({
       items: itemsWithChildCounts,
       totalCount,
+      nextPage: rpcPage.nextPage,
       page,
       search,
       hasGPS: lat !== 0 && lon !== 0,

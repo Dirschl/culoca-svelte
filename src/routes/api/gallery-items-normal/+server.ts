@@ -51,6 +51,65 @@ async function attachCanonicalPaths(items: any[]) {
   }));
 }
 
+async function fetchVisibleRpcPage({
+  startPage,
+  pageSize,
+  lat,
+  lon,
+  effectiveUserId
+}: {
+  startPage: number;
+  pageSize: number;
+  lat: number;
+  lon: number;
+  effectiveUserId: string | null;
+}) {
+  const collected: any[] = [];
+  let rawPage = startPage;
+  let totalCount = 0;
+  let reachedEnd = false;
+  let iterations = 0;
+  const maxIterations = 6;
+
+  while (collected.length < pageSize && !reachedEnd && iterations < maxIterations) {
+    const { data, error } = await safeFunctionCall(supabase, 'gallery_items_normal_postgis', {
+      user_lat: lat || 0,
+      user_lon: lon || 0,
+      page_value: rawPage,
+      page_size_value: pageSize,
+      current_user_id: effectiveUserId
+    });
+
+    if (error) {
+      return { error, items: [], totalCount: 0, nextPage: rawPage };
+    }
+
+    const batch = data || [];
+    if (!totalCount) totalCount = batch[0]?.total_count || 0;
+
+    const itemsWithCanonical = await attachCanonicalPaths(batch);
+    const visibleItems = itemsWithCanonical
+      .map((item) => {
+        const { total_count, ...itemWithoutTotalCount } = item;
+        return itemWithoutTotalCount;
+      })
+      .filter((item) => item.group_root_item_id == null && (!('show_in_main_feed' in item) || isVisibleInMainFeed(item)));
+
+    collected.push(...visibleItems);
+
+    reachedEnd = batch.length < pageSize;
+    rawPage += 1;
+    iterations += 1;
+  }
+
+  return {
+    error: null,
+    items: collected.slice(0, pageSize),
+    totalCount,
+    nextPage: rawPage
+  };
+}
+
 export async function GET({ url }: any) {
   try {
     const page = parseInt(url.searchParams.get('page') || '0');
@@ -113,6 +172,7 @@ export async function GET({ url }: any) {
       return json({
         items: visibleItems,
         totalCount: count || visibleItems.length,
+        nextPage: page + 1,
         page,
         hasGPS: false,
         hasLocationFilter: false,
@@ -121,36 +181,22 @@ export async function GET({ url }: any) {
       });
     }
     
-    const functionParams = {
-      user_lat: lat || 0,
-      user_lon: lon || 0,
-      page_value: page,
-      page_size_value: 50,
-      current_user_id: effectiveUserId
-    };
-    
-    // Function params and GPS debug (debug removed)
-    
-    const { data, error } = await safeFunctionCall(supabase, 'gallery_items_normal_postgis', functionParams);
+    const rpcPage = await fetchVisibleRpcPage({
+      startPage: page,
+      pageSize,
+      lat,
+      lon,
+      effectiveUserId
+    });
 
-    if (error) {
-      console.error('[Normal API] PostGIS RPC error:', error);
-      return json({ error: 'Failed to fetch gallery items', details: error }, { status: 500 });
+    if (rpcPage.error) {
+      console.error('[Normal API] PostGIS RPC error:', rpcPage.error);
+      return json({ error: 'Failed to fetch gallery items', details: rpcPage.error }, { status: 500 });
     }
 
-    // PostGIS RPC success (debug removed)
+    const itemsWithChildCounts = await attachChildCounts(rpcPage.items);
 
-    // Nur total_count entfernen, distance behalten für Frontend-Sortierung
-    const itemsWithCanonical = await attachCanonicalPaths(data || []);
-
-    const items = itemsWithCanonical.map(item => {
-      const { total_count, ...itemWithoutTotalCount } = item;
-      return itemWithoutTotalCount;
-    }).filter((item) => item.group_root_item_id == null && (!('show_in_main_feed' in item) || isVisibleInMainFeed(item))) || [];
-
-    const itemsWithChildCounts = await attachChildCounts(items);
-
-    let totalCount = data?.[0]?.total_count || 0;
+    let totalCount = rpcPage.totalCount || 0;
     let visibleCountQuery = supabase
       .from('items')
       .select('id', { count: 'exact', head: true })
@@ -182,6 +228,7 @@ export async function GET({ url }: any) {
     return json({
       items: itemsWithChildCounts,
       totalCount,
+      nextPage: rpcPage.nextPage,
       page,
       hasGPS: lat !== 0 && lon !== 0,
       hasLocationFilter: locationFilterLat !== 0 && locationFilterLon !== 0,

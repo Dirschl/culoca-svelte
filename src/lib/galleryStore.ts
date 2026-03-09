@@ -34,7 +34,7 @@ export function toggleLayout() {
   console.log('[Global-Layout-Toggle] Switched to:', get(useJustifiedLayout) ? 'justified' : 'grid');
 }
 
-let offset = 0;
+let nextPage = 0;
 const limit = 50; // Erhöht auf 50 für besseres Preloading
 let currentRequestId = 0;
 
@@ -107,7 +107,7 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
   // Normale Limits für alle Filter
   const effectiveLimit = limit; // Normale Limits für alle Filter
 
-  const requestedPage = Math.floor(offset / effectiveLimit);
+  const requestedPage = nextPage;
 
   // NEU: Gallery-Items-Normal API verwenden
   let url;
@@ -155,7 +155,7 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
     effectiveLimit,
     isLocationFilter: !!mergedParams.fromItem,
     originalLimit: limit,
-    offset,
+    nextPage,
     currentItemsCount: get(galleryItems).length,
     hasUserFilter: !!mergedParams.user_id
   });
@@ -217,7 +217,7 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
       });
 
     // Nur beim ersten Laden (offset === 0) das Source-Objekt zulassen
-    if (offset > 0) {
+    if (requestedPage > 0) {
       mapped = mapped.filter(item => !item.isSourceItem);
     }
 
@@ -233,18 +233,16 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
 
     console.log('[GalleryStore] Mapped images:', mapped.length);
 
-    if (offset === 0) {
+    if (requestedPage === 0) {
       galleryItems.set(mapped);
     } else {
       galleryItems.update((existingItems) => [...existingItems, ...mapped]);
     }
-    
-    // Seitennummer immer über die angeforderte Page fortschreiben.
-    // Sichtbar gemappte Treffer koennen durch Varianten-/Source-Filter kleiner sein.
-    offset = (requestedPage + 1) * effectiveLimit;
-    hasMoreGalleryItems.set(offset < (data.totalCount || 0));
 
     const currentStoreItems = get(galleryItems).length;
+    nextPage = typeof data.nextPage === 'number' ? data.nextPage : requestedPage + 1;
+    hasMoreGalleryItems.set(mapped.length > 0 && currentStoreItems < (data.totalCount || currentStoreItems + 1));
+
     // Wenn die API durch nachgelagerte Sichtbarkeitsfilter zu viel zaehlt,
     // ist der geladene Endstand der verlässlichere Wert.
     const effectiveTotalCount = get(hasMoreGalleryItems)
@@ -298,7 +296,7 @@ export function resetGallery(params: { search?: string; lat?: number; lon?: numb
   }
   
   console.log('[GalleryStore] Parameters changed, resetting gallery');
-  offset = 0;
+  nextPage = 0;
   galleryItems.set([]);
   hasMoreGalleryItems.set(true);
   isGalleryLoading.set(false);
