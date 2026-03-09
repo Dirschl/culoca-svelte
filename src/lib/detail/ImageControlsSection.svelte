@@ -118,8 +118,8 @@
         {/if}
 
         {#if showGalleryToggle && (rights?.edit || isCreator)}
-          <button class="square-btn gallery-toggle-btn" on:click={onToggleGallery} title="Aus Galerie entfernen/hinzufügen" class:active={image.gallery ?? true} disabled={loading}>
-            {#if image.gallery ?? true}
+          <button class="square-btn gallery-toggle-btn" on:click={onToggleGallery} title="Variante loesen" class:active={!!image?.group_root_item_id} disabled={loading}>
+            {#if image?.group_root_item_id}
               <svg width="25" height="25" viewBox="0 0 24 24" fill="currentColor">
                 <rect x="3" y="3" width="4" height="4"/>
                 <rect x="10" y="3" width="4" height="4"/>

@@ -3,6 +3,34 @@ import { supabase } from '$lib/supabaseClient';
 import { safeFunctionCall, logDatabaseOperation } from '$lib/databaseConfig';
 import { isVisibleInMainFeed } from '$lib/content/routing';
 
+async function attachChildCounts(items: any[]) {
+  const rootIds = items
+    .filter((item) => !item.group_root_item_id)
+    .map((item) => item.id);
+
+  if (!rootIds.length) return items;
+
+  const { data, error } = await supabase
+    .from('items')
+    .select('group_root_item_id')
+    .in('group_root_item_id', rootIds);
+
+  if (error || !data) {
+    return items.map((item) => ({ ...item, child_count: 0 }));
+  }
+
+  const counts = new Map<string, number>();
+  for (const row of data) {
+    if (!row.group_root_item_id) continue;
+    counts.set(row.group_root_item_id, (counts.get(row.group_root_item_id) || 0) + 1);
+  }
+
+  return items.map((item) => ({
+    ...item,
+    child_count: counts.get(item.id) || 0
+  }));
+}
+
 async function attachCanonicalPaths(items: any[]) {
   if (!items.length) return items;
 
@@ -22,7 +50,7 @@ async function attachCanonicalPaths(items: any[]) {
   }));
 }
 
-export async function GET({ url }) {
+export async function GET({ url }: any) {
   try {
     const page = parseInt(url.searchParams.get('page') || '0');
     const lat = parseFloat(url.searchParams.get('lat') || '0');
@@ -60,6 +88,8 @@ export async function GET({ url }) {
           { count: 'exact' }
         )
         .eq('gallery', true)
+        .eq('admin_hidden', false)
+        .is('group_root_item_id', null)
         .not('path_512', 'is', null)
         .order('created_at', { ascending: false })
         .range(from, to);
@@ -77,9 +107,11 @@ export async function GET({ url }) {
         return json({ error: 'Failed to fetch latest gallery items', details: newestError }, { status: 500 });
       }
 
+      const visibleItems = await attachChildCounts((newestItems || []).filter((item) => isVisibleInMainFeed(item)));
+
       return json({
-        items: (newestItems || []).filter((item) => isVisibleInMainFeed(item)),
-        totalCount: (newestItems || []).filter((item) => isVisibleInMainFeed(item)).length || count || 0,
+        items: visibleItems,
+        totalCount: count || visibleItems.length,
         page,
         hasGPS: false,
         hasLocationFilter: false,
@@ -113,12 +145,41 @@ export async function GET({ url }) {
     const items = itemsWithCanonical.map(item => {
       const { total_count, ...itemWithoutTotalCount } = item;
       return itemWithoutTotalCount;
-    }).filter((item) => !('show_in_main_feed' in item) || isVisibleInMainFeed(item)) || [];
+    }).filter((item) => item.group_root_item_id == null && (!('show_in_main_feed' in item) || isVisibleInMainFeed(item))) || [];
 
-    const totalCount = data?.[0]?.total_count || 0;
+    const itemsWithChildCounts = await attachChildCounts(items);
+
+    let totalCount = data?.[0]?.total_count || 0;
+    let visibleCountQuery = supabase
+      .from('items')
+      .select('id', { count: 'exact', head: true })
+      .eq('gallery', true)
+      .eq('admin_hidden', false)
+      .is('group_root_item_id', null)
+      .not('path_512', 'is', null);
+
+    if (lat !== 0 || lon !== 0) {
+      visibleCountQuery = visibleCountQuery.not('lat', 'is', null).not('lon', 'is', null);
+    }
+
+    if (currentUserId) {
+      visibleCountQuery = visibleCountQuery.or(`is_private.is.null,is_private.eq.false,profile_id.eq.${currentUserId}`);
+    } else {
+      visibleCountQuery = visibleCountQuery.or('is_private.is.null,is_private.eq.false');
+    }
+
+    if (userId) {
+      visibleCountQuery = visibleCountQuery.eq('profile_id', userId);
+    }
+
+    const { count: visibleCount } = await visibleCountQuery;
+
+    if (typeof visibleCount === 'number') {
+      totalCount = visibleCount;
+    }
 
     return json({
-      items,
+      items: itemsWithChildCounts,
       totalCount,
       page,
       hasGPS: lat !== 0 && lon !== 0,

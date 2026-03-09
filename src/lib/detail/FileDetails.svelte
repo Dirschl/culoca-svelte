@@ -1,17 +1,8 @@
 <script lang="ts">
-  type RootCandidate = {
-    id: string;
-    title?: string | null;
-    slug?: string | null;
-    group_slug?: string | null;
-    canonical_path?: string | null;
-  };
-
   type ManagementForm = {
     type_id: number;
     group_slug: string;
     group_root_item_id: string | null;
-    show_in_main_feed: boolean;
     nearby_gallery_mode: string;
     sort_order: string;
     content: string;
@@ -37,25 +28,7 @@
   export let formatFileSize: (bytes: number) => string;
   export let browser: boolean;
   export let managementForm: ManagementForm;
-  export let selectedRootItem: RootCandidate | null = null;
-  export let rootSearchQuery = '';
-  export let rootSearchResults: RootCandidate[] = [];
-  export let rootSearchLoading = false;
   export let managementSaveMessage = '';
-  export let onRootSearchInput: (value: string) => void;
-  export let onRootSearchFocus: () => void;
-  export let selectRootItem: (item: RootCandidate) => void;
-  export let clearRootItem: () => void;
-
-  function rootLabel(item: RootCandidate | null) {
-    if (!item) return 'Kein Root ausgewaehlt';
-    return item.title || item.slug || item.id;
-  }
-
-  function handleRootInput(event: Event) {
-    const target = event.currentTarget as HTMLInputElement;
-    onRootSearchInput(target.value);
-  }
 </script>
 
 <h2>File Details</h2>
@@ -127,13 +100,6 @@
   2048px: {fileSizes && fileSizes.size2048 ? formatFileSize(fileSizes.size2048) : 'unbekannt'}
 </div>
 
-<div class="meta-grid">
-  <div class="meta-row">
-    <span class="meta-label">Canonical Path</span>
-    <span class="meta-value">{image?.canonical_path || '-'}</span>
-  </div>
-</div>
-
 {#if isCreator && editMode}
 <div class="management-card">
   <div class="management-header">
@@ -146,44 +112,6 @@
   </div>
 
   <div class="management-grid">
-    <div class="field root-field">
-      <span class="field-label">Group Root Item</span>
-      <input
-        type="text"
-        bind:value={rootSearchQuery}
-        placeholder="Titel oder Slug suchen"
-        on:input={handleRootInput}
-        on:focus={onRootSearchFocus}
-        disabled={!isCreator}
-      />
-      <div class="root-current">
-        <span class="meta-label">Aktuell</span>
-        <span class="meta-value">{rootLabel(selectedRootItem)}</span>
-      </div>
-      {#if isCreator}
-        <div class="root-actions">
-          <button type="button" class="secondary-btn" on:click={clearRootItem}>Kein Root</button>
-        </div>
-      {/if}
-      {#if rootSearchLoading}
-        <div class="field-hint">Suche...</div>
-      {:else if rootSearchResults.length > 0}
-        <div class="root-results">
-          {#each rootSearchResults as item}
-            <button type="button" class="root-result" on:click={() => selectRootItem(item)}>
-              <span>{item.title || item.slug || item.id}</span>
-              <small>{item.slug || item.id}</small>
-            </button>
-          {/each}
-        </div>
-      {/if}
-    </div>
-
-    <label class="field checkbox-field">
-      <span class="field-label">Show In Main Feed</span>
-      <input type="checkbox" bind:checked={managementForm.show_in_main_feed} disabled={!isCreator} />
-    </label>
-
     <label class="field">
       <span class="field-label">Sort Order</span>
       <input type="number" bind:value={managementForm.sort_order} placeholder="optional" disabled={!isCreator} />
@@ -335,8 +263,7 @@
     gap: 0.4rem;
   }
 
-  .field-wide,
-  .root-field {
+  .field-wide {
     grid-column: span 2;
   }
 
@@ -357,53 +284,6 @@
     box-sizing: border-box;
   }
 
-  .checkbox-field {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.2rem 0;
-  }
-
-  .checkbox-field input {
-    width: auto;
-  }
-
-  .root-current {
-    display: grid;
-    gap: 0.15rem;
-  }
-
-  .root-actions {
-    display: flex;
-    gap: 0.5rem;
-  }
-
-  .secondary-btn,
-  .root-result {
-    border-radius: 8px;
-    border: 1px solid var(--border-color, #ccc);
-    background: var(--bg-primary, #fff);
-    color: var(--text-primary);
-    padding: 0.55rem 0.75rem;
-    font: inherit;
-    cursor: pointer;
-  }
-
-  .root-results {
-    display: grid;
-    gap: 0.45rem;
-    max-height: 220px;
-    overflow: auto;
-  }
-
-  .root-result {
-    display: grid;
-    gap: 0.15rem;
-    text-align: left;
-  }
-
-  .root-result small,
   .field-hint {
     color: var(--text-secondary);
   }
@@ -425,7 +305,6 @@
     }
 
     .field-wide,
-    .root-field,
     .field-full {
       grid-column: auto;
     }

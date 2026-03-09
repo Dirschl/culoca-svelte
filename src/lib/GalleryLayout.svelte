@@ -27,14 +27,15 @@
     lat?: number; 
     lon?: number; 
     distance?: number;
+    child_count?: number;
     title?: string;
     slug?: string; // Added slug to the interface
     canonical_path?: string;
   }[] = [];
   export let layout: 'justified' | 'grid' = 'justified';
   export let containerWidth = 1200; // Set a reasonable default width
-  export let targetRowHeight = 200;
-  export let gap = 2;
+  export let targetRowHeight: number = 200;
+  export let gap: number = 2;
   export let showDistance: boolean = false;
   export let showImageCaptions: boolean = true;
   export let userLat: number | null = null;
@@ -397,6 +398,25 @@
     backdrop-filter: blur(var(--overlay-blur));
   }
 
+  .gallery-variant-count {
+    position: absolute;
+    top: 0;
+    left: 0;
+    background: var(--bg-overlay);
+    color: var(--text-overlay);
+    padding: 0 5px;
+    font-size: 12.5px;
+    font-weight: 600;
+    z-index: 2;
+    pointer-events: none;
+    -webkit-backdrop-filter: blur(var(--overlay-blur));
+    backdrop-filter: blur(var(--overlay-blur));
+  }
+
+  .gallery-variant-count.with-toggle {
+    top: 22px;
+  }
+
   .gallery-toggle-btn:hover {
     transform: scale(1.05);
     filter: brightness(1.1);
@@ -513,6 +533,11 @@
                       {/if}
                     </button>
                   {/if}
+                  {#if (item.child_count || 0) > 0}
+                    <div class:with-toggle={showGalleryToggle} class="gallery-variant-count">
+                      {item.child_count}
+                    </div>
+                  {/if}
                 </div>
                 {#if showImageCaptions && item.title}
                   <div class="gallery-caption-below">
@@ -595,6 +620,11 @@
                   </svg>
                 {/if}
               </button>
+            {/if}
+            {#if (item.child_count || 0) > 0}
+              <div class:with-toggle={showGalleryToggle} class="gallery-variant-count">
+                {item.child_count}
+              </div>
             {/if}
           </div>
           {#if showImageCaptions && item.title}

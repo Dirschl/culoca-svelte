@@ -18,7 +18,7 @@ function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: num
   return R * c;
 }
 
-export async function GET({ params }) {
+export async function GET({ params }: any) {
   try {
     const { slug } = params;
     
@@ -38,6 +38,31 @@ export async function GET({ params }) {
           'X-Robots-Tag': 'noindex, nosnippet'
         }
       });
+    }
+
+    async function attachChildCounts(items: any[]) {
+      const rootIds = items.filter((item) => !item.group_root_item_id).map((item) => item.id);
+      if (!rootIds.length) return items;
+
+      const { data, error } = await supabase
+        .from('items')
+        .select('group_root_item_id')
+        .in('group_root_item_id', rootIds);
+
+      if (error || !data) {
+        return items.map((item) => ({ ...item, child_count: 0 }));
+      }
+
+      const counts = new Map<string, number>();
+      for (const row of data) {
+        if (!row.group_root_item_id) continue;
+        counts.set(row.group_root_item_id, (counts.get(row.group_root_item_id) || 0) + 1);
+      }
+
+      return items.map((item) => ({
+        ...item,
+        child_count: counts.get(item.id) || 0
+      }));
     }
 
     // Fetch nearby items using PostGIS
@@ -66,10 +91,11 @@ export async function GET({ params }) {
           
           const { data: fallbackData, error: fallbackError } = await supabase
             .from('items')
-            .select('id, slug, canonical_path, path_512, path_2048, path_64, original_name, title, description, caption, lat, lon, width, height, is_private, gallery')
+            .select('id, slug, canonical_path, path_512, path_2048, path_64, original_name, title, description, caption, lat, lon, width, height, is_private, gallery, group_root_item_id, profile_id')
             .not('lat', 'is', null)
             .not('lon', 'is', null)
             .not('path_512', 'is', null)
+            .eq('admin_hidden', false)
             .or('is_private.eq.false,is_private.is.null')
             .gte('lat', latMin)
             .lte('lat', latMax)
@@ -102,7 +128,9 @@ export async function GET({ params }) {
                   title: item.title || item.original_name || 'Bild',
                   description: item.description || `Bild aus der Nähe von ${image.title}`,
                   caption: item.caption || item.description || `Bild aus der Nähe von ${image.title}`,
-                  gallery: item.gallery ?? true
+                  gallery: item.gallery ?? true,
+                  group_root_item_id: item.group_root_item_id ?? null,
+                  profile_id: item.profile_id ?? null
                 };
               })
               .filter((item: any) => item.distance <= maxRadius)
@@ -133,7 +161,9 @@ export async function GET({ params }) {
                 title: item.title || item.original_name || 'Bild',
                 description: item.description || `Bild aus der Nähe von ${image.title}`,
                 caption: item.caption || item.description || `Bild aus der Nähe von ${image.title}`,
-                gallery: item.gallery ?? true
+                gallery: item.gallery ?? true,
+                group_root_item_id: item.group_root_item_id ?? null,
+                profile_id: item.profile_id ?? null
               };
             })
             .filter((item: any) => item.distance <= 2000)
@@ -143,6 +173,8 @@ export async function GET({ params }) {
         console.error('[Nearby API] Error fetching nearby items:', error);
       }
     }
+
+    nearby = await attachChildCounts(nearby);
 
     return new Response(JSON.stringify({ nearby }), {
       headers: {

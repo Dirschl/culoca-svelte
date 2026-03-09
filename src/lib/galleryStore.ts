@@ -206,6 +206,8 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
           canonical_path: item.canonical_path,
           profile_id: item.profile_id,
           isSourceItem: item.isSourceItem,
+          child_count: item.child_count || 0,
+          group_root_item_id: item.group_root_item_id ?? null,
           path_64: item.path_64,
           path_512: item.path_512,
           path_2048: item.path_2048

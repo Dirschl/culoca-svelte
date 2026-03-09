@@ -114,9 +114,12 @@ let showRightsManager = false;
   $: hasVideoEmbed = !!image?.video_url;
   $: shouldShowMainImage = contentType?.show_image !== false;
   $: nearbyGalleryOverride = getPageSettingBoolean(image?.page_settings, 'show_nearby_gallery');
-  $: shouldShowNearbyGallery = !!((nearbyGalleryOverride ?? contentType?.show_nearby_gallery) && image?.lat && image?.lon);
+  $: shouldShowNearbyGallery = !!(image?.lat && image?.lon);
   $: shouldShowMap = !!(contentType?.show_map && image?.lat && image?.lon);
   $: shouldShowContentHtml = !!(contentType?.show_content_html && effectiveContentHtml);
+  $: currentVariantRootId = image?.group_root_item_id ? rootItem?.id || image.group_root_item_id : image?.id || null;
+  $: hasVariantStrip = image?.id === rootItem?.id && Array.isArray(groupItems) && groupItems.length > 1;
+  $: variantStripItems = hasVariantStrip ? groupItems : [];
 
   function getPageSettingBoolean(
     settings: Record<string, unknown> | null | undefined,
@@ -277,7 +280,7 @@ let showRightsManager = false;
   $: isAdmin = $sessionStore.permissions?.admin || false;
   
   // Prüfen ob ausgeblendete Items vom aktuellen Benutzer stammen
-  $: hasOwnHiddenItems = hiddenItems.some(item => item.profile_id === currentUser?.id);
+  $: hasOwnHiddenItems = false;
   
   // Debug: Log creator status
   $: if (image && currentUser) {
@@ -641,10 +644,8 @@ let showRightsManager = false;
     }
   }
   $: filteredNearby = nearby.filter(item => item.distance <= radius && item.id !== image?.id);
-  $: hiddenItems = nearby.filter(item => (item.gallery === false) && item.distance <= radius && item.id !== image?.id);
-  $: visibleNearby = showHiddenItems
-    ? nearby.filter(item => item.distance <= radius && item.id !== image?.id && item.gallery === false)
-    : nearby.filter(item => item.distance <= radius && item.id !== image?.id && item.gallery !== false);
+  $: hiddenItems = [];
+  $: visibleNearby = filteredNearby;
   
   // Automatisch showHiddenItems zurücksetzen wenn keine ausgeblendeten Items mehr vorhanden sind
   $: if (showHiddenItems && hiddenItems.length === 0) {
@@ -696,7 +697,7 @@ let showRightsManager = false;
   let showFullExif = false;
   let showHiddenItems = false;
   function toggleHiddenItems() {
-    showHiddenItems = !showHiddenItems;
+    showHiddenItems = false;
   }
   function setUserFilter() {
     if (!image?.profile_id) return;
@@ -958,9 +959,6 @@ let showRightsManager = false;
     const payload = {
       type_id: Number(managementForm.type_id) || image.type_id || 1,
       group_slug: toNullableString(slugifySegment(managementForm.group_slug)),
-      group_root_item_id: selectedRootItem?.id || null,
-      show_in_main_feed: !!managementForm.show_in_main_feed,
-      page_settings: buildPageSettings(image.page_settings, managementForm.nearby_gallery_mode),
       sort_order: managementForm.sort_order.trim() === '' ? null : Number(managementForm.sort_order),
       content: toNullableString(managementForm.content),
       starts_at: toNullableIso(managementForm.starts_at),
@@ -1289,25 +1287,75 @@ let showRightsManager = false;
     const meters = Math.round(R * c);
     return meters >= 1000 ? (meters / 1000).toFixed(1).replace('.', ',') + 'km' : meters + 'm';
   }
-  function handleNearbyGalleryToggle(itemId: string, newGalleryValue: boolean) {
-    // Hier API-Call zum Setzen/Entfernen aus Galerie (vereinfachtes Beispiel)
-    fetch(`/api/item/${itemId}`, {
+  async function refreshVariantContext() {
+    await loadNearbyItems();
+
+    if (browser) {
+      await goto(`${window.location.pathname}${window.location.search}`, {
+        invalidateAll: true,
+        replaceState: true,
+        noScroll: true
+      });
+    }
+  }
+
+  async function updateVariantAssignment(itemId: string, payload: Record<string, unknown>) {
+    const response = await authFetch(`/api/item/${itemId}/variant`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ gallery: newGalleryValue })
-    }).then(() => {
-      // Nach dem Update: nearby-Array aktualisieren (optimistisch)
-      const idx = nearby.findIndex(i => i.id === itemId);
-      if (idx !== -1) {
-        nearby[idx].gallery = newGalleryValue;
-        // Array neu zuweisen für Reaktivität
-        nearby = [...nearby];
-      }
+      body: JSON.stringify(payload)
     });
+
+    if (response.status === 409) {
+      const errorData = await response.json().catch(() => null);
+      if (errorData?.code === 'requires_reparent_confirmation') {
+        const confirmed = browser ? window.confirm(errorData.error) : false;
+        if (!confirmed) return;
+
+        await updateVariantAssignment(itemId, {
+          ...payload,
+          confirmReparent: true
+        });
+        return;
+      }
+
+      throw new Error(errorData?.error || 'Variante konnte nicht zugewiesen werden');
+    }
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null);
+      throw new Error(errorData?.error || 'Variante konnte nicht gespeichert werden');
+    }
+
+    await refreshVariantContext();
   }
+
+  async function handleNearbyGalleryToggle(itemId: string, isAssignedToCurrentRoot: boolean) {
+    if (!currentVariantRootId) return;
+
+    try {
+      if (isAssignedToCurrentRoot) {
+        await updateVariantAssignment(itemId, {
+          action: 'detach'
+        });
+        return;
+      }
+
+      await updateVariantAssignment(itemId, {
+        action: 'assign',
+        targetRootId: currentVariantRootId
+      });
+    } catch (error) {
+      console.error('Failed to update variant assignment:', error);
+      if (browser) {
+        window.alert(error instanceof Error ? error.message : 'Variante konnte nicht gespeichert werden');
+      }
+    }
+  }
+
   function getNearbyGalleryStatus(itemId: string) {
     const item = nearby.find(i => i.id === itemId);
-    return item ? item.gallery !== false : true;
+    return item ? item.group_root_item_id === currentVariantRootId : false;
   }
   function formatRadius(meters) {
     return meters >= 1000
@@ -1395,7 +1443,7 @@ let showRightsManager = false;
   });
 
   // Layout für NearbyGallery (aus LocalStorage, fallback justified)
-  let galleryLayout = 'justified';
+  let galleryLayout: 'justified' | 'grid' = 'justified';
   if (typeof window !== 'undefined') {
     const stored = localStorage.getItem('galleryLayout');
     if (stored === 'grid' || stored === 'justified') {
@@ -1503,19 +1551,8 @@ let showRightsManager = false;
   }
 
   function toggleGallery() {
-    if (!image || !currentUser || image.profile_id !== currentUser.id) return;
-    const newGallery = !(image.gallery ?? true);
-    authFetch(`/api/item/${image.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ gallery: newGallery })
-    }).then(res => {
-      if (res.ok) {
-        image.gallery = newGallery;
-      } else {
-        alert('Fehler beim Speichern des Galerie-Status.');
-      }
-    });
+    if (!image?.group_root_item_id) return;
+    handleNearbyGalleryToggle(image.id, true);
   }
 
   function extractAdobeAssetId(url: string): string {
@@ -1841,6 +1878,48 @@ let showRightsManager = false;
             />
           </a>
         </figure>
+        {#if hasVariantStrip}
+          <div class="variant-strip" data-nosnippet>
+            {#each variantStripItems as groupItem}
+              <a
+                class:active={groupItem.id === activeGroupItemId}
+                class="variant-strip-item"
+                href={groupItem.canonicalPath || `/item/${groupItem.slug}`}
+                title={groupItem.title || 'Variante'}
+              >
+                {#if groupItem.path_64}
+                  <img
+                    class:square={!$useJustifiedLayout}
+                    src={`https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/${groupItem.path_64}`}
+                    alt={groupItem.title || 'Variante'}
+                    loading="lazy"
+                  />
+                {/if}
+                {#if currentUser && groupItem.id !== rootItem?.id}
+                  <button
+                    type="button"
+                    class="variant-detach-btn"
+                    title="Variante loesen"
+                    aria-label="Variante loesen"
+                    on:click|preventDefault|stopPropagation={() => handleNearbyGalleryToggle(groupItem.id, true)}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                      <rect x="3" y="3" width="4" height="4"/>
+                      <rect x="10" y="3" width="4" height="4"/>
+                      <rect x="17" y="3" width="4" height="4"/>
+                      <rect x="3" y="10" width="4" height="4"/>
+                      <rect x="10" y="10" width="4" height="4"/>
+                      <rect x="17" y="10" width="4" height="4"/>
+                      <rect x="3" y="17" width="4" height="4"/>
+                      <rect x="10" y="17" width="4" height="4"/>
+                      <rect x="17" y="17" width="4" height="4"/>
+                    </svg>
+                  </button>
+                {/if}
+              </a>
+            {/each}
+          </div>
+        {/if}
       {/if}
       <div class="passepartout-info">
         {#if canEditItem && editMode}
@@ -2030,34 +2109,6 @@ let showRightsManager = false;
         <p>{formatDateRange(contextItem?.starts_at, contextItem?.ends_at)}</p>
       </section>
     {/if}
-    {#if hasVisibleGroupItems}
-      <section class="content-panel group-panel" data-nosnippet>
-        <h2>{rootItem?.group_slug ? 'Gruppe' : 'Varianten'}</h2>
-        <div class="group-grid">
-          {#each groupItems as groupItem}
-            <a
-              class:active={groupItem.id === activeGroupItemId}
-              class="group-card"
-              href={groupItem.canonicalPath || `/item/${groupItem.slug}`}
-            >
-              {#if groupItem.path_64}
-                <img
-                  src={`https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/${groupItem.path_64}`}
-                  alt={groupItem.title || 'Variante'}
-                  loading="lazy"
-                />
-              {/if}
-              <div>
-                <strong>{groupItem.title}</strong>
-                {#if groupItem.description}
-                  <span>{groupItem.description}</span>
-                {/if}
-              </div>
-            </a>
-          {/each}
-        </div>
-      </section>
-    {/if}
     <ImageControlsSection
       {image}
       isCreator={isCreator}
@@ -2066,7 +2117,7 @@ let showRightsManager = false;
       bind:videoUrl={managementForm.video_url}
       bind:contentHtml={managementForm.content}
       bind:nearbyGalleryMode={managementForm.nearby_gallery_mode}
-      showGalleryToggle={shouldShowNearbyGallery}
+      showGalleryToggle={!!image?.group_root_item_id}
       onSetLocationFilter={setLocationFilter}
       onCopyLink={copyCurrentLink}
       onDeleteImage={deleteImage}
@@ -2104,11 +2155,6 @@ let showRightsManager = false;
               <span class="limit-indicator">(max. 300)</span>
             {/if}
           {/if}
-          {#if typeof hiddenItems !== 'undefined' && hiddenItems.length > 0 && (isAdmin || hasOwnHiddenItems)}
-            <span class="hidden-count" class:active={showHiddenItems} on:click={toggleHiddenItems} on:keydown={(e) => handleKey(e, toggleHiddenItems)}>
-              + {hiddenItems.length} ausgeblendet
-            </span>
-          {/if}
         </div>
         <input id="radius" type="range" min="50" max="2000" step="50" value={radius} on:input={onRadiusInput} on:change={onRadiusChange} class:limit-reached={isAtItemLimit}>
       </div>
@@ -2117,7 +2163,7 @@ let showRightsManager = false;
       <section class="nearby" data-nosnippet>
         <NearbyGallery
           nearby={visibleNearby}
-          isCreator={isCreator}
+          isCreator={!!currentUser}
           showImageCaptions={showImageCaptions}
           userLat={image?.lat}
           userLon={image?.lon}
@@ -2200,15 +2246,7 @@ let showRightsManager = false;
           {formatFileSize}
           {browser}
           {managementForm}
-          {selectedRootItem}
-          {rootSearchQuery}
-          {rootSearchResults}
-          {rootSearchLoading}
           {managementSaveMessage}
-          onRootSearchInput={handleRootSearchInput}
-          onRootSearchFocus={handleRootSearchFocus}
-          selectRootItem={selectRootCandidate}
-          clearRootItem={clearRootCandidate}
         />
 
         {#if isCreator}
@@ -2604,6 +2642,54 @@ let showRightsManager = false;
     border: 1px solid #ffffff;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     background: transparent;
+  }
+  .variant-strip {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+    margin-top: 0.9rem;
+  }
+  .variant-strip-item {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 64px;
+    min-height: 64px;
+    max-width: 160px;
+    padding: 0.2rem;
+    border: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    text-decoration: none;
+  }
+  .variant-strip-item.active {
+    border-color: var(--culoca-orange, #ee7221);
+    box-shadow: 0 0 0 1px var(--culoca-orange, #ee7221);
+  }
+  .variant-strip-item img {
+    display: block;
+    height: 64px;
+    width: auto;
+    max-width: 100%;
+    object-fit: contain;
+  }
+  .variant-strip-item img.square {
+    width: 64px;
+    object-fit: cover;
+  }
+  .variant-detach-btn {
+    position: absolute;
+    top: 0;
+    left: 0;
+    border: 0;
+    background: var(--bg-overlay);
+    color: var(--text-overlay);
+    padding: 0.15rem 0.2rem;
+    cursor: pointer;
+    -webkit-backdrop-filter: blur(var(--overlay-blur));
+    backdrop-filter: blur(var(--overlay-blur));
   }
   .title {
     font-size: 1.8rem;
