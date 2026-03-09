@@ -2358,8 +2358,6 @@ let showRightsManager = false;
           {fileSizes}
           {formatFileSize}
           {browser}
-          {managementForm}
-          {managementSaveMessage}
         />
 
         {#if isCreator}

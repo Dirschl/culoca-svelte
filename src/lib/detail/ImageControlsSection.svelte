@@ -384,6 +384,9 @@
     color: var(--text-primary);
     fill: currentColor;
   }
+  :global(body[data-theme='dark']) .calendar-btn {
+    color: #f8fafc;
+  }
   .calendar-btn svg,
   .calendar-btn path {
     fill: currentColor;

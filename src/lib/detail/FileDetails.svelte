@@ -1,23 +1,4 @@
 <script lang="ts">
-  type ManagementForm = {
-    type_id: number;
-    group_slug: string;
-    group_root_item_id: string | null;
-    nearby_gallery_mode: string;
-    sort_order: string;
-    content: string;
-    starts_at: string;
-    ends_at: string;
-    external_url: string;
-    video_url: string;
-    event_display_mode: 'single_day' | 'multi_day';
-    event_all_day: boolean;
-    event_location_name: string;
-    event_booking_url: string;
-    event_is_free: boolean;
-    event_price_text: string;
-  };
-
   export let image: any;
   export let isCreator: boolean;
   export let editMode = false;
@@ -34,8 +15,6 @@
   export let fileSizes: { size64: number | null; size512: number | null; size2048: number | null };
   export let formatFileSize: (bytes: number) => string;
   export let browser: boolean;
-  export let managementForm: ManagementForm;
-  export let managementSaveMessage = '';
 </script>
 
 <h2>File Details</h2>
@@ -106,37 +85,6 @@
   512px: {fileSizes && fileSizes.size512 ? formatFileSize(fileSizes.size512) : 'unbekannt'} |
   2048px: {fileSizes && fileSizes.size2048 ? formatFileSize(fileSizes.size2048) : 'unbekannt'}
 </div>
-
-{#if isCreator && editMode}
-<div class="management-card">
-  <div class="management-header">
-    <h3>{Number(managementForm.type_id) === 2 ? 'Termin Details' : 'Content Management'}</h3>
-    {#if managementSaveMessage}
-      <span class:success={managementSaveMessage === 'Gespeichert'} class:error={managementSaveMessage !== 'Gespeichert'} class="save-message">
-        {managementSaveMessage}
-      </span>
-    {/if}
-  </div>
-
-  <div class="management-grid">
-    <label class="field">
-      <span class="field-label">Sort Order</span>
-      <input type="number" bind:value={managementForm.sort_order} placeholder="optional" disabled={!isCreator} />
-    </label>
-
-    <label class="field">
-      <span class="field-label">Von</span>
-      <input type="datetime-local" bind:value={managementForm.starts_at} disabled={!isCreator} />
-    </label>
-
-    <label class="field">
-      <span class="field-label">Bis</span>
-      <input type="datetime-local" bind:value={managementForm.ends_at} disabled={!isCreator} />
-    </label>
-
-  </div>
-</div>
-{/if}
 
 <style>
   h2 {
@@ -230,8 +178,7 @@
     gap: 0.2rem;
   }
 
-  .meta-label,
-  .field-label {
+  .meta-label {
     font-size: 0.78rem;
     text-transform: uppercase;
     letter-spacing: 0.04em;
@@ -243,88 +190,4 @@
     word-break: break-word;
   }
 
-  .management-card {
-    margin-top: 1rem;
-    padding: 1rem;
-    border: 1px solid var(--border-color, #ddd);
-    border-radius: 12px;
-    background: var(--bg-secondary, rgba(0, 0, 0, 0.03));
-  }
-
-  .management-header {
-    display: flex;
-    justify-content: space-between;
-    gap: 1rem;
-    align-items: center;
-    margin-bottom: 1rem;
-  }
-
-  .management-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.9rem;
-  }
-
-  .field {
-    display: grid;
-    gap: 0.4rem;
-  }
-
-  .field-wide {
-    grid-column: span 2;
-  }
-
-  .field-full {
-    grid-column: 1 / -1;
-  }
-
-  .field input,
-  .field select,
-  .field textarea {
-    width: 100%;
-    border-radius: 8px;
-    border: 1px solid var(--border-color, #ccc);
-    background: var(--bg-primary, #fff);
-    color: var(--text-primary);
-    padding: 0.65rem 0.75rem;
-    font: inherit;
-    box-sizing: border-box;
-  }
-
-  .field input[type='checkbox'] {
-    width: 1rem;
-    height: 1rem;
-    padding: 0;
-  }
-
-  .field-hint {
-    color: var(--text-secondary);
-  }
-  .save-message {
-    font-size: 0.85rem;
-  }
-
-  .save-message.success {
-    color: #0a8a4b;
-  }
-
-  .save-message.error {
-    color: #c0392b;
-  }
-
-  @media (max-width: 720px) {
-    .management-grid {
-      grid-template-columns: 1fr;
-    }
-
-    .field-wide,
-    .field-full {
-      grid-column: auto;
-    }
-
-    .management-header {
-      align-items: flex-start;
-      flex-direction: column;
-    }
-  }
 </style>
