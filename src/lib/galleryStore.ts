@@ -243,9 +243,13 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
     // Sichtbar gemappte Treffer koennen durch Varianten-/Source-Filter kleiner sein.
     offset = (requestedPage + 1) * effectiveLimit;
     hasMoreGalleryItems.set(offset < (data.totalCount || 0));
-    
-    // FALLBACK: Falls totalCount nicht gesetzt ist, verwende die Anzahl der geladenen Items
-    const effectiveTotalCount = data.totalCount || mapped.length;
+
+    const currentStoreItems = get(galleryItems).length;
+    // Wenn die API durch nachgelagerte Sichtbarkeitsfilter zu viel zaehlt,
+    // ist der geladene Endstand der verlässlichere Wert.
+    const effectiveTotalCount = get(hasMoreGalleryItems)
+      ? (data.totalCount || currentStoreItems)
+      : currentStoreItems;
     galleryTotalCount.set(effectiveTotalCount);
     
     // FALLBACK: Falls loadedCount nicht gesetzt ist, verwende die Anzahl der gemappten Items
@@ -255,7 +259,7 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
       effectiveTotalCount,
       effectiveLoadedCount,
       mappedLength: mapped.length,
-      currentStoreItems: get(galleryItems).length,
+      currentStoreItems,
       hasMore: get(hasMoreGalleryItems)
     });
   } else {
