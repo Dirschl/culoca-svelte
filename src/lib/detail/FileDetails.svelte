@@ -111,7 +111,7 @@
 {#if isCreator && editMode}
 <div class="management-card">
   <div class="management-header">
-    <h3>Content Management</h3>
+    <h3>{Number(managementForm.type_id) === 2 ? 'Termin Details' : 'Content Management'}</h3>
     {#if managementSaveMessage}
       <span class:success={managementSaveMessage === 'Gespeichert'} class:error={managementSaveMessage !== 'Gespeichert'} class="save-message">
         {managementSaveMessage}
@@ -134,46 +134,6 @@
       <span class="field-label">Bis</span>
       <input type="datetime-local" bind:value={managementForm.ends_at} disabled={!isCreator} />
     </label>
-
-    {#if managementForm.type_id === 2}
-      <label class="field">
-        <span class="field-label">Terminart</span>
-        <select bind:value={managementForm.event_display_mode} disabled={!isCreator}>
-          <option value="single_day">Einzeltag</option>
-          <option value="multi_day">Mehrere Tage</option>
-        </select>
-      </label>
-
-      <label class="field">
-        <span class="field-label">Ganztägig</span>
-        <input type="checkbox" bind:checked={managementForm.event_all_day} disabled={!isCreator} />
-      </label>
-
-      <label class="field field-full">
-        <span class="field-label">Ort</span>
-        <input type="text" bind:value={managementForm.event_location_name} placeholder="z.B. Stadthalle Burghausen" disabled={!isCreator} />
-      </label>
-
-      <label class="field field-full">
-        <span class="field-label">Buchungslink</span>
-        <input type="url" bind:value={managementForm.event_booking_url} placeholder="https://..." disabled={!isCreator} />
-      </label>
-
-      <label class="field">
-        <span class="field-label">Kostenfrei</span>
-        <input type="checkbox" bind:checked={managementForm.event_is_free} disabled={!isCreator} />
-      </label>
-
-      <label class="field">
-        <span class="field-label">Preistext</span>
-        <input type="text" bind:value={managementForm.event_price_text} placeholder="z.B. 12 EUR" disabled={!isCreator} />
-      </label>
-
-      <label class="field field-full">
-        <span class="field-label">Online-Link</span>
-        <input type="url" bind:value={managementForm.event_online_url} placeholder="https://..." disabled={!isCreator} />
-      </label>
-    {/if}
 
   </div>
 </div>

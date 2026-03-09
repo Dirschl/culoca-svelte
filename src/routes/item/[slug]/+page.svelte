@@ -1979,6 +1979,50 @@ let showRightsManager = false;
               {/each}
             </select>
           </div>
+          {#if Number(managementForm.type_id) === 2}
+            <div class="title-event-details-card">
+              <div class="title-event-details-header">Termin Details</div>
+              <div class="title-event-details-grid">
+                <label class="title-event-field">
+                  <span>Terminart</span>
+                  <select bind:value={managementForm.event_display_mode}>
+                    <option value="single_day">Einzeltag</option>
+                    <option value="multi_day">Mehrere Tage</option>
+                  </select>
+                </label>
+
+                <label class="title-event-field title-event-checkbox">
+                  <span>Ganztägig</span>
+                  <input type="checkbox" bind:checked={managementForm.event_all_day} />
+                </label>
+
+                <label class="title-event-field title-event-field-full">
+                  <span>Ort</span>
+                  <input type="text" bind:value={managementForm.event_location_name} placeholder="z.B. Stadthalle Burghausen" />
+                </label>
+
+                <label class="title-event-field title-event-field-full">
+                  <span>Buchungslink</span>
+                  <input type="url" bind:value={managementForm.event_booking_url} placeholder="https://..." autocomplete="off" autocorrect="off" autocapitalize="none" inputmode="url" />
+                </label>
+
+                <label class="title-event-field title-event-checkbox">
+                  <span>Kostenfrei</span>
+                  <input type="checkbox" bind:checked={managementForm.event_is_free} />
+                </label>
+
+                <label class="title-event-field">
+                  <span>Preistext</span>
+                  <input type="text" bind:value={managementForm.event_price_text} placeholder="z.B. 12 EUR" />
+                </label>
+
+                <label class="title-event-field title-event-field-full">
+                  <span>Online-Link</span>
+                  <input type="url" bind:value={managementForm.event_online_url} placeholder="https://..." autocomplete="off" autocorrect="off" autocapitalize="none" inputmode="url" />
+                </label>
+              </div>
+            </div>
+          {/if}
           <div class="title-group-slug-field">
             <div class="title-group-slug-header">
               <label for="title-group-slug">Group Slug</label>
@@ -3758,6 +3802,69 @@ let showRightsManager = false;
     background: var(--bg-secondary);
     color: var(--text-primary);
     font: inherit;
+  }
+
+  .title-event-details-card {
+    width: min(100%, 520px);
+    margin: 0 auto 1rem;
+    padding: 0.95rem;
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    background: var(--bg-secondary);
+  }
+
+  .title-event-details-header {
+    margin-bottom: 0.75rem;
+    font-size: 0.78rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    text-align: center;
+  }
+
+  .title-event-details-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+
+  .title-event-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .title-event-field span {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+  }
+
+  .title-event-field input,
+  .title-event-field select {
+    width: 100%;
+    padding: 0.55rem 0.75rem;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font: inherit;
+  }
+
+  .title-event-checkbox input {
+    width: 1rem;
+    height: 1rem;
+    padding: 0;
+    margin-top: 0.25rem;
+  }
+
+  .title-event-field-full {
+    grid-column: 1 / -1;
+  }
+
+  @media (max-width: 768px) {
+    .title-event-details-grid {
+      grid-template-columns: 1fr;
+    }
   }
 
   .title-group-slug-field {
