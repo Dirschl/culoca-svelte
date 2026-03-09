@@ -8,7 +8,7 @@
   export let onDeleteImage: () => void;
   export let onDownloadOriginal: (id: string, name: string) => void;
   export let onToggleGallery: () => void;
-  export let onDownloadCalendar: () => void;
+  export let calendarUrl: string | null = null;
   export let editMode = false;
   export let externalUrl = '';
   export let videoUrl = '';
@@ -119,12 +119,12 @@
           </button>
         {/if}
 
-        {#if showCalendarDownload}
-          <button class="square-btn calendar-btn" on:click={onDownloadCalendar} title="Termin in Kalender speichern" disabled={loading}>
+        {#if showCalendarDownload && calendarUrl}
+          <a class="square-btn calendar-btn" href={calendarUrl} title="Termin in Kalender öffnen">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
               <path d="M7 2h2v2h6V2h2v2h2a2 2 0 0 1 2 2v13a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6a2 2 0 0 1 2-2h2V2zm12 8H5v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9zM6 6a1 1 0 0 0-1 1v1h14V7a1 1 0 0 0-1-1H6zm2 6h3v3H8v-3z"/>
             </svg>
-          </button>
+          </a>
         {/if}
 
         {#if showGalleryToggle && (rights?.edit || isCreator)}
@@ -378,6 +378,14 @@
     background: #f59e0b;
     color: white;
     border-color: #f59e0b;
+  }
+  .calendar-btn {
+    color: var(--text-primary);
+    fill: currentColor;
+  }
+  .calendar-btn svg,
+  .calendar-btn path {
+    fill: currentColor;
   }
   .gallery-toggle-btn {
     background: var(--bg-secondary);

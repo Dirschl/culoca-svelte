@@ -197,10 +197,12 @@ let showRightsManager = false;
     return `Ende: ${format(end as string)}`;
   }
 
-  async function downloadEventIcs() {
-    if (!image?.id || !browser) return;
-    window.location.href = `/api/events/${image.id}/ics`;
-  }
+  $: calendarUrl =
+    browser && image?.id
+      ? `webcal://${window.location.host}/api/events/${image.id}/ics`
+      : image?.id
+        ? `/api/events/${image.id}/ics`
+        : null;
 
   function getEmbedUrl(videoUrl: string | null | undefined): string {
     if (!videoUrl) return '';
@@ -2204,6 +2206,13 @@ let showRightsManager = false;
     {#if hasEventDetails}
       <section class="content-panel">
         <h2>Termin</h2>
+        <div class="event-link-list">
+          {#if eventSettings.booking_url}
+            <a class="event-inline-link" href={eventSettings.booking_url} target="_blank" rel="noopener noreferrer">
+              Buchungslink
+            </a>
+          {/if}
+        </div>
         <div class="event-detail-list">
           {#if eventScheduleText}
             <div class="event-detail-row">
@@ -2224,13 +2233,6 @@ let showRightsManager = false;
             </div>
           {/if}
         </div>
-        <div class="event-link-list">
-          {#if eventSettings.booking_url}
-            <a class="event-link-btn" href={eventSettings.booking_url} target="_blank" rel="noopener noreferrer">
-              Buchungslink
-            </a>
-          {/if}
-        </div>
       </section>
     {/if}
     <ImageControlsSection
@@ -2243,11 +2245,11 @@ let showRightsManager = false;
       bind:nearbyGalleryMode={managementForm.nearby_gallery_mode}
       showGalleryToggle={!!image?.group_root_item_id}
       showCalendarDownload={isEventItem && !!image?.starts_at}
+      {calendarUrl}
       onSetLocationFilter={setLocationFilter}
       onCopyLink={copyCurrentLink}
       onDeleteImage={deleteImage}
       onDownloadOriginal={downloadOriginal}
-      onDownloadCalendar={downloadEventIcs}
       onToggleGallery={toggleGallery}
     />
     {#if hasVideoEmbed && !(canEditItem && editMode)}
@@ -4006,23 +4008,14 @@ let showRightsManager = false;
   }
 
   .event-link-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.6rem;
-    margin-top: 1rem;
+    margin-bottom: 0.85rem;
   }
 
-  .event-link-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid var(--border-color);
-    background: var(--bg-secondary);
-    color: var(--text-primary);
-    text-decoration: none;
-    padding: 0.55rem 0.8rem;
-    cursor: pointer;
-    font: inherit;
+  .event-inline-link {
+    color: var(--accent-color);
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+    font-size: 0.98rem;
   }
 
   .content-html {
