@@ -2205,9 +2205,17 @@ let showRightsManager = false;
         <p>{formatDateRange(contextItem?.starts_at, contextItem?.ends_at)}</p>
       </section>
     {/if}
-    {#if hasEventDetails}
+    {#if hasEventDetails && !(canEditItem && editMode)}
       <section class="content-panel">
         <h2>Termin</h2>
+        {#if eventSettings.booking_url}
+          <div class="event-link-list">
+            <strong>Buchungslink</strong>
+            <a class="event-inline-link" href={eventSettings.booking_url} target="_blank" rel="noopener noreferrer">
+              {eventSettings.booking_url}
+            </a>
+          </div>
+        {/if}
         <div class="event-detail-list">
           {#if eventScheduleText}
             <div class="event-detail-row">
@@ -2228,14 +2236,6 @@ let showRightsManager = false;
             </div>
           {/if}
         </div>
-        {#if eventSettings.booking_url}
-          <div class="event-link-list">
-            <strong>Buchungslink</strong>
-            <a class="event-inline-link" href={eventSettings.booking_url} target="_blank" rel="noopener noreferrer">
-              {eventSettings.booking_url}
-            </a>
-          </div>
-        {/if}
       </section>
     {/if}
     <ImageControlsSection
