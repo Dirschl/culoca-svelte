@@ -107,7 +107,7 @@ async function fetchVisibleRpcPage({
 
   return {
     error: null,
-    items: collected.slice(0, pageSize),
+    items: collected,
     totalCount,
     nextPage: rawPage
   };
