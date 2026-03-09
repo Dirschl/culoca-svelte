@@ -3787,12 +3787,17 @@ let showRightsManager = false;
   }
 
   .title-event-details-card {
+    --calendar-indicator-filter: none;
     width: min(100%, 520px);
     margin: 0 auto 1rem;
     padding: 0.95rem;
     border: 1px solid var(--border-color);
     border-radius: 14px;
     background: var(--bg-secondary);
+  }
+
+  :global(body[data-theme='dark']) .title-event-details-card {
+    --calendar-indicator-filter: invert(1) brightness(1.35) contrast(1.1);
   }
 
   .title-event-details-header {
@@ -3839,6 +3844,7 @@ let showRightsManager = false;
   .title-event-field input[type='datetime-local']::-webkit-calendar-picker-indicator {
     cursor: pointer;
     opacity: 0.85;
+    filter: var(--calendar-indicator-filter);
   }
 
   :global(body[data-theme='dark']) .title-event-field input[type='datetime-local'] {
@@ -3846,7 +3852,6 @@ let showRightsManager = false;
   }
 
   :global(body[data-theme='dark']) .title-event-field input[type='datetime-local']::-webkit-calendar-picker-indicator {
-    filter: invert(1) brightness(1.25);
     opacity: 1;
   }
 
