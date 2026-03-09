@@ -1917,27 +1917,6 @@ let showRightsManager = false;
                     loading="lazy"
                   />
                 {/if}
-                {#if currentUser && groupItem.id !== rootItem?.id}
-                  <button
-                    type="button"
-                    class="variant-detach-btn"
-                    title="Variante loesen"
-                    aria-label="Variante loesen"
-                    on:click|preventDefault|stopPropagation={() => handleNearbyGalleryToggle(groupItem.id, false)}
-                  >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                      <rect x="3" y="3" width="4" height="4"/>
-                      <rect x="10" y="3" width="4" height="4"/>
-                      <rect x="17" y="3" width="4" height="4"/>
-                      <rect x="3" y="10" width="4" height="4"/>
-                      <rect x="10" y="10" width="4" height="4"/>
-                      <rect x="17" y="10" width="4" height="4"/>
-                      <rect x="3" y="17" width="4" height="4"/>
-                      <rect x="10" y="17" width="4" height="4"/>
-                      <rect x="17" y="17" width="4" height="4"/>
-                    </svg>
-                  </button>
-                {/if}
               </a>
             {/each}
           </div>
@@ -2700,18 +2679,6 @@ let showRightsManager = false;
   .variant-strip-item img.square {
     width: 32px;
     object-fit: cover;
-  }
-  .variant-detach-btn {
-    position: absolute;
-    top: 0;
-    left: 0;
-    border: 0;
-    background: var(--bg-overlay);
-    color: var(--text-overlay);
-    padding: 0.15rem 0.2rem;
-    cursor: pointer;
-    -webkit-backdrop-filter: blur(var(--overlay-blur));
-    backdrop-filter: blur(var(--overlay-blur));
   }
   .title {
     font-size: 1.8rem;
