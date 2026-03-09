@@ -2196,6 +2196,24 @@ let showRightsManager = false;
                 {/if}
               </span>
             {/if}
+        {#if hasEventDetails && !(canEditItem && editMode)}
+          <div class="event-detail-list">
+            {#if eventScheduleText}
+              <h2>{eventScheduleText}</h2>
+            {/if}
+            {#if eventSettings.location_name}
+              <h2>{eventSettings.location_name}</h2>
+            {/if}
+            {#if eventSettings.is_free || eventSettings.price_text}
+              <h2>{eventSettings.is_free ? 'Kostenfrei' : eventSettings.price_text}</h2>
+            {/if}
+            {#if eventSettings.booking_url}
+              <a class="event-inline-link" href={eventSettings.booking_url} target="_blank" rel="noopener noreferrer">
+                {eventSettings.booking_url}
+              </a>
+            {/if}
+          </div>
+        {/if}
 
       </div>
     </div>
@@ -2203,39 +2221,6 @@ let showRightsManager = false;
       <section class="content-panel">
         <h2>Zeitraum</h2>
         <p>{formatDateRange(contextItem?.starts_at, contextItem?.ends_at)}</p>
-      </section>
-    {/if}
-    {#if hasEventDetails && !(canEditItem && editMode)}
-      <section class="content-panel">
-        <h2>Termin</h2>
-        {#if eventSettings.booking_url}
-          <div class="event-link-list">
-            <strong>Buchungslink</strong>
-            <a class="event-inline-link" href={eventSettings.booking_url} target="_blank" rel="noopener noreferrer">
-              {eventSettings.booking_url}
-            </a>
-          </div>
-        {/if}
-        <div class="event-detail-list">
-          {#if eventScheduleText}
-            <div class="event-detail-row">
-              <strong>Zeit</strong>
-              <h2>{eventScheduleText}</h2>
-            </div>
-          {/if}
-          {#if eventSettings.location_name}
-            <div class="event-detail-row">
-              <strong>Ort</strong>
-              <h2>{eventSettings.location_name}</h2>
-            </div>
-          {/if}
-          {#if eventSettings.is_free || eventSettings.price_text}
-            <div class="event-detail-row">
-              <strong>Preis</strong>
-              <h2>{eventSettings.is_free ? 'Kostenfrei' : eventSettings.price_text}</h2>
-            </div>
-          {/if}
-        </div>
       </section>
     {/if}
     <ImageControlsSection
@@ -3998,39 +3983,14 @@ let showRightsManager = false;
     display: grid;
     gap: 0.95rem;
     text-align: center;
+    margin-top: 1.1rem;
   }
 
-  .event-detail-row {
-    display: grid;
-    gap: 0.3rem;
-  }
-
-  .event-detail-row strong {
-    font-size: 0.82rem;
-    letter-spacing: 0.03em;
-    text-transform: uppercase;
-    color: var(--text-secondary);
-  }
-
-  .event-detail-row h2 {
+  .event-detail-list h2 {
     margin: 0;
     font-size: 1.28rem;
     line-height: 1.35;
     color: var(--text-primary);
-  }
-
-  .event-link-list {
-    margin-top: 1rem;
-    text-align: center;
-    display: grid;
-    gap: 0.35rem;
-  }
-
-  .event-link-list strong {
-    font-size: 0.82rem;
-    letter-spacing: 0.03em;
-    text-transform: uppercase;
-    color: var(--text-secondary);
   }
 
   .event-inline-link {
