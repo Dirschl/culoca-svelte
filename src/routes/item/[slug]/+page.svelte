@@ -1573,7 +1573,7 @@ let showRightsManager = false;
 
   function toggleGallery() {
     if (!image?.group_root_item_id) return;
-    handleNearbyGalleryToggle(image.id, true);
+    handleNearbyGalleryToggle(image.id, false);
   }
 
   function extractAdobeAssetId(url: string): string {
