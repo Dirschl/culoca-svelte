@@ -233,19 +233,10 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
 
     console.log('[GalleryStore] Mapped images:', mapped.length);
 
-    const dedupeById = (entries: any[]) => {
-      const seen = new Set<string>();
-      return entries.filter((entry) => {
-        if (!entry?.id || seen.has(entry.id)) return false;
-        seen.add(entry.id);
-        return true;
-      });
-    };
-
     if (offset === 0) {
-      galleryItems.set(dedupeById(mapped));
+      galleryItems.set(mapped);
     } else {
-      galleryItems.update((existingItems) => dedupeById([...existingItems, ...mapped]));
+      galleryItems.update((existingItems) => [...existingItems, ...mapped]);
     }
     
     // Seitennummer immer über die angeforderte Page fortschreiben.
