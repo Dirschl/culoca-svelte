@@ -99,6 +99,13 @@ let showRightsManager = false;
   // SEO/Meta: Slug statt ID verwenden - reaktiv auf URL-Parameter
   let itemSlug: string = '';
   $: itemSlug = $page.params.slug || image?.slug || '';
+  $: if (data?.image?.id && data.image.id !== image?.id) {
+    image = data.image;
+    error = data?.error ?? '';
+    seoLinks = data?.seoLinks ?? { newer: null, older: null };
+    canonicalPath = data?.canonicalPath ?? (data.image?.slug ? `/item/${data.image.slug}` : canonicalPath);
+    loading = false;
+  }
   $: canonicalPath = data?.canonicalPath ?? canonicalPath;
   $: contentType = data?.type ?? contentType;
   $: availableTypes = data?.availableTypes ?? availableTypes;
@@ -118,7 +125,7 @@ let showRightsManager = false;
   $: shouldShowMap = !!(contentType?.show_map && image?.lat && image?.lon);
   $: shouldShowContentHtml = !!(contentType?.show_content_html && effectiveContentHtml);
   $: currentVariantRootId = image?.group_root_item_id ? rootItem?.id || image.group_root_item_id : image?.id || null;
-  $: hasVariantStrip = image?.id === rootItem?.id && Array.isArray(groupItems) && groupItems.length > 1;
+  $: hasVariantStrip = Array.isArray(groupItems) && groupItems.length > 1;
   $: variantStripItems = hasVariantStrip ? groupItems : [];
 
   function getPageSettingBoolean(
