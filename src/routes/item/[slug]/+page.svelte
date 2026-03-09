@@ -1842,15 +1842,6 @@ let showRightsManager = false;
     {@const normalizedCopyrightNotice = normalizeUTF8(copyrightNotice)}
     {@const normalizedContentLocationName = normalizeUTF8(image.title || itemName)}
     
-    <!-- Preload LCP image for better performance -->
-    {#if imageUrl2048 && imageUrl2048.length > 0 && image.slug}
-      {#if imageUrl512 && imageUrl512 !== imageUrl2048 && imageUrl512.length > 0}
-        <link rel="preload" as="image" href={imageUrl2048} imagesrcset={`${imageUrl512} 512w, ${imageUrl2048} 2048w`} imagesizes="(max-width: 900px) 512px, 2048px">
-      {:else}
-        <link rel="preload" as="image" href={imageUrl2048}>
-      {/if}
-    {/if}
-    
     {@html `<script type="application/ld+json">
     ${JSON.stringify({
       "@context": "https://schema.org",
@@ -1982,12 +1973,26 @@ let showRightsManager = false;
               <div class="title-event-details-grid">
                 <label class="title-event-field">
                   <span>Von</span>
-                  <input type="datetime-local" bind:value={managementForm.starts_at} />
+                  <div class="datetime-input-wrap">
+                    <input type="datetime-local" bind:value={managementForm.starts_at} />
+                    <span class="datetime-input-icon" aria-hidden="true">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M7 2h2v2h6V2h2v2h2a2 2 0 0 1 2 2v13a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6a2 2 0 0 1 2-2h2V2zm12 8H5v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9zM6 6a1 1 0 0 0-1 1v1h14V7a1 1 0 0 0-1-1H6zm2 6h3v3H8v-3z"/>
+                      </svg>
+                    </span>
+                  </div>
                 </label>
 
                 <label class="title-event-field">
                   <span>Bis</span>
-                  <input type="datetime-local" bind:value={managementForm.ends_at} />
+                  <div class="datetime-input-wrap">
+                    <input type="datetime-local" bind:value={managementForm.ends_at} />
+                    <span class="datetime-input-icon" aria-hidden="true">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M7 2h2v2h6V2h2v2h2a2 2 0 0 1 2 2v13a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6a2 2 0 0 1 2-2h2V2zm12 8H5v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9zM6 6a1 1 0 0 0-1 1v1h14V7a1 1 0 0 0-1-1H6zm2 6h3v3H8v-3z"/>
+                      </svg>
+                    </span>
+                  </div>
                 </label>
 
                 <label class="title-event-field">
@@ -3839,18 +3844,46 @@ let showRightsManager = false;
     font: inherit;
   }
 
+  .datetime-input-wrap {
+    position: relative;
+  }
+
+  .datetime-input-wrap input[type='datetime-local'] {
+    padding-right: 2.7rem;
+  }
+
   .title-event-field input[type='datetime-local'] {
     color-scheme: var(--datetime-color-scheme) !important;
   }
 
   .title-event-field input[type='datetime-local']::-webkit-calendar-picker-indicator {
+    position: absolute;
+    right: 0.55rem;
+    width: 1.7rem;
+    height: 1.7rem;
     cursor: pointer;
-    opacity: 0.85;
+    opacity: 0;
     filter: var(--calendar-indicator-filter);
   }
 
   :global(body[data-theme='dark']) .title-event-field input[type='datetime-local']::-webkit-calendar-picker-indicator {
     opacity: 1;
+  }
+
+  .datetime-input-icon {
+    position: absolute;
+    right: 0.8rem;
+    top: 50%;
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    pointer-events: none;
+  }
+
+  :global(body[data-theme='dark']) .datetime-input-icon {
+    color: #f8fafc;
   }
 
   .title-event-checkbox input {
