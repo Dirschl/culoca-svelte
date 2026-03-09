@@ -1330,21 +1330,20 @@ let showRightsManager = false;
     await refreshVariantContext();
   }
 
-  async function handleNearbyGalleryToggle(itemId: string, isAssignedToCurrentRoot: boolean) {
+  async function handleNearbyGalleryToggle(itemId: string, nextAssignedState: boolean) {
     if (!currentVariantRootId) return;
 
     try {
-      if (isAssignedToCurrentRoot) {
+      if (nextAssignedState) {
+        await updateVariantAssignment(itemId, {
+          action: 'assign',
+          targetRootId: currentVariantRootId
+        });
+      } else {
         await updateVariantAssignment(itemId, {
           action: 'detach'
         });
-        return;
       }
-
-      await updateVariantAssignment(itemId, {
-        action: 'assign',
-        targetRootId: currentVariantRootId
-      });
     } catch (error) {
       console.error('Failed to update variant assignment:', error);
       if (browser) {
