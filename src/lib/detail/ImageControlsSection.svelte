@@ -16,6 +16,7 @@
   export let nearbyGalleryMode = 'default';
   export let showGalleryToggle = true;
   export let showCalendarDownload = false;
+  export let highlightCalendar = false;
   export let darkMode = false;
   export let rotating = false;
 
@@ -120,7 +121,7 @@
         {/if}
 
         {#if showCalendarDownload && calendarUrl}
-          <a class="square-btn calendar-btn" href={calendarUrl} title="Termin in Kalender öffnen">
+          <a class="square-btn calendar-btn" class:alarm={highlightCalendar} href={calendarUrl} title="Termin in Kalender öffnen">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
               <path d="M7 2h2v2h6V2h2v2h2a2 2 0 0 1 2 2v13a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6a2 2 0 0 1 2-2h2V2zm12 8H5v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9zM6 6a1 1 0 0 0-1 1v1h14V7a1 1 0 0 0-1-1H6zm2 6h3v3H8v-3z"/>
             </svg>
@@ -386,6 +387,39 @@
   .calendar-btn svg,
   .calendar-btn path {
     fill: currentColor;
+  }
+  .calendar-btn.alarm {
+    color: #dbeafe;
+    border-color: #60a5fa;
+    background: radial-gradient(circle at 50% 50%, rgba(59, 130, 246, 0.78), rgba(30, 64, 175, 0.92));
+    box-shadow:
+      0 0 0 1px rgba(147, 197, 253, 0.55),
+      0 0 12px rgba(59, 130, 246, 0.95),
+      0 0 24px rgba(37, 99, 235, 0.7);
+    animation: calendar-alarm-pulse 1.05s ease-in-out infinite;
+  }
+  .calendar-btn.alarm:hover {
+    background: radial-gradient(circle at 50% 50%, rgba(96, 165, 250, 0.92), rgba(30, 64, 175, 1));
+    border-color: #bfdbfe;
+    color: #fff;
+  }
+
+  @keyframes calendar-alarm-pulse {
+    0%,
+    100% {
+      transform: scale(1);
+      box-shadow:
+        0 0 0 1px rgba(147, 197, 253, 0.55),
+        0 0 10px rgba(59, 130, 246, 0.95),
+        0 0 20px rgba(37, 99, 235, 0.65);
+    }
+    50% {
+      transform: scale(1.08);
+      box-shadow:
+        0 0 0 1px rgba(191, 219, 254, 0.75),
+        0 0 18px rgba(96, 165, 250, 1),
+        0 0 34px rgba(59, 130, 246, 0.82);
+    }
   }
   .gallery-toggle-btn {
     background: var(--bg-secondary);

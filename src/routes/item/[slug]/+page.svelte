@@ -17,6 +17,7 @@
     formatEventSchedule,
     getEventSettings,
     isEventType,
+    isUpcomingOrCurrentEvent,
     type EventSettings
   } from '$lib/events';
 
@@ -129,6 +130,7 @@ let showRightsManager = false;
   $: eventSettings = getEventSettings(image?.page_settings);
   $: eventScheduleText = formatEventSchedule(contextItem || image || {}, eventSettings);
   $: hasEventDetails = isEventItem && !!(eventScheduleText || eventSettings.location_name || eventSettings.booking_url || eventSettings.is_free || eventSettings.price_text);
+  $: highlightCalendar = isEventItem && isUpcomingOrCurrentEvent(image);
   // A configured video URL should always render, even if the current type default disables embeds.
   $: hasVideoEmbed = !!image?.video_url;
   $: shouldShowMainImage = contentType?.show_image !== false;
@@ -2245,6 +2247,7 @@ let showRightsManager = false;
       bind:nearbyGalleryMode={managementForm.nearby_gallery_mode}
       showGalleryToggle={!!image?.group_root_item_id}
       showCalendarDownload={isEventItem && !!image?.starts_at}
+      {highlightCalendar}
       {calendarUrl}
       onSetLocationFilter={setLocationFilter}
       onCopyLink={copyCurrentLink}
