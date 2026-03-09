@@ -40,9 +40,26 @@ export async function GET({ params }: any) {
       });
     }
 
-    async function attachChildCounts(items: any[]) {
-      const rootIds = items.filter((item) => !item.group_root_item_id).map((item) => item.id);
-      if (!rootIds.length) return items;
+    async function attachVariantMeta(items: any[]) {
+      if (!items.length) return items;
+
+      const { data: itemMeta, error: itemMetaError } = await supabase
+        .from('items')
+        .select('id, group_root_item_id')
+        .in('id', items.map((item) => item.id));
+
+      const metaById = new Map((itemMeta || []).map((item) => [item.id, item]));
+      const withMeta = items.map((item) => ({
+        ...item,
+        group_root_item_id: metaById.get(item.id)?.group_root_item_id ?? item.group_root_item_id ?? null
+      }));
+
+      if (itemMetaError) {
+        return withMeta;
+      }
+
+      const rootIds = withMeta.filter((item) => !item.group_root_item_id).map((item) => item.id);
+      if (!rootIds.length) return withMeta;
 
       const { data, error } = await supabase
         .from('items')
@@ -50,7 +67,7 @@ export async function GET({ params }: any) {
         .in('group_root_item_id', rootIds);
 
       if (error || !data) {
-        return items.map((item) => ({ ...item, child_count: 0 }));
+        return withMeta.map((item) => ({ ...item, child_count: 0 }));
       }
 
       const counts = new Map<string, number>();
@@ -59,7 +76,7 @@ export async function GET({ params }: any) {
         counts.set(row.group_root_item_id, (counts.get(row.group_root_item_id) || 0) + 1);
       }
 
-      return items.map((item) => ({
+      return withMeta.map((item) => ({
         ...item,
         child_count: counts.get(item.id) || 0
       }));
@@ -174,7 +191,7 @@ export async function GET({ params }: any) {
       }
     }
 
-    nearby = await attachChildCounts(nearby);
+    nearby = (await attachVariantMeta(nearby)).filter((item) => item.group_root_item_id == null);
 
     return new Response(JSON.stringify({ nearby }), {
       headers: {

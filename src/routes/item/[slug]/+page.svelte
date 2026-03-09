@@ -1900,7 +1900,7 @@ let showRightsManager = false;
                     class="variant-detach-btn"
                     title="Variante loesen"
                     aria-label="Variante loesen"
-                    on:click|preventDefault|stopPropagation={() => handleNearbyGalleryToggle(groupItem.id, true)}
+                    on:click|preventDefault|stopPropagation={() => handleNearbyGalleryToggle(groupItem.id, false)}
                   >
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
                       <rect x="3" y="3" width="4" height="4"/>
@@ -1916,6 +1916,39 @@ let showRightsManager = false;
                   </button>
                 {/if}
               </a>
+            {/each}
+          </div>
+          <div class="variant-link-list" data-nosnippet>
+            {#each variantStripItems as groupItem}
+              <div class:active={groupItem.id === activeGroupItemId} class="variant-link-row">
+                <a
+                  class="variant-link"
+                  href={groupItem.canonicalPath || `/item/${groupItem.slug}`}
+                >
+                  {groupItem.title || groupItem.slug || 'Variante'}
+                </a>
+                {#if currentUser && groupItem.id !== rootItem?.id}
+                  <button
+                    type="button"
+                    class="variant-link-detach-btn"
+                    title="Variante loesen"
+                    aria-label="Variante loesen"
+                    on:click={() => handleNearbyGalleryToggle(groupItem.id, false)}
+                  >
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
+                      <rect x="3" y="3" width="4" height="4"/>
+                      <rect x="10" y="3" width="4" height="4"/>
+                      <rect x="17" y="3" width="4" height="4"/>
+                      <rect x="3" y="10" width="4" height="4"/>
+                      <rect x="10" y="10" width="4" height="4"/>
+                      <rect x="17" y="10" width="4" height="4"/>
+                      <rect x="3" y="17" width="4" height="4"/>
+                      <rect x="10" y="17" width="4" height="4"/>
+                      <rect x="17" y="17" width="4" height="4"/>
+                    </svg>
+                  </button>
+                {/if}
+              </div>
             {/each}
           </div>
         {/if}
@@ -2655,9 +2688,9 @@ let showRightsManager = false;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 64px;
-    min-height: 64px;
-    max-width: 160px;
+    min-width: 32px;
+    min-height: 32px;
+    max-width: 96px;
     padding: 0.2rem;
     border: 1px solid var(--border-color);
     background: var(--bg-secondary);
@@ -2669,13 +2702,13 @@ let showRightsManager = false;
   }
   .variant-strip-item img {
     display: block;
-    height: 64px;
+    height: 32px;
     width: auto;
     max-width: 100%;
     object-fit: contain;
   }
   .variant-strip-item img.square {
-    width: 64px;
+    width: 32px;
     object-fit: cover;
   }
   .variant-detach-btn {
@@ -2689,6 +2722,37 @@ let showRightsManager = false;
     cursor: pointer;
     -webkit-backdrop-filter: blur(var(--overlay-blur));
     backdrop-filter: blur(var(--overlay-blur));
+  }
+  .variant-link-list {
+    display: grid;
+    gap: 0.35rem;
+    width: min(100%, 540px);
+    margin: 0.85rem auto 0;
+  }
+  .variant-link-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.35rem 0.5rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+  }
+  .variant-link-row.active {
+    border-color: var(--culoca-orange, #ee7221);
+  }
+  .variant-link {
+    color: var(--text-primary);
+    text-decoration: none;
+    min-width: 0;
+  }
+  .variant-link-detach-btn {
+    border: 0;
+    background: var(--bg-overlay);
+    color: var(--text-overlay);
+    padding: 0.15rem 0.25rem;
+    cursor: pointer;
+    flex: 0 0 auto;
   }
   .title {
     font-size: 1.8rem;

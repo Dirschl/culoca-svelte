@@ -36,17 +36,18 @@ async function attachCanonicalPaths(items: any[]) {
 
   const { data, error } = await supabase
     .from('items')
-    .select('id, canonical_path')
+    .select('id, canonical_path, group_root_item_id')
     .in('id', items.map((item) => item.id));
 
   if (error || !data) {
     return items;
   }
 
-  const canonicalById = new Map(data.map((item) => [item.id, item.canonical_path]));
+  const itemById = new Map(data.map((item) => [item.id, item]));
   return items.map((item) => ({
     ...item,
-    canonical_path: canonicalById.get(item.id) || item.canonical_path || null
+    canonical_path: itemById.get(item.id)?.canonical_path || item.canonical_path || null,
+    group_root_item_id: itemById.get(item.id)?.group_root_item_id ?? item.group_root_item_id ?? null
   }));
 }
 
