@@ -3,6 +3,7 @@ import {
   DEFAULT_CONTENT_TYPE_BY_SLUG,
   type ContentTypeDefinition
 } from '$lib/content/types';
+import { hasPersistentEventLandingPage } from '$lib/events';
 
 export type ContentItemLike = {
   id: string;
@@ -105,10 +106,15 @@ export function isEventExpired(item: Pick<ContentItemLike, 'type_id' | 'ends_at'
 
 export function isPubliclyVisibleItem(item: ContentItemLike): boolean {
   if (item.is_private) return false;
-  if (isEventExpired(item)) return false;
   return true;
 }
 
+export function isExpiredEventHiddenFromFeeds(
+  item: Pick<ContentItemLike, 'type_id' | 'ends_at' | 'group_slug'>
+): boolean {
+  return isEventExpired(item) && !hasPersistentEventLandingPage(item);
+}
+
 export function isVisibleInMainFeed(item: ContentItemLike): boolean {
-  return isPubliclyVisibleItem(item) && item.show_in_main_feed !== false;
+  return isPubliclyVisibleItem(item) && !isExpiredEventHiddenFromFeeds(item) && item.show_in_main_feed !== false;
 }

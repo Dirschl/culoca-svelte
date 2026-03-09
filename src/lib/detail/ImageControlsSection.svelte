@@ -8,12 +8,14 @@
   export let onDeleteImage: () => void;
   export let onDownloadOriginal: (id: string, name: string) => void;
   export let onToggleGallery: () => void;
+  export let onDownloadCalendar: () => void;
   export let editMode = false;
   export let externalUrl = '';
   export let videoUrl = '';
   export let contentHtml = '';
   export let nearbyGalleryMode = 'default';
   export let showGalleryToggle = true;
+  export let showCalendarDownload = false;
   export let darkMode = false;
   export let rotating = false;
 
@@ -113,6 +115,14 @@
           <button class="square-btn download-btn" data-download-id={image.id} on:click={() => onDownloadOriginal(image.id, image.original_name)} title="Original herunterladen" disabled={rotating || loading}>
             <svg width="35" height="35" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M12 6v7m0 0l-3-3m3 3l3-3M6 18h12"/>
+            </svg>
+          </button>
+        {/if}
+
+        {#if showCalendarDownload}
+          <button class="square-btn calendar-btn" on:click={onDownloadCalendar} title="Termin in Kalender speichern" disabled={loading}>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M7 2h2v2h6V2h2v2h2a2 2 0 0 1 2 2v13a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6a2 2 0 0 1 2-2h2V2zm12 8H5v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9zM6 6a1 1 0 0 0-1 1v1h14V7a1 1 0 0 0-1-1H6zm2 6h3v3H8v-3z"/>
             </svg>
           </button>
         {/if}
@@ -363,6 +373,11 @@
     background: #28a745;
     color: white;
     border-color: #28a745;
+  }
+  .calendar-btn:hover {
+    background: #f59e0b;
+    color: white;
+    border-color: #f59e0b;
   }
   .gallery-toggle-btn {
     background: var(--bg-secondary);

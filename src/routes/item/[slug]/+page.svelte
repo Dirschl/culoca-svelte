@@ -11,6 +11,14 @@
   import { supabase } from '$lib/supabaseClient';
   import { getStoredOrComputedCanonicalPath, slugifySegment } from '$lib/content/routing';
   import { sanitizeContentHtml } from '$lib/content/html';
+  import {
+    DEFAULT_EVENT_SETTINGS,
+    buildEventPageSettings,
+    formatEventSchedule,
+    getEventSettings,
+    isEventType,
+    type EventSettings
+  } from '$lib/events';
 
   // Client-seitige Umleitung für bekannte Fälle (nur für User, nicht für Bots)
   if (browser) {
@@ -117,6 +125,10 @@ let showRightsManager = false;
   $: effectiveContentHtml = sanitizeContentHtml(contextItem?.content || image?.content || '');
   $: hasVisibleGroupItems = Array.isArray(groupItems) && groupItems.length > 1;
   $: hasDateRange = !!(contentType?.show_date_range && (contextItem?.starts_at || contextItem?.ends_at));
+  $: isEventItem = isEventType(image);
+  $: eventSettings = getEventSettings(image?.page_settings);
+  $: eventScheduleText = formatEventSchedule(contextItem || image || {}, eventSettings);
+  $: hasEventDetails = isEventItem && !!(eventScheduleText || eventSettings.location_name || eventSettings.booking_url || eventSettings.online_url || eventSettings.is_free || eventSettings.price_text);
   // A configured video URL should always render, even if the current type default disables embeds.
   $: hasVideoEmbed = !!image?.video_url;
   $: shouldShowMainImage = contentType?.show_image !== false;
@@ -152,12 +164,11 @@ let showRightsManager = false;
 
   function buildPageSettings(
     currentSettings: Record<string, unknown> | null | undefined,
-    nearbyGalleryMode: string
+    nearbyGalleryMode: string,
+    nextEventSettings: EventSettings,
+    includeEventSettings: boolean
   ) {
-    const nextSettings =
-      currentSettings && typeof currentSettings === 'object' && !Array.isArray(currentSettings)
-        ? { ...currentSettings }
-        : {};
+    const nextSettings = buildEventPageSettings(currentSettings, nextEventSettings, includeEventSettings);
 
     if (nearbyGalleryMode === 'enabled') {
       nextSettings.show_nearby_gallery = true;
@@ -184,6 +195,11 @@ let showRightsManager = false;
     if (start && end) return `${format(start)} - ${format(end)}`;
     if (start) return `Start: ${format(start)}`;
     return `Ende: ${format(end as string)}`;
+  }
+
+  async function downloadEventIcs() {
+    if (!image?.id || !browser) return;
+    window.location.href = `/api/events/${image.id}/ics`;
   }
 
   function getEmbedUrl(videoUrl: string | null | undefined): string {
@@ -692,7 +708,14 @@ let showRightsManager = false;
     starts_at: '',
     ends_at: '',
     external_url: '',
-    video_url: ''
+    video_url: '',
+    event_display_mode: DEFAULT_EVENT_SETTINGS.display_mode as 'single_day' | 'multi_day',
+    event_all_day: DEFAULT_EVENT_SETTINGS.all_day,
+    event_location_name: '',
+    event_booking_url: '',
+    event_is_free: false,
+    event_price_text: '',
+    event_online_url: ''
   };
   let selectedRootItem: any = null;
   let rootSearchQuery = '';
@@ -784,6 +807,7 @@ let showRightsManager = false;
 
   function syncManagementFormFromImage() {
     if (!image) return;
+    const nextEventSettings = getEventSettings(image.page_settings);
 
     managementForm = {
       type_id: image.type_id || contentType?.id || 1,
@@ -796,7 +820,14 @@ let showRightsManager = false;
       starts_at: toDateTimeLocal(image.starts_at),
       ends_at: toDateTimeLocal(image.ends_at),
       external_url: image.external_url || '',
-      video_url: image.video_url || ''
+      video_url: image.video_url || '',
+      event_display_mode: nextEventSettings.display_mode,
+      event_all_day: nextEventSettings.all_day,
+      event_location_name: nextEventSettings.location_name,
+      event_booking_url: nextEventSettings.booking_url,
+      event_is_free: nextEventSettings.is_free,
+      event_price_text: nextEventSettings.price_text,
+      event_online_url: nextEventSettings.online_url
     };
 
     if (image.group_root_item_id && rootItem && rootItem.id !== image.id) {
@@ -977,7 +1008,21 @@ let showRightsManager = false;
       starts_at: toNullableIso(managementForm.starts_at),
       ends_at: toNullableIso(managementForm.ends_at),
       external_url: toNullableString(managementForm.external_url),
-      video_url: toNullableString(managementForm.video_url)
+      video_url: toNullableString(managementForm.video_url),
+      page_settings: buildPageSettings(
+        image.page_settings,
+        managementForm.nearby_gallery_mode,
+        {
+          display_mode: managementForm.event_display_mode,
+          all_day: managementForm.event_all_day,
+          location_name: managementForm.event_location_name,
+          booking_url: managementForm.event_booking_url,
+          is_free: managementForm.event_is_free,
+          price_text: managementForm.event_price_text,
+          online_url: managementForm.event_online_url
+        },
+        Number(managementForm.type_id) === 2
+      )
     };
 
     try {
@@ -2110,6 +2155,43 @@ let showRightsManager = false;
         <p>{formatDateRange(contextItem?.starts_at, contextItem?.ends_at)}</p>
       </section>
     {/if}
+    {#if hasEventDetails}
+      <section class="content-panel">
+        <h2>Termin</h2>
+        <div class="event-detail-list">
+          {#if eventScheduleText}
+            <div class="event-detail-row">
+              <strong>Zeit</strong>
+              <span>{eventScheduleText}</span>
+            </div>
+          {/if}
+          {#if eventSettings.location_name}
+            <div class="event-detail-row">
+              <strong>Ort</strong>
+              <span>{eventSettings.location_name}</span>
+            </div>
+          {/if}
+          {#if eventSettings.is_free || eventSettings.price_text}
+            <div class="event-detail-row">
+              <strong>Preis</strong>
+              <span>{eventSettings.is_free ? 'Kostenfrei' : eventSettings.price_text}</span>
+            </div>
+          {/if}
+        </div>
+        <div class="event-link-list">
+          {#if eventSettings.booking_url}
+            <a class="event-link-btn" href={eventSettings.booking_url} target="_blank" rel="noopener noreferrer">
+              Buchungslink
+            </a>
+          {/if}
+          {#if eventSettings.online_url}
+            <a class="event-link-btn" href={eventSettings.online_url} target="_blank" rel="noopener noreferrer">
+              Online-Event
+            </a>
+          {/if}
+        </div>
+      </section>
+    {/if}
     <ImageControlsSection
       {image}
       isCreator={isCreator}
@@ -2119,10 +2201,12 @@ let showRightsManager = false;
       bind:contentHtml={managementForm.content}
       bind:nearbyGalleryMode={managementForm.nearby_gallery_mode}
       showGalleryToggle={!!image?.group_root_item_id}
+      showCalendarDownload={isEventItem && !!image?.starts_at}
       onSetLocationFilter={setLocationFilter}
       onCopyLink={copyCurrentLink}
       onDeleteImage={deleteImage}
       onDownloadOriginal={downloadOriginal}
+      onDownloadCalendar={downloadEventIcs}
       onToggleGallery={toggleGallery}
     />
     {#if hasVideoEmbed && !(canEditItem && editMode)}
@@ -3798,6 +3882,43 @@ let showRightsManager = false;
 
   .content-panel h2 {
     margin: 0 0 0.75rem 0;
+  }
+
+  .event-detail-list {
+    display: grid;
+    gap: 0.55rem;
+  }
+
+  .event-detail-row {
+    display: grid;
+    gap: 0.2rem;
+  }
+
+  .event-detail-row strong {
+    font-size: 0.82rem;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+  }
+
+  .event-link-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin-top: 1rem;
+  }
+
+  .event-link-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    text-decoration: none;
+    padding: 0.55rem 0.8rem;
+    cursor: pointer;
+    font: inherit;
   }
 
   .content-html {
