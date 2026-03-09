@@ -2208,33 +2208,34 @@ let showRightsManager = false;
     {#if hasEventDetails}
       <section class="content-panel">
         <h2>Termin</h2>
-        <div class="event-link-list">
-          {#if eventSettings.booking_url}
-            <a class="event-inline-link" href={eventSettings.booking_url} target="_blank" rel="noopener noreferrer">
-              Buchungslink
-            </a>
-          {/if}
-        </div>
         <div class="event-detail-list">
           {#if eventScheduleText}
             <div class="event-detail-row">
               <strong>Zeit</strong>
-              <span>{eventScheduleText}</span>
+              <h2>{eventScheduleText}</h2>
             </div>
           {/if}
           {#if eventSettings.location_name}
             <div class="event-detail-row">
               <strong>Ort</strong>
-              <span>{eventSettings.location_name}</span>
+              <h2>{eventSettings.location_name}</h2>
             </div>
           {/if}
           {#if eventSettings.is_free || eventSettings.price_text}
             <div class="event-detail-row">
               <strong>Preis</strong>
-              <span>{eventSettings.is_free ? 'Kostenfrei' : eventSettings.price_text}</span>
+              <h2>{eventSettings.is_free ? 'Kostenfrei' : eventSettings.price_text}</h2>
             </div>
           {/if}
         </div>
+        {#if eventSettings.booking_url}
+          <div class="event-link-list">
+            <strong>Buchungslink</strong>
+            <a class="event-inline-link" href={eventSettings.booking_url} target="_blank" rel="noopener noreferrer">
+              {eventSettings.booking_url}
+            </a>
+          </div>
+        {/if}
       </section>
     {/if}
     <ImageControlsSection
@@ -3995,12 +3996,13 @@ let showRightsManager = false;
 
   .event-detail-list {
     display: grid;
-    gap: 0.55rem;
+    gap: 0.95rem;
+    text-align: center;
   }
 
   .event-detail-row {
     display: grid;
-    gap: 0.2rem;
+    gap: 0.3rem;
   }
 
   .event-detail-row strong {
@@ -4010,15 +4012,33 @@ let showRightsManager = false;
     color: var(--text-secondary);
   }
 
+  .event-detail-row h2 {
+    margin: 0;
+    font-size: 1.28rem;
+    line-height: 1.35;
+    color: var(--text-primary);
+  }
+
   .event-link-list {
-    margin-bottom: 0.85rem;
+    margin-top: 1rem;
+    text-align: center;
+    display: grid;
+    gap: 0.35rem;
+  }
+
+  .event-link-list strong {
+    font-size: 0.82rem;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
   }
 
   .event-inline-link {
-    color: var(--accent-color);
+    color: var(--culoca-orange);
     text-decoration: underline;
     text-underline-offset: 0.15em;
     font-size: 0.98rem;
+    word-break: break-word;
   }
 
   .content-html {
