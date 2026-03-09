@@ -3832,6 +3832,24 @@ let showRightsManager = false;
     font: inherit;
   }
 
+  .title-event-field input[type='datetime-local'] {
+    color-scheme: light;
+  }
+
+  .title-event-field input[type='datetime-local']::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: 0.85;
+  }
+
+  :global(body[data-theme='dark']) .title-event-field input[type='datetime-local'] {
+    color-scheme: dark;
+  }
+
+  :global(body[data-theme='dark']) .title-event-field input[type='datetime-local']::-webkit-calendar-picker-indicator {
+    filter: invert(1) brightness(1.25);
+    opacity: 1;
+  }
+
   .title-event-checkbox input {
     width: 1rem;
     height: 1rem;
