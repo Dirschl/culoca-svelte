@@ -8,7 +8,7 @@ export const ssr = true;
 export const load: PageServerLoad = async ({ url, request }) => {
   // Get page parameter for pagination
   const page = parseInt(url.searchParams.get('page') || '1');
-  const itemsPerPage = 50;
+  const itemsPerPage = 15;
   
   // Bot detection for enhanced SEO
   const userAgent = request.headers.get('user-agent') || '';
