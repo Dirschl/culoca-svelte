@@ -1063,7 +1063,26 @@
     window.addEventListener('storage', onStorageChange);
     
     isInIframe = window.self !== window.top;
-    
+
+    if (window.location.hash) {
+      const hash = window.location.hash.substring(1);
+      const scrollToAnchor = () => {
+        const el = document.getElementById(hash);
+        if (el) {
+          el.scrollIntoView({ behavior: 'instant' });
+          return true;
+        }
+        return false;
+      };
+      if (!scrollToAnchor()) {
+        const observer = new MutationObserver(() => {
+          if (scrollToAnchor()) observer.disconnect();
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+        setTimeout(() => observer.disconnect(), 10000);
+      }
+    }
+
     // Event-Listener für FilterBar Events
     window.addEventListener('toggle3x3Mode', handleToggle3x3Mode);
     window.addEventListener('openMap', handleOpenMap);
