@@ -2357,7 +2357,6 @@
     </div>
   {/if}
   
-  <div id="galerie"></div>
   {#if isManual3x3Mode && !hasLocationFilter}
     <MobileGallery
       userLat={userLat}

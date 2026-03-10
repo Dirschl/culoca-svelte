@@ -450,7 +450,7 @@
   }
 </style>
 
-<div bind:this={galleryEl} class="gallery-container">
+<div bind:this={galleryEl} id="galerie" class="gallery-container">
   {#if layout === 'justified'}
     <div class="justified-wrapper">
       <div 

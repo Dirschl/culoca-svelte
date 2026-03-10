@@ -36,9 +36,10 @@
   import SiteNav from '$lib/SiteNav.svelte';
   import SiteFooter from '$lib/SiteFooter.svelte';
 
-  export let data: { targetUrl: string };
+  export let data: { targetUrl: string; directUrl: boolean };
 
   let testUrl = data.targetUrl || '';
+  const autoFullscreen = data.directUrl && !!data.targetUrl;
 
   let isLoading = false;
   let error = '';
@@ -310,6 +311,9 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
     }
 
     if (testUrl) {
+      if (autoFullscreen) {
+        fullscreenOpen = true;
+      }
       await fetchHeadData();
     }
   });
