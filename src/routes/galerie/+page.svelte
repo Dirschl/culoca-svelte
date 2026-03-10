@@ -859,7 +859,7 @@
   $: lastApiUrl = buildGalleryApiUrl();
 
   $: isLoggedIn = $sessionStore.isAuthenticated;
-  $: simulationMode = $pageStore.url.pathname.startsWith('/simulation');
+  $: simulationMode = $pageStore.url.pathname.startsWith('/simulation') || $pageStore.url.searchParams.has('simulation');
 
   // Lade Avatar und Settings wenn Login-Status sich ändert
   $: if (isLoggedIn) {
@@ -2266,6 +2266,7 @@
   </div>
 {:else}
   <!-- Galerie-Komponenten und restliche Seite -->
+  <div id="galerie"></div>
   <FilterBar
     isManual3x3Mode={isManual3x3Mode}
     onLocationFilterClear={clearLocationFilterAndReloadGallery}

@@ -1004,7 +1004,7 @@
     const iframe = document.querySelector('.app-iframe');
     if (iframe && iframe.tagName === 'IFRAME') {
       const iframeElement = iframe as HTMLIFrameElement;
-      iframeElement.src = '/?stop=simulation';
+      iframeElement.src = '/galerie?stop=simulation';
     }
   }
 
@@ -1097,7 +1097,7 @@
     <!-- Right Side - App iFrame -->
     <div class="app-side">
       <iframe 
-        src="/?autoguide=true&showDistance=true&showCompass=true&simulation=true&mobile=true"
+        src="/galerie?autoguide=true&showDistance=true&showCompass=true&simulation=true&mobile=true#galerie"
         class="app-iframe"
         title="Culoca App Simulation"
       ></iframe>
