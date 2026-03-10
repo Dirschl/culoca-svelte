@@ -1030,10 +1030,9 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
                       <div class="bot-view-frame-container">
                         <iframe
                           class="bot-view-iframe"
-                          srcdoc={injectBaseTag(headData.rawHtml, testUrl)}
+                          src={`/api/seo-proxy?url=${encodeURIComponent(testUrl)}`}
                           title="HTML Bot View Vorschau"
                           style="width: 100%; height: 600px; border: 1px solid var(--border-color); border-radius: 8px; background: white;"
-                          sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
                         ></iframe>
                       </div>
                       <div class="bot-view-details">
@@ -1131,12 +1130,11 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
         </button>
       </div>
     </div>
-    {#if fullscreenMode === 'bot' && headData?.rawHtml}
+    {#if fullscreenMode === 'bot'}
       <iframe
-        srcdoc={injectBaseTag(headData.rawHtml, fullscreenUrl)}
+        src={`/api/seo-proxy?url=${encodeURIComponent(fullscreenUrl)}`}
         title="Bot Fullscreen Vorschau"
         class="fullscreen-iframe"
-        sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
       ></iframe>
     {:else}
       <iframe
