@@ -109,13 +109,13 @@
   import { browser } from '$app/environment';
   import { goto } from '$app/navigation';
   import InfoPageLayout from '$lib/InfoPageLayout.svelte';
+  import NewsFlash from '$lib/NewsFlash.svelte';
   import { getPublicItemHref } from '$lib/content/routing';
 
   let stats = {
     totalItems: 0,
     totalUsers: 0,
-    topUser: null as any,
-    latestItems: [] as any[]
+    topUser: null as any
   };
 
   let bannerImage = null as any;
@@ -216,18 +216,10 @@
           .limit(1)
           .maybeSingle();
 
-        // Neueste Items
-        const { data: latestItems } = await supabase
-          .from('items')
-          .select('id, title, slug, canonical_path, created_at, path_512')
-          .order('created_at', { ascending: false })
-          .limit(5);
-
         stats = {
           totalItems: itemsCount || 0,
           totalUsers: usersCount || 0,
-          topUser: topUserData,
-          latestItems: latestItems || []
+          topUser: topUserData
         };
       } catch (error) {
         console.error('Fehler beim Laden der Daten:', error);
@@ -313,7 +305,6 @@
       </a>
     </div>
     
-    {#if stats.latestItems.length > 0}
     <div class="latest-items">
       <h3>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px;">
@@ -323,25 +314,13 @@
       </h3>
       
       <p>
-        Ganz oben sehen sie die aktuellsten Items. Dieser Bereich kann nach rechts verschoben werden um die Anzahl der geladenen Bilder zu sehen. Er dient Bots dazu, die Seite zu indexieren und wird SSR und Clientseitig gerendert. Wenn ihr selbst uploadet, dann seht ihr hier in Echtzeit eure neuesten Items. Angemeldete User können den Newsflah in den Settings deaktivieren.
+        Der Newsflash zeigt die aktuellsten Items als horizontalen Strip. Er aktualisiert sich automatisch und dient auch Suchmaschinen zur Indexierung. Angemeldete User können den Newsflash in den Settings deaktivieren.
       </p>
       
-      <div class="items-grid">
-        {#each stats.latestItems as item}
-        <a href={getPublicItemHref(item)} class="item-card-link">
-          <div class="item-card">
-            <img src="https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/{item.path_512}" 
-                 alt={item.title || 'Foto'} class="item-thumbnail" />
-            <div class="item-info">
-              <h4>{item.title || 'Ohne Titel'}</h4>
-              <p>{new Date(item.created_at).toLocaleDateString('de-DE')}</p>
-            </div>
-          </div>
-        </a>
-        {/each}
+      <div class="newsflash-embed">
+        <NewsFlash mode="alle" layout="strip" limit={10} showToggles={false} showImageCaptions={true} />
       </div>
     </div>
-    {/if}
     
     <hr class="section-divider" />
     
@@ -500,6 +479,129 @@
             <li>Home = Normale Galerie</li>
           </ul>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="section-divider" />
+
+  <!-- Content-Typen -->
+  <section class="content-types-section">
+    <h2>
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px;">
+        <path d="M4 6h16M4 12h16M4 18h16"/>
+      </svg>
+      Content-Typen
+    </h2>
+
+    <p>
+      Culoca unterstützt verschiedene Inhaltstypen, die jeweils eigene Darstellungen und Funktionen bieten. Jeder Typ hat eine eigene Hub-Seite und kann in der Galerie gefiltert werden.
+    </p>
+
+    <div class="content-types-grid">
+      <a href="/foto" class="content-type-card">
+        <span class="ct-icon">📸</span>
+        <h4>Fotos</h4>
+        <p>Fotografien und Bilder mit GPS-Koordinaten, EXIF-Daten und automatischer Bildoptimierung</p>
+      </a>
+      <a href="/event" class="content-type-card">
+        <span class="ct-icon">📅</span>
+        <h4>Events & Termine</h4>
+        <p>Veranstaltungen mit Datum, Zeitraum und Ort. Ideal für lokale Konzerte, Märkte und Feste</p>
+      </a>
+      <a href="/firma" class="content-type-card">
+        <span class="ct-icon">🏢</span>
+        <h4>Firmen</h4>
+        <p>Unternehmenseinträge mit Kontaktdaten, Webseite und Standort auf der Karte</p>
+      </a>
+      <a href="/galerie" class="content-type-card">
+        <span class="ct-icon">🎬</span>
+        <h4>Videos</h4>
+        <p>Videomaterial mit Embed-Unterstützung für YouTube, Vimeo und andere Plattformen</p>
+      </a>
+      <a href="/galerie" class="content-type-card">
+        <span class="ct-icon">🎵</span>
+        <h4>Musik</h4>
+        <p>Audioinhalte mit integriertem Player, ideal für lokale Künstler und Audioguides</p>
+      </a>
+      <a href="/galerie" class="content-type-card">
+        <span class="ct-icon">🤖</span>
+        <h4>KI-Bilder</h4>
+        <p>KI-generierte Bilder, die ebenfalls an GPS-Koordinaten verankert werden können</p>
+      </a>
+      <a href="/galerie" class="content-type-card">
+        <span class="ct-icon">🔗</span>
+        <h4>Links</h4>
+        <p>Externe Verweise und Weblinks mit Vorschau, an einen Standort gebunden</p>
+      </a>
+      <a href="/galerie" class="content-type-card">
+        <span class="ct-icon">📝</span>
+        <h4>Texte</h4>
+        <p>Textbeiträge und Artikel mit HTML-Formatierung und GPS-Verortung</p>
+      </a>
+    </div>
+  </section>
+
+  <hr class="section-divider" />
+
+  <!-- Child-Items / Varianten -->
+  <section class="childitems-section">
+    <h2>
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px;">
+        <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
+        <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+      </svg>
+      Child-Items & Varianten
+    </h2>
+
+    <p>
+      Items können als <strong>Varianten</strong> gruppiert werden. Ein Root-Item kann beliebig viele Child-Items haben — z.B. verschiedene Perspektiven eines Ortes, verschiedene Tageszeiten oder Jahreszeiten. In der Galerie wird die Anzahl der Varianten als <strong>+N Badge</strong> angezeigt.
+    </p>
+
+    <div class="feature-highlight-grid">
+      <div class="feature-highlight">
+        <h4>Gruppierung</h4>
+        <p>Items werden über eine gemeinsame <code>group_slug</code> verknüpft. Das Root-Item erscheint in der Galerie, die Varianten sind über einen Picker in der Detail-Ansicht erreichbar.</p>
+      </div>
+      <div class="feature-highlight">
+        <h4>Varianten-Picker</h4>
+        <p>In der Item-Ansicht können Nutzer zwischen allen Varianten einer Gruppe wechseln. Der Ersteller kann Varianten hinzufügen, verschieben und lösen.</p>
+      </div>
+      <div class="feature-highlight">
+        <h4>Flexible Verwaltung</h4>
+        <p>Varianten können jederzeit umgehängt oder aus der Gruppe gelöst werden. Beim Verschieben werden Kind-Items automatisch mit umgehängt.</p>
+      </div>
+    </div>
+  </section>
+
+  <hr class="section-divider" />
+
+  <!-- Firmen & Events -->
+  <section class="business-section">
+    <h2>
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px;">
+        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+        <polyline points="9 22 9 12 15 12 15 22"/>
+      </svg>
+      Firmen, Events & lokale Inhalte
+    </h2>
+
+    <p>
+      Culoca ist nicht nur eine Fotoplattform — es ist ein lokales Ökosystem. Firmen können ihren Standort eintragen und mit Fotos, Beschreibungen und Kontaktdaten sichtbar machen. Events und Termine werden mit Zeitraum und Ort dargestellt und erscheinen automatisch in der Nearby-Galerie.
+    </p>
+
+    <div class="feature-highlight-grid">
+      <div class="feature-highlight">
+        <h4>🏢 Firmeneinträge</h4>
+        <p>Unternehmen erstellen GPS-verortete Einträge mit Logo, Beschreibung, externer Webseite und Kontaktdaten. Besucher in der Nähe entdecken sie automatisch.</p>
+      </div>
+      <div class="feature-highlight">
+        <h4>📅 Events & Termine</h4>
+        <p>Veranstaltungen mit Start- und Enddatum. Lokale Feste, Konzerte, Flohmärkte und mehr erscheinen standortbezogen in der Galerie und auf der Karte.</p>
+      </div>
+      <div class="feature-highlight">
+        <h4>🗺️ Lokale Sichtbarkeit</h4>
+        <p>Alle Inhaltstypen werden nach Entfernung zum Nutzer sortiert. Je näher, desto prominenter. So profitieren lokale Anbieter direkt von ihrer Umgebung.</p>
       </div>
     </div>
   </section>
@@ -757,6 +859,126 @@
     margin: 0.25rem 0;
   }
 
+  /* Newsflash Embed */
+  .newsflash-embed {
+    margin: 1rem 0;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  /* Content Types Grid */
+  .content-types-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+
+  .content-type-card {
+    display: block;
+    padding: 1.25rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    text-decoration: none;
+    transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+  }
+
+  .content-type-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px var(--shadow);
+    border-color: var(--culoca-orange);
+  }
+
+  .ct-icon {
+    font-size: 2rem;
+    display: block;
+    margin-bottom: 0.5rem;
+  }
+
+  .content-type-card h4 {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 0.35rem;
+  }
+
+  .content-type-card p {
+    font-size: 0.88rem;
+    color: var(--text-secondary);
+    margin: 0;
+    line-height: 1.45;
+  }
+
+  /* Feature highlight grid */
+  .feature-highlight-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.25rem;
+    margin-top: 1.5rem;
+  }
+
+  .feature-highlight {
+    padding: 1.25rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+  }
+
+  .feature-highlight h4 {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 0.5rem;
+  }
+
+  .feature-highlight p {
+    font-size: 0.92rem;
+    color: var(--text-secondary);
+    margin: 0;
+    line-height: 1.5;
+  }
+
+  .feature-highlight code {
+    background: var(--bg-secondary);
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    color: var(--culoca-orange);
+  }
+
+  /* Stats */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+    margin: 1.5rem 0;
+  }
+
+  .stat-card {
+    padding: 1.25rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    text-align: center;
+  }
+
+  .stat-card h3 {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin: 0 0 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .stat-number {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
   @media (max-width: 768px) {
     .banner-section-fullwidth {
       height: 250px;
@@ -776,11 +998,15 @@
       grid-template-columns: 1fr;
     }
 
-    .stats-grid {
+    .content-types-grid {
       grid-template-columns: repeat(2, 1fr);
     }
 
-    .items-grid {
+    .feature-highlight-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .stats-grid {
       grid-template-columns: repeat(2, 1fr);
     }
   }
