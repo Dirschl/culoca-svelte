@@ -11,6 +11,7 @@
     { href: '/event', label: 'Events' },
     { href: '/firma', label: 'Firmen' },
     { href: '/galerie', label: 'Galerie' },
+    { href: '/seo', label: 'SEO' },
   ];
 
   const infoLinks = [
