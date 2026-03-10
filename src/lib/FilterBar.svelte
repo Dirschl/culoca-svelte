@@ -223,7 +223,7 @@
 					</div>
 				<!-- Priority 4: Culoca Logo (when no other filters are active) -->
 				{:else}
-					<a href="/web" class="culoca-logo">
+					<a href="/" class="culoca-logo">
 						<svg class="culoca-logo-img" id="Ebene_1" data-name="Ebene 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 473.74 100.88">
 							<defs>
 								<style>
