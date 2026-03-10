@@ -995,8 +995,7 @@
         type: 'gps-simulation-stop'
       }, '*');
     }
-    // Navigate back to main page
-    location.href = '/';
+    location.href = '/galerie';
   }
 
   function stopSimulationViaIframe() {
@@ -1068,7 +1067,7 @@
   showTestMode={true}
   isLoggedIn={true}
   simulationMode={true}
-  on:testMode={() => window.location.href = '/'}
+  on:testMode={() => window.location.href = '/galerie'}
 />
 
 <div class="simulation-container" class:dark={$darkMode}>
