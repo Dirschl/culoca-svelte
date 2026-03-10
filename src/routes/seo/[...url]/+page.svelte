@@ -79,6 +79,24 @@
     }
   }
 
+  function injectBaseTag(html: string, url: string): string {
+    try {
+      const parsed = new URL(url);
+      const base = parsed.origin + parsed.pathname.replace(/\/[^/]*$/, '/');
+      const baseTag = `<base href="${base}">`;
+      if (html.includes('<head>')) {
+        return html.replace('<head>', `<head>${baseTag}`);
+      } else if (html.includes('<head ')) {
+        return html.replace(/<head\s[^>]*>/, `$&${baseTag}`);
+      } else if (html.includes('<html')) {
+        return html.replace(/<html[^>]*>/, `$&<head>${baseTag}</head>`);
+      }
+      return `<head>${baseTag}</head>${html}`;
+    } catch {
+      return html;
+    }
+  }
+
   function handleFullscreenUrlSubmit(event: KeyboardEvent) {
     if (event.key === 'Enter' && fullscreenUrl.trim()) {
       testUrl = fullscreenUrl.trim();
@@ -1012,10 +1030,10 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
                       <div class="bot-view-frame-container">
                         <iframe
                           class="bot-view-iframe"
-                          srcdoc={headData.rawHtml}
+                          srcdoc={injectBaseTag(headData.rawHtml, testUrl)}
                           title="HTML Bot View Vorschau"
                           style="width: 100%; height: 600px; border: 1px solid var(--border-color); border-radius: 8px; background: white;"
-                          sandbox="allow-same-origin allow-scripts"
+                          sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
                         ></iframe>
                       </div>
                       <div class="bot-view-details">
@@ -1115,10 +1133,10 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
     </div>
     {#if fullscreenMode === 'bot' && headData?.rawHtml}
       <iframe
-        srcdoc={headData.rawHtml}
+        srcdoc={injectBaseTag(headData.rawHtml, fullscreenUrl)}
         title="Bot Fullscreen Vorschau"
         class="fullscreen-iframe"
-        sandbox="allow-same-origin allow-scripts"
+        sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
       ></iframe>
     {:else}
       <iframe
