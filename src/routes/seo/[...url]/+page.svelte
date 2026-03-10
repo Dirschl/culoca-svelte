@@ -47,6 +47,7 @@
   let isHeadLoading = false;
   let headError = '';
   let activeTab = 'images';
+  let fullscreenOpen = false;
 
   let isBotMode = false;
   let originalUserAgent = '';
@@ -283,6 +284,12 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
       }
       botModeInitialized = true;
 
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && fullscreenOpen) {
+          fullscreenOpen = false;
+        }
+      });
+
       document.addEventListener('click', (e) => {
         if (!isBotMode) return;
 
@@ -421,6 +428,7 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
               <button class="tab-button" class:active={activeTab === 'meta'} on:click={() => activeTab = 'meta'}>Meta-Tags</button>
               <button class="tab-button" class:active={activeTab === 'raw'} on:click={() => activeTab = 'raw'}>Raw HTML</button>
               <button class="tab-button" class:active={activeTab === 'botview'} on:click={() => activeTab = 'botview'}>Bot View</button>
+              <button class="tab-button" class:active={activeTab === 'fullscreen'} on:click={() => activeTab = 'fullscreen'}>Fullscreen</button>
             </div>
 
             {#if activeTab === 'prompt'}
@@ -1016,6 +1024,15 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
                   </div>
                 {/if}
               </div>
+            {:else if activeTab === 'fullscreen'}
+              <div class="fullscreen-section">
+                <h5>Fullscreen — Seite im gesamten Browser anzeigen:</h5>
+                <p class="fullscreen-hint">Die Seite wird als Vollbild-Overlay über dem gesamten Browserfenster geladen. Schließen mit dem X-Button oder Escape.</p>
+                <button class="fullscreen-open-btn" on:click={() => fullscreenOpen = true}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+                  Fullscreen öffnen
+                </button>
+              </div>
             {/if}
           </div>
         {/if}
@@ -1047,6 +1064,28 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
 
   <SiteFooter />
 </div>
+
+{#if fullscreenOpen && testUrl}
+  <div class="fullscreen-overlay">
+    <div class="fullscreen-toolbar">
+      <span class="fullscreen-url">{testUrl}</span>
+      <div class="fullscreen-actions">
+        <a href={testUrl} target="_blank" rel="noopener" class="fullscreen-action-btn" title="In neuem Tab öffnen">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        </a>
+        <button class="fullscreen-close-btn" on:click={() => fullscreenOpen = false} title="Schließen (Esc)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+    </div>
+    <iframe
+      src={testUrl}
+      title="Fullscreen Vorschau"
+      class="fullscreen-iframe"
+      sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+    ></iframe>
+  </div>
+{/if}
 
 <style>
   .seo-page {
@@ -1416,7 +1455,7 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
   }
 
   /* Images tab */
-  .images-analysis h5, .meta-analysis h5, .raw-html-section h5, .bot-view-section h5 {
+  .images-analysis h5, .meta-analysis h5, .raw-html-section h5, .bot-view-section h5, .fullscreen-section h5 {
     margin: 0 0 1rem;
     color: var(--text-primary);
     font-size: 1.1rem;
@@ -1771,5 +1810,119 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
     .analyze-btn { width: 100%; }
     .bot-view-controls { flex-direction: column; }
     .bot-view-header { flex-direction: column; align-items: flex-start; }
+  }
+
+  /* Fullscreen tab */
+  .fullscreen-section {
+    padding: 1.5rem;
+  }
+
+  .fullscreen-hint {
+    color: var(--text-secondary);
+    margin: 0.5rem 0 1.25rem;
+    font-size: 0.95rem;
+  }
+
+  .fullscreen-open-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    background: var(--culoca-orange, #e67e22);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.15s;
+  }
+
+  .fullscreen-open-btn:hover {
+    background: #cf6e17;
+    transform: translateY(-1px);
+  }
+
+  /* Fullscreen overlay */
+  :global(.fullscreen-overlay) {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-primary, #fff);
+  }
+
+  :global(.fullscreen-toolbar) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 1rem;
+    background: var(--bg-secondary, #1a1a2e);
+    border-bottom: 1px solid var(--border-color, #333);
+    min-height: 44px;
+    flex-shrink: 0;
+  }
+
+  :global(.fullscreen-url) {
+    font-size: 0.85rem;
+    color: var(--text-secondary, #aaa);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: calc(100% - 100px);
+  }
+
+  :global(.fullscreen-actions) {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  :global(.fullscreen-action-btn) {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color, #444);
+    background: transparent;
+    color: var(--text-secondary, #aaa);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    text-decoration: none;
+  }
+
+  :global(.fullscreen-action-btn:hover) {
+    background: var(--bg-tertiary, #333);
+    color: var(--text-primary, #fff);
+  }
+
+  :global(.fullscreen-close-btn) {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color, #444);
+    background: transparent;
+    color: var(--text-secondary, #aaa);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+
+  :global(.fullscreen-close-btn:hover) {
+    background: #e74c3c;
+    border-color: #e74c3c;
+    color: #fff;
+  }
+
+  :global(.fullscreen-iframe) {
+    flex: 1;
+    width: 100%;
+    border: none;
+    background: #fff;
   }
 </style>
