@@ -80,19 +80,19 @@
     margin-bottom: 0.75rem;
   }
   .footer-logo svg {
-    height: 22px;
+    height: 28px;
     width: auto;
   }
   .footer-tagline {
     color: var(--text-muted);
-    font-size: 0.875rem;
+    font-size: 0.95rem;
     line-height: 1.5;
     margin: 0;
   }
 
   /* Columns */
   .footer-col h4 {
-    font-size: 0.8rem;
+    font-size: 0.85rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.06em;
@@ -111,7 +111,7 @@
   .footer-col p {
     display: block;
     padding: 0.25rem 0;
-    font-size: 0.875rem;
+    font-size: 0.95rem;
     color: var(--text-secondary);
     text-decoration: none;
     transition: color 0.15s;
@@ -133,7 +133,7 @@
     align-items: center;
     gap: 0.6rem;
     flex-wrap: wrap;
-    font-size: 0.8rem;
+    font-size: 0.875rem;
     color: var(--text-muted);
   }
   .footer-bottom a {

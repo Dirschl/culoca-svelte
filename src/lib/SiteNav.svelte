@@ -180,7 +180,7 @@
     align-items: center;
     text-decoration: none;
   }
-  .logo-svg { height: 26px; width: auto; }
+  .logo-svg { height: 34px; width: auto; }
 
   /* Links */
   .nav-links {
@@ -192,7 +192,7 @@
   .nav-link {
     position: relative;
     padding: 0.5rem 0.85rem;
-    font-size: 0.925rem;
+    font-size: 1rem;
     font-weight: 500;
     letter-spacing: 0.01em;
     color: var(--text-secondary);
@@ -239,7 +239,7 @@
   .dropdown-item {
     display: block;
     padding: 0.6rem 1rem;
-    font-size: 0.875rem;
+    font-size: 0.95rem;
     color: var(--text-secondary);
     text-decoration: none;
     transition: background 0.12s, color 0.12s;
