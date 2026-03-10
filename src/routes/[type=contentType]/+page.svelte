@@ -199,8 +199,6 @@
       var(--bg-primary);
   }
   .hub-inner {
-    max-width: 1120px;
-    margin: 0 auto;
     padding: 2rem;
   }
   .hub-header .hub-inner {

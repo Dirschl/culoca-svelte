@@ -68,8 +68,6 @@
   }
 
   .footer-inner {
-    max-width: 1120px;
-    margin: 0 auto;
     padding: 3rem 2rem 2rem;
     display: grid;
     grid-template-columns: 1.6fr 1fr 1fr 1fr;
@@ -129,8 +127,6 @@
 
   /* Bottom bar */
   .footer-bottom {
-    max-width: 1120px;
-    margin: 0 auto;
     padding: 1.25rem 2rem;
     border-top: 1px solid var(--border-color);
     display: flex;

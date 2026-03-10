@@ -1,14 +1,31 @@
 <script lang="ts">
   import { page } from '$app/stores';
-  import { browser } from '$app/environment';
+  import { onMount } from 'svelte';
+  import { hasAdminPermission } from '$lib/sessionStore';
 
   let mobileOpen = false;
+  let openDropdown: string | null = null;
 
   const navLinks = [
     { href: '/foto', label: 'Fotos' },
     { href: '/event', label: 'Events' },
     { href: '/firma', label: 'Firmen' },
     { href: '/galerie', label: 'Galerie' },
+  ];
+
+  const infoLinks = [
+    { href: '/web', label: 'System' },
+    { href: '/web/license', label: 'Lizenz' },
+    { href: '/web/impressum', label: 'Impressum' },
+    { href: '/web/datenschutz', label: 'Datenschutz' },
+  ];
+
+  const adminLinks = [
+    { href: '/admin', label: 'Dashboard' },
+    { href: '/admin/roles', label: 'Rollen' },
+    { href: '/admin/users', label: 'Benutzer' },
+    { href: '/admin/items', label: 'Items' },
+    { href: '/admin/analytics', label: 'Analytics' },
   ];
 
   $: currentPath = $page.url.pathname;
@@ -18,9 +35,32 @@
     return currentPath === href || currentPath.startsWith(href + '/');
   }
 
+  function isDropdownActive(links: { href: string }[]): boolean {
+    return links.some((l) => isActive(l.href));
+  }
+
+  function toggleDropdown(id: string) {
+    openDropdown = openDropdown === id ? null : id;
+  }
+
   function closeMobile() {
     mobileOpen = false;
+    openDropdown = null;
   }
+
+  function closeDropdowns() {
+    openDropdown = null;
+  }
+
+  onMount(() => {
+    const handler = (e: MouseEvent) => {
+      if (!(e.target as HTMLElement)?.closest('.dropdown')) {
+        closeDropdowns();
+      }
+    };
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
+  });
 </script>
 
 <nav class="site-nav" aria-label="Hauptnavigation">
@@ -39,19 +79,61 @@
 
     <div class="nav-links" class:open={mobileOpen}>
       {#each navLinks as link}
-        <a
-          href={link.href}
-          class="nav-link"
-          class:active={isActive(link.href)}
-          on:click={closeMobile}
-        >{link.label}</a>
+        <a href={link.href} class="nav-link" class:active={isActive(link.href)} on:click={closeMobile}>{link.label}</a>
       {/each}
-      <a
-        href="/web"
-        class="nav-link nav-link--subtle"
-        class:active={isActive('/web')}
-        on:click={closeMobile}
-      >Info</a>
+
+      <!-- Info dropdown (desktop) / expanded list (mobile) -->
+      <div class="dropdown desktop-only">
+        <button
+          class="nav-link dropdown-toggle"
+          class:active={isDropdownActive(infoLinks)}
+          on:click|stopPropagation={() => toggleDropdown('info')}
+        >
+          Info
+          <svg class="dd-arrow" class:dd-open={openDropdown === 'info'} width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5l3 3 3-3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>
+        </button>
+        {#if openDropdown === 'info'}
+          <div class="dropdown-menu">
+            {#each infoLinks as link}
+              <a href={link.href} class="dropdown-item" class:active={isActive(link.href)} on:click={closeDropdowns}>{link.label}</a>
+            {/each}
+          </div>
+        {/if}
+      </div>
+      <!-- Info links inline for mobile -->
+      <div class="mobile-only nav-group">
+        <span class="nav-group-label">Info</span>
+        {#each infoLinks as link}
+          <a href={link.href} class="nav-link nav-link--sub" class:active={isActive(link.href)} on:click={closeMobile}>{link.label}</a>
+        {/each}
+      </div>
+
+      <!-- Admin dropdown (permission-gated) -->
+      {#if $hasAdminPermission}
+        <div class="dropdown desktop-only">
+          <button
+            class="nav-link dropdown-toggle"
+            class:active={isDropdownActive(adminLinks)}
+            on:click|stopPropagation={() => toggleDropdown('admin')}
+          >
+            Admin
+            <svg class="dd-arrow" class:dd-open={openDropdown === 'admin'} width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5l3 3 3-3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>
+          </button>
+          {#if openDropdown === 'admin'}
+            <div class="dropdown-menu">
+              {#each adminLinks as link}
+                <a href={link.href} class="dropdown-item" class:active={isActive(link.href)} on:click={closeDropdowns}>{link.label}</a>
+              {/each}
+            </div>
+          {/if}
+        </div>
+        <div class="mobile-only nav-group">
+          <span class="nav-group-label">Admin</span>
+          {#each adminLinks as link}
+            <a href={link.href} class="nav-link nav-link--sub" class:active={isActive(link.href)} on:click={closeMobile}>{link.label}</a>
+          {/each}
+        </div>
+      {/if}
     </div>
 
     <button
@@ -83,8 +165,6 @@
   }
 
   .nav-inner {
-    max-width: 1120px;
-    margin: 0 auto;
     padding: 0 2rem;
     height: 60px;
     display: flex;
@@ -100,10 +180,7 @@
     align-items: center;
     text-decoration: none;
   }
-  .logo-svg {
-    height: 26px;
-    width: auto;
-  }
+  .logo-svg { height: 26px; width: auto; }
 
   /* Links */
   .nav-links {
@@ -122,27 +199,66 @@
     text-decoration: none;
     border-radius: 8px;
     transition: color 0.15s, background 0.15s;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-family: inherit;
   }
-  .nav-link:hover {
-    color: var(--text-primary);
-    background: var(--bg-tertiary);
-  }
-  .nav-link.active {
-    color: var(--culoca-orange);
-  }
+  .nav-link:hover { color: var(--text-primary); background: var(--bg-tertiary); }
+  .nav-link.active { color: var(--culoca-orange); }
   .nav-link.active::after {
     content: '';
     position: absolute;
-    bottom: 2px;
-    left: 0.85rem;
-    right: 0.85rem;
-    height: 2px;
-    border-radius: 1px;
+    bottom: 2px; left: 0.85rem; right: 0.85rem;
+    height: 2px; border-radius: 1px;
     background: var(--culoca-orange);
   }
-  .nav-link--subtle {
+
+  /* Dropdown */
+  .dropdown { position: relative; }
+  .dropdown-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+  .dd-arrow { transition: transform 0.2s; flex-shrink: 0; }
+  .dd-open { transform: rotate(180deg); }
+
+  .dropdown-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    min-width: 170px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.14);
+    z-index: 300;
+    overflow: hidden;
+  }
+  .dropdown-item {
+    display: block;
+    padding: 0.6rem 1rem;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    text-decoration: none;
+    transition: background 0.12s, color 0.12s;
+  }
+  .dropdown-item:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+  .dropdown-item.active { color: var(--culoca-orange); }
+
+  /* Mobile helpers */
+  .mobile-only { display: none; }
+  .nav-group-label {
+    display: block;
+    padding: 0.6rem 1rem 0.2rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
     color: var(--text-muted);
   }
+  .nav-link--sub { padding-left: 1.5rem; }
 
   /* Hamburger */
   .nav-burger {
@@ -150,98 +266,59 @@
     flex-direction: column;
     justify-content: center;
     gap: 5px;
-    width: 36px;
-    height: 36px;
-    padding: 6px;
-    background: none;
-    border: none;
-    cursor: pointer;
+    width: 36px; height: 36px; padding: 6px;
+    background: none; border: none; cursor: pointer;
     border-radius: 8px;
     transition: background 0.15s;
   }
-  .nav-burger:hover {
-    background: var(--bg-tertiary);
-  }
+  .nav-burger:hover { background: var(--bg-tertiary); }
   .burger-line {
-    display: block;
-    width: 100%;
-    height: 2px;
-    background: var(--text-primary);
-    border-radius: 1px;
+    display: block; width: 100%; height: 2px;
+    background: var(--text-primary); border-radius: 1px;
     transition: transform 0.25s, opacity 0.25s;
     transform-origin: center;
   }
-  .burger-line.open:nth-child(1) {
-    transform: translateY(7px) rotate(45deg);
-  }
-  .burger-line.open:nth-child(2) {
-    opacity: 0;
-  }
-  .burger-line.open:nth-child(3) {
-    transform: translateY(-7px) rotate(-45deg);
-  }
+  .burger-line.open:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+  .burger-line.open:nth-child(2) { opacity: 0; }
+  .burger-line.open:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
 
   .nav-backdrop {
     display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.4);
-    border: none;
-    cursor: default;
-    z-index: -1;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.4);
+    border: none; cursor: default; z-index: -1;
   }
 
   /* Mobile */
   @media (max-width: 720px) {
-    .nav-inner {
-      padding: 0 1.25rem;
-      height: 54px;
-    }
-
-    .nav-burger {
-      display: flex;
-    }
+    .nav-inner { padding: 0 1.25rem; height: 54px; }
+    .nav-burger { display: flex; }
+    .desktop-only { display: none !important; }
+    .mobile-only { display: block; }
 
     .nav-links {
       position: fixed;
-      top: 54px;
-      right: 0;
-      width: 260px;
+      top: 54px; right: 0;
+      width: 280px;
       max-height: calc(100dvh - 54px);
       flex-direction: column;
       align-items: stretch;
-      gap: 0;
-      padding: 0.75rem;
+      gap: 0; padding: 0.75rem;
       background: var(--bg-primary);
       border-left: 1px solid var(--border-color);
       border-bottom: 1px solid var(--border-color);
       border-radius: 0 0 0 16px;
-      box-shadow: -4px 8px 32px rgba(0, 0, 0, 0.18);
+      box-shadow: -4px 8px 32px rgba(0,0,0,0.18);
       transform: translateX(100%);
-      opacity: 0;
-      pointer-events: none;
-      transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s;
+      opacity: 0; pointer-events: none;
+      transition: transform 0.25s cubic-bezier(0.4,0,0.2,1), opacity 0.2s;
       overflow-y: auto;
     }
-    .nav-links.open {
-      transform: translateX(0);
-      opacity: 1;
-      pointer-events: auto;
-    }
-    .nav-link {
-      padding: 0.75rem 1rem;
-      font-size: 1rem;
-      border-radius: 10px;
-    }
-    .nav-link.active::after {
-      display: none;
-    }
-    .nav-link.active {
-      background: var(--bg-tertiary);
-    }
-
-    .nav-backdrop {
-      display: block;
-    }
+    .nav-links.open { transform: translateX(0); opacity: 1; pointer-events: auto; }
+    .nav-link { padding: 0.75rem 1rem; font-size: 1rem; border-radius: 10px; }
+    .nav-link.active::after { display: none; }
+    .nav-link.active { background: var(--bg-tertiary); }
+    .nav-link--sub { padding-left: 2rem; font-size: 0.925rem; }
+    .nav-backdrop { display: block; }
   }
 </style>

@@ -178,8 +178,6 @@
       var(--bg-primary);
   }
   .hero-inner {
-    max-width: 1120px;
-    margin: 0 auto;
     padding: 5rem 2rem 4rem;
   }
   .hero h1 {
@@ -250,8 +248,6 @@
     border-top: 1px solid var(--border-color);
   }
   .section-inner {
-    max-width: 1120px;
-    margin: 0 auto;
     padding: 2.5rem 2rem;
   }
   .section-head {
