@@ -1130,20 +1130,22 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
         </button>
       </div>
     </div>
-    {#if fullscreenMode === 'bot'}
-      <iframe
-        src={`/api/seo-proxy?url=${encodeURIComponent(fullscreenUrl)}`}
-        title="Bot Fullscreen Vorschau"
-        class="fullscreen-iframe"
-      ></iframe>
-    {:else}
-      <iframe
-        src={fullscreenUrl}
-        title="Fullscreen Vorschau"
-        class="fullscreen-iframe"
-        sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
-      ></iframe>
-    {/if}
+    {#key fullscreenMode + fullscreenUrl}
+      {#if fullscreenMode === 'bot'}
+        <iframe
+          src={`/api/seo-proxy?url=${encodeURIComponent(fullscreenUrl)}`}
+          title="Bot Fullscreen Vorschau"
+          class="fullscreen-iframe"
+        ></iframe>
+      {:else}
+        <iframe
+          src={fullscreenUrl}
+          title="Fullscreen Vorschau"
+          class="fullscreen-iframe"
+          sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+        ></iframe>
+      {/if}
+    {/key}
   </div>
 {/if}
 
