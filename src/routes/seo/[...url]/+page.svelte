@@ -79,14 +79,14 @@
     const promptText = `Bitte optimiere die SEO-Daten für die Seite ${testUrl}:
 
 Title: "${editableTitle || headData?.title || 'Titel eingeben'}"
-Description: "${editableDescription || headData?.metaTags?.find((tag: any) => tag.name === 'description' || tag.property === 'og:description')?.content || 'Description eingeben'}"
-Caption: "${editableCaption || headData?.metaTags?.find((tag: any) => tag.name === 'caption' || tag.property === 'og:caption')?.content || headData?.jsonLdData?.[0]?.data?.caption || 'Caption eingeben'}"
+Description: "${editableDescription || headData?.metaTags?.find((tag) => tag.name === 'description' || tag.property === 'og:description')?.content || 'Description eingeben'}"
+Caption: "${editableCaption || headData?.metaTags?.find((tag) => tag.name === 'caption' || tag.property === 'og:caption')?.content || headData?.jsonLdData?.[0]?.data?.caption || 'Caption eingeben'}"
 Seitentyp: ${editablePageType}
-Keywords: "${editableKeywords || headData?.metaTags?.find((tag: any) => tag.name === 'keywords')?.content || 'Keywords eingeben'}"
-Autor: "${editableAuthor || headData?.metaTags?.find((tag: any) => tag.name === 'author' || tag.property === 'og:author')?.content || 'Autor eingeben'}"
-Standort: "${editableLocation || headData?.metaTags?.find((tag: any) => tag.name === 'geo.region' || tag.property === 'og:locale')?.content || 'Standort eingeben'}"
-og:image: "${editableOgImage || headData?.metaTags?.find((tag: any) => tag.property === 'og:image')?.content || 'og:image eingeben'}"
-Icon: "${editableIcon || headData?.linkTags?.find((tag: any) => tag.rel === 'icon')?.href || 'Icon eingeben'}"
+Keywords: "${editableKeywords || headData?.metaTags?.find((tag) => tag.name === 'keywords')?.content || 'Keywords eingeben'}"
+Autor: "${editableAuthor || headData?.metaTags?.find((tag) => tag.name === 'author' || tag.property === 'og:author')?.content || 'Autor eingeben'}"
+Standort: "${editableLocation || headData?.metaTags?.find((tag) => tag.name === 'geo.region' || tag.property === 'og:locale')?.content || 'Standort eingeben'}"
+og:image: "${editableOgImage || headData?.metaTags?.find((tag) => tag.property === 'og:image')?.content || 'og:image eingeben'}"
+Icon: "${editableIcon || headData?.linkTags?.find((tag) => tag.rel === 'icon')?.href || 'Icon eingeben'}"
 
 Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auch das entsprechende JSON-LD Schema.`;
 
@@ -230,10 +230,10 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
         headData = result;
 
         editableTitle = result.title || '';
-        const description = result.metaTags?.find((tag: any) => tag.name === 'description' || tag.property === 'og:description')?.content;
+        const description = result.metaTags?.find((tag) => tag.name === 'description' || tag.property === 'og:description')?.content;
         editableDescription = description || '';
 
-        const caption = result.metaTags?.find((tag: any) => tag.name === 'caption' || tag.property === 'og:caption')?.content;
+        const caption = result.metaTags?.find((tag) => tag.name === 'caption' || tag.property === 'og:caption')?.content;
         editableCaption = caption || '';
 
         if (!caption && headData?.jsonLdData?.[0]?.data?.caption) {
@@ -243,18 +243,18 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
         const pageType = result.jsonLdData?.[0]?.data?.['@type'] || 'WebPage';
         editablePageType = pageType;
 
-        const keywords = result.metaTags?.find((tag: any) => tag.name === 'keywords')?.content;
+        const keywords = result.metaTags?.find((tag) => tag.name === 'keywords')?.content;
         editableKeywords = keywords || '';
 
-        const author = result.metaTags?.find((tag: any) => tag.name === 'author' || tag.property === 'og:author')?.content;
+        const author = result.metaTags?.find((tag) => tag.name === 'author' || tag.property === 'og:author')?.content;
         editableAuthor = author || '';
 
-        const location = result.metaTags?.find((tag: any) => tag.name === 'geo.region' || tag.property === 'og:locale')?.content;
+        const location = result.metaTags?.find((tag) => tag.name === 'geo.region' || tag.property === 'og:locale')?.content;
         editableLocation = location || '';
 
         const isCulocaUrl = testUrl.toLowerCase().includes('culoca') || testUrl.toLowerCase().includes('localhost');
-        const ogImage = result.metaTags?.find((tag: any) => tag.property === 'og:image')?.content;
-        const icon = result.linkTags?.find((tag: any) => tag.rel === 'icon')?.href;
+        const ogImage = result.metaTags?.find((tag) => tag.property === 'og:image')?.content;
+        const icon = result.linkTags?.find((tag) => tag.rel === 'icon')?.href;
 
         editableOgImage = ogImage || (isCulocaUrl ? 'culoca-see-you-local-entdecke-deine-umgebung.jpg' : '');
         editableIcon = icon || (isCulocaUrl ? 'culoca-icon.svg' : '');
@@ -449,7 +449,7 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
                 <div class="seo-item">
                   <h6>Description:</h6>
                   {#if headData.metaTags}
-                    {@const description = headData.metaTags.find((tag: any) => tag.name === 'description' || tag.property === 'og:description')?.content}
+                    {@const description = headData.metaTags.find((tag) => tag.name === 'description' || tag.property === 'og:description')?.content}
                     {#if description}
                       {@const descLength = editableDescription.length || description.length}
                       {@const descStatus = descLength >= 120 && descLength <= 160 ? 'Optimal' : descLength < 120 ? 'Zu kurz' : 'Zu lang'}
@@ -473,8 +473,8 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
                 <div class="seo-item">
                   <h6>Caption:</h6>
                   {#if headData}
-                    {@const captionFromMeta = headData.metaTags?.find((tag: any) => tag.name === 'caption' || tag.property === 'og:caption')?.content}
-                    {@const captionFromJsonLd = headData.jsonLdData?.find((ld: any) => ld.data?.caption)?.data?.caption}
+                    {@const captionFromMeta = headData.metaTags?.find((tag) => tag.name === 'caption' || tag.property === 'og:caption')?.content}
+                    {@const captionFromJsonLd = headData.jsonLdData?.find((ld) => ld.data?.caption)?.data?.caption}
                     {@const caption = captionFromMeta || captionFromJsonLd}
                     {#if caption}
                       {@const captionLength = editableCaption.length || caption.length}
@@ -530,8 +530,8 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
                 <div class="seo-item">
                   <h6>Keywords:</h6>
                   {#if headData}
-                    {@const keywordsFromMeta = headData.metaTags?.find((tag: any) => tag.name === 'keywords')?.content}
-                    {@const keywordsFromJsonLd = headData.jsonLdData?.find((ld: any) => ld.data?.keywords)?.data?.keywords}
+                    {@const keywordsFromMeta = headData.metaTags?.find((tag) => tag.name === 'keywords')?.content}
+                    {@const keywordsFromJsonLd = headData.jsonLdData?.find((ld) => ld.data?.keywords)?.data?.keywords}
                     {@const keywords = keywordsFromMeta || keywordsFromJsonLd}
                     {#if keywords}
                       <p><strong>Aktuelle Keywords:</strong> {keywords}</p>
@@ -550,7 +550,7 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
                 <div class="seo-item">
                   <h6>Autor:</h6>
                   {#if headData.metaTags}
-                    {@const author = headData.metaTags.find((tag: any) => tag.name === 'author' || tag.property === 'og:author')?.content}
+                    {@const author = headData.metaTags.find((tag) => tag.name === 'author' || tag.property === 'og:author')?.content}
                     {#if author}
                       <p><strong>Aktueller Autor:</strong> {author}</p>
                     {/if}
@@ -568,8 +568,8 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
                 <div class="seo-item">
                   <h6>Standort:</h6>
                   {#if headData}
-                    {@const locationFromMeta = headData.metaTags?.find((tag: any) => tag.name === 'geo.region' || tag.property === 'og:locale')?.content}
-                    {@const locationFromJsonLd = headData.jsonLdData?.find((ld: any) => ld.data?.contentLocation?.name)?.data?.contentLocation?.name}
+                    {@const locationFromMeta = headData.metaTags?.find((tag) => tag.name === 'geo.region' || tag.property === 'og:locale')?.content}
+                    {@const locationFromJsonLd = headData.jsonLdData?.find((ld) => ld.data?.contentLocation?.name)?.data?.contentLocation?.name}
                     {@const location = locationFromMeta || locationFromJsonLd}
                     {#if location}
                       <p><strong>Aktueller Standort:</strong> {location}</p>
@@ -588,7 +588,7 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
                 <div class="seo-item">
                   <h6>og:image:</h6>
                   {#if headData}
-                    {@const ogImageFromMeta = headData.metaTags?.find((tag: any) => tag.property === 'og:image')?.content}
+                    {@const ogImageFromMeta = headData.metaTags?.find((tag) => tag.property === 'og:image')?.content}
                     {@const isCulocaUrl = testUrl.toLowerCase().includes('culoca') || testUrl.toLowerCase().includes('localhost')}
                     {@const ogImage = ogImageFromMeta || (isCulocaUrl ? 'culoca-see-you-local-entdecke-deine-umgebung.jpg' : '')}
                     {#if ogImage}
@@ -608,7 +608,7 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
                 <div class="seo-item">
                   <h6>Icon:</h6>
                   {#if headData}
-                    {@const iconFromLink = headData.linkTags?.find((tag: any) => tag.rel === 'icon')?.href}
+                    {@const iconFromLink = headData.linkTags?.find((tag) => tag.rel === 'icon')?.href}
                     {@const isCulocaUrl = testUrl.toLowerCase().includes('culoca') || testUrl.toLowerCase().includes('localhost')}
                     {@const icon = iconFromLink || (isCulocaUrl ? 'culoca-icon.svg' : '')}
                     {#if icon}
