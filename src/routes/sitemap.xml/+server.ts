@@ -16,13 +16,20 @@ export const GET: RequestHandler = async () => {
     // Static pages (nur öffentliche, wichtige Seiten - Login entfernt da nicht indexiert werden soll)
     // Mit priority und changefreq für bessere Indexierung
     const staticPages = [
-      { url: '', priority: '1.0', changefreq: 'daily' },  // Startseite - höchste Priorität
-      { url: '/map-view', priority: '0.8', changefreq: 'daily' },
-      { url: '/bulk-upload', priority: '0.7', changefreq: 'weekly' },
-      { url: '/search', priority: '0.8', changefreq: 'daily' },
-      { url: '/web', priority: '0.6', changefreq: 'monthly' },
-      { url: '/datenschutz', priority: '0.3', changefreq: 'yearly' },
-      { url: '/impressum', priority: '0.3', changefreq: 'yearly' }
+      { url: '', priority: '1.0', changefreq: 'daily' },
+      { url: '/foto', priority: '0.9', changefreq: 'daily' },
+      { url: '/event', priority: '0.9', changefreq: 'daily' },
+      { url: '/firma', priority: '0.9', changefreq: 'daily' },
+      { url: '/video', priority: '0.8', changefreq: 'daily' },
+      { url: '/musik', priority: '0.8', changefreq: 'daily' },
+      { url: '/ki-bild', priority: '0.8', changefreq: 'daily' },
+      { url: '/text', priority: '0.8', changefreq: 'daily' },
+      { url: '/link', priority: '0.8', changefreq: 'daily' },
+      { url: '/galerie', priority: '0.7', changefreq: 'daily' },
+      { url: '/map-view', priority: '0.7', changefreq: 'daily' },
+      { url: '/web', priority: '0.5', changefreq: 'monthly' },
+      { url: '/web/impressum', priority: '0.3', changefreq: 'yearly' },
+      { url: '/web/datenschutz', priority: '0.3', changefreq: 'yearly' }
     ];
 
     // Entfernt: Keine Slug-Mappings mehr
@@ -140,17 +147,19 @@ export const GET: RequestHandler = async () => {
       xml += '  </url>\n';
     }
 
-    // Add crawlable pagination pages so bots can discover all item links
-    const itemsPerPage = 50;
-    const totalPages = Math.max(1, Math.ceil(sitemapItems.length / itemsPerPage));
-    for (let p = 2; p <= totalPages; p++) {
-      xml += '  <url>\n';
-      xml += `    <loc>${baseUrl}/?page=${p}</loc>\n`;
-      const currentDate = new Date().toISOString().split('T')[0];
-      xml += `    <lastmod>${currentDate}</lastmod>\n`;
-      xml += '    <priority>0.7</priority>\n';
-      xml += '    <changefreq>daily</changefreq>\n';
-      xml += '  </url>\n';
+    // Add crawlable hub pagination pages so bots can discover all item links
+    for (const [, typeDef] of DEFAULT_CONTENT_TYPE_BY_ID.entries()) {
+      const typeItems = sitemapItems.filter(item => item.type_id === typeDef.id);
+      const typePages = Math.max(1, Math.ceil(typeItems.length / 24));
+      for (let p = 2; p <= typePages; p++) {
+        xml += '  <url>\n';
+        xml += `    <loc>${baseUrl}/${typeDef.slug}?seite=${p}</loc>\n`;
+        const currentDate = new Date().toISOString().split('T')[0];
+        xml += `    <lastmod>${currentDate}</lastmod>\n`;
+        xml += '    <priority>0.6</priority>\n';
+        xml += '    <changefreq>daily</changefreq>\n';
+        xml += '  </url>\n';
+      }
     }
 
     // Add item pages with optimized data (following Google's current guidelines)

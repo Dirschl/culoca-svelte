@@ -1,7 +1,16 @@
 User-agent: *
 Allow: /
 
-# Explicitly allow item pages and image URLs for Google Image Search
+# Explicitly allow content hubs, item pages and images
+Allow: /foto/
+Allow: /event/
+Allow: /firma/
+Allow: /video/
+Allow: /musik/
+Allow: /ki-bild/
+Allow: /text/
+Allow: /link/
+Allow: /galerie
 Allow: /item/
 Allow: /images/
 

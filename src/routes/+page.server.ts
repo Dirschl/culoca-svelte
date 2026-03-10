@@ -1,213 +1,101 @@
 import type { PageServerLoad } from './$types';
 import { createClient } from '@supabase/supabase-js';
+import { DEFAULT_CONTENT_TYPES } from '$lib/content/types';
 
-// Disable caching for this page to ensure fresh data
-export const csr = true;
 export const ssr = true;
 
-export const load: PageServerLoad = async ({ url, request }) => {
-  // Get page parameter for pagination
-  const page = parseInt(url.searchParams.get('page') || '1');
-  const itemsPerPage = 15;
-  
-  // Bot detection for enhanced SEO
-  const userAgent = request.headers.get('user-agent') || '';
-  const userAgentLower = userAgent.toLowerCase();
-  const forceBot = ['1', 'true', 'yes'].includes((url.searchParams.get('bot') || '').toLowerCase());
-  const isBot = forceBot ||
-                userAgentLower.includes('googlebot') ||
-                userAgentLower.includes('bingbot') ||
-                userAgentLower.includes('slurp') ||
-                userAgentLower.includes('duckduckbot') ||
-                userAgentLower.includes('facebookexternalhit') ||
-                userAgentLower.includes('twitterbot') ||
-                userAgentLower.includes('linkedinbot') ||
-                userAgentLower.includes('yandexbot') ||
-                userAgentLower.includes('baiduspider') ||
-                userAgentLower.includes('rogerbot') ||
-                userAgentLower.includes('dotbot') ||
-                userAgentLower.includes('ia_archiver') ||
-                userAgentLower.includes('google-inspectiontool') ||
-                userAgentLower.includes('inspectiontool') ||
-                userAgentLower.includes('headlesschrome') ||
-                userAgentLower.includes('lighthouse') ||
-                userAgentLower.includes('node');
+const ITEMS_PER_SECTION = 8;
 
-  // Supabase client für serverseitige Daten
-  const supabaseUrl = (process.env.PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL || import.meta.env.PUBLIC_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL) as string;
-  const supabaseServiceKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.PUBLIC_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || import.meta.env.PUBLIC_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY) as string;
-  
-  const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+export const load: PageServerLoad = async () => {
+  const supabaseUrl = (
+    process.env.PUBLIC_SUPABASE_URL ||
+    process.env.VITE_SUPABASE_URL ||
+    import.meta.env.PUBLIC_SUPABASE_URL ||
+    import.meta.env.VITE_SUPABASE_URL
+  ) as string;
+  const supabaseKey = (
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.PUBLIC_SUPABASE_ANON_KEY ||
+    process.env.VITE_SUPABASE_ANON_KEY ||
+    import.meta.env.PUBLIC_SUPABASE_ANON_KEY ||
+    import.meta.env.VITE_SUPABASE_ANON_KEY
+  ) as string;
+
+  const supabase = createClient(supabaseUrl, supabaseKey, {
     auth: { persistSession: false }
   });
 
-  // Newsflash-Daten serverseitig laden für Bots
-  let newsFlashItems = [];
-  let totalCount = 0;
-  
-  try {
-    const { data, error } = await supabase.rpc('newsflash_items_postgis', {
-      page_value: page - 1, // 0-basiert
-      page_size_value: itemsPerPage,
-      current_user_id: null, // Für Bots: alle öffentlichen Bilder
-      mode: 'alle'
-    });
-
-    if (!error && data) {
-      const canonicalRows = data.length
-        ? await supabase
-            .from('items')
-            .select('id, canonical_path')
-            .in('id', data.map((item) => item.id))
-        : { data: [], error: null };
-
-      const canonicalById = new Map((canonicalRows.data || []).map((item) => [item.id, item.canonical_path]));
-
-      newsFlashItems = data.map(item => ({
-        id: item.id,
-        slug: item.slug,
-        canonical_path: canonicalById.get(item.id) || null,
-        lat: item.lat,
-        lon: item.lon,
-        path_512: item.path_512,
-        path_2048: item.path_2048, // Add 2048px path for better SEO
-        width: item.width,
-        height: item.height,
-        title: item.title,
-        description: item.description,
-        original_name: item.original_name,
-        created_at: item.created_at,
-        accountname: item.accountname,
-        full_name: item.full_name
-      }));
-      
-      // Total count aus erstem Item extrahieren
-      if (data.length > 0 && data[0].total_count) {
-        totalCount = data[0].total_count;
-      }
-    }
-  } catch (error) {
-    console.error('[Server] Error loading newsflash items:', error);
-  }
-
-  // Welcome-Content serverseitig laden für Bots
-  let welcomeContent: any = {};
-  try {
-    const { data, error } = await supabase
-      .from('welcome_content')
-      .select('*')
-      .eq('is_active', true)
-      .order('id');
-    
-    if (!error && data) {
-      const content = data || [];
-      welcomeContent = {
-        greeting: content.find(item => item.section_key === 'greeting'),
-        gps: content.find(item => item.section_key === 'gps_feature'),
-        discover: content.find(item => item.section_key === 'discover')
-      };
-      console.log('[Server] Loaded welcome content for SSR:', Object.keys(welcomeContent));
-    }
-  } catch (error) {
-    console.error('[Server] Error loading welcome content:', error);
-  }
-
-  // 3 echte zufällige Items über die gesamte Datenbank für WelcomeSection laden (für SEO)
-  let featuredItems: any[] = [];
-  try {
-    // Verwende direkte Query mit zufälligen Offsets für echte Zufälligkeit
-    // Füge einen Timestamp hinzu um Caching zu vermeiden
-    const timestamp = Date.now();
-    console.log('[Server] Requesting random items at:', timestamp);
-    
-    // Direkte Query mit zufälligen Offsets
-    const { count } = await supabase
-      .from('items')
-      .select('*', { count: 'exact', head: true })
-      .not('slug', 'is', null)
-      .eq('is_private', false);
-    
-    console.log('[Server] Total public items count:', count);
-    
-    if (count && count > 3) {
-      // Generiere 3 zufällige Offsets
-      const randomOffsets = Array.from({ length: 3 }, () => 
-        Math.floor(Math.random() * Math.max(1, count - 1))
-      ).sort((a, b) => a - b); // Sortiere für bessere Performance
-      
-      console.log('[Server] Random offsets:', randomOffsets);
-      
-      // Lade Items an den zufälligen Positionen (slug ist alles was wir brauchen, Rest kommt von og-image API)
-      const promises = randomOffsets.map(offset => 
-        supabase
-          .from('items')
-          .select('id, title, slug, description, canonical_path')
-          .not('slug', 'is', null)
-          .eq('is_private', false)
-          .order('created_at', { ascending: false })
-          .range(offset, offset)
-          .single()
-      );
-      
-      const results = await Promise.all(promises);
-      console.log('[Server] Query results:', results.map(r => ({ error: r.error, hasData: !!r.data })));
-      
-      const fallbackData = results
-        .filter(r => !r.error && r.data)
-        .map(r => r.data);
-    
-      if (fallbackData.length > 0) {
-        featuredItems = fallbackData.map(item => ({
-          id: item.id,
-          slug: item.slug,
-          canonical_path: item.canonical_path,
-          title: item.title || 'Unbenanntes Item',
-          description: item.description || ''
-        }));
-        console.log('[Server] Loaded featured items for SEO:', featuredItems.length);
-      }
-    }
-  } catch (error) {
-    console.error('[Server] Error loading featured items:', error);
-  }
-
-  // SEO-Daten serverseitig laden
-  const seo = {
-    title: 'Culoca - Entdecke die Welt durch Fotos',
-    description: 'Culoca ist eine Plattform zum Entdecken und Teilen von Fotos mit GPS-Daten. Erstelle deine eigene Fotogalerie und erkunde die Welt durch die Augen anderer.',
-    keywords: 'Fotografie, GPS, Galerie, Bilder, Entdeckung, Culoca',
-    author: 'Culoca',
-    robots: 'index, follow',
-    language: 'de',
-    geoRegion: 'DE',
-    geoPosition: '51.1657;10.4515',
-    icbm: '51.1657, 10.4515',
-    ogTitle: 'Culoca - Entdecke die Welt durch Fotos',
-    ogDescription: 'Culoca ist eine Plattform zum Entdecken und Teilen von Fotos mit GPS-Daten. Erstelle deine eigene Fotogalerie und erkunde die Welt durch die Augen anderer.',
-    ogImage: '/culoca-logo-512px.png',
-    ogImageAlt: 'Culoca Logo',
-    ogType: 'website',
-    ogUrl: 'https://culoca.com',
-    twitterCard: 'summary_large_image',
-    twitterTitle: 'Culoca - Entdecke die Welt durch Fotos',
-    twitterDescription: 'Culoca ist eine Plattform zum Entdecken und Teilen von Fotos mit GPS-Daten.',
-    twitterImage: '/culoca-logo-512px.png',
-    canonicalUrl: 'https://culoca.com'
+  type SectionItem = {
+    id: string;
+    slug: string;
+    title: string | null;
+    description: string | null;
+    caption: string | null;
+    canonical_path: string | null;
+    path_512: string | null;
+    width: number | null;
+    height: number | null;
+    created_at: string | null;
+    starts_at: string | null;
+    ends_at: string | null;
   };
 
-  console.log('[Server] Loading page data with SSR newsflash items:', newsFlashItems.length);
-  console.log('[Server] Bot detection:', { isBot, userAgent: userAgent.substring(0, 100) });
-  
-  return {
-    seo,
-    newsFlashItems,
-    welcomeContent,
-    featuredItems,
-    page,
-    totalPages: Math.ceil(totalCount / itemsPerPage),
-    totalCount,
-    dbConnectionOk: true,
-    isBot,
-    userAgent: userAgent.substring(0, 100) // For debugging
+  type Section = {
+    typeId: number;
+    slug: string;
+    name: string;
+    description: string;
+    items: SectionItem[];
+    totalCount: number;
   };
+
+  const sections: Section[] = [];
+
+  const typeQueries = DEFAULT_CONTENT_TYPES.map(async (type) => {
+    try {
+      const { count } = await supabase
+        .from('items')
+        .select('*', { count: 'exact', head: true })
+        .eq('type_id', type.id)
+        .eq('is_private', false)
+        .eq('admin_hidden', false)
+        .is('group_root_item_id', null)
+        .not('slug', 'is', null);
+
+      if (!count || count === 0) return null;
+
+      const { data, error } = await supabase
+        .from('items')
+        .select('id, slug, title, description, caption, canonical_path, path_512, width, height, created_at, starts_at, ends_at')
+        .eq('type_id', type.id)
+        .eq('is_private', false)
+        .eq('admin_hidden', false)
+        .is('group_root_item_id', null)
+        .not('slug', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(ITEMS_PER_SECTION);
+
+      if (error || !data?.length) return null;
+
+      return {
+        typeId: type.id,
+        slug: type.slug,
+        name: type.name,
+        description: type.description,
+        items: data as SectionItem[],
+        totalCount: count
+      } satisfies Section;
+    } catch {
+      return null;
+    }
+  });
+
+  const results = await Promise.all(typeQueries);
+  for (const r of results) {
+    if (r) sections.push(r);
+  }
+
+  const totalItems = sections.reduce((sum, s) => sum + s.totalCount, 0);
+
+  return { sections, totalItems };
 };
