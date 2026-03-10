@@ -49,6 +49,8 @@
   let headError = '';
   let activeTab = 'images';
   let fullscreenOpen = false;
+  let fullscreenMode: 'bot' | 'web' = 'bot';
+  let fullscreenUrl = '';
 
   let isBotMode = false;
   let originalUserAgent = '';
@@ -75,6 +77,18 @@
     if (event.key === 'Enter') {
       fetchHeadData();
     }
+  }
+
+  function handleFullscreenUrlSubmit(event: KeyboardEvent) {
+    if (event.key === 'Enter' && fullscreenUrl.trim()) {
+      testUrl = fullscreenUrl.trim();
+      fetchHeadData();
+    }
+  }
+
+  function openFullscreen() {
+    fullscreenUrl = testUrl;
+    fullscreenOpen = true;
   }
 
   async function copyAdvancedPrompt() {
@@ -312,7 +326,7 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
 
     if (testUrl) {
       if (autoFullscreen) {
-        fullscreenOpen = true;
+        openFullscreen();
       }
       await fetchHeadData();
     }
@@ -1032,7 +1046,7 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
               <div class="fullscreen-section">
                 <h5>Fullscreen — Seite im gesamten Browser anzeigen:</h5>
                 <p class="fullscreen-hint">Die Seite wird als Vollbild-Overlay über dem gesamten Browserfenster geladen. Schließen mit dem X-Button oder Escape.</p>
-                <button class="fullscreen-open-btn" on:click={() => fullscreenOpen = true}>
+                <button class="fullscreen-open-btn" on:click={openFullscreen}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
                   Fullscreen öffnen
                 </button>
@@ -1069,12 +1083,29 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
   <SiteFooter />
 </div>
 
-{#if fullscreenOpen && testUrl}
+{#if fullscreenOpen && fullscreenUrl}
   <div class="fullscreen-overlay">
     <div class="fullscreen-toolbar">
-      <span class="fullscreen-url">{testUrl}</span>
+      <div class="fullscreen-left">
+        <button
+          class="fullscreen-mode-toggle"
+          class:active-bot={fullscreenMode === 'bot'}
+          on:click={() => fullscreenMode = fullscreenMode === 'bot' ? 'web' : 'bot'}
+          title={fullscreenMode === 'bot' ? 'Bot-Ansicht (Server-Side Rendering)' : 'Web-Ansicht (Live-Seite)'}
+        >
+          {fullscreenMode === 'bot' ? 'BOT' : 'WEB'}
+        </button>
+        <input
+          type="text"
+          class="fullscreen-url-input"
+          bind:value={fullscreenUrl}
+          on:keydown={handleFullscreenUrlSubmit}
+          placeholder="URL eingeben..."
+          spellcheck="false"
+        />
+      </div>
       <div class="fullscreen-actions">
-        <a href={testUrl} target="_blank" rel="noopener" class="fullscreen-action-btn" title="In neuem Tab öffnen">
+        <a href={fullscreenUrl} target="_blank" rel="noopener" class="fullscreen-action-btn" title="In neuem Tab öffnen">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
         </a>
         <button class="fullscreen-close-btn" on:click={() => fullscreenOpen = false} title="Schließen (Esc)">
@@ -1082,12 +1113,21 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
         </button>
       </div>
     </div>
-    <iframe
-      src={testUrl}
-      title="Fullscreen Vorschau"
-      class="fullscreen-iframe"
-      sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
-    ></iframe>
+    {#if fullscreenMode === 'bot' && headData?.rawHtml}
+      <iframe
+        srcdoc={headData.rawHtml}
+        title="Bot Fullscreen Vorschau"
+        class="fullscreen-iframe"
+        sandbox="allow-same-origin allow-scripts"
+      ></iframe>
+    {:else}
+      <iframe
+        src={fullscreenUrl}
+        title="Fullscreen Vorschau"
+        class="fullscreen-iframe"
+        sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+      ></iframe>
+    {/if}
   </div>
 {/if}
 
@@ -1868,13 +1908,63 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
     flex-shrink: 0;
   }
 
-  :global(.fullscreen-url) {
-    font-size: 0.85rem;
+  :global(.fullscreen-left) {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1;
+    min-width: 0;
+    margin-right: 0.75rem;
+  }
+
+  :global(.fullscreen-mode-toggle) {
+    flex-shrink: 0;
+    padding: 0.25rem 0.6rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    border-radius: 4px;
+    border: 1px solid var(--border-color, #444);
+    background: transparent;
     color: var(--text-secondary, #aaa);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: calc(100% - 100px);
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: monospace;
+  }
+
+  :global(.fullscreen-mode-toggle.active-bot) {
+    background: var(--culoca-orange, #e67e22);
+    border-color: var(--culoca-orange, #e67e22);
+    color: #fff;
+  }
+
+  :global(.fullscreen-mode-toggle:hover) {
+    border-color: var(--culoca-orange, #e67e22);
+    color: var(--culoca-orange, #e67e22);
+  }
+
+  :global(.fullscreen-mode-toggle.active-bot:hover) {
+    background: #cf6e17;
+    border-color: #cf6e17;
+    color: #fff;
+  }
+
+  :global(.fullscreen-url-input) {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.85rem;
+    color: var(--text-primary, #eee);
+    background: var(--bg-primary, #111);
+    border: 1px solid var(--border-color, #444);
+    border-radius: 4px;
+    padding: 0.3rem 0.6rem;
+    outline: none;
+    font-family: monospace;
+    transition: border-color 0.15s;
+  }
+
+  :global(.fullscreen-url-input:focus) {
+    border-color: var(--culoca-orange, #e67e22);
   }
 
   :global(.fullscreen-actions) {
