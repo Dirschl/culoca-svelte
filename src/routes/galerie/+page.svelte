@@ -2266,7 +2266,6 @@
   </div>
 {:else}
   <!-- Galerie-Komponenten und restliche Seite -->
-  <div id="galerie"></div>
   <FilterBar
     isManual3x3Mode={isManual3x3Mode}
     onLocationFilterClear={clearLocationFilterAndReloadGallery}
@@ -2358,6 +2357,7 @@
     </div>
   {/if}
   
+  <div id="galerie"></div>
   {#if isManual3x3Mode && !hasLocationFilter}
     <MobileGallery
       userLat={userLat}
