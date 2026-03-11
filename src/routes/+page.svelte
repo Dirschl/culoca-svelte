@@ -247,7 +247,7 @@
       var(--bg-primary);
   }
   .hero-inner {
-    padding: 5rem 2rem 4rem;
+    padding: 3rem 2rem 3rem;
   }
   .hero-layout {
     display: grid;
@@ -335,7 +335,7 @@
     color: var(--text-secondary);
   }
   .hero-location-map {
-    min-height: 220px;
+    min-height: 184px;
     overflow: hidden;
     border-radius: 12px;
     border: 1px solid color-mix(in srgb, var(--border-color) 80%, white 20%);
@@ -344,7 +344,7 @@
   .hero-location-map iframe {
     display: block;
     width: 100%;
-    height: 220px;
+    height: 184px;
     border: 0;
   }
 
@@ -546,10 +546,10 @@
       grid-template-columns: 1fr;
     }
     .hero-location-map {
-      min-height: 200px;
+      min-height: 170px;
     }
     .hero-location-map iframe {
-      height: 200px;
+      height: 170px;
     }
     .items-grid {
       grid-template-columns: repeat(3, 1fr);
