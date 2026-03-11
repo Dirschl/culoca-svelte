@@ -980,12 +980,10 @@
   
   // Setze Default-Settings für anonyme User
   function setAnonymousUserDefaults() {
-    if (browser && !isLoggedIn) {
-      // Setze NewsFlash auf 'aus' für anonyme User wenn nicht bereits gesetzt
-      if (!localStorage.getItem('newsFlashMode')) {
-        localStorage.setItem('newsFlashMode', 'aus');
-        newsFlashMode = 'aus';
-      }
+    if (browser && !isLoggedIn && !isBot) {
+      // Anonyme User sollen NewsFlash immer deaktiviert sehen, auch wenn noch ein alter Wert gespeichert ist.
+      localStorage.setItem('newsFlashMode', 'aus');
+      newsFlashMode = 'aus';
 
       if (!localStorage.getItem('welcomeVisible')) {
         localStorage.setItem('welcomeVisible', 'false');
