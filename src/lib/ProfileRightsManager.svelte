@@ -233,7 +233,7 @@
 
 <div class="profile-rights-manager">
   <h3>Profilweite Rechte</h3>
-  <p class="intro-text">Diese Freigaben gelten fuer alle Items deines Profils. Fuer einzelne Eintraege vergibst du Rechte direkt im jeweiligen Item.</p>
+  <p class="intro-text">Diese Freigaben gelten für alle Items deines Profils. Für einzelne Einträge vergibst du Rechte direkt im jeweiligen Item.</p>
   
   {#if message}
     <div class="message {messageType}">
@@ -279,7 +279,7 @@
 
     {#if selectedUser}
       <div class="selected-user">
-        <h5>Ausgewaehlter Benutzer</h5>
+        <h5>Ausgewählter Benutzer</h5>
         <div class="user-info">
           <strong>{selectedUser.full_name}</strong>
           <span class="email">{selectedUser.email}</span>
@@ -288,17 +288,17 @@
         <div class="rights-checkboxes">
           <label class="right-checkbox">
             <input type="checkbox" bind:checked={rights.download}>
-            <span class="checkbox-label">Download fuer alle Items</span>
+            <span class="checkbox-label">Download für alle Items</span>
           </label>
           
           <label class="right-checkbox">
             <input type="checkbox" bind:checked={rights.edit}>
-            <span class="checkbox-label">Bearbeiten fuer alle Items</span>
+            <span class="checkbox-label">Bearbeiten für alle Items</span>
           </label>
           
           <label class="right-checkbox">
             <input type="checkbox" bind:checked={rights.delete}>
-            <span class="checkbox-label">Loeschen fuer alle Items</span>
+            <span class="checkbox-label">Löschen für alle Items</span>
           </label>
         </div>
         
