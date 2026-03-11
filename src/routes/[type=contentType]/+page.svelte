@@ -46,9 +46,22 @@
     lastSearchValue = data.search || '';
   }
   $: shouldPreferGpsSorting = isFotoType && currentGpsPosition != null;
+  $: serverItemsWithDistance = shouldPreferGpsSorting
+    ? data.items.map((item: any) => {
+        const lat = Number(item.lat);
+        const lon = Number(item.lon);
+        const hasCoordinates = Number.isFinite(lat) && Number.isFinite(lon);
+        return {
+          ...item,
+          lat: hasCoordinates ? lat : item.lat,
+          lon: hasCoordinates ? lon : item.lon,
+          distance: hasCoordinates ? getDistanceInMeters(currentGpsPosition!.lat, currentGpsPosition!.lon, lat, lon) : null
+        };
+      })
+    : data.items;
   $: useGpsApi = shouldPreferGpsSorting && clientItems != null;
   $: effectivePage = useGpsApi ? clientPage : data.page;
-  $: displayedItems = useGpsApi ? clientItems! : shouldPreferGpsSorting ? [] : data.items;
+  $: displayedItems = useGpsApi ? clientItems! : serverItemsWithDistance;
   $: displayedTotalCount = (useGpsApi ? clientTotalCount : null) ?? data.totalCount;
   $: displayedTotalPages = Math.max(1, Math.ceil(displayedTotalCount / data.pageSize));
   $: hasDistanceData = displayedItems.some((item: any) => item?.distance !== undefined && item?.distance !== null);

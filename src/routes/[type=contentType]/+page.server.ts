@@ -7,7 +7,11 @@ export const ssr = true;
 
 const PAGE_SIZE = 24;
 
-function applyMultiWordSearch<T>(query: T, search: string) {
+function applyMultiWordSearch<T>(
+  query: T,
+  search: string,
+  opts?: { includeKeywordsAndOriginalName?: boolean }
+) {
   const words = search
     .trim()
     .split(/\s+/)
@@ -17,9 +21,11 @@ function applyMultiWordSearch<T>(query: T, search: string) {
   let nextQuery: any = query;
   for (const word of words) {
     const escaped = word.replace(/%/g, '\\%').replace(/_/g, '\\_');
-    nextQuery = nextQuery.or(
-      `title.ilike.%${escaped}%,description.ilike.%${escaped}%,caption.ilike.%${escaped}%,slug.ilike.%${escaped}%`
-    );
+    const baseClause = `title.ilike.%${escaped}%,description.ilike.%${escaped}%,caption.ilike.%${escaped}%,slug.ilike.%${escaped}%`;
+    const withExtra = opts?.includeKeywordsAndOriginalName
+      ? `${baseClause},keywords.ilike.%${escaped}%,original_name.ilike.%${escaped}%`
+      : baseClause;
+    nextQuery = nextQuery.or(withExtra);
   }
   return nextQuery;
 }
@@ -56,14 +62,16 @@ export const load: PageServerLoad = async ({ params, url }) => {
   const buildBaseQuery = () => {
     let query = supabase
       .from('items')
-      .select('id, slug, title, description, caption, canonical_path, path_512, width, height, created_at, starts_at, ends_at, external_url')
+      .select('id, slug, title, description, caption, canonical_path, path_512, width, height, created_at, starts_at, ends_at, external_url, lat, lon')
       .eq('type_id', typeDef.id)
       .eq('is_private', false)
       .eq('admin_hidden', false)
       .is('group_root_item_id', null)
       .not('slug', 'is', null);
     if (search) {
-      query = applyMultiWordSearch(query, search);
+      query = applyMultiWordSearch(query, search, {
+        includeKeywordsAndOriginalName: typeDef.slug === 'foto'
+      });
     }
     return query;
   };
@@ -78,7 +86,9 @@ export const load: PageServerLoad = async ({ params, url }) => {
       .is('group_root_item_id', null)
       .not('slug', 'is', null);
     if (search) {
-      query = applyMultiWordSearch(query, search);
+      query = applyMultiWordSearch(query, search, {
+        includeKeywordsAndOriginalName: typeDef.slug === 'foto'
+      });
     }
     return query;
   };
@@ -105,6 +115,8 @@ export const load: PageServerLoad = async ({ params, url }) => {
     starts_at: (item.starts_at || null) as string | null,
     ends_at: (item.ends_at || null) as string | null,
     external_url: (item.external_url || null) as string | null,
+    lat: (item.lat || null) as number | null,
+    lon: (item.lon || null) as number | null,
     child_count: 0
   }));
 
