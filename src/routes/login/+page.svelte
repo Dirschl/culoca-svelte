@@ -3,6 +3,7 @@
   import { supabase } from '../../lib/supabaseClient';
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
+  import SiteNav from '$lib/SiteNav.svelte';
 
   let isLoggedIn = false;
   let loginEmail = '';
@@ -12,28 +13,51 @@
   let loginInfo = '';
   let showRegister = false;
 
+  const loginBenefits = [
+    'Eigene Objekte und Einträge anlegen',
+    'Bilder hochladen und Inhalte bearbeiten',
+    'Profil, Freigaben und Einstellungen vollständig nutzen'
+  ];
+
+  const oauthDetails = [
+    {
+      title: 'Was OAuth bedeutet',
+      text: 'OAuth ist ein Anmeldeverfahren, bei dem du dich mit einem bestehenden Konto wie Google oder Facebook einloggst, ohne für Culoca ein separates Passwort pflegen zu müssen.'
+    },
+    {
+      title: 'Welche Daten übernommen werden',
+      text: 'Je nach Anbieter werden Name, E-Mail-Adresse und häufig auch dein Profilbild übernommen. Diese Angaben können in Culoca direkt als Profilbasis verwendet werden.'
+    },
+    {
+      title: 'Warum das praktisch ist',
+      text: 'Dein Profil ist schneller eingerichtet, du musst weniger manuell ausfüllen und kannst sofort mit Uploads, Einträgen und der Verwaltung deiner Inhalte starten.'
+    }
+  ];
+
   $: isLoggedIn = $sessionStore.isAuthenticated;
+
+  onMount(() => {
+    if (isLoggedIn) {
+      goto('/');
+    }
+  });
 
   async function loginWithProvider(provider: 'google' | 'facebook') {
     loginLoading = true;
     loginError = '';
-    
-    // Session löschen vor OAuth-Login für direkten Login
+    loginInfo = '';
+
     sessionStore.clearSession();
-    console.log('🔓 Direct OAuth login - cleared session data');
-    
-    // Für Produktionsumgebung: Explizite Redirect-URL setzen
-    const redirectTo = typeof window !== 'undefined' && window.location.hostname !== 'localhost' 
+
+    const redirectTo = typeof window !== 'undefined' && window.location.hostname !== 'localhost'
       ? `${window.location.origin}/auth/callback`
       : undefined;
-    
-    const { error: authError } = await supabase.auth.signInWithOAuth({ 
+
+    const { error: authError } = await supabase.auth.signInWithOAuth({
       provider,
-      options: {
-        redirectTo
-      }
+      options: { redirectTo }
     });
-    
+
     if (authError) loginError = authError.message;
     loginLoading = false;
   }
@@ -41,26 +65,22 @@
   async function loginWithEmail() {
     loginLoading = true;
     loginError = '';
-    const { data, error: authError } = await supabase.auth.signInWithPassword({ email: loginEmail, password: loginPassword });
+    loginInfo = '';
+
+    const { data, error: authError } = await supabase.auth.signInWithPassword({
+      email: loginEmail,
+      password: loginPassword
+    });
+
     if (authError) {
       loginError = authError.message;
-    } else {
-      // Erfolgreicher Login - Session aktualisieren
-      console.log('🔓 Email login successful - updating session');
-      
-      // Session aktualisieren mit User-Daten
-      if (data.user) {
-        sessionStore.setUser(data.user.id, true);
-        console.log('🔓 Session updated with user:', data.user.id);
-      }
-      
+    } else if (data.user) {
+      sessionStore.setUser(data.user.id, true);
       loginEmail = '';
       loginPassword = '';
-      
-      // WICHTIG: Weiterleitung zur Startseite nach erfolgreichem Login
-      console.log('🔓 Email login successful - redirecting to home page');
       goto('/');
     }
+
     loginLoading = false;
   }
 
@@ -68,57 +88,52 @@
     loginLoading = true;
     loginError = '';
     loginInfo = '';
-    const { data, error: authError } = await supabase.auth.signUp({ email: loginEmail, password: loginPassword });
+
+    const { data, error: authError } = await supabase.auth.signUp({
+      email: loginEmail,
+      password: loginPassword
+    });
+
     if (authError) {
       loginError = authError.message;
+    } else if (data.user && data.session) {
+      sessionStore.setUser(data.user.id, true);
+      loginInfo = 'Registrierung erfolgreich. Du wirst automatisch angemeldet.';
+      loginEmail = '';
+      loginPassword = '';
+      showRegister = false;
+      setTimeout(() => goto('/'), 1200);
     } else {
-      // Erfolgreiche Registrierung
-      console.log('🔓 Email signup successful');
-      
-      if (data.user && data.session) {
-        // Email ist bereits bestätigt (z.B. bei Admin-erstellten Accounts)
-        console.log('🔓 User already confirmed - updating session');
-        sessionStore.setUser(data.user.id, true);
-        loginInfo = 'Registrierung erfolgreich! Du wurdest automatisch angemeldet.';
-        loginEmail = '';
-        loginPassword = '';
-        showRegister = false;
-        
-        // Weiterleitung zur Startseite
-        setTimeout(() => goto('/'), 2000);
-      } else {
-        // Email muss bestätigt werden
-        console.log('🔓 User needs email confirmation');
-        sessionStore.clearSession();
-        loginInfo = 'Registrierung erfolgreich! Bitte bestätige deine E-Mail-Adresse. Du kannst dich nach der Bestätigung anmelden.';
-        loginEmail = '';
-        loginPassword = '';
-        showRegister = false;
-      }
+      sessionStore.clearSession();
+      loginInfo = 'Registrierung erfolgreich. Bitte bestätige deine E-Mail-Adresse und melde dich danach an.';
+      loginEmail = '';
+      loginPassword = '';
+      showRegister = false;
     }
+
     loginLoading = false;
   }
 
   async function resetPassword() {
     if (!loginEmail) {
-      loginError = 'Bitte gib deine E-Mail-Adresse ein.';
+      loginError = 'Bitte gib zuerst deine E-Mail-Adresse ein.';
       return;
     }
-    
+
     loginLoading = true;
     loginError = '';
-    
+    loginInfo = '';
+
     const { error } = await supabase.auth.resetPasswordForEmail(loginEmail, {
       redirectTo: `${window.location.origin}/auth/callback?type=recovery`
     });
-    
+
     if (error) {
       loginError = error.message;
     } else {
-      loginInfo = 'Passwort-Reset-Link wurde an deine E-Mail gesendet.';
-      loginEmail = '';
+      loginInfo = 'Ein Link zum Zurücksetzen wurde an deine E-Mail-Adresse gesendet.';
     }
-    
+
     loginLoading = false;
   }
 
@@ -126,426 +141,434 @@
     sessionStore.setAnonymous(true);
     goto('/');
   }
-
-  function onClose() {
-    // Bei Login-Seite: zurück zur Startseite
-    goto('/');
-  }
 </script>
 
+<svelte:head>
+  <title>Login - Culoca</title>
+  <meta name="robots" content="noindex, nofollow" />
+</svelte:head>
+
 {#if !isLoggedIn}
-  <div class="modern-login-overlay">
-    <div class="modern-login-content">
-      <button class="modern-login-close" on:click={onClose}>×</button>
-      <img src="/culoca-logo-512px.png" alt="Culoca Logo" class="modern-login-logo" />
+  <div class="login-page">
+    <SiteNav />
 
-      {#if loginError}
-        <div class="modern-login-error">{loginError}</div>
-      {/if}
-      {#if loginInfo}
-        <div class="modern-login-info">{loginInfo}</div>
-      {/if}
+    <main class="login-main">
+      <section class="login-shell">
+        <div class="login-card surface-responsive surface-responsive--panel">
+          <div class="login-header">
+            <span class="eyebrow">Login</span>
+            <h1>Culoca vollständig nutzen</h1>
+            <p>
+              Melde dich an, um eigene Objekte anzulegen, Uploads zu starten und dein Profil mit Rechten, Einstellungen und Inhalten zu verwalten.
+            </p>
+          </div>
 
-      <div class="modern-social-login">
-        <button class="modern-social-btn google-btn" on:click={() => loginWithProvider('google')} disabled={loginLoading}>
-          <svg class="modern-social-icon" viewBox="0 0 48 48" fill="none">
-            <g>
-              <path fill="#4285F4" d="M24 9.5c3.54 0 6.7 1.22 9.19 3.23l6.85-6.85C36.45 2.36 30.68 0 24 0 14.82 0 6.71 5.06 2.69 12.44l7.98 6.2C12.13 13.13 17.62 9.5 24 9.5z"/>
-              <path fill="#34A853" d="M46.1 24.5c0-1.64-.15-3.22-.42-4.74H24v9.01h12.42c-.54 2.9-2.18 5.36-4.65 7.03l7.19 5.6C43.98 37.13 46.1 31.3 46.1 24.5z"/>
-              <path fill="#FBBC05" d="M9.67 28.64c-1.13-3.36-1.13-6.92 0-10.28l-7.98-6.2C-1.13 17.13-1.13 31.87 1.69 37.84l7.98-6.2z"/>
-              <path fill="#EA4335" d="M24 46c6.48 0 11.92-2.14 15.9-5.82l-7.19-5.6c-2.01 1.35-4.6 2.15-8.71 2.15-6.38 0-11.87-3.63-14.33-8.94l-7.98 6.2C6.71 42.94 14.82 48 24 48z"/>
-            </g>
-          </svg>
-        </button>
-        <button class="modern-social-btn facebook-btn" on:click={() => loginWithProvider('facebook')} disabled={loginLoading}>
-          <svg class="modern-social-icon" viewBox="0 0 32 32" fill="none">
-            <circle cx="16" cy="16" r="16" fill="white"/>
-            <path d="M20.5 16H18V24H15V16H13.5V13.5H15V12.25C15 10.73 15.67 9 18 9H20.5V11.5H19.25C18.84 11.5 18.5 11.84 18.5 12.25V13.5H20.5L20 16Z" fill="#23272F"/>
-          </svg>
-        </button>
-      </div>
+          <div class="benefit-list">
+            {#each loginBenefits as benefit}
+              <div class="benefit-item">
+                <span class="benefit-check">✓</span>
+                <span>{benefit}</span>
+              </div>
+            {/each}
+          </div>
 
-      <div class="modern-login-tabs">
-        <button class="modern-tab-btn" class:active={!showRegister} on:click={() => showRegister = false}>
-          Anmelden
-        </button>
-        <button class="modern-tab-btn" class:active={showRegister} on:click={() => showRegister = true}>
-          Registrieren
-        </button>
-      </div>
+          {#if loginError}
+            <div class="notice notice-error">{loginError}</div>
+          {/if}
 
-      {#if !showRegister}
-        <form class="modern-login-form" on:submit|preventDefault={loginWithEmail}>
-          <input class="modern-login-input" type="email" placeholder="E-Mail" bind:value={loginEmail} required />
-          <input class="modern-login-input" type="password" placeholder="Passwort" bind:value={loginPassword} required />
-          <button class="modern-login-submit-btn" type="submit" disabled={loginLoading}>
-            {loginLoading ? 'Anmelden...' : 'Anmelden'}
-          </button>
-          <button type="button" class="modern-forgot-password" on:click={resetPassword}>
-            Passwort vergessen?
-          </button>
-        </form>
-      {:else}
-        <form class="modern-login-form" on:submit|preventDefault={signupWithEmail}>
-          <input class="modern-login-input" type="email" placeholder="E-Mail" bind:value={loginEmail} required />
-          <input class="modern-login-input" type="password" placeholder="Passwort" bind:value={loginPassword} required />
-          <button class="modern-login-submit-btn" type="submit" disabled={loginLoading}>
-            {loginLoading ? 'Registrieren...' : 'Registrieren'}
-          </button>
-        </form>
-      {/if}
+          {#if loginInfo}
+            <div class="notice notice-info">{loginInfo}</div>
+          {/if}
 
-      <div class="modern-anonymous-section">
-        <div class="modern-anonymous-divider">
-          <span>oder</span>
+          <div class="oauth-row">
+            <button class="oauth-btn" on:click={() => loginWithProvider('google')} disabled={loginLoading}>
+              <span class="oauth-icon oauth-icon--google">G</span>
+              <span>Mit Google anmelden</span>
+            </button>
+            <button class="oauth-btn" on:click={() => loginWithProvider('facebook')} disabled={loginLoading}>
+              <span class="oauth-icon oauth-icon--facebook">f</span>
+              <span>Mit Facebook anmelden</span>
+            </button>
+          </div>
+
+          <div class="tab-row">
+            <button class:active={!showRegister} class="tab-btn" on:click={() => showRegister = false}>Anmelden</button>
+            <button class:active={showRegister} class="tab-btn" on:click={() => showRegister = true}>Registrieren</button>
+          </div>
+
+          {#if !showRegister}
+            <form class="auth-form" on:submit|preventDefault={loginWithEmail}>
+              <label class="field">
+                <span>E-Mail</span>
+                <input type="email" bind:value={loginEmail} placeholder="name@beispiel.de" required />
+              </label>
+              <label class="field">
+                <span>Passwort</span>
+                <input type="password" bind:value={loginPassword} placeholder="Passwort" required />
+              </label>
+              <button class="primary-btn" type="submit" disabled={loginLoading}>
+                {loginLoading ? 'Anmelden…' : 'Anmelden'}
+              </button>
+              <button type="button" class="link-btn" on:click={resetPassword}>Passwort vergessen?</button>
+            </form>
+          {:else}
+            <form class="auth-form" on:submit|preventDefault={signupWithEmail}>
+              <label class="field">
+                <span>E-Mail</span>
+                <input type="email" bind:value={loginEmail} placeholder="name@beispiel.de" required />
+              </label>
+              <label class="field">
+                <span>Passwort</span>
+                <input type="password" bind:value={loginPassword} placeholder="Mindestens ein sicheres Passwort" required />
+              </label>
+              <button class="primary-btn" type="submit" disabled={loginLoading}>
+                {loginLoading ? 'Registrieren…' : 'Registrieren'}
+              </button>
+            </form>
+          {/if}
+
+          <div class="guest-box">
+            <div class="guest-divider"><span>oder</span></div>
+            <button class="secondary-btn" on:click={setAnonymousMode}>Anonym weiter</button>
+            <p>Ohne Login kannst du Inhalte ansehen, aber keine eigenen Objekte anlegen oder Uploads starten.</p>
+          </div>
         </div>
-        <button class="modern-anonymous-btn" on:click={setAnonymousMode}>
-          Anonym weiter
-        </button>
-        <p class="modern-anonymous-info">
-          Anonyme Benutzer können die Galerie ansehen, aber keine Bilder hochladen.
-        </p>
-      </div>
 
-      <div class="modern-login-footer">
-        <div class="modern-footer-links">
-          <a href="/impressum" class="modern-footer-link">Impressum</a>
-          <span class="modern-footer-separator">•</span>
-          <a href="/datenschutz" class="modern-footer-link">Datenschutz</a>
-        </div>
-      </div>
-    </div>
+        <aside class="info-card surface-responsive surface-responsive--panel">
+          <h2>OAuth einfach erklärt</h2>
+          <div class="info-list">
+            {#each oauthDetails as item}
+              <article class="info-item">
+                <h3>{item.title}</h3>
+                <p>{item.text}</p>
+              </article>
+            {/each}
+          </div>
+
+          <div class="info-highlight">
+            <h3>Welche Angaben typischerweise vorbefüllt werden</h3>
+            <p>Name, E-Mail-Adresse und je nach Anbieter dein Profilbild. Danach kannst du die Angaben in deinem Culoca-Profil jederzeit ergänzen oder anpassen.</p>
+          </div>
+        </aside>
+      </section>
+    </main>
   </div>
 {:else}
-  <div class="min-h-screen flex items-center justify-center bg-[#0a1124]">
-    <div class="text-center text-white">
-      <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
-      <p>Du bist bereits angemeldet. Weiterleitung...</p>
+  <div class="login-redirect">
+    <div class="login-redirect-card surface-responsive surface-responsive--panel">
+      <div class="spinner"></div>
+      <p>Du bist bereits angemeldet. Weiterleitung…</p>
     </div>
   </div>
 {/if}
 
 <style>
-  /* Modern Login Overlay */
-  .modern-login-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(135deg, #0a1124 0%, #1a202c 100%);
-    backdrop-filter: blur(10px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-    animation: fadeIn 0.3s ease-out;
+  .login-page {
+    min-height: 100vh;
+    background:
+      radial-gradient(circle at top right, rgba(238, 114, 33, 0.14), transparent 28%),
+      linear-gradient(180deg, color-mix(in srgb, var(--bg-primary) 94%, #0d1724 6%) 0%, var(--bg-primary) 30rem);
+    color: var(--text-primary);
   }
-  .modern-login-content {
-    background: rgba(26, 32, 44, 0.95);
-    backdrop-filter: blur(20px);
-    border-radius: 20px;
+
+  .login-main {
     padding: 2rem;
-    text-align: center;
-    max-width: 400px;
-    width: 90%;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-    border: 1px solid rgba(238, 114, 33, 0.3);
-    position: relative;
-    overflow: hidden;
   }
-  .modern-login-content::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 4px;
-    background: linear-gradient(90deg, #ee7221, #ff8c42);
-    border-radius: 24px 24px 0 0;
+
+  .login-shell {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
+    gap: 2rem;
+    align-items: start;
   }
-  .modern-login-logo {
-    width: 120px;
-    height: 120px;
-    margin: 0 auto 1rem;
-    object-fit: contain;
-    filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3));
+
+  .login-header h1 {
+    margin: 0.85rem 0 0.9rem;
+    font-size: clamp(2.2rem, 4vw, 3.5rem);
+    line-height: 1.02;
+    letter-spacing: -0.04em;
+    max-width: 11ch;
   }
-  .modern-login-error {
-    background: linear-gradient(135deg, #dc3545, #c82333);
-    color: #fff;
-    padding: 0.75rem;
-    border-radius: 12px;
-    margin-bottom: 1rem;
-    font-weight: 500;
-    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
+
+  .login-header p,
+  .info-item p,
+  .info-highlight p,
+  .guest-box p {
+    margin: 0;
+    line-height: 1.7;
+    color: var(--text-secondary);
   }
-  .modern-login-info {
-    background: linear-gradient(135deg, #28a745, #218838);
-    color: #fff;
-    padding: 0.75rem;
-    border-radius: 12px;
-    margin-bottom: 1rem;
-    font-weight: 500;
-    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
-  }
-  .modern-social-login {
-    display: flex;
-    gap: 0.75rem;
-    justify-content: center;
-    margin-bottom: 1.5rem;
-  }
-  .modern-social-btn {
-    background: #fff;
-    border: 2px solid #f0f0f0;
-    border-radius: 14px;
-    width: 56px;
-    height: 56px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  }
-  .modern-social-btn:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
-    border-color: #ee7221;
-  }
-  .modern-social-btn:active {
-    transform: translateY(0);
-  }
-  .modern-social-btn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-  .modern-social-icon {
-    width: 28px;
-    height: 28px;
-  }
-  .modern-login-tabs {
-    display: flex;
-    margin-bottom: 2rem;
-    border-radius: 12px;
-    overflow: hidden;
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-  }
-  .modern-tab-btn {
-    flex: 1;
-    padding: 0.75rem 1rem;
-    background: transparent;
-    border: none;
-    color: rgba(255, 255, 255, 0.7);
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    position: relative;
-  }
-  .modern-tab-btn.active {
-    background: linear-gradient(135deg, #ee7221, #ff8c42);
-    color: #fff;
-    box-shadow: 0 2px 8px rgba(238, 114, 33, 0.3);
-  }
-  .modern-tab-btn:not(.active):hover {
-    background: rgba(238, 114, 33, 0.2);
-    color: #ee7221;
-  }
-  .modern-login-form {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-  }
-  .modern-login-input {
-    width: 100%;
-    padding: 0.75rem;
-    border: 2px solid rgba(255, 255, 255, 0.2);
-    border-radius: 10px;
-    background: rgba(255, 255, 255, 0.9);
-    color: #2d3748;
-    font-size: 0.95rem;
-    box-sizing: border-box;
-    transition: all 0.3s ease;
-  }
-  .modern-login-input::placeholder {
-    color: #718096;
-  }
-  .modern-login-input:focus {
-    outline: none;
-    border-color: #ee7221;
-    box-shadow: 0 0 0 4px rgba(238, 114, 33, 0.2);
-    background: rgba(255, 255, 255, 0.95);
-  }
-  .modern-login-submit-btn {
-    width: 100%;
-    padding: 0.75rem;
-    background: linear-gradient(135deg, #ee7221, #ff8c42);
-    color: #fff;
-    border: none;
-    border-radius: 10px;
+
+  .eyebrow {
+    display: inline-flex;
+    padding: 0.4rem 0.75rem;
+    border-radius: 999px;
+    background: rgba(238, 114, 33, 0.14);
+    color: var(--culoca-orange);
+    font-size: 0.82rem;
     font-weight: 700;
-    font-size: 0.95rem;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 12px rgba(238, 114, 33, 0.3);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
   }
-  .modern-login-submit-btn:hover:not(:disabled) {
-    background: linear-gradient(135deg, #d6610a, #ee7221);
-    transform: translateY(-1px);
-    box-shadow: 0 6px 16px rgba(238, 114, 33, 0.4);
-  }
-  .modern-login-submit-btn:active {
-    transform: translateY(0);
-  }
-  .modern-login-submit-btn:disabled {
-    background: linear-gradient(135deg, #6c757d, #495057);
-    cursor: not-allowed;
-    transform: none;
-    box-shadow: none;
-  }
-  .modern-forgot-password {
-    background: none;
-    border: none;
-    color: #ee7221;
-    font-size: 0.9rem;
-    cursor: pointer;
-    padding: 0.5rem 0;
-    text-decoration: underline;
-    transition: color 0.3s ease;
-  }
-  .modern-forgot-password:hover {
-    color: #d6610a;
-  }
-  .modern-login-footer {
+
+  .benefit-list,
+  .info-list {
+    display: grid;
+    gap: 0.85rem;
     margin-top: 1.5rem;
-    padding-top: 1rem;
-    border-top: 1px solid rgba(255, 255, 255, 0.2);
   }
-  .modern-footer-links {
+
+  .benefit-item,
+  .info-item,
+  .info-highlight {
+    padding: 1rem 1.1rem;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .benefit-item {
     display: flex;
     align-items: center;
+    gap: 0.75rem;
+    font-weight: 600;
+  }
+
+  .benefit-check {
+    display: inline-flex;
+    width: 1.6rem;
+    height: 1.6rem;
+    border-radius: 999px;
+    align-items: center;
     justify-content: center;
-    gap: 0.5rem;
-    font-size: 0.875rem;
+    background: rgba(238, 114, 33, 0.16);
+    color: var(--culoca-orange);
+    flex-shrink: 0;
   }
-  .modern-footer-link {
-    color: rgba(255, 255, 255, 0.7);
-    text-decoration: none;
-    transition: color 0.3s ease;
+
+  .notice {
+    margin-top: 1.25rem;
+    padding: 0.9rem 1rem;
+    border-radius: 16px;
+    border: 1px solid transparent;
   }
-  .modern-footer-link:hover {
-    color: #ee7221;
+
+  .notice-error {
+    background: color-mix(in srgb, #f8d7da 24%, transparent);
+    color: #ffd3d6;
+    border-color: rgba(245, 198, 203, 0.35);
   }
-  .modern-footer-separator {
-    color: rgba(255, 255, 255, 0.5);
-    font-weight: bold;
+
+  .notice-info {
+    background: color-mix(in srgb, #d4edda 28%, transparent);
+    color: #c9ffd6;
+    border-color: rgba(149, 214, 168, 0.35);
   }
-  /* Anonymous section styles */
-  .modern-anonymous-section {
+
+  .oauth-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.85rem;
     margin-top: 1.5rem;
-    padding-top: 1.5rem;
   }
-  .modern-anonymous-divider {
-    text-align: center;
-    margin-bottom: 1rem;
+
+  .oauth-btn,
+  .primary-btn,
+  .secondary-btn,
+  .tab-btn,
+  .link-btn {
+    font: inherit;
+  }
+
+  .oauth-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.7rem;
+    min-height: 3.35rem;
+    border-radius: 16px;
+    border: 1px solid color-mix(in srgb, var(--border-color) 80%, white 10%);
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-primary);
+    cursor: pointer;
+  }
+
+  .oauth-icon {
+    display: inline-flex;
+    width: 1.9rem;
+    height: 1.9rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    font-weight: 800;
+    background: white;
+  }
+
+  .oauth-icon--google {
+    color: #4285f4;
+  }
+
+  .oauth-icon--facebook {
+    color: #1877f2;
+  }
+
+  .tab-row {
+    display: inline-grid;
+    grid-template-columns: repeat(2, 1fr);
+    margin-top: 1.5rem;
+    padding: 0.25rem;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .tab-btn {
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    padding: 0.75rem 1.2rem;
+    border-radius: 12px;
+    cursor: pointer;
+    font-weight: 600;
+  }
+
+  .tab-btn.active {
+    background: rgba(238, 114, 33, 0.14);
+    color: var(--text-primary);
+  }
+
+  .auth-form {
+    display: grid;
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+
+  .field {
+    display: grid;
+    gap: 0.45rem;
+  }
+
+  .field span {
+    font-weight: 600;
+  }
+
+  .field input {
+    min-height: 3.25rem;
+    border-radius: 14px;
+    padding: 0.85rem 1rem;
+  }
+
+  .primary-btn,
+  .secondary-btn {
+    min-height: 3.3rem;
+    border-radius: 16px;
+    border: none;
+    cursor: pointer;
+    font-weight: 700;
+  }
+
+  .primary-btn {
+    background: linear-gradient(135deg, var(--culoca-orange) 0%, #f39c4c 100%);
+    color: white;
+  }
+
+  .secondary-btn {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-primary);
+    border: 1px solid color-mix(in srgb, var(--border-color) 80%, white 10%);
+  }
+
+  .link-btn {
+    justify-self: start;
+    border: none;
+    background: transparent;
+    color: var(--culoca-orange);
+    padding: 0;
+    cursor: pointer;
+    font-weight: 600;
+  }
+
+  .guest-box {
+    margin-top: 1.75rem;
+  }
+
+  .guest-divider {
     position: relative;
+    display: flex;
+    justify-content: center;
+    margin-bottom: 1rem;
   }
-  .modern-anonymous-divider::before {
+
+  .guest-divider::before {
     content: '';
     position: absolute;
     top: 50%;
     left: 0;
     right: 0;
-    height: 1px;
-    background: rgba(255, 255, 255, 0.2);
+    border-top: 1px solid color-mix(in srgb, var(--border-color) 80%, white 10%);
   }
-  .modern-anonymous-divider span {
-    background: #1a1a1a;
-    padding: 0 1rem;
-    color: rgba(255, 255, 255, 0.7);
-    font-size: 0.875rem;
+
+  .guest-divider span {
     position: relative;
+    padding: 0 0.8rem;
+    background: var(--bg-secondary);
+    color: var(--text-muted);
   }
-  .modern-anonymous-btn {
-    width: 100%;
-    padding: 0.875rem 1rem;
-    background: rgba(255, 255, 255, 0.1);
-    color: rgba(255, 255, 255, 0.9);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 8px;
-    font-size: 0.95rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    margin-bottom: 0.75rem;
-  }
-  .modern-anonymous-btn:hover {
-    background: rgba(255, 255, 255, 0.15);
-    border-color: rgba(255, 255, 255, 0.3);
-    color: white;
-  }
-  .modern-anonymous-info {
-    margin: 0;
-    color: rgba(255, 255, 255, 0.6);
-    font-size: 0.8rem;
-    text-align: center;
-    line-height: 1.4;
-  }
-  .modern-login-close {
-    position: absolute;
-    top: 1rem;
-    right: 1rem;
-    background: none;
-    border: none;
-    color: rgba(255, 255, 255, 0.7);
+
+  .info-card h2 {
+    margin: 0 0 1rem;
     font-size: 1.5rem;
-    cursor: pointer;
-    width: 2rem;
-    height: 2rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  }
+
+  .info-item h3,
+  .info-highlight h3 {
+    margin: 0 0 0.45rem;
+    font-size: 1rem;
+  }
+
+  .login-redirect {
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    padding: 2rem;
+  }
+
+  .login-redirect-card {
+    text-align: center;
+  }
+
+  .spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid var(--border-color);
+    border-top: 3px solid var(--accent-color);
     border-radius: 50%;
-    transition: all 0.3s ease;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1rem;
   }
-  .modern-login-close:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: white;
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
   }
-  @keyframes fadeIn {
-    from {
-      opacity: 0;
-      transform: scale(0.95);
-    }
-    to {
-      opacity: 1;
-      transform: scale(1);
+
+  @media (max-width: 980px) {
+    .login-shell {
+      grid-template-columns: 1fr;
     }
   }
-  @media (max-width: 600px) {
-    .modern-login-content {
-      padding: 1.5rem;
-      margin: 1rem;
-      border-radius: 20px;
+
+  @media (max-width: 720px) {
+    .login-main {
+      padding: 1rem;
     }
-    .modern-login-logo {
-      width: 160px;
-      height: 160px;
-      margin-bottom: 1rem;
+
+    .oauth-row {
+      grid-template-columns: 1fr;
     }
-    .modern-social-btn {
-      width: 56px;
-      height: 56px;
-    }
-    .modern-social-icon {
-      width: 28px;
-      height: 28px;
-    }
-    .modern-login-input,
-    .modern-login-submit-btn {
-      padding: 0.875rem;
-      font-size: 0.95rem;
+
+    .login-header h1 {
+      max-width: none;
+      font-size: clamp(2rem, 12vw, 2.8rem);
     }
   }
-</style> 
+</style>
