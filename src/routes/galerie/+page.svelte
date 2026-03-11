@@ -1526,11 +1526,20 @@
   }
 
   function handleOpenMap() {
-    // Wenn kein aktiver Standort vorhanden ist, direkt das Orts-Suchfeld öffnen
-    // (gleiches Verhalten wie im initialen Standort-Dialog).
-    const hasCoordinates = userLat !== null && userLon !== null;
-    openMapWithSearch = !hasCoordinates;
-    showFullscreenMap = true;
+    window.location.href = buildMapViewHref();
+  }
+
+  function buildMapViewHref() {
+    if (!browser) return '/map-view';
+
+    const url = new URL('/map-view', window.location.origin);
+    if (effectiveLat !== null && effectiveLat !== undefined) {
+      url.searchParams.set('lat', String(effectiveLat));
+    }
+    if (effectiveLon !== null && effectiveLon !== undefined) {
+      url.searchParams.set('lon', String(effectiveLon));
+    }
+    return `${url.pathname}${url.search}${url.hash}`;
   }
   
   // Handle location selection from map
@@ -2437,7 +2446,7 @@
       on:bulkUpload={() => isLoggedIn ? window.location.href = '/bulk-upload' : window.location.href = '/login'}
       on:profile={() => isLoggedIn ? window.location.href = '/profile' : window.location.href = '/login'}
       on:settings={() => isLoggedIn ? window.location.href = '/settings' : window.location.href = '/login'}
-      on:map={() => { openMapWithSearch = false; showFullscreenMap = true; }}
+      on:map={() => { window.location.href = buildMapViewHref(); }}
       on:testMode={() => simulationMode ? window.location.href = '/' : window.location.href = '/simulation'}
     />
   {/if}

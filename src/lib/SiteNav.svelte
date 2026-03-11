@@ -13,9 +13,14 @@
     { href: '/foto', label: 'Fotos' },
     { href: '/event', label: 'Events' },
     { href: '/firma', label: 'Firmen' },
-    { href: '/galerie', label: 'Galerie' },
     { href: '/standort', label: 'Standort' },
     { href: '/seo', label: 'SEO' },
+  ];
+
+  const galleryLinks = [
+    { href: '/galerie', label: 'Galerie' },
+    { href: '/galerie?mobile=true', label: 'Mobile Galerie' },
+    { href: '/map-view', label: 'Kartenansicht' },
   ];
 
   const infoLinks = [
@@ -117,6 +122,31 @@
       {#each navLinks as link}
         <a href={link.href} class="nav-link" class:active={isActive(link.href)} on:click={closeMobile}>{link.label}</a>
       {/each}
+
+      <div class="dropdown desktop-only">
+        <button
+          class="nav-link dropdown-toggle"
+          class:active={isDropdownActive(galleryLinks)}
+          on:click|stopPropagation={() => toggleDropdown('gallery')}
+        >
+          Galerie
+          <svg class="dd-arrow" class:dd-open={openDropdown === 'gallery'} width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5l3 3 3-3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>
+        </button>
+        {#if openDropdown === 'gallery'}
+          <div class="dropdown-menu">
+            {#each galleryLinks as link}
+              <a href={link.href} class="dropdown-item" class:active={isActive(link.href)} on:click={closeDropdowns}>{link.label}</a>
+            {/each}
+          </div>
+        {/if}
+      </div>
+
+      <div class="mobile-only nav-group">
+        <span class="nav-group-label">Galerie</span>
+        {#each galleryLinks as link}
+          <a href={link.href} class="nav-link nav-link--sub" class:active={isActive(link.href)} on:click={closeMobile}>{link.label}</a>
+        {/each}
+      </div>
 
       <!-- Info dropdown (desktop) / expanded list (mobile) -->
       <div class="dropdown desktop-only">
