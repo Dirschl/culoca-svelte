@@ -89,7 +89,8 @@
       on:close={handleMapClose}
       on:imageClick={(event) => {
         const imageHref = event.detail.canonicalPath || event.detail.canonical_path || (event.detail.imageSlug || event.detail.slug ? `/item/${event.detail.imageSlug || event.detail.slug}` : '/');
-        window.location.href = appendReturnTo(imageHref, '/map-view');
+        const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+        window.location.href = appendReturnTo(imageHref, returnTo);
       }}
       on:locationSelected={(event) => {
         // Navigate back to main page with location

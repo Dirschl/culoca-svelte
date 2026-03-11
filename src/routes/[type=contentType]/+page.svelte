@@ -3,6 +3,7 @@
   import SiteNav from '$lib/SiteNav.svelte';
   import SiteFooter from '$lib/SiteFooter.svelte';
   import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
+  import { appendReturnTo } from '$lib/content/routing';
 
   export let data: PageData;
 
@@ -20,9 +21,10 @@
   $: icon = TYPE_ICONS[data.typeDef.slug] || '';
   $: pageTitle = `${data.typeDef.name} - Culoca`;
   $: metaDesc = `Alle ${data.typeDef.name}-Einträge auf Culoca. ${data.typeDef.description}. ${data.totalCount} Einträge verfügbar.`;
+  $: currentListPath = pageUrl(data.page);
 
   function itemHref(item: { canonical_path: string | null; slug: string }): string {
-    return item.canonical_path || `/item/${item.slug}`;
+    return appendReturnTo(item.canonical_path || `/item/${item.slug}`, currentListPath);
   }
 
   function thumbUrl(item: { slug: string; path_512: string | null }): string {
