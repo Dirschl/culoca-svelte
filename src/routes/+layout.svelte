@@ -7,14 +7,22 @@
   import { supabase } from '$lib/supabaseClient';
   import { sessionReady } from '$lib/sessionStore';
   import { browser } from '$app/environment';
-  import { beforeNavigate, afterNavigate } from '$app/navigation';
+  import { afterNavigate } from '$app/navigation';
+  import { isDetailPath, LAST_LOCAL_ROUTE_KEY } from '$lib/returnTo';
 
-  // Navigation debugging
-  beforeNavigate((e) => console.log('🚀 beforeNavigate', e));
-  afterNavigate((e) => console.log('✅ afterNavigate', e));
+  function storeLastLocalRoute(url: URL) {
+    if (!browser || isDetailPath(url.pathname)) return;
+    sessionStorage.setItem(LAST_LOCAL_ROUTE_KEY, `${url.pathname}${url.search}${url.hash}`);
+  }
+
+  afterNavigate((navigation) => {
+    if (!navigation.to?.url) return;
+    storeLastLocalRoute(navigation.to.url);
+  });
 
   onMount(() => {
     console.log('🚀 Layout mounted, starting session initialization...');
+    storeLastLocalRoute(new URL(window.location.href));
     
     // Initialize session store
     try {

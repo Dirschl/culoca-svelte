@@ -11,7 +11,7 @@
   import { supabase } from '$lib/supabaseClient';
   import { getStoredOrComputedCanonicalPath, slugifySegment } from '$lib/content/routing';
   import { sanitizeContentHtml } from '$lib/content/html';
-  import { sanitizeReturnTo } from '$lib/returnTo';
+  import { isDetailPath, LAST_LOCAL_ROUTE_KEY, sanitizeReturnTo } from '$lib/returnTo';
   import {
     DEFAULT_EVENT_SETTINGS,
     buildEventPageSettings,
@@ -244,6 +244,28 @@ let showRightsManager = false;
     adobeMessage = '';
   }
 
+  function isValidImageBackTarget(candidate: string | null | undefined): boolean {
+    if (!candidate) return false;
+    if (!candidate.startsWith('/')) return false;
+
+    const sanitized = sanitizeReturnTo(candidate, '/');
+    try {
+      const url = new URL(sanitized, 'https://culoca.com');
+      if (isDetailPath(url.pathname)) return false;
+      if (url.pathname === $page.url.pathname && url.search === $page.url.search) return false;
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  function getStoredLocalRoute(): string {
+    if (!browser) return '/';
+
+    const storedRoute = sanitizeReturnTo(sessionStorage.getItem(LAST_LOCAL_ROUTE_KEY), '/');
+    return isValidImageBackTarget(storedRoute) ? storedRoute : '/';
+  }
+
   function getLocalReferrerFallback(): string {
     if (!browser || !document.referrer) return '/';
 
@@ -251,7 +273,12 @@ let showRightsManager = false;
       const referrerUrl = new URL(document.referrer);
       if (referrerUrl.origin !== window.location.origin) return '/';
       if (referrerUrl.pathname === $page.url.pathname && referrerUrl.search === $page.url.search) return '/';
-      return sanitizeReturnTo(`${referrerUrl.pathname}${referrerUrl.search}${referrerUrl.hash}`, '/');
+
+      const localReferrer = sanitizeReturnTo(
+        `${referrerUrl.pathname}${referrerUrl.search}${referrerUrl.hash}`,
+        '/'
+      );
+      return isValidImageBackTarget(localReferrer) ? localReferrer : '/';
     } catch {
       return '/';
     }
@@ -1712,7 +1739,12 @@ let showRightsManager = false;
   }
 
   onMount(() => {
-    imageBackHref = sanitizeReturnTo($page.url.searchParams.get('returnTo'), getLocalReferrerFallback());
+    imageBackHref = getStoredLocalRoute();
+
+    const localReferrer = getLocalReferrerFallback();
+    if (localReferrer !== '/') {
+      imageBackHref = localReferrer;
+    }
   });
 </script>
 
