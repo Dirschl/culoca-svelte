@@ -91,6 +91,24 @@
     return `${(distance / 1000).toFixed(1)}km`;
   }
 
+  function clearFotoSearch() {
+    searchQuery = '';
+    if (typeof window !== 'undefined') {
+      window.location.href = `/${data.typeDef.slug}`;
+    }
+  }
+
+  function handleFotoSearchSubmit(event: SubmitEvent) {
+    const trimmedQuery = searchQuery.trim();
+    if (trimmedQuery) {
+      searchQuery = trimmedQuery;
+      return;
+    }
+
+    event.preventDefault();
+    clearFotoSearch();
+  }
+
   function getStoredGpsPosition(): { lat: number; lon: number } | null {
     if (typeof window === 'undefined') return null;
 
@@ -399,8 +417,9 @@
     );
     currentGpsPosition = getStoredGpsPosition();
 
+    refreshFotoItemsByGps();
+
     const start = async () => {
-      await refreshFotoItemsByGps();
       const hasVariants = displayedItems.some((item: any) => variantThumbUrls(item).length > 0);
       if (hasVariants) {
         preloadVariantImages();
@@ -482,13 +501,16 @@
           {/if}
         </p>
         {#if isFotoType}
-          <form class="foto-search" action={`/${data.typeDef.slug}`} method="GET">
+          <form class="foto-search" action={`/${data.typeDef.slug}`} method="GET" on:submit={handleFotoSearchSubmit}>
             <input
               type="search"
               name="suche"
               placeholder="Fotos durchsuchen"
               bind:value={searchQuery}
             />
+            {#if searchQuery.trim()}
+              <button type="button" class="foto-search-clear" on:click={clearFotoSearch}>X</button>
+            {/if}
             <button type="submit">Suchen</button>
           </form>
           {#if isClientLoading}
@@ -691,6 +713,11 @@
     padding: 0.78rem 1rem;
     font-weight: 700;
     cursor: pointer;
+  }
+  .foto-search-clear {
+    background: var(--bg-tertiary) !important;
+    color: var(--text-primary) !important;
+    padding-inline: 0.95rem !important;
   }
   .foto-search-hint {
     margin: 0.65rem 0 0;

@@ -33,13 +33,6 @@ function getSearchFromUrl(): string {
 
 export function setSearchQuery(q: string) {
   searchQuery.set(q);
-  useSearchResults.set(!!q.trim());
-  
-  // Update URL with search query
-  updateSearchUrl(q);
-  
-  // Sofortige Suche ohne Debounce für bessere UX
-  performSearch(q, false);
 }
 
 export async function performSearch(q: string, trigger = true) {
