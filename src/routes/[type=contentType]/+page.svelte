@@ -245,7 +245,7 @@
                       bind:this={previewThumbElements[item.id]}
                     >
                       {#if isFotoType && (item.child_count || 0) > 0}
-                        <div class="item-variant-count">+{item.child_count}</div>
+                        <div class="item-variant-count">+{(item.child_count || 0) + 1}</div>
                       {/if}
                       <img
                         src={previewUrl}
