@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { createClient } from '@supabase/supabase-js';
 import type { RequestHandler } from './$types';
+import { supabaseAdmin } from '$lib/supabaseAdmin.js';
 
 export const GET: RequestHandler = async ({ params, request }) => {
   try {
@@ -44,7 +45,20 @@ export const GET: RequestHandler = async ({ params, request }) => {
       return json({ error: 'Benutzer nicht gefunden' }, { status: 404 });
     }
 
-    return json({ user: userDetails });
+    let resolvedEmail = userDetails.email || '';
+
+    // Many profiles do not persist the auth email into public_profiles.
+    // Fall back to the auth user record when admin access is available.
+    if (!resolvedEmail && supabaseAdmin) {
+      const { data: authUserData, error: authUserError } = await supabaseAdmin.auth.admin.getUserById(targetUserId);
+      if (authUserError) {
+        console.error('Error fetching auth user email:', authUserError);
+      } else {
+        resolvedEmail = authUserData.user?.email || '';
+      }
+    }
+
+    return json({ user: { ...userDetails, email: resolvedEmail } });
     
   } catch (error) {
     console.error('Error in GET /api/user-details:', error);
