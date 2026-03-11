@@ -71,7 +71,7 @@
         </div>
 
         <div class="hero-panel">
-          <div class="panel-card panel-card--primary">
+          <div class="panel-card panel-card--primary surface-responsive surface-responsive--panel">
             <h2>Typische Einsätze</h2>
             <div class="use-case-list">
               {#each useCases as useCase}
@@ -92,7 +92,7 @@
             <p>Suche Benutzer, vergebe profilweite Rechte und passe bestehende Freigaben jederzeit an.</p>
           </div>
 
-          <div class="manager-card">
+          <div class="manager-card surface-responsive surface-responsive--panel">
             {#if user}
               <ProfileRightsManager profileId={user.id} />
             {/if}
@@ -100,7 +100,7 @@
         </section>
 
         <aside class="sidebar">
-          <div class="sidebar-card">
+          <div class="sidebar-card surface-responsive surface-responsive--soft">
             <h2>Was jedes Recht bedeutet</h2>
             <div class="legend-list">
               {#each rightsLegend as right}
@@ -112,7 +112,7 @@
             </div>
           </div>
 
-          <div class="sidebar-card sidebar-card--warning">
+          <div class="sidebar-card sidebar-card--warning surface-responsive surface-responsive--soft">
             <h2>Hinweis</h2>
             <p>
               Vergib profilweite Rechte nur an Personen, denen du dauerhaft vertraust. Eine Freigabe wirkt auf deinen kompletten Bestand und ist bewusst für langfristige Zusammenarbeit gedacht.
@@ -306,7 +306,7 @@
   }
 
   .manager-card {
-    padding: 0;
+    padding: 0.75rem;
   }
 
   @keyframes spin {
@@ -345,6 +345,11 @@
 
     .panel-card,
     .sidebar-card {
+      padding-left: 0;
+      padding-right: 0;
+    }
+
+    .manager-card {
       padding-left: 0;
       padding-right: 0;
     }
