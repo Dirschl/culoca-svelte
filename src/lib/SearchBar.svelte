@@ -25,6 +25,10 @@
     }
   }
 
+  function handleInput(event: Event) {
+    onInput((event.currentTarget as HTMLInputElement).value);
+  }
+
   function handleLayoutToggle() {
     if (onToggleLayout) {
       onToggleLayout();
@@ -53,8 +57,9 @@
       {/if}
       <input 
         type="text" 
-        placeholder=""
+        placeholder="Suche"
         bind:value={searchQuery}
+        on:input={handleInput}
         on:keydown={handleKeydown}
         class="search-input"
         disabled={isSearching}

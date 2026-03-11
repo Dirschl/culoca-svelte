@@ -29,16 +29,6 @@
     updateGalleryStats($galleryTotalCount, displayedImageCount);
       }
       
-  // WICHTIG: Reagiere auf Filter-Änderungen und lade neue Daten
-  $: if (filterStore && $filterStore.locationFilter) {
-    console.log('[NormalGallery] Location filter changed, resetting gallery:', $filterStore.locationFilter);
-    resetGallery({
-      lat: $filterStore.locationFilter.lat,
-      lon: $filterStore.locationFilter.lon,
-      fromItem: true // explizit setzen!
-    });
-  }
-
   function handleScroll() {
     console.log('[NormalGallery][Scroll] handleScroll called');
     if (scrollTimeout) clearTimeout(scrollTimeout);

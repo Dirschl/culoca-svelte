@@ -202,6 +202,18 @@
   // Bot-Erkennung als globale Variable
   let isBot = data.isBot || false;
 
+  function withActiveSearch<T extends Record<string, any>>(params: T): T & { search?: string } {
+    const activeSearch = get(searchQuery).trim();
+    if (!activeSearch) {
+      return params;
+    }
+
+    return {
+      ...params,
+      search: activeSearch
+    };
+  }
+
   function setGpsPromptPreference(preference: 'skip' | 'ask' | 'map' | 'gps') {
     if (!browser) return;
     localStorage.setItem(GPS_PROMPT_PREFERENCE_KEY, preference);
@@ -898,13 +910,13 @@
       console.log('[Reactive] Location filter changed, loading more gallery:', currentLocationFilter);
       isHandlingFilterChange = true;
       lastLocationFilter = JSON.parse(JSON.stringify(currentLocationFilter));
-      resetGallery({
+      resetGallery(withActiveSearch({
         lat: currentLocationFilter.lat,
         lon: currentLocationFilter.lon,
         fromItem: currentLocationFilter.fromItem,
         locationFilterLat: currentLocationFilter.lat,
         locationFilterLon: currentLocationFilter.lon
-      });
+      }));
       setTimeout(() => { isHandlingFilterChange = false; }, 100);
     }
     
@@ -925,11 +937,11 @@
         lastUserFilter = JSON.parse(JSON.stringify(currentUserFilter));
         
         // WICHTIG: GPS-Koordinaten für User-Filter bereitstellen
-        const gpsParams = {
+        const gpsParams = withActiveSearch({
           user_id: currentUserFilter.userId,
           lat: userLat || 0,
           lon: userLon || 0
-        };
+        });
         
         resetGallery(gpsParams);
         setTimeout(() => { isHandlingFilterChange = false; }, 100);
@@ -940,10 +952,10 @@
         lastUserFilter = null;
         
         // Galerie ohne User-Filter neu laden
-        const gpsParams = {
+        const gpsParams = withActiveSearch({
           lat: userLat || 0,
           lon: userLon || 0
-        };
+        });
         
         resetGallery(gpsParams);
         setTimeout(() => { isHandlingFilterChange = false; }, 100);
@@ -1131,7 +1143,7 @@
               console.log('[GPS-Simulation] Mobile Mode: Triggering client-side sort only');
             } else {
               // Normal Mode: Reset Galerie mit neuen GPS-Daten
-              resetGallery({ lat: userLat!, lon: userLon! });
+              resetGallery(withActiveSearch({ lat: userLat!, lon: userLon! }));
               console.log('[GPS-Simulation] Normal Mode: Reset gallery with simulated GPS');
             }
             
@@ -1301,7 +1313,8 @@
         // Füge Suchparameter hinzu falls vorhanden
         if (searchParam) {
           galleryParams.search = searchParam;
-          setSearchQuery(searchParam);
+          searchQuery.set(searchParam);
+          useSearchResults.set(true);
         }
         // Setze fromItem, wenn Location-Filter aktiv
         if ($filterStore.locationFilter) {
@@ -1361,7 +1374,8 @@
               // Füge Suchparameter hinzu falls vorhanden
               if (searchParam) {
                 galleryParams.search = searchParam;
-                setSearchQuery(searchParam);
+                searchQuery.set(searchParam);
+                useSearchResults.set(true);
               }
               // Setze fromItem, wenn Location-Filter aktiv
               if ($filterStore.locationFilter) {
@@ -1465,7 +1479,7 @@
             lastLoadedLon = effectiveLon;
             lastLoadedSource = gpsSource;
             // Normal Mode: Mit GPS nur bei relevanter Änderung neu laden
-            resetGallery({ lat: effectiveLat, lon: effectiveLon });
+            resetGallery(withActiveSearch({ lat: effectiveLat, lon: effectiveLon }));
             console.log('[GPS-Trigger] Normal Mode: Reloaded gallery with GPS coordinates');
           } else {
             console.log(`[GPS-Trigger] Normal Mode: Skip reload (${Math.round(movedMeters)}m movement)`);
@@ -1583,7 +1597,7 @@
     // Trigger gallery reload with new coordinates
     if (galleryInitialized) {
       console.log('[Location-Selected] Reloading gallery with selected location');
-      resetGallery({ lat, lon });
+      resetGallery(withActiveSearch({ lat, lon }));
     }
   }
 
@@ -2018,7 +2032,7 @@
       if ($filterStore.locationFilter) {
         galleryParams.fromItem = true;
       }
-      resetGallery(galleryParams);
+      resetGallery(withActiveSearch(galleryParams));
       console.log('[Search-Clear] resetGallery called');
     }, 50);
   }
@@ -2061,7 +2075,7 @@
           galleryParams.locationFilterLat = $filterStore.locationFilter.lat;
           galleryParams.locationFilterLon = $filterStore.locationFilter.lon;
         }
-        resetGallery(galleryParams);
+        resetGallery(withActiveSearch(galleryParams));
         console.log('[Location-Clear] resetGallery called for normal gallery');
       } else {
         console.log('[Location-Clear] Skipping resetGallery for mobile gallery mode');
@@ -2532,7 +2546,7 @@
         // Trigger gallery reload with new coordinates
         if (galleryInitialized) {
           console.log('[FullscreenMap] Reloading gallery with selected location');
-          resetGallery({ lat, lon });
+          resetGallery(withActiveSearch({ lat, lon }));
         }
       }}
     />
