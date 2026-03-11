@@ -73,7 +73,8 @@ export const load: PageServerLoad = async ({ params, url }) => {
     created_at: (item.created_at || null) as string | null,
     starts_at: (item.starts_at || null) as string | null,
     ends_at: (item.ends_at || null) as string | null,
-    external_url: (item.external_url || null) as string | null
+    external_url: (item.external_url || null) as string | null,
+    child_count: 0
   }));
 
   let items = baseItems;
@@ -115,7 +116,8 @@ export const load: PageServerLoad = async ({ params, url }) => {
 
     items = baseItems.map((item) => ({
       ...item,
-      variants: variantsByRoot.get(item.id) || []
+      variants: variantsByRoot.get(item.id) || [],
+      child_count: (variantsByRoot.get(item.id) || []).length
     }));
   }
 

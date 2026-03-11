@@ -88,6 +88,18 @@
   function startVariantRotation() {
     if (!isFotoType) return;
 
+    console.log(
+      '[foto-list] starting rotation for items:',
+      data.items
+        .map((item: any) => ({
+          id: item.id,
+          slug: item.slug,
+          child_count: item.child_count || 0,
+          rotation_frames: rotationThumbUrls(item).length
+        }))
+        .filter((item: any) => item.child_count > 0)
+    );
+
     variantTimer = setInterval(() => {
       const nextUrls: Record<string, string> = {};
       const nextIndexes: Record<string, number> = { ...variantImageIndexes };
@@ -107,6 +119,15 @@
 
   onMount(() => {
     if (!isFotoType) return;
+    console.log(
+      '[foto-list] loaded items:',
+      data.items.map((item: any) => ({
+        id: item.id,
+        slug: item.slug,
+        child_count: item.child_count || 0,
+        variant_count: variantThumbUrls(item).length
+      }))
+    );
     const hasVariants = data.items.some((item: any) => variantThumbUrls(item).length > 0);
     if (!hasVariants) return;
 
@@ -207,6 +228,9 @@
                       class:item-thumb--foto={isFotoType}
                       style={isFotoType ? `--thumb-preview:url('${previewUrl}')` : undefined}
                     >
+                      {#if isFotoType && (item.child_count || 0) > 0}
+                        <div class="item-variant-count">+{item.child_count}</div>
+                      {/if}
                       <img
                         src={previewUrl}
                         alt={item.title || item.slug}
@@ -401,6 +425,22 @@
   }
   .item-thumb--foto img {
     object-fit: contain;
+  }
+  .item-variant-count {
+    position: absolute;
+    top: 0.55rem;
+    left: 0.55rem;
+    z-index: 2;
+    min-width: 2rem;
+    padding: 0.18rem 0.42rem;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.82);
+    color: #fff;
+    font-size: 0.78rem;
+    font-weight: 700;
+    line-height: 1;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+    backdrop-filter: blur(8px);
   }
   .item-card:hover .item-thumb img {
     transform: scale(1.04);
