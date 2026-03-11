@@ -232,7 +232,8 @@
 </script>
 
 <div class="profile-rights-manager">
-  <h3>Rechte für andere Benutzer verwalten</h3>
+  <h3>Profilweite Rechte</h3>
+  <p class="intro-text">Diese Freigaben gelten fuer alle Items deines Profils. Fuer einzelne Eintraege vergibst du Rechte direkt im jeweiligen Item.</p>
   
   {#if message}
     <div class="message {messageType}">
@@ -242,10 +243,10 @@
 
   <!-- Neue Rechte vergeben -->
   <div class="add-rights-section">
-    <h4>Neue Rechte vergeben</h4>
+    <h4>Neue Freigabe anlegen</h4>
     
     <div class="search-section">
-      <label for="user-search">Benutzer suchen:</label>
+      <label for="user-search">Benutzer suchen</label>
       <input
         id="user-search"
         type="text"
@@ -278,7 +279,7 @@
 
     {#if selectedUser}
       <div class="selected-user">
-        <h5>Ausgewählter Benutzer:</h5>
+        <h5>Ausgewaehlter Benutzer</h5>
         <div class="user-info">
           <strong>{selectedUser.full_name}</strong>
           <span class="email">{selectedUser.email}</span>
@@ -287,17 +288,17 @@
         <div class="rights-checkboxes">
           <label class="right-checkbox">
             <input type="checkbox" bind:checked={rights.download}>
-            <span class="checkbox-label">Download erlauben</span>
+            <span class="checkbox-label">Download fuer alle Items</span>
           </label>
           
           <label class="right-checkbox">
             <input type="checkbox" bind:checked={rights.edit}>
-            <span class="checkbox-label">Bearbeiten erlauben</span>
+            <span class="checkbox-label">Bearbeiten fuer alle Items</span>
           </label>
           
           <label class="right-checkbox">
             <input type="checkbox" bind:checked={rights.delete}>
-            <span class="checkbox-label">Löschen erlauben</span>
+            <span class="checkbox-label">Loeschen fuer alle Items</span>
           </label>
         </div>
         
@@ -314,12 +315,12 @@
 
   <!-- Bestehende Rechte -->
   <div class="existing-rights-section">
-    <h4>Bestehende Rechte</h4>
+    <h4>Bestehende Freigaben</h4>
     
     {#if loading}
       <div class="loading">Lade Rechte...</div>
     {:else if existingRights.length === 0}
-      <div class="no-rights">Noch keine Rechte vergeben</div>
+      <div class="no-rights">Noch keine profilweiten Freigaben vorhanden</div>
     {:else}
       <div class="rights-list">
         {#each existingRights as right}
@@ -404,95 +405,115 @@
 
 <style>
   .profile-rights-manager {
-    max-width: 800px;
-    margin: 0 auto;
+    display: grid;
+    gap: 1.5rem;
     padding: 1rem;
   }
 
   h3 {
     color: var(--text-primary);
-    margin-bottom: 2rem;
-    border-bottom: 2px solid var(--border-color);
-    padding-bottom: 0.5rem;
+    margin: 0;
+    font-size: 1.6rem;
+    letter-spacing: -0.03em;
   }
 
   h4 {
     color: var(--text-primary);
-    margin: 1.5rem 0 1rem 0;
+    margin: 0 0 1rem;
+    font-size: 1.05rem;
+  }
+
+  h5 {
+    margin: 0 0 0.75rem;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-secondary);
+  }
+
+  .intro-text {
+    margin: -0.75rem 0 0;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    max-width: 68ch;
   }
 
   .message {
-    padding: 0.75rem 1rem;
-    border-radius: 4px;
-    margin-bottom: 1rem;
+    padding: 0.9rem 1rem;
+    border-radius: 16px;
+    margin-bottom: 0;
+    border: 1px solid transparent;
   }
 
   .message.success {
-    background: #d4edda;
-    color: #155724;
-    border: 1px solid #c3e6cb;
+    background: color-mix(in srgb, #d4edda 28%, transparent);
+    color: #c9ffd6;
+    border-color: rgba(149, 214, 168, 0.35);
   }
 
   .message.error {
-    background: #f8d7da;
-    color: #721c24;
-    border: 1px solid #f5c6cb;
+    background: color-mix(in srgb, #f8d7da 24%, transparent);
+    color: #ffd3d6;
+    border-color: rgba(245, 198, 203, 0.35);
   }
 
-  .add-rights-section {
-    background: var(--bg-secondary);
+  .add-rights-section,
+  .existing-rights-section {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 100%), var(--bg-secondary);
     padding: 1.5rem;
-    border-radius: 8px;
-    margin-bottom: 2rem;
+    border-radius: 24px;
+    border: 1px solid color-mix(in srgb, var(--border-color) 85%, white 7%);
   }
 
   .search-section {
-    margin-bottom: 1.5rem;
+    position: relative;
+    margin-bottom: 1.25rem;
   }
 
   label {
     display: block;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.55rem;
     color: var(--text-primary);
-    font-weight: 500;
+    font-weight: 600;
   }
 
   input[type="text"] {
     width: 100%;
-    padding: 0.75rem;
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    background: var(--bg-primary);
+    padding: 0.95rem 1rem;
+    border: 1px solid color-mix(in srgb, var(--border-color) 85%, white 8%);
+    border-radius: 16px;
+    background: color-mix(in srgb, var(--bg-primary) 88%, #0f1723 12%);
     color: var(--text-primary);
     font-size: 1rem;
+    box-sizing: border-box;
   }
 
   input[type="text"]:focus {
     outline: none;
     border-color: var(--accent-color);
-    box-shadow: 0 0 0 2px rgba(238, 114, 33, 0.2);
+    box-shadow: 0 0 0 4px rgba(238, 114, 33, 0.16);
   }
 
   .loading {
     color: var(--text-secondary);
-    font-style: italic;
     margin: 0.5rem 0;
   }
 
   .search-results {
     margin-top: 0.5rem;
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    background: var(--bg-primary);
+    border: 1px solid color-mix(in srgb, var(--border-color) 85%, white 8%);
+    border-radius: 18px;
+    background: color-mix(in srgb, var(--bg-primary) 92%, #0f1723 8%);
     max-height: 200px;
     overflow-y: auto;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.18);
   }
 
   .search-result {
-    padding: 0.75rem;
+    padding: 0.9rem 1rem;
     cursor: pointer;
-    border-bottom: 1px solid var(--border-color);
-    transition: background 0.2s;
+    border-bottom: 1px solid color-mix(in srgb, var(--border-color) 75%, transparent);
+    transition: background 0.2s, transform 0.2s;
     width: 100%;
     text-align: left;
     font-family: inherit;
@@ -502,7 +523,7 @@
   }
 
   .search-result:hover {
-    background: var(--bg-secondary);
+    background: rgba(255, 255, 255, 0.04);
   }
 
   .search-result:last-child {
@@ -510,56 +531,67 @@
   }
 
   .user-name {
-    font-weight: 500;
+    font-weight: 600;
     color: var(--text-primary);
   }
 
   .user-email {
-    font-size: 0.9rem;
+    font-size: 0.92rem;
     color: var(--text-secondary);
     margin-top: 0.25rem;
+    word-break: break-word;
   }
 
   .selected-user {
-    background: var(--bg-primary);
-    padding: 1rem;
-    border-radius: 4px;
-    border: 1px solid var(--border-color);
+    background: color-mix(in srgb, var(--bg-primary) 85%, #0f1723 15%);
+    padding: 1.1rem;
+    border-radius: 20px;
+    border: 1px solid color-mix(in srgb, var(--border-color) 80%, white 7%);
   }
 
   .rights-checkboxes {
-    margin: 1rem 0;
+    display: grid;
+    gap: 0.75rem;
+    margin: 1rem 0 1.2rem;
   }
 
   .right-checkbox {
     display: flex;
     align-items: center;
-    margin: 0.5rem 0;
+    gap: 0.75rem;
     cursor: pointer;
+    padding: 0.9rem 1rem;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
   }
 
   .right-checkbox input[type="checkbox"] {
-    margin-right: 0.5rem;
     width: auto;
+    margin: 0;
+    accent-color: var(--culoca-orange);
   }
 
   .checkbox-label {
     color: var(--text-primary);
+    line-height: 1.45;
   }
 
   .save-btn {
-    background: var(--accent-color);
+    background: linear-gradient(135deg, var(--culoca-orange) 0%, #f39c4c 100%);
     color: white;
     border: none;
-    padding: 0.75rem 1.5rem;
-    border-radius: 4px;
+    padding: 0.85rem 1.25rem;
+    border-radius: 14px;
     cursor: pointer;
-    font-size: 1rem;
-    transition: background 0.2s;
+    font-size: 0.98rem;
+    font-weight: 700;
+    transition: transform 0.2s, box-shadow 0.2s;
   }
 
   .save-btn:hover:not(:disabled) {
-    background: #d65a1a;
+    transform: translateY(-1px);
+    box-shadow: 0 10px 24px rgba(238, 114, 33, 0.28);
   }
 
   .save-btn:disabled {
@@ -567,17 +599,12 @@
     cursor: not-allowed;
   }
 
-  .existing-rights-section {
-    background: var(--bg-secondary);
-    padding: 1.5rem;
-    border-radius: 8px;
-  }
-
   .no-rights {
     color: var(--text-secondary);
-    font-style: italic;
     text-align: center;
-    padding: 2rem;
+    padding: 2rem 1rem;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.03);
   }
 
   .rights-list {
@@ -587,22 +614,22 @@
   }
 
   .right-item {
-    background: var(--bg-primary);
-    padding: 1rem;
-    border-radius: 4px;
-    border: 1px solid var(--border-color);
-    display: flex;
-    justify-content: space-between;
+    background: color-mix(in srgb, var(--bg-primary) 84%, #101822 16%);
+    padding: 1rem 1.1rem;
+    border-radius: 20px;
+    border: 1px solid color-mix(in srgb, var(--border-color) 80%, white 8%);
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr) auto;
+    gap: 1rem;
     align-items: center;
   }
 
   .rights-info {
-    flex: 1;
-    margin: 0 1rem;
+    min-width: 0;
   }
 
   .rights-text {
-    font-weight: 500;
+    font-weight: 600;
     color: var(--text-primary);
     margin-bottom: 0.25rem;
   }
@@ -613,18 +640,19 @@
   }
 
   .delete-btn {
-    background: #dc3545;
+    background: rgba(220, 53, 69, 0.14);
     color: white;
-    border: none;
-    padding: 0.5rem 1rem;
-    border-radius: 4px;
+    border: 1px solid rgba(220, 53, 69, 0.24);
+    padding: 0.7rem 1rem;
+    border-radius: 14px;
     cursor: pointer;
     font-size: 0.9rem;
-    transition: background 0.2s;
+    transition: transform 0.2s, background 0.2s;
   }
 
   .delete-btn:hover:not(:disabled) {
-    background: #c82333;
+    background: rgba(220, 53, 69, 0.22);
+    transform: translateY(-1px);
   }
 
   .delete-btn:disabled {
@@ -633,19 +661,19 @@
   }
 
   .edit-btn {
-    background: #007bff;
+    background: rgba(255, 255, 255, 0.06);
     color: white;
-    border: none;
-    padding: 0.5rem 1rem;
-    border-radius: 4px;
+    border: 1px solid color-mix(in srgb, var(--border-color) 75%, white 8%);
+    padding: 0.7rem 1rem;
+    border-radius: 14px;
     cursor: pointer;
     font-size: 0.9rem;
-    transition: background 0.2s;
-    margin-right: 0.5rem;
+    transition: transform 0.2s, background 0.2s;
   }
 
   .edit-btn:hover:not(:disabled) {
-    background: #0056b3;
+    background: rgba(255, 255, 255, 0.1);
+    transform: translateY(-1px);
   }
 
   .edit-btn:disabled {
@@ -654,19 +682,19 @@
   }
 
   .cancel-btn {
-    background: #6c757d;
+    background: rgba(255, 255, 255, 0.06);
     color: white;
-    border: none;
-    padding: 0.5rem 1rem;
-    border-radius: 4px;
+    border: 1px solid color-mix(in srgb, var(--border-color) 75%, white 8%);
+    padding: 0.7rem 1rem;
+    border-radius: 14px;
     cursor: pointer;
     font-size: 0.9rem;
-    transition: background 0.2s;
-    margin-left: 0.5rem;
+    transition: transform 0.2s, background 0.2s;
   }
 
   .cancel-btn:hover:not(:disabled) {
-    background: #545b62;
+    background: rgba(255, 255, 255, 0.1);
+    transform: translateY(-1px);
   }
 
   .cancel-btn:disabled {
@@ -677,31 +705,24 @@
   .action-buttons {
     display: flex;
     gap: 0.5rem;
+    flex-wrap: wrap;
   }
 
   .edit-buttons {
     display: flex;
     gap: 0.5rem;
+    flex-wrap: wrap;
   }
 
   .rights-edit {
-    flex: 1;
-    margin: 0 1rem;
+    min-width: 0;
   }
 
   @media (max-width: 768px) {
     .right-item {
-      flex-direction: column;
-      align-items: flex-start;
+      grid-template-columns: 1fr;
+      align-items: stretch;
       gap: 1rem;
-    }
-
-    .rights-info {
-      margin: 0;
-    }
-
-    .rights-edit {
-      margin: 0;
     }
 
     .action-buttons,
