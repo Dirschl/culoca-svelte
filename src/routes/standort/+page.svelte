@@ -113,8 +113,8 @@
         <span class="eyebrow">Standort freigeben</span>
         <h1>{currentLocation ? 'Standort ändern' : 'Standort für Culoca festlegen'}</h1>
         <p class="lead">
-          Mit einem gesetzten Standort zeigt Culoca Inhalte in deiner Umgebung präziser an. Du kannst den Browser-GPS-Zugriff
-          erlauben oder deinen Ort rechts direkt auf der Karte festlegen.
+          Die Standortfreigabe macht Culoca interaktiv: Inhalte, Distanzen und Sortierung reagieren dann auf deine aktuelle
+          Position. Du kannst Live-GPS aktivieren oder rechts einen festen Ort manuell setzen.
         </p>
 
         {#if message}
@@ -129,20 +129,17 @@
               {currentLocation.lat.toFixed(6)}, {currentLocation.lon.toFixed(6)}
             </p>
             <p class="status-meta">
-              Quelle: {currentLocation.source === 'gps' ? 'Automatisch über Browser-GPS' : 'Manuell über Karte festgelegt'}
+              Modus: {currentLocation.source === 'gps' ? 'Live-GPS für interaktive Inhalte' : 'Fester Ort über Karte festgelegt'}
             </p>
           {:else}
-            <p>Noch kein Standort gespeichert. Ohne Standort bleibt die Galerie allgemeiner und Distanzfunktionen fehlen.</p>
+            <p>Noch kein Standort gespeichert. Ohne Standort fehlen Live-Distanzen, dynamische Sortierung und die mobile Standortlogik.</p>
           {/if}
         </div>
 
         <div class="action-list">
           <button type="button" class="primary-action" on:click={activateGpsLocation} disabled={locating}>
-            {locating ? 'Standort wird abgefragt...' : currentLocation ? 'Standort automatisch neu übernehmen' : 'Standort automatisch freigeben'}
+            {locating ? 'Standort wird abgefragt...' : currentLocation ? 'Live-GPS erneut freigeben' : 'Live-GPS freigeben'}
           </button>
-          <a href={`/galerie?locationDialog=true&returnTo=${encodeURIComponent(returnTo)}`} class="secondary-action">
-            Weiterhin direkt in der Galerie freigeben
-          </a>
           {#if currentLocation}
             <button type="button" class="ghost-action" on:click={clearLocation}>Gespeicherten Standort entfernen</button>
           {/if}
@@ -152,17 +149,17 @@
           <section class="info-card surface-responsive surface-responsive--soft">
             <h3>Freigabeoptionen</h3>
             <ul>
-              <li><strong>Automatisch:</strong> Der Browser fragt nach GPS-Zugriff und übernimmt deinen aktuellen Standort.</li>
-              <li><strong>Manuell:</strong> Du suchst rechts einen Ort oder setzt ihn direkt auf der Karte.</li>
-              <li><strong>Galerie:</strong> Der bisherige GPS-Dialog in der Galerie bleibt zusätzlich verfügbar.</li>
+              <li><strong>Live-GPS:</strong> Culoca darf deine aktuelle Position verwenden und Inhalte unterwegs laufend anpassen.</li>
+              <li><strong>Fester Ort:</strong> Du suchst rechts einen Ort oder setzt ihn direkt auf der Karte als feste Basis.</li>
+              <li><strong>Jederzeit änderbar:</strong> Du kannst den Modus später wieder wechseln oder den Standort ganz entfernen.</li>
             </ul>
           </section>
 
           <section class="info-card surface-responsive surface-responsive--soft">
             <h3>Wofür der Standort genutzt wird</h3>
             <ul>
-              <li>Distanzangaben und nahe Inhalte werden präziser.</li>
-              <li>Die mobile Galerie und Kartenansichten lassen sich sinnvoller nutzen.</li>
+              <li>Die Galerie kann Inhalte nach deiner aktuellen Position oder nach deinem festen Ort sortieren.</li>
+              <li>Distanzangaben, mobile Galerie, Karte und nahe Inhalte reagieren präziser.</li>
               <li>Du kannst den Standort jederzeit hier oder über Konto → Standort ändern.</li>
             </ul>
           </section>
@@ -274,8 +271,7 @@
   }
 
   .primary-action,
-  .ghost-action,
-  .secondary-action {
+  .ghost-action {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -309,7 +305,6 @@
   }
 
   .primary-action:hover,
-  .secondary-action:hover,
   .ghost-action:hover {
     transform: translateY(-1px);
   }

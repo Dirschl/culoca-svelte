@@ -1,6 +1,6 @@
 import { browser } from '$app/environment';
 
-export type GpsPromptPreference = 'ask' | 'skip' | 'map';
+export type GpsPromptPreference = 'ask' | 'skip' | 'map' | 'gps';
 export type RememberedLocationSource = 'gps' | 'manual';
 
 export interface RememberedLocation {
@@ -17,7 +17,7 @@ const GPS_PROMPT_PREFERENCE_KEY = 'culoca-gps-preference';
 export function getGpsPromptPreference(): GpsPromptPreference | null {
   if (!browser) return null;
   const value = localStorage.getItem(GPS_PROMPT_PREFERENCE_KEY);
-  if (value === 'ask' || value === 'skip' || value === 'map') return value;
+  if (value === 'ask' || value === 'skip' || value === 'map' || value === 'gps') return value;
   return null;
 }
 
@@ -49,7 +49,7 @@ export function saveRememberedLocation(
     localStorage.removeItem(LOCATION_LABEL_KEY);
   }
 
-  setGpsPromptPreference(source === 'gps' ? 'ask' : 'map');
+  setGpsPromptPreference(source === 'gps' ? 'gps' : 'map');
   return location;
 }
 

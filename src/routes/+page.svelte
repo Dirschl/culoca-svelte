@@ -100,29 +100,21 @@
             <div class="hero-actions">
               <a href="/galerie" class="btn-primary">Galerie öffnen</a>
               <a href="/map-view" class="btn-secondary">Karte anzeigen</a>
+              {#if !$isAuthenticated}
+                <a href="/login?returnTo=%2F" class="btn-secondary">Login für eigene Inhalte</a>
+              {/if}
             </div>
           </div>
 
           <aside class="hero-side surface-responsive surface-responsive--panel">
-            {#if !$isAuthenticated}
-              <section class="hero-side-section">
-                <span class="hero-side-kicker">Login empfohlen</span>
-                <h2>Mehr Möglichkeiten mit deinem Konto</h2>
-                <p>
-                  Mit Login kannst du eigene Objekte anlegen, Inhalte bearbeiten und Profil, Freigaben sowie Einstellungen vollständig nutzen.
-                </p>
-                <a href="/login?returnTo=%2F" class="hero-side-link">Jetzt einloggen</a>
-              </section>
-            {/if}
-
             <section class="hero-side-section">
               <span class="hero-side-kicker">Standort</span>
               <h2>{savedLocation ? 'Standort ändern' : 'Standort freigeben'}</h2>
               <p>
                 {#if savedLocation}
-                  Dein gespeicherter Standort ist aktiv. Du kannst ihn jederzeit präziser setzen oder durch einen anderen Ort ersetzen.
+                  Dein Standort ist aktiv. Culoca kann damit Inhalte, Distanzen und Sortierung an deine Position anpassen.
                 {:else}
-                  Ohne gesetzten Standort bleiben Distanzangaben und nahe Inhalte allgemeiner. Lege ihn direkt fest oder erlaube später GPS in der Galerie.
+                  Ohne Standort bleiben Distanzangaben und nahe Inhalte allgemeiner. Mit Freigabe wird Culoca interaktiver und reagiert auf deine Position.
                 {/if}
               </p>
 
@@ -136,9 +128,6 @@
               <div class="hero-side-actions">
                 <a href="/standort?returnTo=%2F" class="btn-primary hero-wide-btn">
                   {savedLocation ? 'Standort ändern' : 'Standort jetzt festlegen'}
-                </a>
-                <a href="/galerie?locationDialog=true" class="btn-secondary hero-wide-btn">
-                  Alternativ in der Galerie freigeben
                 </a>
               </div>
             </section>
@@ -283,10 +272,6 @@
     display: grid;
     gap: 0.75rem;
   }
-  .hero-side-section + .hero-side-section {
-    padding-top: 1rem;
-    border-top: 1px solid var(--border-color);
-  }
   .hero-side-kicker {
     font-size: 0.78rem;
     font-weight: 700;
@@ -304,11 +289,6 @@
     margin: 0;
     color: var(--text-secondary);
     line-height: 1.6;
-  }
-  .hero-side-link {
-    color: var(--culoca-orange);
-    font-weight: 700;
-    text-decoration: none;
   }
   .hero-side-actions {
     display: grid;

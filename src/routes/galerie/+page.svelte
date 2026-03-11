@@ -221,15 +221,21 @@
     return !skipGpsPrompt;
   }
 
+  function openLocationSettings(activateMobileMode = false) {
+    if (!browser) return;
+
+    const returnUrl = new URL(window.location.href);
+    returnUrl.searchParams.delete('locationDialog');
+
+    if (activateMobileMode) {
+      returnUrl.searchParams.set('mobile', 'true');
+    }
+
+    window.location.href = `/standort?returnTo=${encodeURIComponent(`${returnUrl.pathname}${returnUrl.search}${returnUrl.hash}`)}`;
+  }
+
   function openGpsReactivationDialog() {
-    mobileModeLocationPromptPending = true;
-    isManual3x3Mode = false;
-    showFullscreenMap = true;
-    openMapWithSearch = true;
-    gpsStatus = 'none';
-    statusOverlayMessage = 'GPS-Funktionen sind in den Einstellungen deaktiviert';
-    showStatusOverlay = true;
-    setTimeout(() => { showStatusOverlay = false; }, 2500);
+    openLocationSettings(true);
   }
 
   function ensureMobileGpsTracking() {
@@ -997,6 +1003,12 @@
       disableGPSFeatures();
       isManual3x3Mode = false;
     }
+    const storedGpsPreference = browser ? localStorage.getItem(GPS_PROMPT_PREFERENCE_KEY) : null;
+    if (!isBot && storedGpsPreference === 'gps') {
+      setTimeout(() => {
+        initializeGPSIntelligently();
+      }, 0);
+    }
 
     // Initialize filter store from URL parameters
     filterStore.initFromUrl($pageStore.url.searchParams);
@@ -1012,14 +1024,11 @@
       isManual3x3Mode = true;
     }
     if (locationDialogParam === '1' || locationDialogParam === 'true' || locationDialogParam === 'yes') {
-      showFullscreenMap = true;
-      openMapWithSearch = true;
-      mobileModeLocationPromptPending = false;
       urlParams.delete('locationDialog');
       const nextQuery = urlParams.toString();
-      const nextUrl = `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ''}${window.location.hash}`;
-      window.history.replaceState({}, '', nextUrl);
-      console.log('[onMount] Opening location dialog via URL parameter');
+      const returnTo = `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ''}${window.location.hash}`;
+      window.location.replace(`/standort?returnTo=${encodeURIComponent(returnTo)}`);
+      return;
     }
     if (botParam === '1' || botParam === 'true' || botParam === 'yes') {
       isBot = true;
@@ -1495,12 +1504,9 @@
 
     const hasCoordinates = userLat !== null && userLon !== null;
     if (wantsEnableMobileMode && !hasCoordinates) {
-      mobileModeLocationPromptPending = true;
-      gpsStatus = 'none';
-      openMapWithSearch = true;
-      showFullscreenMap = true;
       showStatusOverlay = false;
-      console.log('[Mobile-Mode] No GPS coordinates available - showing location prompt first');
+      console.log('[Mobile-Mode] No GPS coordinates available - redirecting to location settings');
+      openLocationSettings(true);
       return;
     }
 
@@ -1706,7 +1712,8 @@
     const hasSavedGPS = loadGPSData();
     
     // Wenn bereits cached GPS-Daten vorhanden sind, nicht sofort live GPS starten
-          if (hasSavedGPS && gpsStatus === 'cached' && userLat && userLon) {
+    const wantsLiveGps = browser && localStorage.getItem(GPS_PROMPT_PREFERENCE_KEY) === 'gps';
+    if (hasSavedGPS && gpsStatus === 'cached' && userLat && userLon && !wantsLiveGps) {
       console.log('[GPS-Init] Using cached GPS data, not starting live GPS immediately');
       return;
     }
@@ -1954,10 +1961,7 @@
     }
     const hasCoordinates = userLat !== null && userLon !== null;
     if (wantsEnableMobileMode && !hasCoordinates) {
-      mobileModeLocationPromptPending = true;
-      gpsStatus = 'none';
-      openMapWithSearch = true;
-      showFullscreenMap = true;
+      openLocationSettings(true);
       return;
     }
     isManual3x3Mode = !isManual3x3Mode;
