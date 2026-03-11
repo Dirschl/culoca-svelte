@@ -113,7 +113,10 @@
               {/if}
             </p>
             <div class="hero-actions">
-              <a href="/galerie" class="btn-primary">Galerie öffnen</a>
+              <a href="/galerie" class={savedLocation?.source === 'gps' ? 'btn-secondary' : 'btn-primary'}>Galerie öffnen</a>
+              {#if savedLocation?.source === 'gps'}
+                <a href="/galerie?mobile=true" class="btn-primary">Mobile Galerie</a>
+              {/if}
               <a href="/map-view" class="btn-secondary">Karte anzeigen</a>
               {#if !$isAuthenticated}
                 <a href="/login?returnTo=%2F" class="btn-secondary btn-attention">Login</a>
