@@ -268,8 +268,6 @@
     isClientLoading = true;
     try {
       const search = activeSearchTerm.trim();
-      const { data: authData } = await supabase.auth.getUser();
-      const currentUserId = authData.user?.id || null;
 
       let countQuery = supabase
         .from('items')
@@ -278,8 +276,7 @@
         .eq('admin_hidden', false)
         .is('group_root_item_id', null)
         .not('slug', 'is', null)
-        .not('path_512', 'is', null)
-        .or(currentUserId ? `is_private.is.null,is_private.eq.false,profile_id.eq.${currentUserId}` : 'is_private.is.null,is_private.eq.false');
+        .not('path_512', 'is', null);
 
       if (search) {
         countQuery = applyMultiWordSearch(countQuery, search, true);
@@ -304,7 +301,6 @@
           .is('group_root_item_id', null)
           .not('slug', 'is', null)
           .not('path_512', 'is', null)
-          .or(currentUserId ? `is_private.is.null,is_private.eq.false,profile_id.eq.${currentUserId}` : 'is_private.is.null,is_private.eq.false')
           .range(from, from + pageFetchSize - 1);
 
         if (search) {
