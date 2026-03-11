@@ -58,10 +58,17 @@
   function variantThumbUrls(item: any): string[] {
     if (!isFotoType) return [];
     const variants = Array.isArray(item.variants) ? item.variants : [];
+    const rootUrl = thumbUrl(item);
     return variants
       .filter((variant) => variant?.slug && variant?.path_512)
       .map((variant) => getSeoImageUrl(variant.slug, variant.path_512, '512'))
-      .filter(Boolean);
+      .filter((url): url is string => Boolean(url) && url !== rootUrl);
+  }
+
+  function rotationThumbUrls(item: any): string[] {
+    const rootUrl = thumbUrl(item);
+    const variantUrls = variantThumbUrls(item);
+    return variantUrls.length ? [rootUrl, ...variantUrls] : [rootUrl];
   }
 
   function currentThumbUrl(item: any): string {
@@ -70,7 +77,7 @@
 
   function preloadVariantImages() {
     for (const item of data.items) {
-      for (const url of variantThumbUrls(item)) {
+      for (const url of rotationThumbUrls(item).slice(1)) {
         const img = new Image();
         img.decoding = 'async';
         img.src = url;
@@ -86,9 +93,9 @@
       const nextIndexes: Record<string, number> = { ...variantImageIndexes };
 
       for (const item of data.items) {
-        const variants = variantThumbUrls(item);
-        if (!variants.length) continue;
-        const nextIndex = ((nextIndexes[item.id] ?? -1) + 1) % variants.length;
+        const variants = rotationThumbUrls(item);
+        if (variants.length <= 1) continue;
+        const nextIndex = ((nextIndexes[item.id] ?? 0) + 1) % variants.length;
         nextIndexes[item.id] = nextIndex;
         nextUrls[item.id] = variants[nextIndex];
       }
@@ -100,7 +107,7 @@
 
   onMount(() => {
     if (!isFotoType) return;
-    const hasVariants = data.items.some((item: any) => Array.isArray(item.variants) && item.variants.length > 0);
+    const hasVariants = data.items.some((item: any) => variantThumbUrls(item).length > 0);
     if (!hasVariants) return;
 
     const start = () => {
@@ -109,9 +116,9 @@
     };
 
     if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
-      idleHandle = window.requestIdleCallback(start, { timeout: 1800 });
+      idleHandle = window.requestIdleCallback(start, { timeout: 900 });
     } else {
-      idleHandle = window.setTimeout(start, 1200);
+      idleHandle = window.setTimeout(start, 600);
     }
   });
 

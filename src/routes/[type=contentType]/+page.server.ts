@@ -84,7 +84,6 @@ export const load: PageServerLoad = async ({ params, url }) => {
       .from('items')
       .select('id, slug, path_512, width, height, group_root_item_id')
       .in('group_root_item_id', rootIds)
-      .eq('type_id', typeDef.id)
       .eq('is_private', false)
       .eq('admin_hidden', false)
       .not('slug', 'is', null)
