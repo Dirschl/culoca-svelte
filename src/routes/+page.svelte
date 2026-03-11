@@ -116,7 +116,7 @@
               <a href="/galerie" class="btn-primary">Galerie öffnen</a>
               <a href="/map-view" class="btn-secondary">Karte anzeigen</a>
               {#if !$isAuthenticated}
-                <a href="/login?returnTo=%2F" class="btn-secondary">Login für eigene Inhalte</a>
+                <a href="/login?returnTo=%2F" class="btn-secondary btn-attention">Login</a>
               {/if}
             </div>
           </div>
@@ -150,7 +150,7 @@
               {/if}
 
               <div class="hero-side-actions">
-                <a href="/standort?returnTo=%2F" class="btn-primary hero-wide-btn">
+                <a href="/standort?returnTo=%2F" class="btn-primary hero-wide-btn" class:btn-attention={!savedLocation}>
                   {savedLocation ? 'Standortfreigabe ändern' : 'Standort jetzt festlegen'}
                 </a>
               </div>
@@ -325,10 +325,10 @@
   .hero-location-status {
     display: grid;
     gap: 0.65rem;
-    padding: 0.85rem 0.95rem;
-    border-radius: 14px;
-    background: color-mix(in srgb, var(--bg-secondary) 86%, transparent);
-    border: 1px solid var(--border-color);
+    padding: 0;
+    border-radius: 0;
+    background: transparent;
+    border: 0;
     color: var(--text-secondary);
   }
   .hero-location-map {
@@ -373,6 +373,32 @@
   .btn-secondary:hover {
     background: var(--border-color);
     transform: translateY(-1px);
+  }
+  .btn-attention {
+    animation: heroPulse 2.4s ease-in-out infinite;
+    box-shadow:
+      0 0 0 0 rgba(238, 114, 33, 0.4),
+      0 0 28px rgba(238, 114, 33, 0.2);
+  }
+  @keyframes heroPulse {
+    0% {
+      transform: translateY(0);
+      box-shadow:
+        0 0 0 0 rgba(238, 114, 33, 0.45),
+        0 0 18px rgba(238, 114, 33, 0.16);
+    }
+    50% {
+      transform: translateY(-1px);
+      box-shadow:
+        0 0 0 10px rgba(238, 114, 33, 0),
+        0 0 34px rgba(238, 114, 33, 0.28);
+    }
+    100% {
+      transform: translateY(0);
+      box-shadow:
+        0 0 0 0 rgba(238, 114, 33, 0),
+        0 0 18px rgba(238, 114, 33, 0.16);
+    }
   }
 
   /* ---- Content Sections ---- */
