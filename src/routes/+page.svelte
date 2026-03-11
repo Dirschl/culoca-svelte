@@ -116,7 +116,7 @@
                 {:else if savedLocation}
                   Bei einem manuell gesetzten Location Punkt, wird der Standort nicht verändert. Die mobile Galerie kann daher nicht verwendet werden.
                 {:else}
-                  Ohne Standort bleiben Distanzangaben und nahe Inhalte allgemeiner. Mit Freigabe wird Culoca interaktiver und reagiert auf deine Position.
+                  Ohne Standort kann nur nach Aktualität, aber nicht nach Entfernungen oder Locations gefiltert werden. Mit Standort Festlegung oder Live Standort wird Culoca interaktiv und zeigt dir zuerst Inhalte in der gewünschten Umgebung an.
                 {/if}
               </p>
 
