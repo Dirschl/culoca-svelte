@@ -309,9 +309,10 @@
   }
   .hero-greeting {
     margin: 0 0 0.6rem;
-    font-size: 0.92rem;
+    font-size: 1.4rem;
+    font-weight: 500;
     line-height: 1.4;
-    color: var(--text-muted);
+    color: #ffffff;
   }
   .hero-line {
     display: block;
