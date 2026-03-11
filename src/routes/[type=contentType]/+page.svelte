@@ -26,15 +26,28 @@
   $: metaDesc = `Alle ${data.typeDef.name}-Einträge auf Culoca. ${data.typeDef.description}. ${data.totalCount} Einträge verfügbar.`;
   let clientItems: any[] | null = null;
   let clientTotalCount: number | null = null;
+  let clientPage = 1;
   let currentGpsPosition: { lat: number; lon: number } | null = null;
   let activeSearchTerm = data.search || '';
   let searchQuery = activeSearchTerm;
   let isClientLoading = false;
-  $: displayedItems = clientItems || data.items;
-  $: displayedTotalCount = clientTotalCount ?? data.totalCount;
+  let _lastDataKey = '';
+  $: _dataKey = `${data.page}-${data.search ?? ''}`;
+  $: if (typeof window !== 'undefined' && _dataKey !== _lastDataKey) {
+    _lastDataKey = _dataKey;
+    clientItems = null;
+    clientTotalCount = null;
+    clientPage = data.page;
+    activeSearchTerm = data.search || '';
+    searchQuery = data.search || '';
+  }
+  $: useGpsApi = isFotoType && currentGpsPosition != null && clientItems != null;
+  $: effectivePage = useGpsApi ? clientPage : data.page;
+  $: displayedItems = useGpsApi ? clientItems! : data.items;
+  $: displayedTotalCount = (useGpsApi ? clientTotalCount : null) ?? data.totalCount;
   $: displayedTotalPages = Math.max(1, Math.ceil(displayedTotalCount / data.pageSize));
   $: hasDistanceData = displayedItems.some((item: any) => item?.distance !== undefined && item?.distance !== null);
-  $: currentListPath = pageUrl(data.page);
+  $: currentListPath = pageUrl(effectivePage);
   let animatedPreviewUrls: Record<string, string> = {};
   let variantImageIndexes: Record<string, number> = {};
   let variantTimer: ReturnType<typeof setInterval> | null = null;
@@ -109,6 +122,36 @@
     return null;
   }
 
+  function applyMultiWordSearch(query: any, search: string) {
+    const words = search
+      .trim()
+      .split(/\s+/)
+      .map((word) => word.trim())
+      .filter(Boolean);
+
+    let nextQuery = query;
+    for (const word of words) {
+      const escaped = word.replace(/%/g, '\\%').replace(/_/g, '\\_');
+      nextQuery = nextQuery.or(
+        `title.ilike.%${escaped}%,description.ilike.%${escaped}%,caption.ilike.%${escaped}%,slug.ilike.%${escaped}%`
+      );
+    }
+    return nextQuery;
+  }
+
+  function getDistanceInMeters(userLat: number, userLon: number, itemLat: number, itemLon: number) {
+    const earthRadius = 6371000;
+    const lat1 = (userLat * Math.PI) / 180;
+    const lat2 = (itemLat * Math.PI) / 180;
+    const dLat = ((itemLat - userLat) * Math.PI) / 180;
+    const dLon = ((itemLon - userLon) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return earthRadius * c;
+  }
+
   async function attachVariants(items: any[]) {
     if (!items.length) return items;
 
@@ -140,36 +183,65 @@
     }));
   }
 
-  async function refreshFotoItemsByGps() {
-    if (!isFotoType) return;
-
+  async function loadFotoPageFromGalleryApi(pageIndex0Based: number) {
+    if (!isFotoType || typeof window === 'undefined') return;
     const gps = getStoredGpsPosition();
     currentGpsPosition = gps;
     if (!gps) return;
 
-    const endpoint = activeSearchTerm.trim() ? '/api/gallery-items-search' : '/api/gallery-items-normal';
-    const params = new URLSearchParams({
-      page: String(Math.max(0, data.page - 1)),
-      type_id: String(data.typeDef.id)
-    });
-    params.set('lat', String(gps.lat));
-    params.set('lon', String(gps.lon));
-    if (activeSearchTerm.trim()) {
-      params.set('search', activeSearchTerm.trim());
-    }
-
     isClientLoading = true;
     try {
-      const response = await fetch(`${endpoint}?${params.toString()}`);
-      const payload = await response.json();
-      const apiItems = Array.isArray(payload.items) ? payload.items : [];
-      const enriched = await attachVariants(apiItems);
+      const search = activeSearchTerm.trim();
+      const base = window.location.origin;
+      const url = search
+        ? new URL('/api/gallery-items-search', base)
+        : new URL('/api/gallery-items-normal', base);
+      url.searchParams.set('page', String(pageIndex0Based));
+      url.searchParams.set('lat', String(gps.lat));
+      url.searchParams.set('lon', String(gps.lon));
+      url.searchParams.set('type_id', String(data.typeDef.id));
+      url.searchParams.set('page_size', String(data.pageSize));
+      if (search) url.searchParams.set('search', search);
+
+      const res = await fetch(url.toString());
+      const json = await res.json();
+      if (!res.ok || json.error) {
+        throw new Error(json.error || 'API error');
+      }
+      const raw = json.items || [];
+      const withCaption = raw.map((item: any) => ({
+        ...item,
+        caption: item.caption ?? item.description ?? null
+      }));
+      const enriched = await attachVariants(withCaption);
       clientItems = enriched;
-      clientTotalCount = typeof payload.totalCount === 'number' ? payload.totalCount : enriched.length;
+      clientTotalCount = json.totalCount ?? enriched.length;
+      clientPage = pageIndex0Based + 1;
     } catch (err) {
-      console.error('[foto-list] client gps refresh failed:', err);
+      console.error('[foto-list] gallery API failed:', err);
+      clientItems = null;
+      clientTotalCount = null;
     } finally {
       isClientLoading = false;
+    }
+  }
+
+  async function refreshFotoItemsByGps() {
+    if (!isFotoType) return;
+    const gps = getStoredGpsPosition();
+    currentGpsPosition = gps;
+    if (!gps) return;
+    await loadFotoPageFromGalleryApi(data.page - 1);
+  }
+
+  async function goToPage(p: number) {
+    if (useGpsApi) {
+      clientPage = p;
+      await loadFotoPageFromGalleryApi(p - 1);
+      if (typeof window !== 'undefined') {
+        const url = pageUrl(p);
+        window.history.replaceState({}, '', url);
+      }
     }
   }
 
@@ -259,8 +331,9 @@
         variant_count: variantThumbUrls(item).length
       }))
     );
-    const start = async () => {
-      await refreshFotoItemsByGps();
+    currentGpsPosition = getStoredGpsPosition();
+
+    const start = () => {
       const hasVariants = displayedItems.some((item: any) => variantThumbUrls(item).length > 0);
       if (hasVariants) {
         preloadVariantImages();
@@ -423,25 +496,43 @@
           <!-- SSR Pagination -->
           {#if displayedTotalPages > 1}
             <nav class="pagination" aria-label="Seitennavigation">
-              {#if data.page > 1}
-                <a href={pageUrl(data.page - 1)} class="pg-link" rel="prev">Zurück</a>
+              {#if effectivePage > 1}
+                {#if useGpsApi}
+                  <button type="button" class="pg-link" on:click={() => goToPage(effectivePage - 1)}>Zurück</button>
+                {:else}
+                  <a href={pageUrl(effectivePage - 1)} class="pg-link" rel="prev">Zurück</a>
+                {/if}
               {/if}
 
               {#each Array.from({length: displayedTotalPages}, (_, i) => i + 1) as p}
-                {#if p === 1 || p === displayedTotalPages || (p >= data.page - 2 && p <= data.page + 2)}
-                  <a
-                    href={pageUrl(p)}
-                    class="pg-link"
-                    class:pg-active={p === data.page}
-                    aria-current={p === data.page ? 'page' : undefined}
-                  >{p}</a>
-                {:else if p === data.page - 3 || p === data.page + 3}
+                {#if p === 1 || p === displayedTotalPages || (p >= effectivePage - 2 && p <= effectivePage + 2)}
+                  {#if useGpsApi}
+                    <button
+                      type="button"
+                      class="pg-link"
+                      class:pg-active={p === effectivePage}
+                      aria-current={p === effectivePage ? 'page' : undefined}
+                      on:click={() => goToPage(p)}
+                    >{p}</button>
+                  {:else}
+                    <a
+                      href={pageUrl(p)}
+                      class="pg-link"
+                      class:pg-active={p === effectivePage}
+                      aria-current={p === effectivePage ? 'page' : undefined}
+                    >{p}</a>
+                  {/if}
+                {:else if p === effectivePage - 3 || p === effectivePage + 3}
                   <span class="pg-dots" aria-hidden="true">...</span>
                 {/if}
               {/each}
 
-              {#if data.page < displayedTotalPages}
-                <a href={pageUrl(data.page + 1)} class="pg-link" rel="next">Weiter</a>
+              {#if effectivePage < displayedTotalPages}
+                {#if useGpsApi}
+                  <button type="button" class="pg-link" on:click={() => goToPage(effectivePage + 1)}>Weiter</button>
+                {:else}
+                  <a href={pageUrl(effectivePage + 1)} class="pg-link" rel="next">Weiter</a>
+                {/if}
               {/if}
             </nav>
           {/if}
@@ -718,6 +809,10 @@
     border-radius: 8px;
     text-decoration: none;
     transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .pagination button.pg-link {
+    font-family: inherit;
+    cursor: pointer;
   }
   .pg-link:hover {
     background: var(--bg-tertiary);
