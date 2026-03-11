@@ -44,6 +44,20 @@
     }
   }
 
+  function buildLocationPreviewUrl(location: RememberedLocation | null): string {
+    if (!location) return '';
+
+    const delta = 0.018;
+    const left = location.lon - delta;
+    const right = location.lon + delta;
+    const top = location.lat + delta;
+    const bottom = location.lat - delta;
+
+    return `https://www.openstreetmap.org/export/embed.html?bbox=${left}%2C${bottom}%2C${right}%2C${top}&layer=mapnik&marker=${location.lat}%2C${location.lon}`;
+  }
+
+  $: locationPreviewUrl = buildLocationPreviewUrl(savedLocation);
+
   onMount(() => {
     savedLocation = readRememberedLocation();
   });
@@ -124,7 +138,14 @@
               {#if savedLocation}
                 <div class="hero-location-status">
                   <strong>{savedLocation.label || 'Standort gespeichert'}</strong>
-                  <span>{savedLocation.lat.toFixed(5)}, {savedLocation.lon.toFixed(5)}</span>
+                  <div class="hero-location-map">
+                    <iframe
+                      src={locationPreviewUrl}
+                      title="Kartenausschnitt des aktuell verwendeten Standorts"
+                      loading="lazy"
+                      referrerpolicy="no-referrer-when-downgrade"
+                    ></iframe>
+                  </div>
                 </div>
               {/if}
 
@@ -303,12 +324,25 @@
   }
   .hero-location-status {
     display: grid;
-    gap: 0.2rem;
+    gap: 0.65rem;
     padding: 0.85rem 0.95rem;
     border-radius: 14px;
     background: color-mix(in srgb, var(--bg-secondary) 86%, transparent);
     border: 1px solid var(--border-color);
     color: var(--text-secondary);
+  }
+  .hero-location-map {
+    min-height: 220px;
+    overflow: hidden;
+    border-radius: 12px;
+    border: 1px solid color-mix(in srgb, var(--border-color) 80%, white 20%);
+    background: var(--bg-secondary);
+  }
+  .hero-location-map iframe {
+    display: block;
+    width: 100%;
+    height: 220px;
+    border: 0;
   }
 
   .btn-primary,
@@ -481,6 +515,12 @@
   @media (max-width: 960px) {
     .hero-layout {
       grid-template-columns: 1fr;
+    }
+    .hero-location-map {
+      min-height: 200px;
+    }
+    .hero-location-map iframe {
+      height: 200px;
     }
     .items-grid {
       grid-template-columns: repeat(3, 1fr);
