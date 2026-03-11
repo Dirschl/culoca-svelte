@@ -18,16 +18,24 @@ function applyMultiWordSearch<T>(
     .map((word) => word.trim())
     .filter(Boolean);
 
-  let nextQuery: any = query;
-  for (const word of words) {
+  const clauses = words.flatMap((word) => {
     const escaped = word.replace(/%/g, '\\%').replace(/_/g, '\\_');
-    const baseClause = `title.ilike.%${escaped}%,description.ilike.%${escaped}%,caption.ilike.%${escaped}%,slug.ilike.%${escaped}%`;
-    const withExtra = opts?.includeKeywordsAndOriginalName
-      ? `${baseClause},keywords.ilike.%${escaped}%,original_name.ilike.%${escaped}%`
-      : baseClause;
-    nextQuery = nextQuery.or(withExtra);
-  }
-  return nextQuery;
+    const baseClauses = [
+      `title.ilike.%${escaped}%`,
+      `description.ilike.%${escaped}%`,
+      `caption.ilike.%${escaped}%`,
+      `slug.ilike.%${escaped}%`
+    ];
+
+    if (opts?.includeKeywordsAndOriginalName) {
+      baseClauses.push(`keywords.ilike.%${escaped}%`, `original_name.ilike.%${escaped}%`);
+    }
+
+    return baseClauses;
+  });
+
+  if (clauses.length === 0) return query;
+  return (query as any).or(clauses.join(','));
 }
 
 export const load: PageServerLoad = async ({ params, url }) => {

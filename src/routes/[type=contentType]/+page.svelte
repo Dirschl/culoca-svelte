@@ -195,18 +195,24 @@
       .map((word) => word.trim())
       .filter(Boolean);
 
-    let nextQuery = query;
-    for (const word of words) {
+    const clauses = words.flatMap((word) => {
       const escaped = word.replace(/%/g, '\\%').replace(/_/g, '\\_');
-      const baseClause =
-        `title.ilike.%${escaped}%,description.ilike.%${escaped}%,caption.ilike.%${escaped}%,slug.ilike.%${escaped}%`;
-      nextQuery = nextQuery.or(
-        includeExtendedFotoFields
-          ? `${baseClause},keywords.ilike.%${escaped}%,original_name.ilike.%${escaped}%`
-          : baseClause
-      );
-    }
-    return nextQuery;
+      const baseClauses = [
+        `title.ilike.%${escaped}%`,
+        `description.ilike.%${escaped}%`,
+        `caption.ilike.%${escaped}%`,
+        `slug.ilike.%${escaped}%`
+      ];
+
+      if (includeExtendedFotoFields) {
+        baseClauses.push(`keywords.ilike.%${escaped}%`, `original_name.ilike.%${escaped}%`);
+      }
+
+      return baseClauses;
+    });
+
+    if (clauses.length === 0) return query;
+    return query.or(clauses.join(','));
   }
 
   function getDistanceInMeters(userLat: number, userLon: number, itemLat: number, itemLon: number) {
