@@ -11,6 +11,7 @@
   import { supabase } from '$lib/supabaseClient';
   import { getStoredOrComputedCanonicalPath, slugifySegment } from '$lib/content/routing';
   import { sanitizeContentHtml } from '$lib/content/html';
+  import { sanitizeReturnTo } from '$lib/returnTo';
   import {
     DEFAULT_EVENT_SETTINGS,
     buildEventPageSettings,
@@ -104,6 +105,7 @@ let showRightsManager = false;
   let adobeSaveLoading = false;
   let adobeMessage = '';
   let lastAdobeItemId = '';
+  let imageBackHref = '/';
 
   // SEO/Meta: Slug statt ID verwenden - reaktiv auf URL-Parameter
   let itemSlug: string = '';
@@ -240,6 +242,19 @@ let showRightsManager = false;
     adobeStockUrlEdit = image.adobe_stock_url || '';
     adobeStockAssetIdEdit = image.adobe_stock_asset_id || '';
     adobeMessage = '';
+  }
+
+  function getLocalReferrerFallback(): string {
+    if (!browser || !document.referrer) return '/';
+
+    try {
+      const referrerUrl = new URL(document.referrer);
+      if (referrerUrl.origin !== window.location.origin) return '/';
+      if (referrerUrl.pathname === $page.url.pathname && referrerUrl.search === $page.url.search) return '/';
+      return sanitizeReturnTo(`${referrerUrl.pathname}${referrerUrl.search}${referrerUrl.hash}`, '/');
+    } catch {
+      return '/';
+    }
   }
 
   async function loadNearbyItems() {
@@ -1695,6 +1710,10 @@ let showRightsManager = false;
       adobeUploadLoading = false;
     }
   }
+
+  onMount(() => {
+    imageBackHref = sanitizeReturnTo($page.url.searchParams.get('returnTo'), getLocalReferrerFallback());
+  });
 </script>
 
 <svelte:head>
@@ -1915,7 +1934,7 @@ let showRightsManager = false;
     <div class="passepartout-container">
       {#if shouldShowMainImage}
         <figure>
-          <a href="/" class="image-link">
+          <a href={imageBackHref} class="image-link">
             <img
               src={imageSource}
               srcset={imageSrcset || undefined}
