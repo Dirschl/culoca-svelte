@@ -2,8 +2,10 @@
   import { supabase } from '$lib/supabaseClient';
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
+  import { page } from '$app/stores';
   import { darkMode } from '$lib/darkMode';
   import SiteNav from '$lib/SiteNav.svelte';
+  import { sanitizeReturnTo } from '$lib/returnTo';
   import { welcomeVisible, resetWelcome } from '$lib/welcomeStore';
 
   let user: any = null;
@@ -53,9 +55,11 @@
   let lastKnownLat: number | null = null;
   let lastKnownLon: number | null = null;
   let gpsTrackingActive = false;
+  let returnTo = '/';
 
   onMount(() => {
     (async () => {
+      returnTo = sanitizeReturnTo($page.url.searchParams.get('returnTo'), getReferrerFallback());
       // Check if user is authenticated
       const { data: { user: currentUser } } = await supabase.auth.getUser();
       if (!currentUser) {
@@ -229,8 +233,7 @@
         stopGPSTracking();
       }
 
-      // Nach dem Speichern direkt zur Startseite
-      setTimeout(() => goto('/'), 500);
+      setTimeout(() => goto(returnTo), 500);
 
     } catch (error) {
       console.error('Error saving profile:', error);
@@ -363,6 +366,19 @@
   function openLocationDialog() {
     applyGpsPreferenceImmediately();
     goto('/?locationDialog=true');
+  }
+
+  function getReferrerFallback() {
+    if (typeof window === 'undefined' || !document.referrer) return '/';
+
+    try {
+      const referrerUrl = new URL(document.referrer);
+      if (referrerUrl.origin !== window.location.origin) return '/';
+      if (referrerUrl.pathname === $page.url.pathname) return '/';
+      return sanitizeReturnTo(`${referrerUrl.pathname}${referrerUrl.search}${referrerUrl.hash}`, '/');
+    } catch {
+      return '/';
+    }
   }
 </script>
 

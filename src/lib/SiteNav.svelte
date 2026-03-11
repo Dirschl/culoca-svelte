@@ -4,6 +4,7 @@
   import { onMount } from 'svelte';
   import { hasAdminPermission, isAuthenticated, customerBranding } from '$lib/sessionStore';
   import { supabase } from '$lib/supabaseClient';
+  import { currentPathWithSearch, sanitizeReturnTo } from '$lib/returnTo';
 
   let mobileOpen = false;
   let openDropdown: string | null = null;
@@ -34,12 +35,18 @@
   const userLinks = [
     { href: '/settings', label: 'Einstellungen' },
     { href: '/profile', label: 'Profil' },
+    { href: '/profile/freigaben', label: 'Freigaben' },
   ];
 
   $: currentPath = $page.url.pathname;
   $: displayName = $customerBranding?.fullName || $customerBranding?.accountName || '';
   $: userMenuLabel = $isAuthenticated && displayName ? displayName : ($isAuthenticated ? 'Konto' : 'Login');
-  $: userMenuActive = isActive('/settings') || isActive('/profile') || isActive('/login') || ($hasAdminPermission && adminLinks.some(l => isActive(l.href)));
+  $: userMenuActive = isActive('/settings') || isActive('/profile') || isActive('/profile/freigaben') || isActive('/login') || ($hasAdminPermission && adminLinks.some(l => isActive(l.href)));
+  $: inheritedReturnTo = sanitizeReturnTo($page.url.searchParams.get('returnTo'), currentPathWithSearch($page.url));
+
+  function getUserLinkHref(href: string): string {
+    return `${href}?returnTo=${encodeURIComponent(inheritedReturnTo)}`;
+  }
 
   function isActive(href: string): boolean {
     if (href === '/') return currentPath === '/';
@@ -151,7 +158,7 @@
         {#if $isAuthenticated && openDropdown === 'user'}
           <div class="dropdown-menu dropdown-menu--user">
             {#each userLinks as link}
-              <a href={link.href} class="dropdown-item" class:active={isActive(link.href)} on:click={closeDropdowns}>{link.label}</a>
+              <a href={getUserLinkHref(link.href)} class="dropdown-item" class:active={isActive(link.href)} on:click={closeDropdowns}>{link.label}</a>
             {/each}
             {#if $hasAdminPermission}
               <div class="dropdown-divider"></div>
@@ -174,7 +181,7 @@
         {#if $isAuthenticated}
           <span class="nav-group-label">{userMenuLabel}</span>
           {#each userLinks as link}
-            <a href={link.href} class="nav-link nav-link--sub" class:active={isActive(link.href)} on:click={closeMobile}>{link.label}</a>
+            <a href={getUserLinkHref(link.href)} class="nav-link nav-link--sub" class:active={isActive(link.href)} on:click={closeMobile}>{link.label}</a>
           {/each}
           {#if $hasAdminPermission}
             <span class="nav-group-label nav-group-label--nested">Admin</span>

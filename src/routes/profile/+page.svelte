@@ -2,8 +2,9 @@
   import { supabase } from '$lib/supabaseClient';
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
-  import ProfileRightsManager from '$lib/ProfileRightsManager.svelte';
+  import { page } from '$app/stores';
   import SiteNav from '$lib/SiteNav.svelte';
+  import { sanitizeReturnTo } from '$lib/returnTo';
 
   let user: any = null;
   let profile: any = null;
@@ -51,6 +52,7 @@
   let errorLogUrl = '';
   let userId = '';
   let errorLogFiles: string[] = [];
+  let returnTo = '/';
 
   $: nameValid = name.length >= 2 && name.length <= 60;
   $: phoneValid = phone.length === 0 || /^\+?[0-9\- ]{7,20}$/.test(phone);
@@ -75,6 +77,7 @@
   $: isReservedAccountname = reservedAccountnames.includes(accountname.toLowerCase());
 
   onMount(async () => {
+    returnTo = sanitizeReturnTo($page.url.searchParams.get('returnTo'), getReferrerFallback());
     const { data: { user: currentUser } } = await supabase.auth.getUser();
     if (!currentUser) {
       goto('/');
@@ -269,8 +272,7 @@
       }
       avatarFile = null;
       
-      // Nach dem Speichern direkt zur Startseite
-      setTimeout(() => goto('/'), 500);
+      setTimeout(() => goto(returnTo), 500);
     } catch (error) {
       console.error('Error saving profile:', error);
       showMessage('Fehler beim Speichern des Profils', 'error');
@@ -332,8 +334,17 @@
     errorLogUrl = '';
   }
 
-  function goHome() {
-    goto('/');
+  function getReferrerFallback() {
+    if (typeof window === 'undefined' || !document.referrer) return '/';
+
+    try {
+      const referrerUrl = new URL(document.referrer);
+      if (referrerUrl.origin !== window.location.origin) return '/';
+      if (referrerUrl.pathname === $page.url.pathname) return '/';
+      return sanitizeReturnTo(`${referrerUrl.pathname}${referrerUrl.search}${referrerUrl.hash}`, '/');
+    } catch {
+      return '/';
+    }
   }
 
   async function signOut() {
@@ -373,14 +384,7 @@
     </div>
   {:else}
     <div class="profile-container">
-      <!-- Header mit Zurück-Button -->
       <div class="profile-header">
-        <button class="back-btn" on:click={goHome} aria-label="Zurück zur Startseite">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
-          </svg>
-          Zurück
-        </button>
         <h1 class="page-title">Mein Profil</h1>
         <button class="signout-btn" on:click={signOut}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
@@ -758,6 +762,19 @@
             </label>
           </div>
 
+          <div class="card">
+            <h3 class="section-title">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/>
+              </svg>
+              Freigaben
+            </h3>
+            <p class="help-text">
+              Freigaben werden auf einer eigenen Seite verwaltet. Dort legst du fest, welche Benutzer deine Bilder herunterladen, bearbeiten oder loeschen duerfen.
+            </p>
+            <a class="inline-link-btn" href={`/profile/freigaben?returnTo=${encodeURIComponent(returnTo)}`}>Freigaben verwalten</a>
+          </div>
+
           <!-- Actions -->
           <div class="actions">
             <button type="submit" class="save-btn" disabled={saving}>
@@ -770,12 +787,6 @@
                 </svg>
                 Profil speichern
               {/if}
-            </button>
-            <button type="button" class="back-btn" on:click={goHome} disabled={saving}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M19 12H5M12 19l-7-7 7-7"/>
-              </svg>
-              Zurück zur Startseite
             </button>
           </div>
 
@@ -815,22 +826,6 @@
       </div>
     </div>
 
-    <!-- Rechteverwaltung -->
-    <div class="card">
-      <h3 class="section-title">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/>
-        </svg>
-        Rechteverwaltung
-      </h3>
-      <p class="section-description">
-        Hier können Sie anderen Benutzern Rechte auf Ihre Bilder geben. Diese Rechte gelten für alle Ihre Bilder.
-      </p>
-      
-      {#if user}
-        <ProfileRightsManager profileId={user.id} />
-      {/if}
-    </div>
   {/if}
 </div>
 
@@ -878,26 +873,6 @@
     margin-bottom: 2rem;
   }
 
-  .back-btn {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.75rem 1rem;
-    background: var(--bg-secondary);
-    color: var(--accent-color);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    text-decoration: none;
-  }
-
-  .back-btn:hover {
-    background: var(--border-color);
-    transform: translateY(-1px);
-  }
-
   .page-title {
     font-size: 1.875rem;
     font-weight: 700;
@@ -924,6 +899,23 @@
   .signout-btn:hover {
     background: #dc2626;
     transform: translateY(-1px);
+  }
+
+  .inline-link-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 1rem;
+    padding: 0.75rem 1rem;
+    background: var(--accent-color);
+    color: white;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+  }
+
+  .inline-link-btn:hover {
+    background: var(--accent-hover);
   }
 
   .profile-content {
@@ -1161,7 +1153,7 @@
     flex-wrap: wrap;
   }
 
-  .save-btn, .back-btn {
+  .save-btn {
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -1188,22 +1180,6 @@
   }
 
   .save-btn:disabled {
-    opacity: 0.7;
-    cursor: not-allowed;
-  }
-
-  .back-btn {
-    background: var(--bg-secondary);
-    color: var(--text-primary);
-    border: 1px solid var(--border-color);
-  }
-
-  .back-btn:hover:not(:disabled) {
-    background: var(--border-color);
-    transform: translateY(-1px);
-  }
-
-  .back-btn:disabled {
     opacity: 0.7;
     cursor: not-allowed;
   }
@@ -1516,7 +1492,7 @@
       align-items: stretch;
     }
 
-    .save-btn, .back-btn {
+    .save-btn {
       width: 100%;
     }
   }
