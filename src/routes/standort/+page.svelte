@@ -111,7 +111,7 @@
     <section class="hero-grid">
       <div class="hero-copy surface-responsive surface-responsive--panel">
         <span class="eyebrow">Standort freigeben</span>
-        <h1>{currentLocation ? 'Standort ändern' : 'Standort für Culoca festlegen'}</h1>
+        <h1>{currentLocation?.source === 'gps' ? 'Live-Standort aktiv' : currentLocation ? 'Standortfreigabe ändern' : 'Standort für Culoca freigeben'}</h1>
         <p class="lead">
           Die Standortfreigabe macht Culoca interaktiv: Inhalte, Distanzen und Sortierung reagieren dann auf deine aktuelle
           Position. Du kannst Live-GPS aktivieren oder rechts einen festen Ort manuell setzen.
@@ -136,6 +136,19 @@
           {/if}
         </div>
 
+        <div class="info-card surface-responsive surface-responsive--soft">
+          <h3>So aktivierst du Live-GPS sicher</h3>
+          <ul>
+            <li><strong>1. Button klicken:</strong> Wähle hier `Live-GPS freigeben`.</li>
+            <li><strong>2. Browser erlauben:</strong> Bestätige im Hinweisfenster `Erlauben` oder `Zulassen` für den Standort.</li>
+            <li><strong>3. Wenn nichts erscheint:</strong> Prüfe die Freigabe direkt am Standortsymbol des Browsers oder in den Systemeinstellungen.</li>
+          </ul>
+          <p class="browser-help">
+            <strong>Desktop:</strong> Meist sitzt das Standortsymbol rechts neben der URL in der Adressleiste.<br />
+            <strong>Mobil:</strong> Öffne die Website-Einstellungen im Browser oder die App-/Website-Berechtigungen im Betriebssystem und setze Standort auf `Erlauben`.
+          </p>
+        </div>
+
         <div class="action-list">
           <button type="button" class="primary-action" on:click={activateGpsLocation} disabled={locating}>
             {locating ? 'Standort wird abgefragt...' : currentLocation ? 'Live-GPS erneut freigeben' : 'Live-GPS freigeben'}
@@ -151,7 +164,7 @@
             <ul>
               <li><strong>Live-GPS:</strong> Culoca darf deine aktuelle Position verwenden und Inhalte unterwegs laufend anpassen.</li>
               <li><strong>Fester Ort:</strong> Du suchst rechts einen Ort oder setzt ihn direkt auf der Karte als feste Basis.</li>
-              <li><strong>Jederzeit änderbar:</strong> Du kannst den Modus später wieder wechseln oder den Standort ganz entfernen.</li>
+              <li><strong>Jederzeit änderbar:</strong> Du kannst den Modus später wieder wechseln, im Browser ändern oder den Standort ganz entfernen.</li>
             </ul>
           </section>
 
@@ -160,7 +173,7 @@
             <ul>
               <li>Die Galerie kann Inhalte nach deiner aktuellen Position oder nach deinem festen Ort sortieren.</li>
               <li>Distanzangaben, mobile Galerie, Karte und nahe Inhalte reagieren präziser.</li>
-              <li>Du kannst den Standort jederzeit hier oder über Konto → Standort ändern.</li>
+              <li>Du kannst die Freigabe jederzeit hier, im Browser oder in den Betriebssystem-Einstellungen anpassen.</li>
             </ul>
           </section>
         </div>
@@ -170,7 +183,7 @@
         initialLat={currentLocation?.lat ?? null}
         initialLon={currentLocation?.lon ?? null}
         initialLabel={currentLocation?.label ?? ''}
-        submitLabel={currentLocation ? 'Standort ändern' : 'Standort speichern'}
+        submitLabel={currentLocation ? 'Standortfreigabe ändern' : 'Standort speichern'}
         on:save={handleMapSave}
       />
     </section>
@@ -264,6 +277,12 @@
     font-size: 0.95rem;
   }
 
+  .browser-help {
+    margin: 0.85rem 0 0;
+    color: var(--text-secondary);
+    line-height: 1.65;
+  }
+
   .action-list {
     display: flex;
     flex-wrap: wrap;
@@ -291,13 +310,6 @@
     color: white;
     box-shadow: 0 18px 34px rgba(238, 114, 33, 0.24);
   }
-
-  .secondary-action {
-    background: var(--bg-tertiary);
-    color: var(--text-primary);
-    border-color: var(--border-color);
-  }
-
   .ghost-action {
     background: transparent;
     color: var(--text-primary);
