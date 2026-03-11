@@ -7,9 +7,11 @@
   import { isAuthenticated } from '$lib/sessionStore';
   import { readRememberedLocation, type RememberedLocation } from '$lib/locationPreferences';
   import { appendReturnTo } from '$lib/content/routing';
+  import { supabase } from '$lib/supabaseClient';
 
   export let data: PageData;
   let savedLocation: RememberedLocation | null = null;
+  let currentUserFullName = '';
 
   const TYPE_ICONS: Record<string, string> = {
     foto: '📷',
@@ -58,8 +60,42 @@
 
   $: locationPreviewUrl = buildLocationPreviewUrl(savedLocation);
 
+  async function loadCurrentUserFullName() {
+    const { data: authData } = await supabase.auth.getUser();
+    const user = authData.user;
+    if (!user) {
+      currentUserFullName = '';
+      return;
+    }
+
+    const profileName =
+      user.user_metadata?.full_name ||
+      user.user_metadata?.name ||
+      user.user_metadata?.display_name;
+
+    if (profileName) {
+      currentUserFullName = profileName;
+      return;
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name, accountname')
+      .eq('id', user.id)
+      .single();
+
+    currentUserFullName = profile?.full_name || profile?.accountname || '';
+  }
+
+  $: if ($isAuthenticated && !currentUserFullName) {
+    loadCurrentUserFullName();
+  }
+
   onMount(() => {
     savedLocation = readRememberedLocation();
+    if ($isAuthenticated) {
+      loadCurrentUserFullName();
+    }
   });
 </script>
 
@@ -102,8 +138,11 @@
       <div class="hero-inner">
         <div class="hero-layout">
           <div class="hero-copy">
+            {#if currentUserFullName}
+              <p class="hero-greeting">Hallo, {currentUserFullName}</p>
+            {/if}
             <h1>
-              <span class="hero-line">Entdecke die Welt</span>
+              <span class="hero-line">Entdecke deine Umgebung</span>
               <span class="hero-line hero-accent">durch GPS-Inhalte</span>
             </h1>
             <p class="hero-sub">
@@ -267,6 +306,12 @@
     line-height: 1.15;
     letter-spacing: -0.025em;
     margin: 0 0 1.25rem;
+  }
+  .hero-greeting {
+    margin: 0 0 0.6rem;
+    font-size: 0.92rem;
+    line-height: 1.4;
+    color: var(--text-muted);
   }
   .hero-line {
     display: block;
