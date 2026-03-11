@@ -122,7 +122,7 @@
     return null;
   }
 
-  function applyMultiWordSearch(query: any, search: string) {
+  function applyMultiWordSearch(query: any, search: string, includeExtendedFotoFields = false) {
     const words = search
       .trim()
       .split(/\s+/)
@@ -132,8 +132,12 @@
     let nextQuery = query;
     for (const word of words) {
       const escaped = word.replace(/%/g, '\\%').replace(/_/g, '\\_');
+      const baseClause =
+        `title.ilike.%${escaped}%,description.ilike.%${escaped}%,caption.ilike.%${escaped}%,slug.ilike.%${escaped}%`;
       nextQuery = nextQuery.or(
-        `title.ilike.%${escaped}%,description.ilike.%${escaped}%,caption.ilike.%${escaped}%,slug.ilike.%${escaped}%`
+        includeExtendedFotoFields
+          ? `${baseClause},keywords.ilike.%${escaped}%,original_name.ilike.%${escaped}%`
+          : baseClause
       );
     }
     return nextQuery;
@@ -183,7 +187,7 @@
     }));
   }
 
-  async function loadFotoPageFromGalleryApi(pageIndex0Based: number) {
+  async function loadFotoPageFromGps(pageIndex0Based: number) {
     if (!isFotoType || typeof window === 'undefined') return;
     const gps = getStoredGpsPosition();
     currentGpsPosition = gps;
@@ -192,33 +196,95 @@
     isClientLoading = true;
     try {
       const search = activeSearchTerm.trim();
-      const base = window.location.origin;
-      const url = search
-        ? new URL('/api/gallery-items-search', base)
-        : new URL('/api/gallery-items-normal', base);
-      url.searchParams.set('page', String(pageIndex0Based));
-      url.searchParams.set('lat', String(gps.lat));
-      url.searchParams.set('lon', String(gps.lon));
-      url.searchParams.set('type_id', String(data.typeDef.id));
-      url.searchParams.set('page_size', String(data.pageSize));
-      if (search) url.searchParams.set('search', search);
+      const { data: authData } = await supabase.auth.getUser();
+      const currentUserId = authData.user?.id || null;
 
-      const res = await fetch(url.toString());
-      const json = await res.json();
-      if (!res.ok || json.error) {
-        throw new Error(json.error || 'API error');
+      let countQuery = supabase
+        .from('items')
+        .select('id', { count: 'exact', head: true })
+        .eq('type_id', data.typeDef.id)
+        .eq('admin_hidden', false)
+        .is('group_root_item_id', null)
+        .not('slug', 'is', null)
+        .not('path_512', 'is', null)
+        .or(currentUserId ? `is_private.is.null,is_private.eq.false,profile_id.eq.${currentUserId}` : 'is_private.is.null,is_private.eq.false');
+
+      if (search) {
+        countQuery = applyMultiWordSearch(countQuery, search, true);
       }
-      const raw = json.items || [];
-      const withCaption = raw.map((item: any) => ({
+
+      const { count, error: countError } = await countQuery;
+      if (countError) {
+        throw countError;
+      }
+
+      const totalMatching = count || 0;
+      const pageFetchSize = 1000;
+      let from = 0;
+      const allRows: any[] = [];
+
+      while (from < totalMatching) {
+        let pageQuery = supabase
+          .from('items')
+          .select('id, slug, title, description, caption, canonical_path, path_512, width, height, created_at, starts_at, ends_at, external_url, lat, lon')
+          .eq('type_id', data.typeDef.id)
+          .eq('admin_hidden', false)
+          .is('group_root_item_id', null)
+          .not('slug', 'is', null)
+          .not('path_512', 'is', null)
+          .or(currentUserId ? `is_private.is.null,is_private.eq.false,profile_id.eq.${currentUserId}` : 'is_private.is.null,is_private.eq.false')
+          .range(from, from + pageFetchSize - 1);
+
+        if (search) {
+          pageQuery = applyMultiWordSearch(pageQuery, search, true);
+        }
+
+        const { data: rows, error: rowsError } = await pageQuery;
+        if (rowsError) {
+          throw rowsError;
+        }
+
+        if (!rows || rows.length === 0) {
+          break;
+        }
+
+        allRows.push(...rows);
+        from += pageFetchSize;
+      }
+
+      const sortedRows = allRows
+        .map((item) => {
+          const hasCoordinates = Number.isFinite(item.lat) && Number.isFinite(item.lon);
+          const distance = hasCoordinates
+            ? getDistanceInMeters(gps.lat, gps.lon, Number(item.lat), Number(item.lon))
+            : null;
+
+          return {
+            ...item,
+            distance
+          };
+        })
+        .sort((a, b) => {
+          const aDistance = a.distance ?? Number.POSITIVE_INFINITY;
+          const bDistance = b.distance ?? Number.POSITIVE_INFINITY;
+          if (aDistance !== bDistance) return aDistance - bDistance;
+
+          const aCreated = a.created_at ? new Date(a.created_at).getTime() : 0;
+          const bCreated = b.created_at ? new Date(b.created_at).getTime() : 0;
+          return bCreated - aCreated;
+        });
+
+      const pageStart = pageIndex0Based * data.pageSize;
+      const pageRows = sortedRows.slice(pageStart, pageStart + data.pageSize);
+      const enriched = await attachVariants(pageRows);
+      clientItems = enriched.map((item) => ({
         ...item,
         caption: item.caption ?? item.description ?? null
       }));
-      const enriched = await attachVariants(withCaption);
-      clientItems = enriched;
-      clientTotalCount = json.totalCount ?? enriched.length;
+      clientTotalCount = totalMatching;
       clientPage = pageIndex0Based + 1;
     } catch (err) {
-      console.error('[foto-list] gallery API failed:', err);
+      console.error('[foto-list] GPS photo load failed:', err);
       clientItems = null;
       clientTotalCount = null;
     } finally {
@@ -231,13 +297,13 @@
     const gps = getStoredGpsPosition();
     currentGpsPosition = gps;
     if (!gps) return;
-    await loadFotoPageFromGalleryApi(data.page - 1);
+    await loadFotoPageFromGps(data.page - 1);
   }
 
   async function goToPage(p: number) {
     if (useGpsApi) {
       clientPage = p;
-      await loadFotoPageFromGalleryApi(p - 1);
+      await loadFotoPageFromGps(p - 1);
       if (typeof window !== 'undefined') {
         const url = pageUrl(p);
         window.history.replaceState({}, '', url);
@@ -333,7 +399,8 @@
     );
     currentGpsPosition = getStoredGpsPosition();
 
-    const start = () => {
+    const start = async () => {
+      await refreshFotoItemsByGps();
       const hasVariants = displayedItems.some((item: any) => variantThumbUrls(item).length > 0);
       if (hasVariants) {
         preloadVariantImages();
