@@ -113,15 +113,18 @@
               {/if}
             </p>
             <div class="hero-actions">
-              <a href="/galerie" class={savedLocation?.source === 'gps' ? 'btn-secondary' : 'btn-primary'}>Galerie öffnen</a>
+              <a href="/galerie" class={savedLocation?.source === 'gps' ? 'btn-secondary' : 'btn-primary'}>Galerie</a>
               {#if savedLocation?.source === 'gps'}
                 <a href="/galerie?mobile=true" class="btn-primary">Mobile Galerie</a>
               {/if}
-              <a href="/map-view" class="btn-secondary">Karte anzeigen</a>
-              {#if !$isAuthenticated}
-                <a href="/login?returnTo=%2F" class="btn-secondary btn-attention">Login</a>
-              {/if}
+              <a href="/map-view" class="btn-secondary">Kartenansicht</a>
             </div>
+            {#if !$isAuthenticated}
+              <div class="hero-login-callout">
+                <p>Mehr Funktionen,<br>jetzt kostenfrei anmelden</p>
+                <a href="/login?returnTo=%2F" class="btn-secondary btn-attention">Login</a>
+              </div>
+            {/if}
           </div>
 
           <aside class="hero-side surface-responsive surface-responsive--panel">
@@ -289,6 +292,18 @@
     display: flex;
     gap: 0.75rem;
     flex-wrap: wrap;
+  }
+  .hero-login-callout {
+    display: grid;
+    justify-items: start;
+    gap: 0.75rem;
+    margin-top: 1rem;
+  }
+  .hero-login-callout p {
+    margin: 0;
+    font-size: 0.92rem;
+    line-height: 1.45;
+    color: var(--text-muted);
   }
   .hero-side {
     display: grid;
