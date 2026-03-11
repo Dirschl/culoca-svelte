@@ -3,6 +3,7 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import ProfileRightsManager from '$lib/ProfileRightsManager.svelte';
+  import SiteNav from '$lib/SiteNav.svelte';
 
   let user: any = null;
   let profile: any = null;
@@ -363,6 +364,8 @@
 </svelte:head>
 
 <div class="profile-page">
+  <SiteNav />
+
   {#if loading}
     <div class="loading-container">
       <div class="spinner"></div>

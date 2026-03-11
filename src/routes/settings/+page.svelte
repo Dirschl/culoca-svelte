@@ -3,6 +3,7 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { darkMode } from '$lib/darkMode';
+  import SiteNav from '$lib/SiteNav.svelte';
   import { welcomeVisible, resetWelcome } from '$lib/welcomeStore';
 
   let user: any = null;
@@ -387,6 +388,8 @@
 </svelte:head>
 
 <div class="settings-page">
+  <SiteNav />
+
   {#if loading}
     <div class="loading-container">
       <div class="spinner"></div>
@@ -437,6 +440,32 @@
           <div class="section-header">
             <h2>Galerie-Einstellungen</h2>
             <p class="section-description">Passe die Darstellung deiner Bilder an</p>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-info">
+              <label class="setting-label">News-Flash</label>
+              <p class="setting-description">Lege fest, ob der News-Flash in deiner Galerie ausgeblendet bleibt oder eigene bzw. alle Uploads zeigt.</p>
+            </div>
+            <div class="setting-control">
+              <div class="radio-group">
+                <label class="radio-option">
+                  <input type="radio" bind:group={newsFlashMode} value="aus" />
+                  <span class="radio-custom"></span>
+                  <span class="radio-label">Aus</span>
+                </label>
+                <label class="radio-option">
+                  <input type="radio" bind:group={newsFlashMode} value="eigene" />
+                  <span class="radio-custom"></span>
+                  <span class="radio-label">Eigene</span>
+                </label>
+                <label class="radio-option">
+                  <input type="radio" bind:group={newsFlashMode} value="alle" />
+                  <span class="radio-custom"></span>
+                  <span class="radio-label">Alle</span>
+                </label>
+              </div>
+            </div>
           </div>
 
           <div class="setting-row">
@@ -542,32 +571,6 @@
                 <span class="toggle-slider"></span>
               </label>
               <span class="setting-status">{autoguide ? 'Aktiviert' : 'Deaktiviert'}</span>
-            </div>
-          </div>
-
-          <div class="setting-row">
-            <div class="setting-info">
-              <label class="setting-label">News-Flash</label>
-              <p class="setting-description">Bestimme, welche Benachrichtigungen du erhalten möchtest</p>
-            </div>
-            <div class="setting-control">
-              <div class="radio-group">
-                <label class="radio-option">
-                  <input type="radio" bind:group={newsFlashMode} value="aus" />
-                  <span class="radio-custom"></span>
-                  <span class="radio-label">Aus</span>
-                </label>
-                <label class="radio-option">
-                  <input type="radio" bind:group={newsFlashMode} value="eigene" />
-                  <span class="radio-custom"></span>
-                  <span class="radio-label">Eigene</span>
-                </label>
-                <label class="radio-option">
-                  <input type="radio" bind:group={newsFlashMode} value="alle" />
-                  <span class="radio-custom"></span>
-                  <span class="radio-label">Alle</span>
-                </label>
-              </div>
             </div>
           </div>
         </section>
