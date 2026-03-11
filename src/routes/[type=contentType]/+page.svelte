@@ -1,11 +1,13 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
+  import { browser } from '$app/environment';
   import type { PageData } from './$types';
   import SiteNav from '$lib/SiteNav.svelte';
   import SiteFooter from '$lib/SiteFooter.svelte';
   import { supabase } from '$lib/supabaseClient';
   import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
   import { appendReturnTo } from '$lib/content/routing';
+  import { getEffectiveGpsPosition } from '$lib/filterStore';
 
   export let data: PageData;
 
@@ -27,7 +29,7 @@
   let clientItems: any[] | null = null;
   let clientTotalCount: number | null = null;
   let clientPage = 1;
-  let currentGpsPosition: { lat: number; lon: number } | null = null;
+  let currentGpsPosition: { lat: number; lon: number } | null = browser ? getStoredGpsPosition() : null;
   let activeSearchTerm = data.search || '';
   let searchQuery = activeSearchTerm;
   let isClientLoading = false;
@@ -43,9 +45,10 @@
     searchQuery = data.search || '';
     lastSearchValue = data.search || '';
   }
-  $: useGpsApi = isFotoType && currentGpsPosition != null && clientItems != null;
+  $: shouldPreferGpsSorting = isFotoType && currentGpsPosition != null;
+  $: useGpsApi = shouldPreferGpsSorting && clientItems != null;
   $: effectivePage = useGpsApi ? clientPage : data.page;
-  $: displayedItems = useGpsApi ? clientItems! : data.items;
+  $: displayedItems = useGpsApi ? clientItems! : shouldPreferGpsSorting ? [] : data.items;
   $: displayedTotalCount = (useGpsApi ? clientTotalCount : null) ?? data.totalCount;
   $: displayedTotalPages = Math.max(1, Math.ceil(displayedTotalCount / data.pageSize));
   $: hasDistanceData = displayedItems.some((item: any) => item?.distance !== undefined && item?.distance !== null);
@@ -124,8 +127,20 @@
     lastSearchValue = nextValue;
   }
 
+  function handleFotoSearchEvent(event: Event) {
+    const nextValue = (event.currentTarget as HTMLInputElement).value;
+    if (!nextValue.trim()) {
+      clearFotoSearch();
+    }
+  }
+
   function getStoredGpsPosition(): { lat: number; lon: number } | null {
     if (typeof window === 'undefined') return null;
+
+    const effectiveGps = getEffectiveGpsPosition();
+    if (effectiveGps && Number.isFinite(effectiveGps.lat) && Number.isFinite(effectiveGps.lon)) {
+      return { lat: effectiveGps.lat, lon: effectiveGps.lon };
+    }
 
     const windowLat = Number((window as any).userLat);
     const windowLon = Number((window as any).userLon);
@@ -527,9 +542,12 @@
               placeholder="Fotos durchsuchen"
               bind:value={searchQuery}
               on:input={handleFotoSearchInput}
+              on:search={handleFotoSearchEvent}
             />
           </form>
-          {#if isClientLoading}
+          {#if shouldPreferGpsSorting && !useGpsApi}
+            <p class="foto-search-hint">Sortiere nach aktuellem Standort ...</p>
+          {:else if isClientLoading}
             <p class="foto-search-hint">Sortiere nach aktuellem Standort ...</p>
           {:else if currentGpsPosition}
             <p class="foto-search-hint">Sortierung wie Galerie, nach Entfernung ab deinem aktuellen Standort.</p>
