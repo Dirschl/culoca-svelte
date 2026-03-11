@@ -56,13 +56,15 @@ async function fetchVisibleRpcPage({
   pageSize,
   lat,
   lon,
-  effectiveUserId
+  effectiveUserId,
+  typeId
 }: {
   startPage: number;
   pageSize: number;
   lat: number;
   lon: number;
   effectiveUserId: string | null;
+  typeId: number | null;
 }) {
   const collected: any[] = [];
   let rawPage = startPage;
@@ -93,7 +95,11 @@ async function fetchVisibleRpcPage({
         const { total_count, ...itemWithoutTotalCount } = item;
         return itemWithoutTotalCount;
       })
-      .filter((item) => item.group_root_item_id == null && (!('show_in_main_feed' in item) || isVisibleInMainFeed(item)));
+      .filter((item) =>
+        item.group_root_item_id == null &&
+        (!typeId || item.type_id === typeId) &&
+        (!('show_in_main_feed' in item) || isVisibleInMainFeed(item))
+      );
 
     collected.push(...visibleItems);
 
@@ -118,6 +124,7 @@ export async function GET({ url }: any) {
     const locationFilterLat = parseFloat(url.searchParams.get('locationFilterLat') || '0');
     const locationFilterLon = parseFloat(url.searchParams.get('locationFilterLon') || '0');
     const userId = url.searchParams.get('user_id');
+    const typeId = parseInt(url.searchParams.get('type_id') || '0') || null;
     const pageSize = 50;
     
     // Request params (debug removed)
@@ -154,6 +161,10 @@ export async function GET({ url }: any) {
         .order('created_at', { ascending: false })
         .range(from, to);
 
+      if (typeId) {
+        query = query.eq('type_id', typeId);
+      }
+
       if (currentUserId) {
         query = query.or(`is_private.is.null,is_private.eq.false,profile_id.eq.${currentUserId}`);
       } else {
@@ -186,7 +197,8 @@ export async function GET({ url }: any) {
       pageSize,
       lat,
       lon,
-      effectiveUserId
+      effectiveUserId,
+      typeId
     });
 
     if (rpcPage.error) {
@@ -204,6 +216,10 @@ export async function GET({ url }: any) {
       .eq('admin_hidden', false)
       .is('group_root_item_id', null)
       .not('path_512', 'is', null);
+
+    if (typeId) {
+      visibleCountQuery = visibleCountQuery.eq('type_id', typeId);
+    }
 
     if (lat !== 0 || lon !== 0) {
       visibleCountQuery = visibleCountQuery.not('lat', 'is', null).not('lon', 'is', null);

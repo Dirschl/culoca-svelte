@@ -7,6 +7,23 @@ export const ssr = true;
 
 const PAGE_SIZE = 24;
 
+function applyMultiWordSearch<T>(query: T, search: string) {
+  const words = search
+    .trim()
+    .split(/\s+/)
+    .map((word) => word.trim())
+    .filter(Boolean);
+
+  let nextQuery: any = query;
+  for (const word of words) {
+    const escaped = word.replace(/%/g, '\\%').replace(/_/g, '\\_');
+    nextQuery = nextQuery.or(
+      `title.ilike.%${escaped}%,description.ilike.%${escaped}%,caption.ilike.%${escaped}%,slug.ilike.%${escaped}%`
+    );
+  }
+  return nextQuery;
+}
+
 export const load: PageServerLoad = async ({ params, url }) => {
   const typeSlug = params.type;
   const typeDef = DEFAULT_CONTENT_TYPE_BY_SLUG.get(typeSlug);
@@ -16,6 +33,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
   }
 
   const page = Math.max(1, parseInt(url.searchParams.get('seite') || '1'));
+  const search = (url.searchParams.get('suche') || '').trim();
 
   const supabaseUrl = (
     process.env.PUBLIC_SUPABASE_URL ||
@@ -35,8 +53,8 @@ export const load: PageServerLoad = async ({ params, url }) => {
     auth: { persistSession: false }
   });
 
-  const baseQuery = () =>
-    supabase
+  const buildBaseQuery = () => {
+    let query = supabase
       .from('items')
       .select('id, slug, title, description, caption, canonical_path, path_512, width, height, created_at, starts_at, ends_at, external_url')
       .eq('type_id', typeDef.id)
@@ -44,17 +62,30 @@ export const load: PageServerLoad = async ({ params, url }) => {
       .eq('admin_hidden', false)
       .is('group_root_item_id', null)
       .not('slug', 'is', null);
+    if (search) {
+      query = applyMultiWordSearch(query, search);
+    }
+    return query;
+  };
 
-  const [countResult, dataResult] = await Promise.all([
-    supabase
+  const buildCountQuery = () => {
+    let query = supabase
       .from('items')
       .select('*', { count: 'exact', head: true })
       .eq('type_id', typeDef.id)
       .eq('is_private', false)
       .eq('admin_hidden', false)
       .is('group_root_item_id', null)
-      .not('slug', 'is', null),
-    baseQuery()
+      .not('slug', 'is', null);
+    if (search) {
+      query = applyMultiWordSearch(query, search);
+    }
+    return query;
+  };
+
+  const [countResult, dataResult] = await Promise.all([
+    buildCountQuery(),
+    buildBaseQuery()
       .order('created_at', { ascending: false })
       .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1)
   ]);
@@ -132,6 +163,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
     },
     items,
     page,
+    search,
     totalPages,
     totalCount,
     pageSize: PAGE_SIZE

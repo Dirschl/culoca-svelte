@@ -3,6 +3,7 @@
   import type { PageData } from './$types';
   import SiteNav from '$lib/SiteNav.svelte';
   import SiteFooter from '$lib/SiteFooter.svelte';
+  import { supabase } from '$lib/supabaseClient';
   import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
   import { appendReturnTo } from '$lib/content/routing';
 
@@ -23,6 +24,16 @@
   $: isFotoType = data.typeDef.slug === 'foto';
   $: pageTitle = `${data.typeDef.name} - Culoca`;
   $: metaDesc = `Alle ${data.typeDef.name}-Einträge auf Culoca. ${data.typeDef.description}. ${data.totalCount} Einträge verfügbar.`;
+  let clientItems: any[] | null = null;
+  let clientTotalCount: number | null = null;
+  let currentGpsPosition: { lat: number; lon: number } | null = null;
+  let activeSearchTerm = data.search || '';
+  let searchQuery = activeSearchTerm;
+  let isClientLoading = false;
+  $: displayedItems = clientItems || data.items;
+  $: displayedTotalCount = clientTotalCount ?? data.totalCount;
+  $: displayedTotalPages = Math.max(1, Math.ceil(displayedTotalCount / data.pageSize));
+  $: hasDistanceData = displayedItems.some((item: any) => item?.distance !== undefined && item?.distance !== null);
   $: currentListPath = pageUrl(data.page);
   let animatedPreviewUrls: Record<string, string> = {};
   let variantImageIndexes: Record<string, number> = {};
@@ -54,7 +65,112 @@
   }
 
   function pageUrl(p: number): string {
-    return p === 1 ? `/${data.typeDef.slug}` : `/${data.typeDef.slug}?seite=${p}`;
+    const params = new URLSearchParams();
+    if (activeSearchTerm.trim()) params.set('suche', activeSearchTerm.trim());
+    if (p > 1) params.set('seite', String(p));
+    const qs = params.toString();
+    return qs ? `/${data.typeDef.slug}?${qs}` : `/${data.typeDef.slug}`;
+  }
+
+  function formatDistance(distance: number | null | undefined): string {
+    if (distance == null || Number.isNaN(distance)) return '';
+    if (distance < 1000) return `${Math.round(distance)}m`;
+    return `${(distance / 1000).toFixed(1)}km`;
+  }
+
+  function getStoredGpsPosition(): { lat: number; lon: number } | null {
+    if (typeof window === 'undefined') return null;
+
+    const windowLat = Number((window as any).userLat);
+    const windowLon = Number((window as any).userLon);
+    if (Number.isFinite(windowLat) && Number.isFinite(windowLon) && (windowLat !== 0 || windowLon !== 0)) {
+      return { lat: windowLat, lon: windowLon };
+    }
+
+    const directLat = Number(localStorage.getItem('userLat'));
+    const directLon = Number(localStorage.getItem('userLon'));
+    if (Number.isFinite(directLat) && Number.isFinite(directLon) && (directLat !== 0 || directLon !== 0)) {
+      return { lat: directLat, lon: directLon };
+    }
+
+    try {
+      const raw = localStorage.getItem('culoca-filters');
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      const lat = Number(parsed?.lastGpsPosition?.lat);
+      const lon = Number(parsed?.lastGpsPosition?.lon);
+      if (Number.isFinite(lat) && Number.isFinite(lon) && (lat !== 0 || lon !== 0)) {
+        return { lat, lon };
+      }
+    } catch {
+      return null;
+    }
+
+    return null;
+  }
+
+  async function attachVariants(items: any[]) {
+    if (!items.length) return items;
+
+    const rootIds = items.map((item) => item.id);
+    const { data: variantRows } = await supabase
+      .from('items')
+      .select('id, slug, path_512, width, height, group_root_item_id')
+      .in('group_root_item_id', rootIds)
+      .eq('is_private', false)
+      .eq('admin_hidden', false)
+      .not('slug', 'is', null)
+      .not('path_512', 'is', null)
+      .order('created_at', { ascending: false });
+
+    const variantsByRoot = new Map<string, any[]>();
+    for (const row of variantRows || []) {
+      const rootId = row.group_root_item_id as string | null;
+      if (!rootId) continue;
+      const current = variantsByRoot.get(rootId) || [];
+      if (current.length >= 5) continue;
+      current.push(row);
+      variantsByRoot.set(rootId, current);
+    }
+
+    return items.map((item) => ({
+      ...item,
+      variants: variantsByRoot.get(item.id) || [],
+      child_count: item.child_count ?? (variantsByRoot.get(item.id) || []).length
+    }));
+  }
+
+  async function refreshFotoItemsByGps() {
+    if (!isFotoType) return;
+
+    const gps = getStoredGpsPosition();
+    currentGpsPosition = gps;
+    if (!gps) return;
+
+    const endpoint = activeSearchTerm.trim() ? '/api/gallery-items-search' : '/api/gallery-items-normal';
+    const params = new URLSearchParams({
+      page: String(Math.max(0, data.page - 1)),
+      type_id: String(data.typeDef.id)
+    });
+    params.set('lat', String(gps.lat));
+    params.set('lon', String(gps.lon));
+    if (activeSearchTerm.trim()) {
+      params.set('search', activeSearchTerm.trim());
+    }
+
+    isClientLoading = true;
+    try {
+      const response = await fetch(`${endpoint}?${params.toString()}`);
+      const payload = await response.json();
+      const apiItems = Array.isArray(payload.items) ? payload.items : [];
+      const enriched = await attachVariants(apiItems);
+      clientItems = enriched;
+      clientTotalCount = typeof payload.totalCount === 'number' ? payload.totalCount : enriched.length;
+    } catch (err) {
+      console.error('[foto-list] client gps refresh failed:', err);
+    } finally {
+      isClientLoading = false;
+    }
   }
 
   function variantThumbUrls(item: any): string[] {
@@ -90,7 +206,7 @@
   }
 
   function preloadVariantImages() {
-    for (const item of data.items) {
+    for (const item of displayedItems) {
       for (const url of rotationThumbUrls(item).slice(1)) {
         const img = new Image();
         img.decoding = 'async';
@@ -104,7 +220,7 @@
 
     console.log(
       '[foto-list] starting rotation for items:',
-      data.items
+      displayedItems
         .map((item: any) => ({
           id: item.id,
           slug: item.slug,
@@ -118,7 +234,7 @@
       const nextUrls: Record<string, string> = {};
       const nextIndexes: Record<string, number> = { ...variantImageIndexes };
 
-      for (const item of data.items) {
+      for (const item of displayedItems) {
         const variants = rotationThumbUrls(item);
         if (variants.length <= 1) continue;
         const nextIndex = ((nextIndexes[item.id] ?? 0) + 1) % variants.length;
@@ -136,19 +252,20 @@
     if (!isFotoType) return;
     console.log(
       '[foto-list] loaded items:',
-      data.items.map((item: any) => ({
+      displayedItems.map((item: any) => ({
         id: item.id,
         slug: item.slug,
         child_count: item.child_count || 0,
         variant_count: variantThumbUrls(item).length
       }))
     );
-    const hasVariants = data.items.some((item: any) => variantThumbUrls(item).length > 0);
-    if (!hasVariants) return;
-
-    const start = () => {
-      preloadVariantImages();
-      startVariantRotation();
+    const start = async () => {
+      await refreshFotoItemsByGps();
+      const hasVariants = displayedItems.some((item: any) => variantThumbUrls(item).length > 0);
+      if (hasVariants) {
+        preloadVariantImages();
+        startVariantRotation();
+      }
     };
 
     if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
@@ -218,22 +335,40 @@
           {data.typeDef.name}
         </h1>
         <p class="hub-meta">
-          {data.totalCount.toLocaleString('de-DE')} {data.totalCount === 1 ? 'Eintrag' : 'Einträge'}
+          {displayedTotalCount.toLocaleString('de-DE')} {displayedTotalCount === 1 ? 'Eintrag' : 'Einträge'}
           {#if data.typeDef.description}
             <span class="hub-sep" aria-hidden="true">&mdash;</span>
             {data.typeDef.description}
           {/if}
         </p>
+        {#if isFotoType}
+          <form class="foto-search" action={`/${data.typeDef.slug}`} method="GET">
+            <input
+              type="search"
+              name="suche"
+              placeholder="Fotos durchsuchen"
+              bind:value={searchQuery}
+            />
+            <button type="submit">Suchen</button>
+          </form>
+          {#if isClientLoading}
+            <p class="foto-search-hint">Sortiere nach aktuellem Standort ...</p>
+          {:else if currentGpsPosition}
+            <p class="foto-search-hint">Sortierung wie Galerie, nach Entfernung ab deinem aktuellen Standort.</p>
+          {:else}
+            <p class="foto-search-hint">Ohne GPS werden die neuesten Fotos zuerst gezeigt.</p>
+          {/if}
+        {/if}
       </div>
     </header>
 
     <section class="hub-content">
       <div class="hub-inner">
-        {#if data.items.length === 0}
+        {#if displayedItems.length === 0}
           <p class="empty">Noch keine Einträge vorhanden.</p>
         {:else}
           <div class="items-grid">
-            {#each data.items as item (item.id)}
+            {#each displayedItems as item (item.id)}
               <article class="item-card">
                 <a href={itemHref(item)} class="item-link">
                   {#if item.path_512}
@@ -246,6 +381,9 @@
                     >
                       {#if isFotoType && (item.child_count || 0) > 0}
                         <div class="item-variant-count">+{(item.child_count || 0) + 1}</div>
+                      {/if}
+                      {#if isFotoType && hasDistanceData && item.distance !== undefined && item.distance !== null}
+                        <div class="item-distance-badge">{formatDistance(item.distance)}</div>
                       {/if}
                       <img
                         src={previewUrl}
@@ -283,14 +421,14 @@
           </div>
 
           <!-- SSR Pagination -->
-          {#if data.totalPages > 1}
+          {#if displayedTotalPages > 1}
             <nav class="pagination" aria-label="Seitennavigation">
               {#if data.page > 1}
                 <a href={pageUrl(data.page - 1)} class="pg-link" rel="prev">Zurück</a>
               {/if}
 
-              {#each Array.from({length: data.totalPages}, (_, i) => i + 1) as p}
-                {#if p === 1 || p === data.totalPages || (p >= data.page - 2 && p <= data.page + 2)}
+              {#each Array.from({length: displayedTotalPages}, (_, i) => i + 1) as p}
+                {#if p === 1 || p === displayedTotalPages || (p >= data.page - 2 && p <= data.page + 2)}
                   <a
                     href={pageUrl(p)}
                     class="pg-link"
@@ -302,7 +440,7 @@
                 {/if}
               {/each}
 
-              {#if data.page < data.totalPages}
+              {#if data.page < displayedTotalPages}
                 <a href={pageUrl(data.page + 1)} class="pg-link" rel="next">Weiter</a>
               {/if}
             </nav>
@@ -370,6 +508,36 @@
     font-size: 0.95rem;
     color: var(--text-secondary);
     margin: 0;
+  }
+  .foto-search {
+    margin-top: 1rem;
+    display: flex;
+    gap: 0.65rem;
+    max-width: 34rem;
+  }
+  .foto-search input {
+    flex: 1;
+    min-width: 0;
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    padding: 0.78rem 1rem;
+    font-size: 0.95rem;
+  }
+  .foto-search button {
+    border: none;
+    border-radius: 999px;
+    background: var(--culoca-orange);
+    color: #fff;
+    padding: 0.78rem 1rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .foto-search-hint {
+    margin: 0.65rem 0 0;
+    color: var(--text-muted);
+    font-size: 0.82rem;
   }
   .hub-sep {
     margin: 0 0.3rem;
@@ -454,6 +622,21 @@
     background: rgba(15, 23, 42, 0.82);
     color: #fff;
     font-size: 0.78rem;
+    font-weight: 700;
+    line-height: 1;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+    backdrop-filter: blur(8px);
+  }
+  .item-distance-badge {
+    position: absolute;
+    top: 0.55rem;
+    right: 0.55rem;
+    z-index: 2;
+    padding: 0.22rem 0.48rem;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.82);
+    color: #fff;
+    font-size: 0.76rem;
     font-weight: 700;
     line-height: 1;
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
@@ -559,6 +742,10 @@
   @media (max-width: 680px) {
     .hub-inner { padding-left: 1.25rem; padding-right: 1.25rem; }
     .items-grid { grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
+    .foto-search {
+      flex-direction: column;
+      max-width: none;
+    }
   }
   @media (max-width: 420px) {
     .items-grid { grid-template-columns: 1fr; }

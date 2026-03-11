@@ -3,6 +3,23 @@ import { supabase } from '$lib/supabaseClient';
 import { safeFunctionCall, logDatabaseOperation } from '$lib/databaseConfig';
 import { isVisibleInMainFeed } from '$lib/content/routing';
 
+function applyMultiWordSearch<T>(query: T, search: string) {
+  const words = search
+    .trim()
+    .split(/\s+/)
+    .map((word) => word.trim())
+    .filter(Boolean);
+
+  let nextQuery: any = query;
+  for (const word of words) {
+    const escaped = word.replace(/%/g, '\\%').replace(/_/g, '\\_');
+    nextQuery = nextQuery.or(
+      `title.ilike.%${escaped}%,description.ilike.%${escaped}%,original_name.ilike.%${escaped}%,slug.ilike.%${escaped}%`
+    );
+  }
+  return nextQuery;
+}
+
 async function attachChildCounts(items: any[]) {
   const rootIds = items
     .filter((item) => !item.group_root_item_id)
@@ -57,7 +74,8 @@ async function fetchVisibleRpcPage({
   lat,
   lon,
   effectiveUserId,
-  searchTerm
+  searchTerm,
+  typeId
 }: {
   startPage: number;
   pageSize: number;
@@ -65,6 +83,7 @@ async function fetchVisibleRpcPage({
   lon: number;
   effectiveUserId: string | null;
   searchTerm: string | null;
+  typeId: number | null;
 }) {
   const collected: any[] = [];
   let rawPage = startPage;
@@ -96,7 +115,11 @@ async function fetchVisibleRpcPage({
         const { total_count, ...itemWithoutTotalCount } = item;
         return itemWithoutTotalCount;
       })
-      .filter((item) => item.group_root_item_id == null && (!('show_in_main_feed' in item) || isVisibleInMainFeed(item)));
+      .filter((item) =>
+        item.group_root_item_id == null &&
+        (!typeId || item.type_id === typeId) &&
+        (!('show_in_main_feed' in item) || isVisibleInMainFeed(item))
+      );
 
     collected.push(...visibleItems);
 
@@ -122,6 +145,7 @@ export async function GET({ url }: any) {
     const locationFilterLat = parseFloat(url.searchParams.get('locationFilterLat') || '0');
     const locationFilterLon = parseFloat(url.searchParams.get('locationFilterLon') || '0');
     const userId = url.searchParams.get('user_id');
+    const typeId = parseInt(url.searchParams.get('type_id') || '0') || null;
     const pageSize = 50;
     
     console.log('[Search API] Request params:', { page, search, lat, lon, locationFilterLat, locationFilterLon, userId });
@@ -161,10 +185,11 @@ export async function GET({ url }: any) {
         .range(from, to);
 
       if (trimmedSearch) {
-        const escaped = trimmedSearch.replace(/%/g, '\\%').replace(/_/g, '\\_');
-        query = query.or(
-          `title.ilike.%${escaped}%,description.ilike.%${escaped}%,original_name.ilike.%${escaped}%,slug.ilike.%${escaped}%`
-        );
+        query = applyMultiWordSearch(query, trimmedSearch);
+      }
+
+      if (typeId) {
+        query = query.eq('type_id', typeId);
       }
 
       if (currentUserId) {
@@ -220,7 +245,8 @@ export async function GET({ url }: any) {
       lat,
       lon,
       effectiveUserId,
-      searchTerm
+      searchTerm,
+      typeId
     });
 
     if (rpcPage.error) {
@@ -256,16 +282,17 @@ export async function GET({ url }: any) {
       .is('group_root_item_id', null)
       .not('path_512', 'is', null);
 
+    if (typeId) {
+      visibleCountQuery = visibleCountQuery.eq('type_id', typeId);
+    }
+
     if (lat !== 0 || lon !== 0) {
       visibleCountQuery = visibleCountQuery.not('lat', 'is', null).not('lon', 'is', null);
     }
 
     const trimmedSearch = search.trim();
     if (trimmedSearch) {
-      const escaped = trimmedSearch.replace(/%/g, '\\%').replace(/_/g, '\\_');
-      visibleCountQuery = visibleCountQuery.or(
-        `title.ilike.%${escaped}%,description.ilike.%${escaped}%,original_name.ilike.%${escaped}%,slug.ilike.%${escaped}%`
-      );
+      visibleCountQuery = applyMultiWordSearch(visibleCountQuery, trimmedSearch);
     }
 
     if (currentUserId) {
