@@ -1,19 +1,14 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
-  import { page } from '$app/stores';
   import SiteNav from '$lib/SiteNav.svelte';
   import ProfileRightsManager from '$lib/ProfileRightsManager.svelte';
   import { supabase } from '$lib/supabaseClient';
-  import { sanitizeReturnTo } from '$lib/returnTo';
 
   let user: any = null;
   let loading = true;
-  let returnTo = '/';
 
   onMount(async () => {
-    returnTo = sanitizeReturnTo($page.url.searchParams.get('returnTo'), getReferrerFallback());
-
     const { data: { user: currentUser } } = await supabase.auth.getUser();
     if (!currentUser) {
       goto('/');
@@ -23,19 +18,6 @@
     user = currentUser;
     loading = false;
   });
-
-  function getReferrerFallback() {
-    if (typeof window === 'undefined' || !document.referrer) return '/profile';
-
-    try {
-      const referrerUrl = new URL(document.referrer);
-      if (referrerUrl.origin !== window.location.origin) return '/profile';
-      if (referrerUrl.pathname === $page.url.pathname) return '/profile';
-      return sanitizeReturnTo(`${referrerUrl.pathname}${referrerUrl.search}${referrerUrl.hash}`, '/profile');
-    } catch {
-      return '/profile';
-    }
-  }
 </script>
 
 <svelte:head>
@@ -60,7 +42,6 @@
           <h1>Freigaben</h1>
           <p class="subtitle">Verwalte zentrale Berechtigungen fuer andere Benutzer auf all deine Bilder.</p>
         </div>
-        <a class="profile-link" href={`/profile?returnTo=${encodeURIComponent(returnTo)}`}>Profil bearbeiten</a>
       </header>
 
       <section class="intro-card">
@@ -140,19 +121,6 @@
     color: var(--text-secondary);
   }
 
-  .profile-link {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0.8rem 1rem;
-    border-radius: 8px;
-    text-decoration: none;
-    background: var(--bg-secondary);
-    color: var(--text-primary);
-    border: 1px solid var(--border-color);
-    white-space: nowrap;
-  }
-
   .intro-card,
   .manager-card {
     background: var(--bg-secondary);
@@ -189,10 +157,6 @@
     .header {
       flex-direction: column;
       align-items: stretch;
-    }
-
-    .profile-link {
-      width: 100%;
     }
   }
 </style>

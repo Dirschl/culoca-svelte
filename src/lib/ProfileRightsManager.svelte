@@ -52,13 +52,16 @@
               const userData = await userResponse.json();
               if (userData.user) {
                 right.userName = userData.user.full_name;
-                right.userEmail = userData.user.email;
+                right.userEmail = userData.user.email || '';
               }
             }
           } catch (error) {
             console.error('Error loading user details:', error);
           }
         }
+
+        // Trigger a reactive update after enriching entries with user details.
+        existingRights = [...existingRights];
       } else {
         showMessage('Fehler beim Laden der Rechte', 'error');
       }
