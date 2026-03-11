@@ -87,11 +87,6 @@
 
       <section class="content-grid">
         <section class="manager-shell">
-          <div class="manager-header">
-            <h2>Freigaben verwalten</h2>
-            <p>Suche Benutzer, vergebe profilweite Rechte und passe bestehende Freigaben jederzeit an.</p>
-          </div>
-
           <div class="manager-card surface-responsive surface-responsive--panel">
             {#if user}
               <ProfileRightsManager profileId={user.id} />
@@ -225,8 +220,7 @@
   }
 
   .panel-card h2,
-  .sidebar-card h2,
-  .manager-header h2 {
+  .sidebar-card h2 {
     margin: 0 0 1rem;
     font-size: 1.15rem;
   }
@@ -251,8 +245,7 @@
 
   .use-case p,
   .legend-item p,
-  .sidebar-card p,
-  .manager-header p {
+  .sidebar-card p {
     margin: 0;
     line-height: 1.65;
     color: var(--text-secondary);
@@ -304,11 +297,6 @@
 
   .manager-shell {
     min-width: 0;
-  }
-
-  .manager-header {
-    margin-bottom: 1rem;
-    padding-top: 0.25rem;
   }
 
   .manager-card {
