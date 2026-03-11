@@ -223,23 +223,25 @@
                 <a href={itemHref(item)} class="item-link">
                   {#if item.path_512}
                     {@const previewUrl = currentThumbUrl(item)}
-                    <div
-                      class="item-thumb"
-                      class:item-thumb--foto={isFotoType}
-                      style={isFotoType ? `--thumb-preview:url('${previewUrl}')` : undefined}
-                    >
-                      {#if isFotoType && (item.child_count || 0) > 0}
-                        <div class="item-variant-count">+{item.child_count}</div>
-                      {/if}
-                      <img
-                        src={previewUrl}
-                        alt={item.title || item.slug}
-                        width="320"
-                        height="213"
-                        loading="lazy"
-                        decoding="async"
-                      />
-                    </div>
+                    {#key `${item.id}:${previewUrl}`}
+                      <div
+                        class="item-thumb"
+                        class:item-thumb--foto={isFotoType}
+                        style={isFotoType ? `--thumb-preview:url('${previewUrl}')` : undefined}
+                      >
+                        {#if isFotoType && (item.child_count || 0) > 0}
+                          <div class="item-variant-count">+{item.child_count}</div>
+                        {/if}
+                        <img
+                          src={previewUrl}
+                          alt={item.title || item.slug}
+                          width="320"
+                          height="213"
+                          loading="lazy"
+                          decoding="async"
+                        />
+                      </div>
+                    {/key}
                   {:else}
                     <div class="item-thumb item-thumb--empty">
                       <span class="thumb-icon">{icon || '📄'}</span>
