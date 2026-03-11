@@ -59,7 +59,7 @@
   {:else}
     <main class="rights-main">
       <section class="hero">
-        <div class="hero-copy">
+        <div class="hero-copy surface-responsive surface-responsive--panel">
           <span class="eyebrow">Profilweite Rechte</span>
           <h1>Freigaben für dein gesamtes Profil klar und zentral steuern</h1>
           <p class="hero-text">
@@ -165,7 +165,13 @@
   }
 
   .hero-copy {
-    padding: 2.5rem 0 1rem;
+    padding: 2.5rem;
+    background: color-mix(in srgb, var(--bg-secondary) 88%, transparent);
+    border: 1px solid color-mix(in srgb, var(--border-color) 80%, white 8%);
+    border-radius: 28px;
+    box-shadow: 0 18px 60px rgba(0, 0, 0, 0.12);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
   }
 
   .eyebrow {
@@ -267,7 +273,7 @@
   }
 
   .sidebar-card {
-    padding: 1.25rem 0;
+    padding: 1.25rem;
   }
 
   .sidebar-card--warning {
@@ -335,7 +341,13 @@
     }
 
     .hero-copy {
-      padding: 1.5rem 0 0.5rem;
+      padding: 0;
+      background: transparent;
+      border: none;
+      border-radius: 0;
+      box-shadow: none;
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
     }
 
     h1 {

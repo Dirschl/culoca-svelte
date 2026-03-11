@@ -719,6 +719,14 @@
   }
 
   @media (max-width: 768px) {
+    .profile-rights-manager {
+      padding: 0;
+    }
+
+    .intro-text {
+      margin-top: 0;
+    }
+
     .right-item {
       grid-template-columns: 1fr;
       align-items: stretch;
