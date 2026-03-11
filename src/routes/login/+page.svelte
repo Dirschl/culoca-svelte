@@ -332,6 +332,10 @@
     align-items: center;
     gap: 0.75rem;
     font-weight: 600;
+    padding: 0.15rem 0;
+    border-radius: 0;
+    background: transparent;
+    border: none;
   }
 
   .benefit-check {
@@ -387,9 +391,9 @@
     gap: 0.7rem;
     min-height: 3.35rem;
     border-radius: 16px;
-    border: 1px solid color-mix(in srgb, var(--border-color) 80%, white 10%);
-    background: rgba(255, 255, 255, 0.05);
-    color: var(--text-primary);
+    border: 1px solid rgba(238, 114, 33, 0.45);
+    background: linear-gradient(135deg, rgba(238, 114, 33, 0.9) 0%, rgba(255, 140, 66, 0.88) 100%);
+    color: white;
     cursor: pointer;
   }
 
@@ -489,6 +493,7 @@
 
   .guest-box {
     margin-top: 1.75rem;
+    padding-top: 0.35rem;
   }
 
   .guest-divider {
@@ -510,7 +515,7 @@
   .guest-divider span {
     position: relative;
     padding: 0 0.8rem;
-    background: var(--bg-secondary);
+    background: color-mix(in srgb, var(--bg-secondary) 88%, transparent);
     color: var(--text-muted);
   }
 
@@ -569,6 +574,10 @@
     .login-header h1 {
       max-width: none;
       font-size: clamp(2rem, 12vw, 2.8rem);
+    }
+
+    .guest-box {
+      margin-top: 2rem;
     }
   }
 </style>
