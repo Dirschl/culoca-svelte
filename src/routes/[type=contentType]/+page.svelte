@@ -117,14 +117,19 @@
   }
 
   function handleFotoSearchSubmit(event: SubmitEvent) {
+    event.preventDefault();
     const trimmedQuery = searchQuery.trim();
     if (trimmedQuery) {
       searchQuery = trimmedQuery;
       lastSearchValue = trimmedQuery;
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams();
+        params.set('suche', trimmedQuery);
+        window.location.href = `/${data.typeDef.slug}?${params.toString()}`;
+      }
       return;
     }
 
-    event.preventDefault();
     clearFotoSearch();
   }
 
