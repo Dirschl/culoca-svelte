@@ -31,6 +31,7 @@
   let activeSearchTerm = data.search || '';
   let searchQuery = activeSearchTerm;
   let isClientLoading = false;
+  let lastSearchValue = activeSearchTerm;
   let _lastDataKey = '';
   $: _dataKey = `${data.page}-${data.search ?? ''}`;
   $: if (typeof window !== 'undefined' && _dataKey !== _lastDataKey) {
@@ -40,6 +41,7 @@
     clientPage = data.page;
     activeSearchTerm = data.search || '';
     searchQuery = data.search || '';
+    lastSearchValue = data.search || '';
   }
   $: useGpsApi = isFotoType && currentGpsPosition != null && clientItems != null;
   $: effectivePage = useGpsApi ? clientPage : data.page;
@@ -102,11 +104,24 @@
     const trimmedQuery = searchQuery.trim();
     if (trimmedQuery) {
       searchQuery = trimmedQuery;
+      lastSearchValue = trimmedQuery;
       return;
     }
 
     event.preventDefault();
     clearFotoSearch();
+  }
+
+  function handleFotoSearchInput(event: Event) {
+    const nextValue = (event.currentTarget as HTMLInputElement).value;
+    searchQuery = nextValue;
+
+    if (!nextValue.trim() && lastSearchValue.trim()) {
+      clearFotoSearch();
+      return;
+    }
+
+    lastSearchValue = nextValue;
   }
 
   function getStoredGpsPosition(): { lat: number; lon: number } | null {
@@ -272,13 +287,17 @@
 
       const sortedRows = allRows
         .map((item) => {
-          const hasCoordinates = Number.isFinite(item.lat) && Number.isFinite(item.lon);
+          const lat = Number(item.lat);
+          const lon = Number(item.lon);
+          const hasCoordinates = Number.isFinite(lat) && Number.isFinite(lon);
           const distance = hasCoordinates
-            ? getDistanceInMeters(gps.lat, gps.lon, Number(item.lat), Number(item.lon))
+            ? getDistanceInMeters(gps.lat, gps.lon, lat, lon)
             : null;
 
           return {
             ...item,
+            lat: hasCoordinates ? lat : item.lat,
+            lon: hasCoordinates ? lon : item.lon,
             distance
           };
         })
@@ -507,11 +526,8 @@
               name="suche"
               placeholder="Fotos durchsuchen"
               bind:value={searchQuery}
+              on:input={handleFotoSearchInput}
             />
-            {#if searchQuery.trim()}
-              <button type="button" class="foto-search-clear" on:click={clearFotoSearch}>X</button>
-            {/if}
-            <button type="submit">Suchen</button>
           </form>
           {#if isClientLoading}
             <p class="foto-search-hint">Sortiere nach aktuellem Standort ...</p>
