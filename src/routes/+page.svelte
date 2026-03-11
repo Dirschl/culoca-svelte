@@ -109,12 +109,12 @@
           <aside class="hero-side surface-responsive surface-responsive--panel">
             <section class="hero-side-section">
               <span class="hero-side-kicker">Standort</span>
-              <h2>{savedLocation?.source === 'gps' ? 'Live-Standort aktiv' : savedLocation ? 'Standort festgelegt' : 'Standort freigeben'}</h2>
+              <h2>{savedLocation?.source === 'gps' ? 'Live-Standort aktiv' : savedLocation ? 'Location manuell gesetzt' : 'Standort freigeben'}</h2>
               <p>
                 {#if savedLocation?.source === 'gps'}
                   Culoca nutzt deinen aktuellen Live-Standort und kann Inhalte, Distanzen und Sortierung laufend an deine Position anpassen.
                 {:else if savedLocation}
-                  Ein fester Standort ist gespeichert. Du kannst jederzeit auf Live-GPS umstellen oder den Ort anpassen.
+                  Bei einem manuell gesetzten Location Punkt, wird der Standort nicht verändert. Die mobile Galerie kann daher nicht verwendet werden.
                 {:else}
                   Ohne Standort bleiben Distanzangaben und nahe Inhalte allgemeiner. Mit Freigabe wird Culoca interaktiver und reagiert auf deine Position.
                 {/if}
