@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onDestroy, onMount } from 'svelte';
   import type { PageData } from './$types';
   import SiteNav from '$lib/SiteNav.svelte';
   import SiteFooter from '$lib/SiteFooter.svelte';
@@ -23,6 +24,10 @@
   $: pageTitle = `${data.typeDef.name} - Culoca`;
   $: metaDesc = `Alle ${data.typeDef.name}-Einträge auf Culoca. ${data.typeDef.description}. ${data.totalCount} Einträge verfügbar.`;
   $: currentListPath = pageUrl(data.page);
+  let animatedPreviewUrls: Record<string, string> = {};
+  let variantImageIndexes: Record<string, number> = {};
+  let variantTimer: ReturnType<typeof setInterval> | null = null;
+  let idleHandle: number | null = null;
 
   function itemHref(item: { canonical_path: string | null; slug: string }): string {
     return appendReturnTo(item.canonical_path || `/item/${item.slug}`, currentListPath);
@@ -49,6 +54,77 @@
   function pageUrl(p: number): string {
     return p === 1 ? `/${data.typeDef.slug}` : `/${data.typeDef.slug}?seite=${p}`;
   }
+
+  function variantThumbUrls(item: any): string[] {
+    if (!isFotoType) return [];
+    const variants = Array.isArray(item.variants) ? item.variants : [];
+    return variants
+      .filter((variant) => variant?.slug && variant?.path_512)
+      .map((variant) => getSeoImageUrl(variant.slug, variant.path_512, '512'))
+      .filter(Boolean);
+  }
+
+  function currentThumbUrl(item: any): string {
+    return animatedPreviewUrls[item.id] || thumbUrl(item);
+  }
+
+  function preloadVariantImages() {
+    for (const item of data.items) {
+      for (const url of variantThumbUrls(item)) {
+        const img = new Image();
+        img.decoding = 'async';
+        img.src = url;
+      }
+    }
+  }
+
+  function startVariantRotation() {
+    if (!isFotoType) return;
+
+    variantTimer = setInterval(() => {
+      const nextUrls: Record<string, string> = {};
+      const nextIndexes: Record<string, number> = { ...variantImageIndexes };
+
+      for (const item of data.items) {
+        const variants = variantThumbUrls(item);
+        if (!variants.length) continue;
+        const nextIndex = ((nextIndexes[item.id] ?? -1) + 1) % variants.length;
+        nextIndexes[item.id] = nextIndex;
+        nextUrls[item.id] = variants[nextIndex];
+      }
+
+      variantImageIndexes = nextIndexes;
+      animatedPreviewUrls = nextUrls;
+    }, 2800);
+  }
+
+  onMount(() => {
+    if (!isFotoType) return;
+    const hasVariants = data.items.some((item: any) => Array.isArray(item.variants) && item.variants.length > 0);
+    if (!hasVariants) return;
+
+    const start = () => {
+      preloadVariantImages();
+      startVariantRotation();
+    };
+
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      idleHandle = window.requestIdleCallback(start, { timeout: 1800 });
+    } else {
+      idleHandle = window.setTimeout(start, 1200);
+    }
+  });
+
+  onDestroy(() => {
+    if (variantTimer) clearInterval(variantTimer);
+    if (idleHandle !== null) {
+      if (typeof window !== 'undefined' && 'cancelIdleCallback' in window) {
+        window.cancelIdleCallback(idleHandle);
+      } else {
+        clearTimeout(idleHandle);
+      }
+    }
+  });
 </script>
 
 <svelte:head>
@@ -118,7 +194,7 @@
               <article class="item-card">
                 <a href={itemHref(item)} class="item-link">
                   {#if item.path_512}
-                    {@const previewUrl = thumbUrl(item)}
+                    {@const previewUrl = currentThumbUrl(item)}
                     <div
                       class="item-thumb"
                       class:item-thumb--foto={isFotoType}
@@ -143,13 +219,15 @@
                     {#if item.description || item.caption}
                       <p class="item-desc">{truncate(item.description || item.caption, 120)}</p>
                     {/if}
-                    <div class="item-meta">
-                      {#if item.starts_at}
-                        <time datetime={item.starts_at}>{formatDate(item.starts_at)}</time>
-                      {:else if item.created_at}
-                        <time datetime={item.created_at}>{formatDate(item.created_at)}</time>
-                      {/if}
-                    </div>
+                    {#if !isFotoType}
+                      <div class="item-meta">
+                        {#if item.starts_at}
+                          <time datetime={item.starts_at}>{formatDate(item.starts_at)}</time>
+                        {:else if item.created_at}
+                          <time datetime={item.created_at}>{formatDate(item.created_at)}</time>
+                        {/if}
+                      </div>
+                    {/if}
                   </div>
                 </a>
               </article>

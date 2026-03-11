@@ -60,7 +60,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
   ]);
 
   const totalCount = countResult.count || 0;
-  const items = (dataResult.data || []).map((item) => ({
+  const baseItems = (dataResult.data || []).map((item) => ({
     id: item.id as string,
     slug: item.slug as string,
     title: (item.title || null) as string | null,
@@ -75,6 +75,50 @@ export const load: PageServerLoad = async ({ params, url }) => {
     ends_at: (item.ends_at || null) as string | null,
     external_url: (item.external_url || null) as string | null
   }));
+
+  let items = baseItems;
+
+  if (typeDef.slug === 'foto' && baseItems.length > 0) {
+    const rootIds = baseItems.map((item) => item.id);
+    const { data: variantRows } = await supabase
+      .from('items')
+      .select('id, slug, path_512, width, height, group_root_item_id')
+      .in('group_root_item_id', rootIds)
+      .eq('type_id', typeDef.id)
+      .eq('is_private', false)
+      .eq('admin_hidden', false)
+      .not('slug', 'is', null)
+      .not('path_512', 'is', null)
+      .order('created_at', { ascending: false });
+
+    const variantsByRoot = new Map<string, Array<{
+      id: string;
+      slug: string;
+      path_512: string | null;
+      width: number | null;
+      height: number | null;
+    }>>();
+
+    for (const row of variantRows || []) {
+      const rootId = row.group_root_item_id as string | null;
+      if (!rootId) continue;
+      const current = variantsByRoot.get(rootId) || [];
+      if (current.length >= 5) continue;
+      current.push({
+        id: row.id as string,
+        slug: row.slug as string,
+        path_512: (row.path_512 || null) as string | null,
+        width: (row.width || null) as number | null,
+        height: (row.height || null) as number | null
+      });
+      variantsByRoot.set(rootId, current);
+    }
+
+    items = baseItems.map((item) => ({
+      ...item,
+      variants: variantsByRoot.get(item.id) || []
+    }));
+  }
 
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
