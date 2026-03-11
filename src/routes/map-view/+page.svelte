@@ -3,6 +3,7 @@
   import { goto } from '$app/navigation';
   import { filterStore } from '$lib/filterStore';
   import FullscreenMap from '$lib/FullscreenMap.svelte';
+  import { appendReturnTo } from '$lib/content/routing';
   
   export let data;
   
@@ -88,7 +89,7 @@
       on:close={handleMapClose}
       on:imageClick={(event) => {
         const imageHref = event.detail.canonicalPath || event.detail.canonical_path || (event.detail.imageSlug || event.detail.slug ? `/item/${event.detail.imageSlug || event.detail.slug}` : '/');
-        window.location.href = imageHref;
+        window.location.href = appendReturnTo(imageHref, '/map-view');
       }}
       on:locationSelected={(event) => {
         // Navigate back to main page with location

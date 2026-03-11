@@ -6,6 +6,7 @@
   import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
   import { isAuthenticated } from '$lib/sessionStore';
   import { readRememberedLocation, type RememberedLocation } from '$lib/locationPreferences';
+  import { appendReturnTo } from '$lib/content/routing';
 
   export let data: PageData;
   let savedLocation: RememberedLocation | null = null;
@@ -22,7 +23,7 @@
   };
 
   function itemHref(item: { canonical_path: string | null; slug: string }): string {
-    return item.canonical_path || `/item/${item.slug}`;
+    return appendReturnTo(item.canonical_path || `/item/${item.slug}`, '/');
   }
 
   function thumbUrl(item: { slug: string; path_512: string | null }): string {

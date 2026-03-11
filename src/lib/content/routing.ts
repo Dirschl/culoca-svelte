@@ -98,6 +98,17 @@ export function getPublicItemHref(item: {
   return item.slug ? `/item/${item.slug}` : '/';
 }
 
+export function appendReturnTo(href: string, returnTo: string | null | undefined): string {
+  const normalizedHref = normalizePath(href);
+  if (!returnTo) return normalizedHref;
+
+  const normalizedReturnTo = normalizePath(returnTo);
+  if (!normalizedReturnTo.startsWith('/')) return normalizedHref;
+
+  const separator = normalizedHref.includes('?') ? '&' : '?';
+  return `${normalizedHref}${separator}returnTo=${encodeURIComponent(normalizedReturnTo)}`;
+}
+
 export function isEventExpired(item: Pick<ContentItemLike, 'type_id' | 'ends_at'>): boolean {
   const type = getTypeForItem(item);
   if (type?.slug !== 'event' || !item.ends_at) return false;

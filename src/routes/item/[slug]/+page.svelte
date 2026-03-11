@@ -1739,6 +1739,12 @@ let showRightsManager = false;
   }
 
   onMount(() => {
+    const explicitReturnTo = sanitizeReturnTo($page.url.searchParams.get('returnTo'), '/');
+    if (isValidImageBackTarget(explicitReturnTo)) {
+      imageBackHref = explicitReturnTo;
+      return;
+    }
+
     imageBackHref = getStoredLocalRoute();
 
     const localReferrer = getLocalReferrerFallback();

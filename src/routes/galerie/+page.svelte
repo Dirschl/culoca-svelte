@@ -2475,7 +2475,10 @@
       }}
       on:imageClick={(event) => {
         const imageHref = event.detail.canonicalPath || event.detail.canonical_path || (event.detail.imageSlug || event.detail.slug ? `/item/${event.detail.imageSlug || event.detail.slug}` : '/');
-        window.location.href = imageHref;
+        const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+        window.location.href = imageHref.includes('?')
+          ? `${imageHref}&returnTo=${encodeURIComponent(returnTo)}`
+          : `${imageHref}?returnTo=${encodeURIComponent(returnTo)}`;
       }}
       on:locationSelected={(event) => {
         const { lat, lon } = event.detail;
