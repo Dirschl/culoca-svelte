@@ -19,6 +19,7 @@
   };
 
   $: icon = TYPE_ICONS[data.typeDef.slug] || '';
+  $: isFotoType = data.typeDef.slug === 'foto';
   $: pageTitle = `${data.typeDef.name} - Culoca`;
   $: metaDesc = `Alle ${data.typeDef.name}-Einträge auf Culoca. ${data.typeDef.description}. ${data.totalCount} Einträge verfügbar.`;
   $: currentListPath = pageUrl(data.page);
@@ -117,9 +118,14 @@
               <article class="item-card">
                 <a href={itemHref(item)} class="item-link">
                   {#if item.path_512}
-                    <div class="item-thumb">
+                    {@const previewUrl = thumbUrl(item)}
+                    <div
+                      class="item-thumb"
+                      class:item-thumb--foto={isFotoType}
+                      style={isFotoType ? `--thumb-preview:url('${previewUrl}')` : undefined}
+                    >
                       <img
-                        src={thumbUrl(item)}
+                        src={previewUrl}
                         alt={item.title || item.slug}
                         width="320"
                         height="213"
@@ -287,12 +293,29 @@
     aspect-ratio: 3 / 2;
     overflow: hidden;
     background: var(--bg-tertiary);
+    position: relative;
+  }
+  .item-thumb--foto::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: var(--thumb-preview);
+    background-size: cover;
+    background-position: center;
+    transform: scale(1.08);
+    filter: blur(14px) saturate(0.9);
+    opacity: 0.5;
   }
   .item-thumb img {
+    position: relative;
+    z-index: 1;
     width: 100%;
     height: 100%;
     object-fit: cover;
     transition: transform 0.3s;
+  }
+  .item-thumb--foto img {
+    object-fit: contain;
   }
   .item-card:hover .item-thumb img {
     transform: scale(1.04);
