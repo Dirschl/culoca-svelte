@@ -1,7 +1,9 @@
 <script lang="ts">
   import { page } from '$app/stores';
+  import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
-  import { hasAdminPermission } from '$lib/sessionStore';
+  import { hasAdminPermission, isAuthenticated, customerBranding } from '$lib/sessionStore';
+  import { supabase } from '$lib/supabaseClient';
 
   let mobileOpen = false;
   let openDropdown: string | null = null;
@@ -29,7 +31,15 @@
     { href: '/admin/analytics', label: 'Analytics' },
   ];
 
+  const userLinks = [
+    { href: '/settings', label: 'Einstellungen' },
+    { href: '/profile', label: 'Profil' },
+  ];
+
   $: currentPath = $page.url.pathname;
+  $: displayName = $customerBranding?.fullName || $customerBranding?.accountName || '';
+  $: userMenuLabel = $isAuthenticated && displayName ? displayName : ($isAuthenticated ? 'Konto' : 'Login');
+  $: userMenuActive = isActive('/settings') || isActive('/profile') || isActive('/login') || ($hasAdminPermission && adminLinks.some(l => isActive(l.href)));
 
   function isActive(href: string): boolean {
     if (href === '/') return currentPath === '/';
@@ -51,6 +61,22 @@
 
   function closeDropdowns() {
     openDropdown = null;
+  }
+
+  function handleUserMenuClick() {
+    if (!$isAuthenticated) {
+      goto('/login');
+      closeMobile();
+      return;
+    }
+    toggleDropdown('user');
+  }
+
+  async function handleLogout() {
+    closeDropdowns();
+    closeMobile();
+    await supabase.auth.signOut();
+    goto('/');
   }
 
   onMount(() => {
@@ -109,32 +135,64 @@
         {/each}
       </div>
 
-      <!-- Admin dropdown (permission-gated) -->
-      {#if $hasAdminPermission}
-        <div class="dropdown desktop-only">
-          <button
-            class="nav-link dropdown-toggle"
-            class:active={isDropdownActive(adminLinks)}
-            on:click|stopPropagation={() => toggleDropdown('admin')}
-          >
-            Admin
-            <svg class="dd-arrow" class:dd-open={openDropdown === 'admin'} width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5l3 3 3-3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>
-          </button>
-          {#if openDropdown === 'admin'}
-            <div class="dropdown-menu">
+      <!-- User menu (desktop) -->
+      <div class="dropdown desktop-only">
+        <button
+          class="nav-link dropdown-toggle user-toggle"
+          class:active={userMenuActive}
+          on:click|stopPropagation={() => handleUserMenuClick()}
+        >
+          <svg class="user-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          {userMenuLabel}
+          {#if $isAuthenticated}
+            <svg class="dd-arrow" class:dd-open={openDropdown === 'user'} width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5l3 3 3-3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>
+          {/if}
+        </button>
+        {#if $isAuthenticated && openDropdown === 'user'}
+          <div class="dropdown-menu dropdown-menu--user">
+            {#each userLinks as link}
+              <a href={link.href} class="dropdown-item" class:active={isActive(link.href)} on:click={closeDropdowns}>{link.label}</a>
+            {/each}
+            {#if $hasAdminPermission}
+              <div class="dropdown-divider"></div>
+              <span class="dropdown-label">Admin</span>
               {#each adminLinks as link}
                 <a href={link.href} class="dropdown-item" class:active={isActive(link.href)} on:click={closeDropdowns}>{link.label}</a>
               {/each}
-            </div>
-          {/if}
-        </div>
-        <div class="mobile-only nav-group">
-          <span class="nav-group-label">Admin</span>
-          {#each adminLinks as link}
+            {/if}
+            <div class="dropdown-divider"></div>
+            <button class="dropdown-item dropdown-item--logout" on:click={handleLogout}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M10.09 15.59L11.5 17l5-5-5-5-1.41 1.41L12.67 11H3v2h9.67l-2.58 2.59zM19 3H5c-1.11 0-2 .9-2 2v4h2V5h14v14H5v-4H3v4c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg>
+              Abmelden
+            </button>
+          </div>
+        {/if}
+      </div>
+
+      <!-- User menu (mobile) -->
+      <div class="mobile-only nav-group">
+        {#if $isAuthenticated}
+          <span class="nav-group-label">{userMenuLabel}</span>
+          {#each userLinks as link}
             <a href={link.href} class="nav-link nav-link--sub" class:active={isActive(link.href)} on:click={closeMobile}>{link.label}</a>
           {/each}
-        </div>
-      {/if}
+          {#if $hasAdminPermission}
+            <span class="nav-group-label nav-group-label--nested">Admin</span>
+            {#each adminLinks as link}
+              <a href={link.href} class="nav-link nav-link--sub" class:active={isActive(link.href)} on:click={closeMobile}>{link.label}</a>
+            {/each}
+          {/if}
+          <button class="nav-link nav-link--sub nav-link--logout" on:click={handleLogout}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M10.09 15.59L11.5 17l5-5-5-5-1.41 1.41L12.67 11H3v2h9.67l-2.58 2.59zM19 3H5c-1.11 0-2 .9-2 2v4h2V5h14v14H5v-4H3v4c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg>
+            Abmelden
+          </button>
+        {:else}
+          <a href="/login" class="nav-link nav-link--sub" class:active={isActive('/login')} on:click={closeMobile}>
+            <svg class="user-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            Login
+          </a>
+        {/if}
+      </div>
     </div>
 
     <button
@@ -248,6 +306,44 @@
   .dropdown-item:hover { background: var(--bg-tertiary); color: var(--text-primary); }
   .dropdown-item.active { color: var(--culoca-orange); }
 
+  .dropdown-menu--user { min-width: 190px; right: 0; left: auto; }
+
+  .dropdown-divider {
+    height: 1px;
+    margin: 0.35rem 0;
+    background: var(--border-color);
+  }
+
+  .dropdown-label {
+    display: block;
+    padding: 0.4rem 1rem 0.15rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+  }
+
+  .dropdown-item--logout {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    border: none;
+    background: none;
+    font-family: inherit;
+    cursor: pointer;
+    color: var(--text-secondary);
+  }
+  .dropdown-item--logout:hover { color: #e74c3c; background: var(--bg-tertiary); }
+
+  .user-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  .user-icon { flex-shrink: 0; opacity: 0.7; }
+
   /* Mobile helpers */
   .mobile-only { display: none; }
   .nav-group-label {
@@ -320,6 +416,20 @@
     .nav-link.active::after { display: none; }
     .nav-link.active { background: var(--bg-tertiary); }
     .nav-link--sub { padding-left: 2rem; font-size: 0.925rem; }
+    .nav-link--logout {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      border: none;
+      background: none;
+      font-family: inherit;
+      cursor: pointer;
+      color: var(--text-secondary);
+      width: 100%;
+      text-align: left;
+    }
+    .nav-link--logout:hover { color: #e74c3c; }
+    :global(.nav-group-label--nested) { margin-top: 0.25rem; }
     .nav-backdrop { display: block; }
   }
 </style>
