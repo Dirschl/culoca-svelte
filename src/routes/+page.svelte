@@ -121,7 +121,7 @@
             </div>
             {#if !$isAuthenticated}
               <div class="hero-login-callout">
-                <p>Mehr Funktionen,<br>jetzt kostenfrei anmelden</p>
+                <p>Mehr Funktionen, jetzt kostenfrei anmelden</p>
                 <a href="/login?returnTo=%2F" class="btn-secondary btn-attention">Login</a>
               </div>
             {/if}
@@ -296,14 +296,17 @@
   .hero-login-callout {
     display: grid;
     justify-items: start;
-    gap: 0.75rem;
-    margin-top: 1rem;
+    gap: 1rem;
+    margin-top: 1.5rem;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
   }
   .hero-login-callout p {
     margin: 0;
     font-size: 0.92rem;
     line-height: 1.45;
     color: var(--text-muted);
+    white-space: nowrap;
   }
   .hero-side {
     display: grid;
