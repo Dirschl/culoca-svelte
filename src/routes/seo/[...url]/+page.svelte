@@ -51,6 +51,7 @@
   let fullscreenOpen = false;
   let fullscreenMode: 'bot' | 'web' = 'bot';
   let fullscreenUrl = '';
+  let fullscreenInput = '';
 
   let isBotMode = false;
   let originalUserAgent = '';
@@ -98,14 +99,16 @@
   }
 
   function handleFullscreenUrlSubmit(event: KeyboardEvent) {
-    if (event.key === 'Enter' && fullscreenUrl.trim()) {
-      testUrl = fullscreenUrl.trim();
+    if (event.key === 'Enter' && fullscreenInput.trim()) {
+      fullscreenUrl = fullscreenInput.trim();
+      testUrl = fullscreenUrl;
       fetchHeadData();
     }
   }
 
   function openFullscreen() {
     fullscreenUrl = testUrl;
+    fullscreenInput = testUrl;
     fullscreenOpen = true;
   }
 
@@ -1115,8 +1118,10 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
         <input
           type="text"
           class="fullscreen-url-input"
-          bind:value={fullscreenUrl}
+          bind:value={fullscreenInput}
           on:keydown={handleFullscreenUrlSubmit}
+          on:focus={() => { fullscreenInput = ''; }}
+          on:blur={() => { if (!fullscreenInput.trim()) fullscreenInput = fullscreenUrl; }}
           placeholder="URL eingeben..."
           spellcheck="false"
         />
