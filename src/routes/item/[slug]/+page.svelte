@@ -105,7 +105,7 @@ let showRightsManager = false;
   let adobeSaveLoading = false;
   let adobeMessage = '';
   let lastAdobeItemId = '';
-  let imageBackHref = '/';
+  let imageBackHref = sanitizeReturnTo($page.url.searchParams.get('returnTo'), '/');
 
   // SEO/Meta: Slug statt ID verwenden - reaktiv auf URL-Parameter
   let itemSlug: string = '';
@@ -256,6 +256,13 @@ let showRightsManager = false;
       return true;
     } catch {
       return false;
+    }
+  }
+
+  $: {
+    const explicitReturnTo = sanitizeReturnTo($page.url.searchParams.get('returnTo'), '/');
+    if (isValidImageBackTarget(explicitReturnTo)) {
+      imageBackHref = explicitReturnTo;
     }
   }
 
