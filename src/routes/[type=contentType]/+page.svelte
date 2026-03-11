@@ -28,6 +28,8 @@
   let variantImageIndexes: Record<string, number> = {};
   let variantTimer: ReturnType<typeof setInterval> | null = null;
   let idleHandle: number | null = null;
+  let previewImageElements: Record<string, HTMLImageElement | null> = {};
+  let previewThumbElements: Record<string, HTMLDivElement | null> = {};
 
   function itemHref(item: { canonical_path: string | null; slug: string }): string {
     return appendReturnTo(item.canonical_path || `/item/${item.slug}`, currentListPath);
@@ -75,6 +77,18 @@
     return animatedPreviewUrls[item.id] || thumbUrl(item);
   }
 
+  function applyPreviewUrl(itemId: string, url: string) {
+    const imageEl = previewImageElements[itemId];
+    if (imageEl && imageEl.src !== url) {
+      imageEl.src = url;
+    }
+
+    const thumbEl = previewThumbElements[itemId];
+    if (thumbEl) {
+      thumbEl.style.setProperty('--thumb-preview', `url('${url}')`);
+    }
+  }
+
   function preloadVariantImages() {
     for (const item of data.items) {
       for (const url of rotationThumbUrls(item).slice(1)) {
@@ -110,6 +124,7 @@
         const nextIndex = ((nextIndexes[item.id] ?? 0) + 1) % variants.length;
         nextIndexes[item.id] = nextIndex;
         nextUrls[item.id] = variants[nextIndex];
+        applyPreviewUrl(item.id, variants[nextIndex]);
       }
 
       variantImageIndexes = nextIndexes;
@@ -223,25 +238,25 @@
                 <a href={itemHref(item)} class="item-link">
                   {#if item.path_512}
                     {@const previewUrl = currentThumbUrl(item)}
-                    {#key `${item.id}:${previewUrl}`}
-                      <div
-                        class="item-thumb"
-                        class:item-thumb--foto={isFotoType}
-                        style={isFotoType ? `--thumb-preview:url('${previewUrl}')` : undefined}
-                      >
-                        {#if isFotoType && (item.child_count || 0) > 0}
-                          <div class="item-variant-count">+{item.child_count}</div>
-                        {/if}
-                        <img
-                          src={previewUrl}
-                          alt={item.title || item.slug}
-                          width="320"
-                          height="213"
-                          loading="lazy"
-                          decoding="async"
-                        />
-                      </div>
-                    {/key}
+                    <div
+                      class="item-thumb"
+                      class:item-thumb--foto={isFotoType}
+                      style={isFotoType ? `--thumb-preview:url('${previewUrl}')` : undefined}
+                      bind:this={previewThumbElements[item.id]}
+                    >
+                      {#if isFotoType && (item.child_count || 0) > 0}
+                        <div class="item-variant-count">+{item.child_count}</div>
+                      {/if}
+                      <img
+                        src={previewUrl}
+                        alt={item.title || item.slug}
+                        width="320"
+                        height="213"
+                        loading="lazy"
+                        decoding="async"
+                        bind:this={previewImageElements[item.id]}
+                      />
+                    </div>
                   {:else}
                     <div class="item-thumb item-thumb--empty">
                       <span class="thumb-icon">{icon || '📄'}</span>
