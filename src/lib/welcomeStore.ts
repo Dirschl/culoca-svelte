@@ -2,7 +2,7 @@ import { writable } from 'svelte/store';
 import { browser } from '$app/environment';
 
 // Create writable store for welcome visibility
-export const welcomeVisible = writable(true);
+export const welcomeVisible = writable(false);
 
 // Initialize from localStorage if available
 if (browser) {

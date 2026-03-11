@@ -980,11 +980,14 @@
         localStorage.setItem('newsFlashMode', 'aus');
         newsFlashMode = 'aus';
       }
-      
-      // WelcomeVisible ist bereits standardmäßig auf true gesetzt
+
+      if (!localStorage.getItem('welcomeVisible')) {
+        localStorage.setItem('welcomeVisible', 'false');
+      }
+
       // Dark Mode wird bereits in darkMode.ts auf true gesetzt
-      
-      console.log('[Anonymous] Set default settings:', { newsFlashMode, darkMode: true, welcomeVisible: true });
+
+      console.log('[Anonymous] Set default settings:', { newsFlashMode, darkMode: true, welcomeVisible: false });
     }
   }
   

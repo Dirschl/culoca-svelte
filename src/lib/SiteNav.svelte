@@ -14,6 +14,7 @@
     { href: '/event', label: 'Events' },
     { href: '/firma', label: 'Firmen' },
     { href: '/galerie', label: 'Galerie' },
+    { href: '/standort', label: 'Standort' },
     { href: '/seo', label: 'SEO' },
   ];
 
@@ -34,6 +35,7 @@
 
   const userLinks = [
     { href: '/settings', label: 'Einstellungen' },
+    { href: '/standort', label: 'Standort' },
     { href: '/profile', label: 'Profil' },
     { href: '/profile/freigaben', label: 'Freigaben' },
   ];
@@ -41,7 +43,7 @@
   $: currentPath = $page.url.pathname;
   $: displayName = $customerBranding?.fullName || $customerBranding?.accountName || '';
   $: userMenuLabel = $isAuthenticated && displayName ? displayName : ($isAuthenticated ? 'Konto' : 'Login');
-  $: userMenuActive = isActive('/settings') || isActive('/profile') || isActive('/profile/freigaben') || isActive('/login') || ($hasAdminPermission && adminLinks.some(l => isActive(l.href)));
+  $: userMenuActive = isActive('/settings') || isActive('/standort') || isActive('/profile') || isActive('/profile/freigaben') || isActive('/login') || ($hasAdminPermission && adminLinks.some(l => isActive(l.href)));
   $: inheritedReturnTo = sanitizeReturnTo($page.url.searchParams.get('returnTo'), currentPathWithSearch($page.url));
 
   function getUserLinkHref(href: string): string {

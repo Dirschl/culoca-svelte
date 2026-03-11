@@ -55,7 +55,8 @@ export const POST = async ({ request }) => {
         full_name: fullName,
         accountname: accountName || fullName,
         use_justified_layout: true,
-        show_welcome: true,
+        show_welcome: false,
+        newsflash_mode: 'aus',
         privacy_mode: 'public',
         save_originals: true
       });

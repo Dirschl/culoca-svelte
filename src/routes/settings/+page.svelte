@@ -5,7 +5,7 @@
   import { page } from '$app/stores';
   import { darkMode } from '$lib/darkMode';
   import SiteNav from '$lib/SiteNav.svelte';
-  import { sanitizeReturnTo } from '$lib/returnTo';
+  import { currentPathWithSearch, sanitizeReturnTo } from '$lib/returnTo';
   import { welcomeVisible, resetWelcome } from '$lib/welcomeStore';
 
   let user: any = null;
@@ -32,7 +32,7 @@
   let showCompass = false;
   let autoguide = false;
   let newsFlashMode: 'aus' | 'eigene' | 'alle' = 'aus';
-  let showWelcome = true;
+  let showWelcome = false;
   let showImageCaptions = true;
 
   
@@ -141,7 +141,7 @@
         showCompass = data.show_compass ?? false;
         autoguide = data.autoguide ?? false;
         newsFlashMode = data.newsflash_mode ?? 'aus';
-        showWelcome = data.show_welcome ?? true;
+        showWelcome = data.show_welcome ?? false;
         showImageCaptions = data.show_image_captions ?? true;
 
         saveOriginals = data.save_originals ?? true;
@@ -365,7 +365,7 @@
 
   function openLocationDialog() {
     applyGpsPreferenceImmediately();
-    goto('/?locationDialog=true');
+    goto(`/standort?returnTo=${encodeURIComponent(currentPathWithSearch($page.url))}`);
   }
 
   function getReferrerFallback() {
@@ -528,12 +528,12 @@
 
           <div class="setting-row">
             <div class="setting-info">
-              <label class="setting-label">Standort-Dialog</label>
-              <p class="setting-description">Standort auswählen öffnen, um GPS direkt zu aktivieren oder mit rotem Button wieder zu deaktivieren.</p>
+              <label class="setting-label">Standort festlegen</label>
+              <p class="setting-description">Öffnet die neue Standort-Seite mit Erklärung, GPS-Freigabe und manueller Karten-Auswahl.</p>
             </div>
             <div class="setting-control">
               <button type="button" class="location-dialog-btn" on:click={openLocationDialog}>
-                Standort auswählen öffnen
+                Standort-Seite öffnen
               </button>
             </div>
           </div>
@@ -725,12 +725,6 @@
               </svg>
               Einstellungen speichern
             {/if}
-          </button>
-          <button type="button" class="back-btn" on:click={() => goto('/')} disabled={saving}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M19 12H5M12 19l-7-7 7-7"/>
-            </svg>
-            Zurück zur Startseite
           </button>
         </div>
       </form>
@@ -1151,7 +1145,7 @@
     flex-wrap: wrap;
   }
 
-  .save-btn, .back-btn {
+  .save-btn {
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -1193,22 +1187,6 @@
   }
 
   .save-btn:disabled {
-    opacity: 0.7;
-    cursor: not-allowed;
-  }
-
-  .back-btn {
-    background: var(--bg-secondary);
-    color: var(--text-primary);
-    border: 1px solid var(--border-color);
-  }
-
-  .back-btn:hover:not(:disabled) {
-    background: var(--border-color);
-    transform: translateY(-1px);
-  }
-
-  .back-btn:disabled {
     opacity: 0.7;
     cursor: not-allowed;
   }
@@ -1264,7 +1242,7 @@
       align-items: stretch;
     }
 
-    .save-btn, .back-btn {
+    .save-btn {
       width: 100%;
     }
   }
