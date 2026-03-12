@@ -34,6 +34,7 @@
   let searchQuery = activeSearchTerm;
   let isClientLoading = false;
   let lastSearchValue = activeSearchTerm;
+  let suppressNextEmptySubmit = false;
   let _lastDataKey = '';
   $: _dataKey = `${data.page}-${data.search ?? ''}`;
   $: if (typeof window !== 'undefined' && _dataKey !== _lastDataKey) {
@@ -113,8 +114,9 @@
 
   function clearFotoSearch() {
     searchQuery = '';
+    suppressNextEmptySubmit = true;
     if (typeof window !== 'undefined') {
-      window.location.href = `/${data.typeDef.slug}`;
+      window.location.replace(`/${data.typeDef.slug}`);
     }
   }
 
@@ -127,6 +129,10 @@
     }
 
     event.preventDefault();
+    if (suppressNextEmptySubmit) {
+      suppressNextEmptySubmit = false;
+      return;
+    }
     clearFotoSearch();
   }
 
@@ -461,6 +467,7 @@
   }
 
   function preloadVariantImages() {
+    if (typeof window === 'undefined') return;
     for (const item of displayedItems) {
       for (const url of rotationThumbUrls(item).slice(1)) {
         const img = new Image();
@@ -504,7 +511,7 @@
   }
 
   function refreshVariantRotation() {
-    if (!isFotoType) return;
+    if (!isFotoType || typeof window === 'undefined') return;
     const nextKey = displayedItems.map((item: any) => `${item.id}:${item.child_count || 0}`).join('|');
     if (nextKey === lastRotationKey) return;
     lastRotationKey = nextKey;
