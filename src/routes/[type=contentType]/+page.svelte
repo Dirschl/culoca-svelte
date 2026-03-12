@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
   import { browser } from '$app/environment';
+  import { goto } from '$app/navigation';
   import type { PageData } from './$types';
   import SiteNav from '$lib/SiteNav.svelte';
   import SiteFooter from '$lib/SiteFooter.svelte';
@@ -28,7 +29,7 @@
   let clientItems: any[] | null = null;
   let clientTotalCount: number | null = null;
   let clientPage = 1;
-  let currentGpsPosition: { lat: number; lon: number } | null = browser ? getStoredGpsPosition() : null;
+  let currentGpsPosition: { lat: number; lon: number } | null = browser ? readGalleryGpsPosition() : null;
   let activeSearchTerm = data.search || '';
   let searchQuery = activeSearchTerm;
   let isClientLoading = false;
@@ -111,9 +112,7 @@
 
   function clearFotoSearch() {
     searchQuery = '';
-    if (typeof window !== 'undefined') {
-      window.location.href = `/${data.typeDef.slug}`;
-    }
+    goto(`/${data.typeDef.slug}`, { invalidateAll: true });
   }
 
   function handleFotoSearchSubmit(event: SubmitEvent) {
@@ -122,11 +121,9 @@
     if (trimmedQuery) {
       searchQuery = trimmedQuery;
       lastSearchValue = trimmedQuery;
-      if (typeof window !== 'undefined') {
-        const params = new URLSearchParams();
-        params.set('suche', trimmedQuery);
-        window.location.href = `/${data.typeDef.slug}?${params.toString()}`;
-      }
+      const params = new URLSearchParams();
+      params.set('suche', trimmedQuery);
+      goto(`/${data.typeDef.slug}?${params.toString()}`, { invalidateAll: true });
       return;
     }
 
@@ -149,13 +146,6 @@
     }
 
     lastSearchValue = nextValue;
-  }
-
-  function handleFotoSearchEvent(event: Event) {
-    const nextValue = (event.currentTarget as HTMLInputElement).value;
-    if (!nextValue.trim()) {
-      clearFotoSearch();
-    }
   }
 
   function readGalleryGpsPosition(): { lat: number; lon: number } | null {
@@ -274,14 +264,6 @@
     } finally {
       isClientLoading = false;
     }
-  }
-
-  async function refreshFotoItemsByGps() {
-    if (!isFotoType) return;
-    const gps = readGalleryGpsPosition();
-    currentGpsPosition = gps;
-    if (!gps) return;
-    await loadFotoPageFromGps(data.page - 1);
   }
 
   async function syncGpsState(forceReload = false) {
@@ -501,7 +483,6 @@
               autocomplete="off"
               bind:value={searchQuery}
               on:input={handleFotoSearchInput}
-              on:search={handleFotoSearchEvent}
               on:keydown={handleFotoSearchKeydown}
             />
           </form>
