@@ -4,7 +4,6 @@
   import type { PageData } from './$types';
   import SiteNav from '$lib/SiteNav.svelte';
   import SiteFooter from '$lib/SiteFooter.svelte';
-  import { supabase } from '$lib/supabaseClient';
   import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
   import { appendReturnTo } from '$lib/content/routing';
   import { getEffectiveGpsPosition } from '$lib/filterStore';
@@ -70,6 +69,7 @@
   let variantImageIndexes: Record<string, number> = {};
   let variantTimer: ReturnType<typeof setInterval> | null = null;
   let idleHandle: number | null = null;
+  let gpsBootstrapTimer: ReturnType<typeof setInterval> | null = null;
   let previewImageElements: Record<string, HTMLImageElement | null> = {};
   let previewThumbElements: Record<string, HTMLDivElement | null> = {};
 
@@ -133,6 +133,12 @@
     clearFotoSearch();
   }
 
+  function handleFotoSearchKeydown(event: KeyboardEvent) {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    handleFotoSearchSubmit(event as unknown as SubmitEvent);
+  }
+
   function handleFotoSearchInput(event: Event) {
     const nextValue = (event.currentTarget as HTMLInputElement).value;
     searchQuery = nextValue;
@@ -152,12 +158,29 @@
     }
   }
 
-  function getStoredGpsPosition(): { lat: number; lon: number } | null {
+  function readGalleryGpsPosition(): { lat: number; lon: number } | null {
     if (typeof window === 'undefined') return null;
 
-    const effectiveGps = getEffectiveGpsPosition();
-    if (effectiveGps && Number.isFinite(effectiveGps.lat) && Number.isFinite(effectiveGps.lon)) {
-      return { lat: effectiveGps.lat, lon: effectiveGps.lon };
+    const savedGPSAllowed = localStorage.getItem('gpsAllowed');
+    const directLat = Number(localStorage.getItem('userLat'));
+    const directLon = Number(localStorage.getItem('userLon'));
+    if (savedGPSAllowed === 'true' && Number.isFinite(directLat) && Number.isFinite(directLon) && (directLat !== 0 || directLon !== 0)) {
+      return { lat: directLat, lon: directLon };
+    }
+
+    try {
+      const savedGPS = localStorage.getItem('userGps');
+      if (savedGPS) {
+        const gpsData = JSON.parse(savedGPS);
+        const gpsAge = Date.now() - Number(gpsData.timestamp || 0);
+        const lat = Number(gpsData.lat);
+        const lon = Number(gpsData.lon);
+        if (Number.isFinite(lat) && Number.isFinite(lon) && gpsAge < 24 * 60 * 60 * 1000 && (lat !== 0 || lon !== 0)) {
+          return { lat, lon };
+        }
+      }
+    } catch {
+      // Ignore malformed persisted GPS and continue with other sources.
     }
 
     const windowLat = Number((window as any).userLat);
@@ -166,10 +189,14 @@
       return { lat: windowLat, lon: windowLon };
     }
 
-    const directLat = Number(localStorage.getItem('userLat'));
-    const directLon = Number(localStorage.getItem('userLon'));
-    if (Number.isFinite(directLat) && Number.isFinite(directLon) && (directLat !== 0 || directLon !== 0)) {
-      return { lat: directLat, lon: directLon };
+    const effectiveGps = getEffectiveGpsPosition();
+    if (
+      effectiveGps &&
+      effectiveGps.source !== 'locationFilter' &&
+      Number.isFinite(effectiveGps.lat) &&
+      Number.isFinite(effectiveGps.lon)
+    ) {
+      return { lat: effectiveGps.lat, lon: effectiveGps.lon };
     }
 
     try {
@@ -188,31 +215,13 @@
     return null;
   }
 
-  function applyMultiWordSearch(query: any, search: string, includeExtendedFotoFields = false) {
-    const words = search
-      .trim()
-      .split(/\s+/)
-      .map((word) => word.trim())
-      .filter(Boolean);
-
-    const clauses = words.flatMap((word) => {
-      const escaped = word.replace(/%/g, '\\%').replace(/_/g, '\\_');
-      const baseClauses = [
-        `title.ilike.%${escaped}%`,
-        `description.ilike.%${escaped}%`,
-        `caption.ilike.%${escaped}%`,
-        `slug.ilike.%${escaped}%`
-      ];
-
-      if (includeExtendedFotoFields) {
-        baseClauses.push(`keywords.ilike.%${escaped}%`, `original_name.ilike.%${escaped}%`);
-      }
-
-      return baseClauses;
-    });
-
-    if (clauses.length === 0) return query;
-    return query.or(clauses.join(','));
+  function sameGpsPosition(
+    left: { lat: number; lon: number } | null,
+    right: { lat: number; lon: number } | null
+  ) {
+    if (!left && !right) return true;
+    if (!left || !right) return false;
+    return left.lat === right.lat && left.lon === right.lon;
   }
 
   function getDistanceInMeters(userLat: number, userLon: number, itemLat: number, itemLon: number) {
@@ -228,132 +237,35 @@
     return earthRadius * c;
   }
 
-  async function attachVariants(items: any[]) {
-    if (!items.length) return items;
-
-    const rootIds = items.map((item) => item.id);
-    const { data: variantRows } = await supabase
-      .from('items')
-      .select('id, slug, path_512, width, height, group_root_item_id')
-      .in('group_root_item_id', rootIds)
-      .eq('is_private', false)
-      .eq('admin_hidden', false)
-      .not('slug', 'is', null)
-      .not('path_512', 'is', null)
-      .order('created_at', { ascending: false });
-
-    const variantsByRoot = new Map<string, any[]>();
-    for (const row of variantRows || []) {
-      const rootId = row.group_root_item_id as string | null;
-      if (!rootId) continue;
-      const current = variantsByRoot.get(rootId) || [];
-      if (current.length >= 5) continue;
-      current.push(row);
-      variantsByRoot.set(rootId, current);
-    }
-
-    return items.map((item) => ({
-      ...item,
-      variants: variantsByRoot.get(item.id) || [],
-      child_count: item.child_count ?? (variantsByRoot.get(item.id) || []).length
-    }));
-  }
-
-  async function loadFotoPageFromGps(pageIndex0Based: number) {
+  async function loadFotoPageFromGps(pageIndex0Based: number, gpsOverride?: { lat: number; lon: number } | null) {
     if (!isFotoType || typeof window === 'undefined') return;
-    const gps = getStoredGpsPosition();
+    const gps = gpsOverride ?? readGalleryGpsPosition();
     currentGpsPosition = gps;
     if (!gps) return;
 
     isClientLoading = true;
     try {
       const search = activeSearchTerm.trim();
-
-      let countQuery = supabase
-        .from('items')
-        .select('id', { count: 'exact', head: true })
-        .eq('type_id', data.typeDef.id)
-        .eq('admin_hidden', false)
-        .is('group_root_item_id', null)
-        .not('slug', 'is', null)
-        .not('path_512', 'is', null);
-
+      const url = new URL('/api/foto-items', window.location.origin);
+      url.searchParams.set('page', String(pageIndex0Based));
+      url.searchParams.set('page_size', String(data.pageSize));
+      url.searchParams.set('lat', String(gps.lat));
+      url.searchParams.set('lon', String(gps.lon));
       if (search) {
-        countQuery = applyMultiWordSearch(countQuery, search, true);
+        url.searchParams.set('search', search);
       }
 
-      const { count, error: countError } = await countQuery;
-      if (countError) {
-        throw countError;
+      const response = await fetch(url.toString());
+      const payload = await response.json();
+      if (!response.ok || payload.error) {
+        throw new Error(payload.error || 'Failed to load foto items');
       }
 
-      const totalMatching = count || 0;
-      const pageFetchSize = 1000;
-      let from = 0;
-      const allRows: any[] = [];
-
-      while (from < totalMatching) {
-        let pageQuery = supabase
-          .from('items')
-          .select('id, slug, title, description, caption, canonical_path, path_512, width, height, created_at, starts_at, ends_at, external_url, lat, lon')
-          .eq('type_id', data.typeDef.id)
-          .eq('admin_hidden', false)
-          .is('group_root_item_id', null)
-          .not('slug', 'is', null)
-          .not('path_512', 'is', null)
-          .range(from, from + pageFetchSize - 1);
-
-        if (search) {
-          pageQuery = applyMultiWordSearch(pageQuery, search, true);
-        }
-
-        const { data: rows, error: rowsError } = await pageQuery;
-        if (rowsError) {
-          throw rowsError;
-        }
-
-        if (!rows || rows.length === 0) {
-          break;
-        }
-
-        allRows.push(...rows);
-        from += pageFetchSize;
-      }
-
-      const sortedRows = allRows
-        .map((item) => {
-          const lat = Number(item.lat);
-          const lon = Number(item.lon);
-          const hasCoordinates = Number.isFinite(lat) && Number.isFinite(lon);
-          const distance = hasCoordinates
-            ? getDistanceInMeters(gps.lat, gps.lon, lat, lon)
-            : null;
-
-          return {
-            ...item,
-            lat: hasCoordinates ? lat : item.lat,
-            lon: hasCoordinates ? lon : item.lon,
-            distance
-          };
-        })
-        .sort((a, b) => {
-          const aDistance = a.distance ?? Number.POSITIVE_INFINITY;
-          const bDistance = b.distance ?? Number.POSITIVE_INFINITY;
-          if (aDistance !== bDistance) return aDistance - bDistance;
-
-          const aCreated = a.created_at ? new Date(a.created_at).getTime() : 0;
-          const bCreated = b.created_at ? new Date(b.created_at).getTime() : 0;
-          return bCreated - aCreated;
-        });
-
-      const pageStart = pageIndex0Based * data.pageSize;
-      const pageRows = sortedRows.slice(pageStart, pageStart + data.pageSize);
-      const enriched = await attachVariants(pageRows);
-      clientItems = enriched.map((item) => ({
+      clientItems = (payload.items || []).map((item: any) => ({
         ...item,
         caption: item.caption ?? item.description ?? null
       }));
-      clientTotalCount = totalMatching;
+      clientTotalCount = payload.totalCount ?? clientItems.length;
       clientPage = pageIndex0Based + 1;
     } catch (err) {
       console.error('[foto-list] GPS photo load failed:', err);
@@ -366,10 +278,20 @@
 
   async function refreshFotoItemsByGps() {
     if (!isFotoType) return;
-    const gps = getStoredGpsPosition();
+    const gps = readGalleryGpsPosition();
     currentGpsPosition = gps;
     if (!gps) return;
     await loadFotoPageFromGps(data.page - 1);
+  }
+
+  async function syncGpsState(forceReload = false) {
+    const nextGps = readGalleryGpsPosition();
+    const gpsChanged = !sameGpsPosition(currentGpsPosition, nextGps);
+    currentGpsPosition = nextGps;
+    if (!nextGps) return;
+    if (forceReload || gpsChanged || clientItems == null) {
+      await loadFotoPageFromGps(data.page - 1, nextGps);
+    }
   }
 
   async function goToPage(p: number) {
@@ -469,9 +391,17 @@
         variant_count: variantThumbUrls(item).length
       }))
     );
-    currentGpsPosition = getStoredGpsPosition();
+    void syncGpsState(true);
 
-    refreshFotoItemsByGps();
+    const handleGpsRefresh = () => {
+      void syncGpsState();
+    };
+
+    window.addEventListener('focus', handleGpsRefresh);
+    document.addEventListener('visibilitychange', handleGpsRefresh);
+    gpsBootstrapTimer = setInterval(() => {
+      void syncGpsState();
+    }, 500);
 
     const start = async () => {
       const hasVariants = displayedItems.some((item: any) => variantThumbUrls(item).length > 0);
@@ -486,6 +416,12 @@
     } else {
       idleHandle = window.setTimeout(start, 600);
     }
+
+    return () => {
+      window.removeEventListener('focus', handleGpsRefresh);
+      document.removeEventListener('visibilitychange', handleGpsRefresh);
+      if (gpsBootstrapTimer) clearInterval(gpsBootstrapTimer);
+    };
   });
 
   onDestroy(() => {
@@ -497,6 +433,7 @@
         clearTimeout(idleHandle);
       }
     }
+    if (gpsBootstrapTimer) clearInterval(gpsBootstrapTimer);
   });
 </script>
 
@@ -555,14 +492,17 @@
           {/if}
         </p>
         {#if isFotoType}
-          <form class="foto-search" action={`/${data.typeDef.slug}`} method="GET" on:submit={handleFotoSearchSubmit}>
+          <form class="foto-search" on:submit={handleFotoSearchSubmit}>
             <input
-              type="search"
+              type="text"
               name="suche"
               placeholder="Fotos durchsuchen"
+              enterkeyhint="search"
+              autocomplete="off"
               bind:value={searchQuery}
               on:input={handleFotoSearchInput}
               on:search={handleFotoSearchEvent}
+              on:keydown={handleFotoSearchKeydown}
             />
           </form>
           {#if shouldPreferGpsSorting && !useGpsApi}
