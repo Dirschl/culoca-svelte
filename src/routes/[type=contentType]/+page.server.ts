@@ -6,6 +6,7 @@ import { DEFAULT_CONTENT_TYPE_BY_SLUG } from '$lib/content/types';
 export const ssr = true;
 
 const PAGE_SIZE = 24;
+const FETCH_SIZE = 1000;
 
 function applyMultiWordSearch<T>(
   query: T,
@@ -28,14 +29,47 @@ function applyMultiWordSearch<T>(
     ];
 
     if (opts?.includeKeywordsAndOriginalName) {
-      baseClauses.push(`keywords.ilike.%${escaped}%`, `original_name.ilike.%${escaped}%`);
+      baseClauses.push(`original_name.ilike.%${escaped}%`);
     }
 
     return baseClauses;
   });
 
-  if (clauses.length === 0) return query;
+  if (!clauses.length) return query;
   return (query as any).or(clauses.join(','));
+}
+
+function matchesAllSearchWords(
+  item: {
+    title?: string | null;
+    description?: string | null;
+    caption?: string | null;
+    slug?: string | null;
+    original_name?: string | null;
+  },
+  search: string
+) {
+  const words = search
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .map((word) => word.trim())
+    .filter(Boolean);
+
+  if (!words.length) return true;
+
+  const haystack = [
+    item.title,
+    item.description,
+    item.caption,
+    item.slug,
+    item.original_name
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+
+  return words.every((word) => haystack.includes(word));
 }
 
 export const load: PageServerLoad = async ({ params, url }) => {
@@ -70,7 +104,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
   const buildBaseQuery = () => {
     let query = supabase
       .from('items')
-      .select('id, slug, title, description, caption, canonical_path, path_512, width, height, created_at, starts_at, ends_at, external_url, lat, lon')
+      .select('id, slug, title, description, caption, canonical_path, path_512, width, height, created_at, starts_at, ends_at, external_url, lat, lon, original_name')
       .eq('type_id', typeDef.id)
       .eq('is_private', false)
       .eq('admin_hidden', false)
@@ -101,15 +135,43 @@ export const load: PageServerLoad = async ({ params, url }) => {
     return query;
   };
 
-  const [countResult, dataResult] = await Promise.all([
-    buildCountQuery(),
-    buildBaseQuery()
-      .order('created_at', { ascending: false })
-      .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1)
-  ]);
+  let rows: any[] = [];
+  let totalCount = 0;
 
-  const totalCount = countResult.count || 0;
-  const baseItems = (dataResult.data || []).map((item) => ({
+  if (search) {
+    let from = 0;
+    while (true) {
+      const dataResult = await buildBaseQuery()
+        .order('created_at', { ascending: false })
+        .range(from, from + FETCH_SIZE - 1);
+
+      if (dataResult.error) {
+        throw error(500, dataResult.error.message);
+      }
+
+      const batch = dataResult.data || [];
+      if (batch.length === 0) break;
+      rows.push(...batch);
+      if (batch.length < FETCH_SIZE) break;
+      from += FETCH_SIZE;
+    }
+
+    rows = rows.filter((item) => matchesAllSearchWords(item, search));
+    totalCount = rows.length;
+    rows = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  } else {
+    const [countResult, dataResult] = await Promise.all([
+      buildCountQuery(),
+      buildBaseQuery()
+        .order('created_at', { ascending: false })
+        .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1)
+    ]);
+
+    totalCount = countResult.count || 0;
+    rows = dataResult.data || [];
+  }
+
+  const baseItems = rows.map((item) => ({
     id: item.id as string,
     slug: item.slug as string,
     title: (item.title || null) as string | null,
@@ -125,6 +187,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
     external_url: (item.external_url || null) as string | null,
     lat: (item.lat || null) as number | null,
     lon: (item.lon || null) as number | null,
+    original_name: (item.original_name || null) as string | null,
     child_count: 0
   }));
 
