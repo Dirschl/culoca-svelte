@@ -27,6 +27,9 @@ type GalleryMappedItem = {
   distance: number | null;
   description: string | null;
   canonical_path: string | null;
+  country_slug: string | null;
+  district_slug: string | null;
+  municipality_slug: string | null;
   profile_id: string | null;
   isSourceItem?: boolean;
   child_count: number;
@@ -243,6 +246,9 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
           distance: item.distance,
           description: item.description,
           canonical_path: item.canonical_path,
+          country_slug: item.country_slug ?? null,
+          district_slug: item.district_slug ?? null,
+          municipality_slug: item.municipality_slug ?? null,
           profile_id: item.profile_id,
           isSourceItem: item.isSourceItem,
           child_count: item.child_count || 0,

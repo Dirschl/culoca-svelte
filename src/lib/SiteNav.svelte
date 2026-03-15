@@ -16,8 +16,6 @@
     { href: '/foto', label: 'Fotos' },
     { href: '/event', label: 'Events' },
     { href: '/firma', label: 'Firmen' },
-    { href: '/standort', label: 'Standort' },
-    { href: '/seo', label: 'SEO' },
   ];
 
   const galleryLinks = [
@@ -28,6 +26,7 @@
 
   const infoLinks = [
     { href: '/web', label: 'System' },
+    { href: '/seo', label: 'SEO' },
     { href: '/web/license', label: 'Lizenz' },
     { href: '/web/impressum', label: 'Impressum' },
     { href: '/web/datenschutz', label: 'Datenschutz' },

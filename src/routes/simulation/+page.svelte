@@ -488,21 +488,21 @@
       document.head.appendChild(link);
     }
 
-    // Load Leaflet JS if not already loaded
-    if (typeof L === 'undefined') {
-      const script = document.createElement('script');
-      script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-      script.onload = () => {
-        createMap();
-      };
-      document.head.appendChild(script);
-    } else {
+    import('leaflet').then((Lmod) => {
+      L = Lmod.default || Lmod;
       createMap();
-    }
+    }).catch((error) => {
+      console.error('Failed to load Leaflet in simulation view:', error);
+    });
   }
 
   function createMap() {
     if (!mapEl || mapInitialized) return;
+
+    if (!L) {
+      console.error('Leaflet failed to initialize in simulation view.');
+      return;
+    }
 
     const initialLat = userLat ?? simulatedLat;
     const initialLon = userLon ?? simulatedLon;
@@ -586,6 +586,13 @@
     });
 
     mapInitialized = true;
+
+    // Leaflet needs a size recalculation after flex layouts settle.
+    setTimeout(() => {
+      if (map) {
+        map.invalidateSize();
+      }
+    }, 50);
   }
 
   function addImageMarkers() {
@@ -1065,7 +1072,6 @@
   <title>Simulation - Culoca</title>
   <meta name="robots" content="noindex, nofollow, nosnippet, noarchive" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   
   <!-- Strukturierte Daten (JSON-LD) für bessere SEO -->
   {@html `<script type="application/ld+json">
@@ -1202,6 +1208,7 @@
   .split-screen {
     display: flex;
     flex: 1;
+    min-height: 0;
     overflow: hidden;
   }
 
@@ -1209,6 +1216,7 @@
     flex: 1;
     display: flex;
     flex-direction: column;
+    min-height: 0;
     border-right: 1px solid var(--border-color);
   }
 
@@ -1247,8 +1255,9 @@
   }
 
   .map-container {
-    flex: 1;
-    min-height: 0;
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 320px;
   }
 
   .map-info {

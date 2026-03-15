@@ -30,6 +30,16 @@
   import { getAdministrativeHierarchy, normalizeAdminDisplayLabel } from '$lib/content/locationTaxonomy';
   import { reverseGeocodeCoordinates, searchLocationHierarchy, type SearchGeocodeResult } from '$lib/content/geocoding';
   import { KEYWORDS_MAX, sanitizeKeywords } from '$lib/content/keywords';
+  import { env as publicEnv } from '$env/dynamic/public';
+
+  /** Wenn PUBLIC_ADOBE_AFFILIATE_REDIRECT_BASE gesetzt ist (z. B. Partnerize), wird der Adobe-Link darüber geleitet. */
+  function getAdobeAffiliateUrl(directUrl: string | null | undefined): string | null {
+    if (!directUrl?.trim()) return null;
+    const base = (publicEnv as Record<string, string>)?.PUBLIC_ADOBE_AFFILIATE_REDIRECT_BASE;
+    if (!base?.trim()) return directUrl;
+    const trimmed = base.replace(/\/+$/, '');
+    return `${trimmed}/${encodeURIComponent(directUrl.trim())}`;
+  }
 
   // Client-seitige Umleitung für bekannte Fälle (nur für User, nicht für Bots)
   if (browser) {
@@ -2678,6 +2688,11 @@ let showRightsManager = false;
 
       </div>
     </div>
+    {#if image?.adobe_stock_url && !(canEditItem && editMode)}
+      <p class="adobe-stock-cta">
+        <a href={getAdobeAffiliateUrl(image.adobe_stock_url) || image.adobe_stock_url} target="_blank" rel="noopener noreferrer sponsored">Bei Adobe Stock ansehen</a>
+      </p>
+    {/if}
     {#if hasDateRange && !isEventItem}
       <section class="content-panel">
         <h2>Zeitraum</h2>
@@ -2971,7 +2986,7 @@ let showRightsManager = false;
               <div class="meta-line">{adobeMessage}</div>
             {/if}
             {#if image?.adobe_stock_url}
-              <a class="adobe-link" href={image.adobe_stock_url} target="_blank" rel="noopener">Adobe Link öffnen</a>
+              <a class="adobe-link" href={getAdobeAffiliateUrl(image.adobe_stock_url) || image.adobe_stock_url} target="_blank" rel="noopener noreferrer sponsored">Adobe Link öffnen</a>
             {/if}
           </div>
         {/if}
@@ -4443,6 +4458,20 @@ let showRightsManager = false;
   .adobe-link {
     font-size: 0.9rem;
     color: var(--accent-color);
+    text-decoration: underline;
+  }
+
+  .adobe-stock-cta {
+    margin: 0.75rem 0 0;
+    padding: 0;
+  }
+  .adobe-stock-cta a {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--culoca-orange, #ee7221);
+    text-decoration: none;
+  }
+  .adobe-stock-cta a:hover {
     text-decoration: underline;
   }
 

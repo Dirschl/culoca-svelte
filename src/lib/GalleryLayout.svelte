@@ -31,6 +31,9 @@
     title?: string;
     slug?: string; // Added slug to the interface
     canonical_path?: string;
+    country_slug?: string | null;
+    district_slug?: string | null;
+    municipality_slug?: string | null;
   }[] = [];
   export let layout: 'justified' | 'grid' = 'justified';
   export let containerWidth = 1200; // Set a reasonable default width
@@ -146,7 +149,13 @@
     };
   });
 
-  function getItemHref(item: { slug?: string; canonical_path?: string }) {
+  function getItemHref(item: {
+    slug?: string;
+    canonical_path?: string;
+    country_slug?: string | null;
+    district_slug?: string | null;
+    municipality_slug?: string | null;
+  }) {
     const returnTo = typeof window !== 'undefined'
       ? `${window.location.pathname}${window.location.search}${window.location.hash}`
       : null;

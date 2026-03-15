@@ -24,6 +24,8 @@ export type HubItem = {
   district_name?: string | null;
   municipality_slug?: string | null;
   municipality_name?: string | null;
+  lat?: number | null;
+  lon?: number | null;
   child_count?: number;
   variants?: Array<{
     id: string;
@@ -35,7 +37,7 @@ export type HubItem = {
 };
 
 const HUB_SELECT =
-  'id, slug, title, description, caption, canonical_path, path_512, width, height, created_at, keywords, profile_id, page_settings, country_slug, country_name, district_slug, district_name, municipality_slug, municipality_name';
+  'id, slug, title, description, caption, canonical_path, path_512, width, height, created_at, keywords, profile_id, page_settings, country_slug, country_name, district_slug, district_name, municipality_slug, municipality_name, lat, lon';
 
 function createServerSupabase() {
   const supabaseUrl = (

@@ -40,9 +40,8 @@ body[data-theme="dark"] {
   max-width: none !important;
 }
 
-/* CRITICAL: Page background fallback - MUST be fifth */
+/* CRITICAL: Page layout - background set per page (e.g. .bulk-upload-main) */
 main, .page, [data-sveltekit-page], [data-sveltekit-preload-data] {
-  background: var(--bg-primary) !important;
   color: var(--text-primary) !important;
   width: 100% !important;
   min-width: 100% !important;

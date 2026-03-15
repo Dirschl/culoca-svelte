@@ -34,8 +34,10 @@ export function extractReverseGeocodeFields(address: NominatimAddress, displayNa
   );
   const districtName = firstNonEmpty(
     address.county,
+    address.state_district,
+    address.borough,
+    municipalityName,
     stateName,
-    municipalityName
   );
   const localityName = firstNonEmpty(
     address.suburb,

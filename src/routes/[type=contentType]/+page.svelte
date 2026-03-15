@@ -686,44 +686,33 @@
           {/if}
         </p>
         {#if isFotoType}
-          <form class="foto-search" action={`/${data.typeDef.slug}`} method="GET" on:submit={handleFotoSearchSubmit}>
-            <input
-              type="search"
-              name="suche"
-              placeholder="Fotos durchsuchen"
-              bind:value={searchQuery}
-              on:input={handleFotoSearchInput}
-            />
-          </form>
-          {#if shouldPreferGpsSorting && !useGpsApi}
-            <p class="foto-search-hint">Sortiere nach aktuellem Standort ...</p>
-          {:else if isClientLoading}
-            <p class="foto-search-hint">Sortiere nach aktuellem Standort ...</p>
-          {:else if currentGpsPosition}
-            <p class="foto-search-hint">Sortierung wie Galerie, nach Entfernung ab deinem aktuellen Standort.</p>
-          {:else}
-            <p class="foto-search-hint">Ohne GPS werden die neuesten Fotos zuerst gezeigt.</p>
-          {/if}
-
-          <div class="foto-upload-panel">
-            <div class="foto-upload-copy">
-              <p class="foto-upload-eyebrow">Foto Upload</p>
-              <h2>Fotos auf Culoca brauchen einen Ortsbezug</h2>
-              <p>
-                Fotos, die du hier veröffentlichst, können alle Culoca-Nutzer sehen. Deshalb sollten Motiv,
-                Beschreibung und vor allem die Ortsdaten sauber gepflegt sein.
-              </p>
-              <ul>
-                <li>Neue oder unvollständige Fotos am besten über den neuen Foto-Upload anlegen.</li>
-                <li>Bereits vollständig vorbereitete Serien können weiter über den Batch-Uploader laufen.</li>
-                <li>Fehlende Angaben erscheinen danach rot im Konto unter Daten prüfen.</li>
-              </ul>
+          <div class="foto-hub-layout">
+            <div class="foto-hub-main">
+              <form class="foto-search" action={`/${data.typeDef.slug}`} method="GET" on:submit={handleFotoSearchSubmit}>
+                <input
+                  type="search"
+                  name="suche"
+                  placeholder="Fotos durchsuchen"
+                  bind:value={searchQuery}
+                  on:input={handleFotoSearchInput}
+                />
+              </form>
+              {#if shouldPreferGpsSorting && !useGpsApi}
+                <p class="foto-search-hint">Sortiere nach aktuellem Standort ...</p>
+              {:else if isClientLoading}
+                <p class="foto-search-hint">Sortiere nach aktuellem Standort ...</p>
+              {:else if currentGpsPosition}
+                <p class="foto-search-hint">Sortierung wie Galerie, nach Entfernung ab deinem aktuellen Standort.</p>
+              {:else}
+                <p class="foto-search-hint">Ohne GPS werden die neuesten Fotos zuerst gezeigt.</p>
+              {/if}
             </div>
 
-            <div class="foto-upload-actions">
-              <a class="foto-upload-link foto-upload-link--primary" href="/foto/upload">Zum Foto-Upload</a>
-              <a class="foto-upload-link" href="/bulk-upload">Zum Batch-Uploader</a>
-              <a class="foto-upload-link" href="/profile/review">Daten prüfen</a>
+            <div class="foto-upload-panel">
+              <div class="foto-upload-actions">
+                <a class="foto-upload-link foto-upload-link--primary" href="/foto/upload">Foto Upload</a>
+                <a class="foto-upload-link" href="/bulk-upload">Batch Upload</a>
+              </div>
             </div>
           </div>
         {/if}
@@ -930,44 +919,30 @@
     color: var(--text-muted);
     font-size: 0.82rem;
   }
-  .foto-upload-panel {
+  .foto-hub-layout {
     display: grid;
-    grid-template-columns: minmax(0, 1.65fr) minmax(240px, 0.9fr);
-    gap: 1rem;
+    grid-template-columns: minmax(0, 1.7fr) minmax(260px, 0.9fr);
+    gap: 1.2rem;
+    align-items: start;
     margin-top: 1rem;
+  }
+  .foto-hub-main {
+    min-width: 0;
+  }
+  .foto-upload-panel {
+    min-width: 0;
+  }
+  .foto-upload-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.85rem;
+    align-content: start;
     padding: 1rem 1.1rem;
     border-radius: 20px;
     border: 1px solid var(--border-color);
     background:
       linear-gradient(135deg, rgba(238, 114, 33, 0.09), transparent 48%),
       var(--bg-secondary);
-  }
-  .foto-upload-eyebrow {
-    margin: 0 0 0.3rem;
-    font-size: 0.76rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--culoca-orange);
-  }
-  .foto-upload-copy h2 {
-    margin: 0 0 0.45rem;
-    font-size: clamp(1.1rem, 2.2vw, 1.45rem);
-    line-height: 1.15;
-  }
-  .foto-upload-copy p {
-    margin: 0;
-    color: var(--text-secondary);
-  }
-  .foto-upload-copy ul {
-    margin: 0.8rem 0 0;
-    padding-left: 1.15rem;
-    color: var(--text-secondary);
-  }
-  .foto-upload-actions {
-    display: grid;
-    gap: 0.75rem;
-    align-content: start;
   }
   .foto-upload-link {
     display: inline-flex;
@@ -1030,6 +1005,7 @@
   .hub-content .hub-inner {
     padding-top: 2rem;
     padding-bottom: 3rem;
+    background-color: var(--passepartout-bg);
   }
   .empty {
     text-align: center;
@@ -1046,10 +1022,8 @@
   }
 
   .item-card {
-    border-radius: 12px;
     overflow: hidden;
     background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
     transition: transform 0.2s, box-shadow 0.2s;
   }
   .item-card:hover {
@@ -1093,36 +1067,37 @@
   .item-thumb--foto img {
     object-fit: contain;
   }
+  /* Varianten-Zahl: wie Galerie, links oben, Dark/Light-Mode, ohne Abrundung */
   .item-variant-count {
     position: absolute;
-    top: 0.55rem;
-    left: 0.55rem;
+    top: 0;
+    left: 0;
     z-index: 2;
-    min-width: 2rem;
-    padding: 0.18rem 0.42rem;
-    border-radius: 999px;
-    background: rgba(15, 23, 42, 0.82);
-    color: #fff;
-    font-size: 0.78rem;
-    font-weight: 700;
-    line-height: 1;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
-    backdrop-filter: blur(8px);
+    background: var(--bg-overlay);
+    color: var(--text-overlay);
+    padding: 0 5px;
+    font-size: 12.5px;
+    font-weight: 600;
+    line-height: 1.35;
+    pointer-events: none;
+    -webkit-backdrop-filter: blur(var(--overlay-blur));
+    backdrop-filter: blur(var(--overlay-blur));
   }
+  /* Entfernung: wie Galerie, rechts oben, Dark/Light-Mode, ohne Abrundung */
   .item-distance-badge {
     position: absolute;
-    top: 0.55rem;
-    right: 0.55rem;
+    top: 0;
+    right: 0;
     z-index: 2;
-    padding: 0.22rem 0.48rem;
-    border-radius: 999px;
-    background: rgba(15, 23, 42, 0.82);
-    color: #fff;
-    font-size: 0.76rem;
-    font-weight: 700;
-    line-height: 1;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
-    backdrop-filter: blur(8px);
+    background: var(--bg-overlay);
+    color: var(--text-overlay);
+    padding: 0 4px;
+    font-size: 12.5px;
+    font-weight: 600;
+    line-height: 1.35;
+    pointer-events: none;
+    -webkit-backdrop-filter: blur(var(--overlay-blur));
+    backdrop-filter: blur(var(--overlay-blur));
   }
   .item-card:hover .item-thumb img {
     transform: scale(1.04);
@@ -1236,9 +1211,7 @@
       flex-direction: column;
       max-width: none;
     }
-    .foto-upload-panel {
-      grid-template-columns: 1fr;
-    }
+    .foto-hub-layout { grid-template-columns: 1fr; }
   }
   @media (max-width: 420px) {
     .items-grid { grid-template-columns: 1fr; }

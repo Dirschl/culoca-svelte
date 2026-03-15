@@ -1,8 +1,11 @@
 <script lang="ts">
+  import { onMount, onDestroy } from 'svelte';
+  import { browser } from '$app/environment';
   import SiteNav from '$lib/SiteNav.svelte';
   import SiteFooter from '$lib/SiteFooter.svelte';
   import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
   import { appendReturnTo } from '$lib/content/routing';
+  import { getEffectiveGpsPosition } from '$lib/filterStore';
   import {
     absoluteUrl,
     buildBreadcrumbJsonLd,
@@ -20,7 +23,11 @@
     caption: string | null;
     canonical_path: string | null;
     path_512: string | null;
+    lat?: number | null;
+    lon?: number | null;
     child_count?: number;
+    variants?: Array<{ slug: string; path_512: string | null }>;
+    distance?: number | null;
   };
 
   export let data: any;
@@ -70,6 +77,158 @@
   }
 
   const geoTrail = (data.breadcrumbs || []).filter((crumb: { path: string }) => crumb.path !== '/');
+
+  let currentGpsPosition: { lat: number; lon: number } | null = browser ? getStoredGpsPosition() : null;
+  let variantImageIndexes: Record<string, number> = {};
+  let animatedPreviewUrls: Record<string, string> = {};
+  let variantTimer: ReturnType<typeof setInterval> | null = null;
+  let lastRotationKey = '';
+  let previewImageElements: Record<string, HTMLImageElement | null> = {};
+  let previewThumbElements: Record<string, HTMLDivElement | null> = {};
+
+  function getStoredGpsPosition(): { lat: number; lon: number } | null {
+    if (typeof window === 'undefined') return null;
+    const directLat = Number(localStorage.getItem('userLat'));
+    const directLon = Number(localStorage.getItem('userLon'));
+    if (Number.isFinite(directLat) && Number.isFinite(directLon) && (directLat !== 0 || directLon !== 0)) {
+      return { lat: directLat, lon: directLon };
+    }
+    const effectiveGps = getEffectiveGpsPosition();
+    if (effectiveGps && Number.isFinite(effectiveGps.lat) && Number.isFinite(effectiveGps.lon)) {
+      return { lat: effectiveGps.lat, lon: effectiveGps.lon };
+    }
+    try {
+      const raw = localStorage.getItem('culoca-filters');
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      const lat = Number(parsed?.lastGpsPosition?.lat);
+      const lon = Number(parsed?.lastGpsPosition?.lon);
+      if (Number.isFinite(lat) && Number.isFinite(lon) && (lat !== 0 || lon !== 0)) return { lat, lon };
+    } catch {
+      return null;
+    }
+    return null;
+  }
+
+  function getDistanceInMeters(userLat: number, userLon: number, itemLat: number, itemLon: number): number {
+    const R = 6371000;
+    const lat1 = (userLat * Math.PI) / 180;
+    const lat2 = (itemLat * Math.PI) / 180;
+    const dLat = ((itemLat - userLat) * Math.PI) / 180;
+    const dLon = ((itemLon - userLon) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }
+
+  function formatDistance(distance: number | null | undefined): string {
+    if (distance == null || Number.isNaN(distance)) return '';
+    if (distance < 1000) return `${Math.round(distance)}m`;
+    return `${(distance / 1000).toFixed(1)}km`;
+  }
+
+  $: displayedItems = (() => {
+    const items = (data.items || []) as HubItem[];
+    const gps = currentGpsPosition;
+    if (!gps) return items;
+    return items.map((item) => {
+      const lat = Number(item.lat);
+      const lon = Number(item.lon);
+      const hasCoords = Number.isFinite(lat) && Number.isFinite(lon);
+      const distance = hasCoords ? getDistanceInMeters(gps.lat, gps.lon, lat, lon) : null;
+      return { ...item, lat: hasCoords ? lat : item.lat, lon: hasCoords ? lon : item.lon, distance };
+    });
+  })();
+
+  $: hasDistanceData = displayedItems.some((i: HubItem) => i?.distance != null);
+
+  function variantThumbUrls(item: HubItem): string[] {
+    const variants = Array.isArray(item.variants) ? item.variants : [];
+    const rootUrl = thumbUrl(item);
+    return variants
+      .filter((v) => v?.slug && v?.path_512)
+      .map((v) => getSeoImageUrl(v.slug, v.path_512, '512'))
+      .filter((url): url is string => Boolean(url) && url !== rootUrl);
+  }
+
+  function rotationThumbUrls(item: HubItem): string[] {
+    const rootUrl = thumbUrl(item);
+    const variantUrls = variantThumbUrls(item);
+    return variantUrls.length ? [rootUrl, ...variantUrls] : [rootUrl];
+  }
+
+  function currentThumbUrl(item: HubItem): string {
+    return animatedPreviewUrls[item.id] ?? thumbUrl(item);
+  }
+
+  function applyPreviewUrl(itemId: string, url: string) {
+    const imageEl = previewImageElements[itemId];
+    if (imageEl && imageEl.src !== url) imageEl.src = url;
+    const thumbEl = previewThumbElements[itemId];
+    if (thumbEl) thumbEl.style.setProperty('--thumb-preview', `url('${url}')`);
+  }
+
+  function preloadVariantImages() {
+    if (typeof window === 'undefined') return;
+    for (const item of displayedItems) {
+      for (const url of rotationThumbUrls(item).slice(1)) {
+        const img = new Image();
+        img.decoding = 'async';
+        img.src = url;
+      }
+    }
+  }
+
+  function startVariantRotation() {
+    variantTimer = setInterval(() => {
+      const nextUrls: Record<string, string> = {};
+      const nextIndexes = { ...variantImageIndexes };
+      for (const item of displayedItems) {
+        const urls = rotationThumbUrls(item);
+        if (urls.length <= 1) continue;
+        const nextIndex = ((nextIndexes[item.id] ?? 0) + 1) % urls.length;
+        nextIndexes[item.id] = nextIndex;
+        nextUrls[item.id] = urls[nextIndex];
+        applyPreviewUrl(item.id, urls[nextIndex]);
+      }
+      variantImageIndexes = nextIndexes;
+      animatedPreviewUrls = nextUrls;
+    }, 2800);
+  }
+
+  function refreshVariantRotation() {
+    if (typeof window === 'undefined') return;
+    const nextKey = displayedItems.map((i) => `${i.id}:${i.child_count ?? 0}`).join('|');
+    if (nextKey === lastRotationKey) return;
+    lastRotationKey = nextKey;
+    if (variantTimer) {
+      clearInterval(variantTimer);
+      variantTimer = null;
+    }
+    animatedPreviewUrls = {};
+    variantImageIndexes = {};
+    const hasVariants = displayedItems.some((item) => variantThumbUrls(item).length > 0);
+    if (!hasVariants) return;
+    preloadVariantImages();
+    startVariantRotation();
+  }
+
+  $: if (displayedItems.length > 0) refreshVariantRotation();
+
+  onMount(() => {
+    currentGpsPosition = getStoredGpsPosition();
+    const hasVariants = displayedItems.some((item) => variantThumbUrls(item).length > 0);
+    if (hasVariants) {
+      preloadVariantImages();
+      startVariantRotation();
+    }
+  });
+
+  onDestroy(() => {
+    if (variantTimer) clearInterval(variantTimer);
+  });
 </script>
 
 <svelte:head>
@@ -162,14 +321,21 @@
           <p class="empty">Noch keine Einträge vorhanden.</p>
         {:else}
           <div class="items-grid">
-            {#each data.items as item (item.id)}
+            {#each displayedItems as item (item.id)}
               <article class="item-card">
                 <a href={itemHref(item)} class="item-link">
                   {#if item.path_512}
-                    {@const previewUrl = thumbUrl(item)}
-                    <div class="item-thumb item-thumb--foto" style={`--thumb-preview:url('${previewUrl}')`}>
+                    {@const previewUrl = currentThumbUrl(item)}
+                    <div
+                      class="item-thumb item-thumb--foto"
+                      style={`--thumb-preview:url('${previewUrl}')`}
+                      bind:this={previewThumbElements[item.id]}
+                    >
                       {#if (item.child_count || 0) > 0}
                         <div class="item-variant-count">+{(item.child_count || 0) + 1}</div>
+                      {/if}
+                      {#if hasDistanceData && item.distance != null}
+                        <div class="item-distance-badge">{formatDistance(item.distance)}</div>
                       {/if}
                       <img
                         src={previewUrl}
@@ -178,6 +344,7 @@
                         height="213"
                         loading="lazy"
                         decoding="async"
+                        bind:this={previewImageElements[item.id]}
                       />
                     </div>
                   {:else}
@@ -344,6 +511,7 @@
   .hub-content .hub-inner {
     padding-top: 2rem;
     padding-bottom: 3rem;
+    background-color: var(--passepartout-bg);
   }
   .empty {
     text-align: center;
@@ -357,10 +525,8 @@
     gap: 1rem;
   }
   .item-card {
-    border-radius: 12px;
     overflow: hidden;
     background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
     transition: transform 0.2s, box-shadow 0.2s;
   }
   .item-card:hover {
@@ -399,21 +565,37 @@
     object-fit: contain;
     transition: transform 0.3s;
   }
+  /* Varianten-Zahl: wie Galerie, links oben, Dark/Light-Mode, ohne Abrundung */
   .item-variant-count {
     position: absolute;
-    top: 0.55rem;
-    left: 0.55rem;
+    top: 0;
+    left: 0;
     z-index: 2;
-    min-width: 2rem;
-    padding: 0.18rem 0.42rem;
-    border-radius: 999px;
-    background: rgba(15, 23, 42, 0.82);
-    color: #fff;
-    font-size: 0.78rem;
-    font-weight: 700;
-    line-height: 1;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
-    backdrop-filter: blur(8px);
+    background: var(--bg-overlay);
+    color: var(--text-overlay);
+    padding: 0 5px;
+    font-size: 12.5px;
+    font-weight: 600;
+    line-height: 1.35;
+    pointer-events: none;
+    -webkit-backdrop-filter: blur(var(--overlay-blur));
+    backdrop-filter: blur(var(--overlay-blur));
+  }
+  /* Entfernung: wie Galerie, rechts oben, Dark/Light-Mode, ohne Abrundung */
+  .item-distance-badge {
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 2;
+    background: var(--bg-overlay);
+    color: var(--text-overlay);
+    padding: 0 4px;
+    font-size: 12.5px;
+    font-weight: 600;
+    line-height: 1.35;
+    pointer-events: none;
+    -webkit-backdrop-filter: blur(var(--overlay-blur));
+    backdrop-filter: blur(var(--overlay-blur));
   }
   .item-card:hover .item-thumb img {
     transform: scale(1.04);

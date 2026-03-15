@@ -5,6 +5,8 @@
   import { env as publicEnv } from '$env/dynamic/public';
   import { authFetch } from '$lib/authFetch';
   import AIButton from '$lib/AIButton.svelte';
+  import SiteNav from '$lib/SiteNav.svelte';
+  import SiteFooter from '$lib/SiteFooter.svelte';
   import { ITEM_TYPES, ITEM_TYPE_LABELS, getAvailableTypes, getTypeDescription } from '$lib/constants/itemTypes';
 
   // Map picker state
@@ -1119,38 +1121,42 @@
   </script>`}
 </svelte:head>
 
-<div class="bulk-upload-container">
-  
-  {#if message}
-    <div class="message {messageType}">
-      {message}
-    </div>
-  {/if}
+<div class="page">
+  <SiteNav />
 
-  <!-- Camera Input (hidden) -->
-  <input 
-    type="file" 
-    bind:this={cameraInput}
-    accept="image/*"
-    capture="environment"
-    on:change={handleCameraCapture}
-    style="display: none;" 
-  />
+  <main class="bulk-upload-main">
+    <h1 class="bulk-upload-heading">Bulk-Upload</h1>
+    <div class="bulk-upload-container">
+      {#if message}
+        <div class="message {messageType}">
+          {message}
+        </div>
+      {/if}
 
-  <!-- File Upload Area -->
-  <div class="upload-area" 
-       class:drag-over={dragOver}
-       on:dragover={handleDragOver}
-       on:dragleave={handleDragLeave}
-       on:drop={handleDrop}
-       role="button"
-       tabindex="0"
-       on:keydown={(e) => {
-         if (e.key === 'Enter' || e.key === ' ') {
-           e.preventDefault();
-           document.getElementById('file-input')?.click();
-         }
-       }}>
+      <!-- Camera Input (hidden) -->
+      <input 
+        type="file" 
+        bind:this={cameraInput}
+        accept="image/*"
+        capture="environment"
+        on:change={handleCameraCapture}
+        style="display: none;" 
+      />
+
+      <!-- File Upload Area -->
+      <div class="upload-area" 
+           class:drag-over={dragOver}
+           on:dragover={handleDragOver}
+           on:dragleave={handleDragLeave}
+           on:drop={handleDrop}
+           role="button"
+           tabindex="0"
+           on:keydown={(e) => {
+             if (e.key === 'Enter' || e.key === ' ') {
+               e.preventDefault();
+               document.getElementById('file-input')?.click();
+             }
+           }}>
     
     <input type="file" 
            id="file-input" 
@@ -1201,11 +1207,11 @@
         Unterstützte Formate: JPEG, PNG, WebP (max. 50MB pro Datei)
       </div>
     </div>
-  </div>
+      </div>
 
-  <!-- Image List -->
-  {#if files.length > 0}
-    <div class="images-container">
+      <!-- Image List -->
+      {#if files.length > 0}
+        <div class="images-container">
       <h2>Bilder zur Korrektur ({files.length})</h2>
       
       <div class="validation-summary">
@@ -1400,13 +1406,13 @@
       </div>
 
       <!-- Upload Button (only show if there are images to correct) -->
-    </div>
-  {/if}
+        </div>
+      {/if}
 
-  <!-- Map Picker Modal -->
-  {#if showMapPicker}
-    <div class="map-modal">
-      <div class="map-modal-content">
+      <!-- Map Picker Modal -->
+      {#if showMapPicker}
+        <div class="map-modal">
+          <div class="map-modal-content">
         <div class="map-modal-header">
           <h3>Standort auswählen</h3>
           <div class="map-controls">
@@ -1478,17 +1484,103 @@
             </button>
           </div>
         </div>
-      </div>
+          </div>
+        </div>
+      {/if}
     </div>
-  {/if}
+
+    <section class="bulk-upload-info" aria-labelledby="bulk-upload-info-heading">
+      <h2 id="bulk-upload-info-heading">So funktioniert der Bulk-Upload</h2>
+      <p>
+        Damit auch viele große Fotodateien (bis 45 MB) zuverlässig hochgeladen werden können, ist die <strong>richtige Dateistruktur</strong> wichtig. 
+        Mit dem <strong>Culoca Image Describer</strong> lassen sich Fotos inklusive EXIF- und GPS-Daten vorbereiten – so können auch große Mengen an Bildern schnell verarbeitet werden.
+      </p>
+      <div class="bulk-upload-info-tool">
+        <p>
+          Der Culoca Image Describer ist derzeit als <strong>Beta für macOS</strong> verfügbar und benötigt einen gültigen API-Key. 
+          Bei Interesse melden Sie sich gerne unter <a href="mailto:johann.dirschl@gmx.de">johann.dirschl@gmx.de</a>.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <SiteFooter />
 </div>
 
 <style>
+  .page {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--passepartout-bg);
+    color: var(--text-primary);
+  }
+
+  .bulk-upload-main {
+    flex: 1;
+    background: var(--passepartout-bg);
+  }
+
+  .bulk-upload-heading {
+    margin: 0;
+    padding: 1rem 20px 0.5rem;
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
   .bulk-upload-container {
     max-width: 100%;
     margin: 0 auto;
     padding: 20px;
     width: 100%;
+  }
+
+  .bulk-upload-info {
+    max-width: 720px;
+    margin: 0 auto 3rem;
+    padding: 2rem 20px;
+    color: var(--text-primary);
+  }
+
+  .bulk-upload-info h2 {
+    margin: 0 0 1rem;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .bulk-upload-info p {
+    margin: 0 0 1rem;
+    line-height: 1.6;
+    color: var(--text-secondary, var(--text-primary));
+  }
+
+  .bulk-upload-info p:last-child {
+    margin-bottom: 0;
+  }
+
+  .bulk-upload-info-tool {
+    margin-top: 1.25rem;
+    padding: 1.25rem 1.5rem;
+    background: var(--bg-secondary, rgba(0, 0, 0, 0.06));
+    border-radius: 12px;
+    border-left: 4px solid var(--accent-color);
+  }
+
+  .bulk-upload-info-tool p {
+    margin: 0;
+    font-size: 0.95rem;
+  }
+
+  .bulk-upload-info a {
+    color: var(--accent-color);
+    text-decoration: none;
+    font-weight: 500;
+  }
+
+  .bulk-upload-info a:hover {
+    text-decoration: underline;
   }
 
   .back-to-app-btn {
@@ -2056,8 +2148,16 @@
       grid-template-columns: repeat(3, 1fr);
       max-width: 100%;
     }
+    .bulk-upload-heading {
+      padding-left: 40px;
+      padding-right: 40px;
+    }
     .bulk-upload-container {
       padding: 20px 40px;
+    }
+    .bulk-upload-info {
+      padding-left: 40px;
+      padding-right: 40px;
     }
   }
 
@@ -2073,8 +2173,16 @@
     .images-grid {
       grid-template-columns: 1fr;
     }
+    .bulk-upload-heading {
+      padding-left: 10px;
+      padding-right: 10px;
+      font-size: 1.35rem;
+    }
     .bulk-upload-container {
       padding: 10px;
+    }
+    .bulk-upload-info {
+      padding: 1.5rem 10px 2rem;
     }
   }
 
