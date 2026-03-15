@@ -40,12 +40,13 @@ body[data-theme="dark"] {
   max-width: none !important;
 }
 
-/* CRITICAL: Page layout - background set per page (e.g. .bulk-upload-main) */
+/* CRITICAL: Page layout and default background */
 main, .page, [data-sveltekit-page], [data-sveltekit-preload-data] {
   color: var(--text-primary) !important;
   width: 100% !important;
   min-width: 100% !important;
   max-width: none !important;
+  background-color: var(--bg-primary);
 }
 
 /* CRITICAL: Specific component backgrounds - MUST be sixth */

@@ -4862,7 +4862,7 @@ let showRightsManager = false;
   .similar-motifs-panel {
     width: 100%;
     padding: 1.25rem 1rem 1rem;
-    background: var(--passepartout-bg);
+    background: var(--bg-primary);
   }
 
   .similar-motifs-head {
@@ -4948,7 +4948,7 @@ let showRightsManager = false;
     flex-direction: column;
     gap: 0.25rem;
     flex: 1;
-    background: var(--bg-primary);
+    background: var(--passepartout-bg);
   }
 
   .similar-item-body h3 {

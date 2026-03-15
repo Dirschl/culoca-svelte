@@ -511,7 +511,7 @@
   .hub-content .hub-inner {
     padding-top: 2rem;
     padding-bottom: 3rem;
-    background-color: var(--passepartout-bg);
+    background: var(--bg-primary);
   }
   .empty {
     text-align: center;
