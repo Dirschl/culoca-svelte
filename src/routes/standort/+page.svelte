@@ -150,7 +150,7 @@
         </div>
 
         <div class="action-list">
-          <button type="button" class="primary-action" on:click={activateGpsLocation} disabled={locating}>
+          <button type="button" class="primary-action" class:primary-action--pulse={!currentLocation && !locating} on:click={activateGpsLocation} disabled={locating}>
             {locating ? 'Standort wird abgefragt...' : currentLocation ? 'Live-GPS erneut freigeben' : 'Live-GPS freigeben'}
           </button>
           {#if currentLocation}
@@ -309,6 +309,19 @@
     background: var(--culoca-orange);
     color: white;
     box-shadow: 0 18px 34px rgba(238, 114, 33, 0.24);
+  }
+  .primary-action--pulse {
+    animation: standort-pulse 2s ease-in-out infinite;
+  }
+  @keyframes standort-pulse {
+    0%, 100% {
+      box-shadow: 0 18px 34px rgba(238, 114, 33, 0.24);
+      transform: scale(1);
+    }
+    50% {
+      box-shadow: 0 0 28px rgba(238, 114, 33, 0.5), 0 18px 34px rgba(238, 114, 33, 0.35);
+      transform: scale(1.02);
+    }
   }
   .ghost-action {
     background: transparent;
