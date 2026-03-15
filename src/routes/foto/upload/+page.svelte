@@ -3,6 +3,7 @@
   import { onMount } from 'svelte';
   import * as exifr from 'exifr';
   import SiteNav from '$lib/SiteNav.svelte';
+  import SiteFooter from '$lib/SiteFooter.svelte';
   import { supabase } from '$lib/supabaseClient';
   import { authFetch } from '$lib/authFetch';
   import { ITEM_TYPES, getAvailableTypes, getTypeDescription } from '$lib/constants/itemTypes';
@@ -1043,9 +1044,14 @@
       {/if}
     {/if}
   </div>
+  <SiteFooter />
 </div>
 
 <style>
+  .upload-page {
+    background-color: var(--bg-primary);
+  }
+
   .upload-shell {
     margin: 0 auto;
     padding: 2rem 1rem 4rem;

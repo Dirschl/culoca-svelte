@@ -1518,7 +1518,7 @@
 
   .bulk-upload-main {
     flex: 1;
-    background: var(--passepartout-bg);
+    background-color: var(--bg-primary);
   }
 
   .bulk-upload-heading {
