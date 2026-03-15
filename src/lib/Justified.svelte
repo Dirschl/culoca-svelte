@@ -251,8 +251,8 @@
             width:{boxes[i].width}px;
             height:{boxes[i].height}px;
           "
-          on:click={() => handleImageClick(item.slug)}
-          on:keydown={(e) => handleKeydown(e, item.slug)}
+          on:click={() => handleImageClick(item.slug || '')}
+          on:keydown={(e) => handleKeydown(e, item.slug || '')}
         >
           <img
             class="pic"

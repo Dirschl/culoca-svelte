@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { supabase } from '$lib/supabaseClient.ts';
+  import { supabase } from '$lib/supabaseClient';
   import InfoPageLayout from '$lib/InfoPageLayout.svelte';
   
   let user: any = null;

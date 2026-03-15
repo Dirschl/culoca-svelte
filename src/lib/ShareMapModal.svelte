@@ -12,6 +12,13 @@
   function closeModal() {
     dispatch('close');
   }
+
+  function handleOverlayKeydown(event: KeyboardEvent) {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      closeModal();
+    }
+  }
   
   let copyButtonText = 'Kopieren';
   
@@ -42,7 +49,7 @@
       
       // Get auth token from localStorage
       const authToken = localStorage.getItem('sb-caskhmcbvtevdwsolvwk-auth-token');
-      const headers = {
+      const headers: Record<string, string> = {
         'Content-Type': 'application/json',
       };
       
@@ -91,11 +98,18 @@
 </script>
 
 {#if showModal}
-  <div class="share-modal-overlay" on:click={closeModal}>
-    <div class="share-modal" on:click|stopPropagation>
+  <div
+    class="share-modal-overlay"
+    role="button"
+    tabindex="0"
+    on:click={closeModal}
+    on:keydown={handleOverlayKeydown}
+    aria-label="Teilen-Dialog schließen"
+  >
+    <div class="share-modal" role="dialog" aria-modal="true" aria-labelledby="share-map-title" on:click|stopPropagation>
       <div class="share-modal-header">
-        <h3>Kartenausschnitt teilen</h3>
-        <button class="close-btn" on:click={closeModal}>×</button>
+        <h3 id="share-map-title">Kartenausschnitt teilen</h3>
+        <button type="button" class="close-btn" on:click={closeModal}>×</button>
       </div>
       
       <div class="share-modal-content">
@@ -129,9 +143,9 @@
           </div>
           
           <div class="share-url-group">
-            <label>Teilbarer Link</label>
+            <label for="share-url">Teilbarer Link</label>
             <div class="url-input-group">
-              <input readonly value={shareUrl} />
+              <input id="share-url" readonly value={shareUrl} />
               <button type="button" on:click={copyUrl}>{copyButtonText}</button>
             </div>
             <button type="button" class="save-share-btn" on:click={saveShare}>

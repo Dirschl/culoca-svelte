@@ -7,14 +7,11 @@
   export let descriptionEditValue: string;
   export let startEditTitle: () => void;
   export let saveTitle: () => void;
-  export let cancelEditTitle: () => void;
   export let handleTitleKeydown: (event: KeyboardEvent) => void;
   export let startEditDescription: () => void;
   export let saveDescription: () => void;
-  export let cancelEditDescription: () => void;
   export let handleDescriptionKeydown: (event: KeyboardEvent) => void;
   export let imageSource: string;
-  export let darkMode: boolean;
 </script>
 
 <div class="passepartout-container">
@@ -52,9 +49,9 @@
           </span>
         </div>
       {:else}
-        <span class="title-text" on:click={startEditTitle}>
+        <button type="button" class="title-text" on:click={startEditTitle}>
           {image.title || image.original_name || `Bild ${image.id?.substring(0, 8)}...`}
-        </span>
+        </button>
       {/if}
     </h1>
     <p class="description" class:editable={isCreator} class:editing={editingDescription}>
@@ -80,13 +77,13 @@
           </span>
         </div>
       {:else}
-        <span class="description-text" on:click={startEditDescription}>
+        <button type="button" class="description-text" on:click={startEditDescription}>
           {#if image.description}
             {image.description}
           {:else}
             <span class="placeholder">Keine Beschreibung verfügbar</span>
           {/if}
-        </span>
+        </button>
       {/if}
     </p>
   </div>
@@ -150,12 +147,6 @@
   transition: color 0.3s ease;
 }
 
-.description.placeholder {
-  color: var(--text-muted);
-  font-style: italic;
-  background: transparent;
-}
-
 .title-edit-container, .description-edit-container {
   display: flex;
   align-items: center;
@@ -180,5 +171,14 @@
 }
 .char-count.valid {
   color: var(--success-color);
+}
+.title-text,
+.description-text {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
 }
 </style> 

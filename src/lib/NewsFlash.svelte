@@ -25,7 +25,9 @@ export let initialItems: any[] = [];
 export let currentPage: number = 1;
 export let totalPages: number = 1;
 
-let images: NewsFlashImage[] = [];
+type NewsFlashDisplayImage = NewsFlashImage & { canonical_path?: string | null };
+
+let images: NewsFlashDisplayImage[] = [];
 let loading = true;
 let loadingMore = false;
 let errorMsg = '';
@@ -33,7 +35,7 @@ let lastUpdate = new Date();
 let lastImageId: string | null = null;
 let hasMoreImages = true;
 let currentOffset = 0;
-let refreshInterval: number | null = null;
+let refreshInterval: ReturnType<typeof setInterval> | null = null;
 let mounted = false;
 let usedInitialItems = false; // NEU: Merker, ob SSR-Items verwendet wurden
 
@@ -49,7 +51,7 @@ async function attachCanonicalPaths<T extends { id: string }>(items: T[]): Promi
 
   const { data, error } = await supabase
     .from('items')
-    .select('id, canonical_path')
+    .select('id, slug, canonical_path, country_slug, district_slug, municipality_slug')
     .in('id', items.map((item) => item.id));
 
   if (error || !data) {
@@ -57,10 +59,23 @@ async function attachCanonicalPaths<T extends { id: string }>(items: T[]): Promi
     return items;
   }
 
-  const canonicalById = new Map(data.map((item) => [item.id, item.canonical_path]));
+  const canonicalById = new Map(
+    data.map((item) => [
+      item.id,
+      {
+        canonical_path: getPublicItemHref(item),
+        country_slug: item.country_slug,
+        district_slug: item.district_slug,
+        municipality_slug: item.municipality_slug
+      }
+    ])
+  );
   return items.map((item) => ({
     ...item,
-    canonical_path: canonicalById.get(item.id) || null
+    canonical_path: canonicalById.get(item.id)?.canonical_path || null,
+    country_slug: canonicalById.get(item.id)?.country_slug || null,
+    district_slug: canonicalById.get(item.id)?.district_slug || null,
+    municipality_slug: canonicalById.get(item.id)?.municipality_slug || null
   }));
 }
 
@@ -81,6 +96,9 @@ $: if (initialItems && initialItems.length > 0 && (images.length === 0 || curren
     id: item.id,
     slug: item.slug,
     canonical_path: item.canonical_path,
+    country_slug: item.country_slug,
+    district_slug: item.district_slug,
+    municipality_slug: item.municipality_slug,
     lat: item.lat,
     lon: item.lon,
     path_512: item.path_512,
@@ -100,7 +118,7 @@ $: if (initialItems && initialItems.length > 0 && (images.length === 0 || curren
 }
 
 // Direct database query for NewsFlash images (bypasses API limitations)
-async function loadNewsFlashImagesDirectFromDB(): Promise<NewsFlashImage[]> {
+async function loadNewsFlashImagesDirectFromDB(): Promise<NewsFlashDisplayImage[]> {
   try {
     console.log('[NewsFlash DirectDB] Loading images directly from database...');
     
@@ -121,10 +139,13 @@ async function loadNewsFlashImagesDirectFromDB(): Promise<NewsFlashImage[]> {
       return [];
     }
     
-    const images = await attachCanonicalPaths((data || []).map(item => ({
+    const images = await attachCanonicalPaths<NewsFlashDisplayImage>((data || []).map((item: any) => ({
       id: item.id,
       slug: item.slug,
       canonical_path: item.canonical_path,
+      country_slug: item.country_slug,
+      district_slug: item.district_slug,
+      municipality_slug: item.municipality_slug,
       lat: item.lat,
       lon: item.lon,
       path_512: item.path_512!,
@@ -226,7 +247,7 @@ function startAutoRefresh() {
     clearInterval(refreshInterval);
   }
   if (mode !== 'aus') {
-    refreshInterval = setInterval(() => {
+      refreshInterval = setInterval(() => {
       console.log('NewsFlash: Auto-refresh triggered - loading newest items');
       // WICHTIG: Auto-Refresh soll die neuesten Items laden und die Liste ersetzen
       // nicht anhängen! Deshalb currentOffset auf 0 setzen
@@ -278,9 +299,9 @@ function handleImageClick(img: NewsFlashImage) {
 }
 
 function toggleMode() {
-  if (mode === 'alle') mode = 'eigene';
-  else if (mode === 'eigene') mode = 'aus';
-  else mode = 'alle';
+  const nextMode: 'eigene' | 'alle' | 'aus' =
+    mode === 'alle' ? 'eigene' : mode === 'eigene' ? 'aus' : 'alle';
+  mode = nextMode;
   
   // Explizit laden und Auto-Refresh starten statt reaktiver Block
   if (mode !== 'aus') {
@@ -324,9 +345,7 @@ function handleScroll(event: Event) {
     {#if showToggles}
       <div class="newsflash-toggles">
         <button class="toggle-btn" on:click={toggleMode} title="Modus wechseln">
-          {#if mode === 'alle'}Alle{/if}
-          {#if mode === 'eigene'}Eigene{/if}
-          {#if mode === 'aus'}Aus{/if}
+          {mode === 'alle' ? 'Alle' : mode === 'eigene' ? 'Eigene' : 'Aus'}
         </button>
         <button class="toggle-btn" on:click={toggleLayout} title="Layout wechseln">
           {#if layout === 'strip'}Streifen{/if}

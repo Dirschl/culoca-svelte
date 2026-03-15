@@ -1,5 +1,6 @@
 import type { PageServerLoad } from './$types';
 import { createClient } from '@supabase/supabase-js';
+import { getPublicItemHref } from '$lib/content/routing';
 
 // Disable caching for this page to ensure fresh data
 export const csr = true;
@@ -42,7 +43,7 @@ export const load: PageServerLoad = async ({ url, request }) => {
   });
 
   // Newsflash-Daten serverseitig laden für Bots
-  let newsFlashItems = [];
+  let newsFlashItems: Array<Record<string, unknown>> = [];
   let totalCount = 0;
   
   try {
@@ -57,16 +58,27 @@ export const load: PageServerLoad = async ({ url, request }) => {
       const canonicalRows = data.length
         ? await supabase
             .from('items')
-            .select('id, canonical_path')
-            .in('id', data.map((item) => item.id))
+            .select('id, slug, canonical_path, country_slug, district_slug, municipality_slug')
+            .in('id', data.map((item: any) => item.id))
         : { data: [], error: null };
 
-      const canonicalById = new Map((canonicalRows.data || []).map((item) => [item.id, item.canonical_path]));
+      const canonicalById = new Map((canonicalRows.data || []).map((item: any) => [
+        item.id,
+        {
+          canonical_path: getPublicItemHref(item),
+          country_slug: item.country_slug,
+          district_slug: item.district_slug,
+          municipality_slug: item.municipality_slug
+        }
+      ]));
 
-      newsFlashItems = data.map(item => ({
+      newsFlashItems = data.map((item: any) => ({
         id: item.id,
         slug: item.slug,
-        canonical_path: canonicalById.get(item.id) || null,
+        canonical_path: canonicalById.get(item.id)?.canonical_path || null,
+        country_slug: canonicalById.get(item.id)?.country_slug || null,
+        district_slug: canonicalById.get(item.id)?.district_slug || null,
+        municipality_slug: canonicalById.get(item.id)?.municipality_slug || null,
         lat: item.lat,
         lon: item.lon,
         path_512: item.path_512,
@@ -113,7 +125,7 @@ export const load: PageServerLoad = async ({ url, request }) => {
   }
 
   // 3 echte zufällige Items über die gesamte Datenbank für WelcomeSection laden (für SEO)
-  let featuredItems: any[] = [];
+  let featuredItems: Array<Record<string, unknown>> = [];
   try {
     // Verwende direkte Query mit zufälligen Offsets für echte Zufälligkeit
     // Füge einen Timestamp hinzu um Caching zu vermeiden
@@ -141,7 +153,7 @@ export const load: PageServerLoad = async ({ url, request }) => {
       const promises = randomOffsets.map(offset => 
         supabase
           .from('items')
-          .select('id, title, slug, description, canonical_path')
+          .select('id, title, slug, description, canonical_path, country_slug, district_slug, municipality_slug')
           .not('slug', 'is', null)
           .eq('is_private', false)
           .order('created_at', { ascending: false })
@@ -157,13 +169,18 @@ export const load: PageServerLoad = async ({ url, request }) => {
         .map(r => r.data);
     
       if (fallbackData.length > 0) {
-        featuredItems = fallbackData.map(item => ({
+        featuredItems = fallbackData
+          .filter((item): item is NonNullable<typeof item> => item != null)
+          .map((item) => ({
           id: item.id,
           slug: item.slug,
-          canonical_path: item.canonical_path,
+          canonical_path: getPublicItemHref(item),
+          country_slug: item.country_slug,
+          district_slug: item.district_slug,
+          municipality_slug: item.municipality_slug,
           title: item.title || 'Unbenanntes Item',
           description: item.description || ''
-        }));
+          }));
         console.log('[Server] Loaded featured items for SEO:', featuredItems.length);
       }
     }

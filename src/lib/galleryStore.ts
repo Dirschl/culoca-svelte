@@ -1,13 +1,48 @@
 import { writable, get } from 'svelte/store';
 import { browser } from '$app/environment';
 import { getSeoImageUrl } from './utils/seoImageUrl';
+import type { FilterState } from './filterStore';
+
+type GalleryParams = {
+  search: string;
+  lat: number | null;
+  lon: number | null;
+  radius: number | null;
+  user_id?: string | null;
+  fromItem?: boolean;
+  locationFilterLat?: number | null;
+  locationFilterLon?: number | null;
+};
+
+type GalleryMappedItem = {
+  src: string;
+  srcHD: string;
+  width: number | null;
+  height: number | null;
+  id: string;
+  slug: string;
+  lat: number | null;
+  lon: number | null;
+  title: string | null;
+  distance: number | null;
+  description: string | null;
+  canonical_path: string | null;
+  profile_id: string | null;
+  isSourceItem?: boolean;
+  child_count: number;
+  group_root_item_id: string | null;
+  path_64: string | null;
+  path_512: string | null;
+  path_2048: string | null;
+  original_name?: string | null;
+};
 
 // Gallery Items and Loading State
-export const galleryItems = writable<any[]>([]);
+export const galleryItems = writable<GalleryMappedItem[]>([]);
 export const isGalleryLoading = writable(false);
 export const galleryTotalCount = writable(0);
 export const hasMoreGalleryItems = writable(true);
-export const galleryParams = writable({ search: '', lat: null, lon: null, radius: null });
+export const galleryParams = writable<GalleryParams>({ search: '', lat: null, lon: null, radius: null });
 
 // Global Layout Store - shared between main page and detail page
 export const useJustifiedLayout = writable(true);
@@ -50,17 +85,19 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
   console.log('[GalleryStore] loadMoreGallery called with params:', params);
 
   // --- NEU: Location Filter Koordinaten bevorzugen ---
-  let mergedParams = { ...get(galleryParams), ...params };
+  let mergedParams: GalleryParams = { ...get(galleryParams), ...params };
   try {
     // WICHTIG: User-Filter aus dem Store holen und anwenden
     const { filterStore } = await import('./filterStore');
-    const filterState = get(filterStore);
+    const filterState = get(filterStore) as FilterState;
     
     // NEU: Location Filter hat höchste Priorität
     if (filterState.locationFilter) {
       mergedParams.lat = filterState.locationFilter.lat;
       mergedParams.lon = filterState.locationFilter.lon;
       mergedParams.fromItem = true; // Immer setzen, wenn Location-Filter aktiv
+      mergedParams.locationFilterLat = filterState.locationFilter.lat;
+      mergedParams.locationFilterLon = filterState.locationFilter.lon;
       console.log('[GalleryStore] Using Location Filter coordinates:', mergedParams.lat, mergedParams.lon);
     } else {
       // Nur wenn kein Location Filter gesetzt ist, verwende aktuelle GPS-Position
@@ -183,7 +220,7 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
   if (items && items.length) {
     let mapped = items
       .filter((item: any) => item.path_512)
-      .map((item: any) => {
+      .map((item: any): GalleryMappedItem => {
         // Use SEO-friendly URLs for better Google indexing
         const seoSrc = getSeoImageUrl(item.slug, item.path_512, '512');
         const seoSrcHD = getSeoImageUrl(item.slug, item.path_2048 || item.path_512, '2048');
@@ -218,14 +255,14 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
 
     // Nur beim ersten Laden (offset === 0) das Source-Objekt zulassen
     if (requestedPage > 0) {
-      mapped = mapped.filter(item => !item.isSourceItem);
+      mapped = mapped.filter((item: GalleryMappedItem) => !item.isSourceItem);
     }
 
     // DEBUG: Log first few items to check order
-    console.log('[Frontend] First 5 mapped galleryItems:', mapped.slice(0, 5).map(item => ({id: item.id, isSourceItem: item.isSourceItem, distance: item.distance})));
+    console.log('[Frontend] First 5 mapped galleryItems:', mapped.slice(0, 5).map((item: GalleryMappedItem) => ({id: item.id, isSourceItem: item.isSourceItem, distance: item.distance})));
 
     // DEBUG: Log first few items to check distances
-    console.log('[GalleryStore] First 3 mapped items:', mapped.slice(0, 3).map(item => ({
+    console.log('[GalleryStore] First 3 mapped items:', mapped.slice(0, 3).map((item: GalleryMappedItem) => ({
       id: item.id,
       distance: item.distance,
       title: item.title
@@ -275,7 +312,7 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
 export function resetGallery(params: { search?: string; lat?: number; lon?: number; radius?: number; user_id?: string } = {}) {
   // Prüfe ob sich die Parameter wirklich geändert haben
   const currentParams = get(galleryParams);
-  const newParams = { 
+  const newParams: GalleryParams = { 
     search: params.search || '', 
     lat: params.lat ?? null, 
     lon: params.lon ?? null, 

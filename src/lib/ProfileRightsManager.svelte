@@ -29,7 +29,7 @@
   };
 
   // Debounced search
-  let searchTimeout: number;
+  let searchTimeout: ReturnType<typeof setTimeout>;
 
   onMount(() => {
     loadExistingRights();

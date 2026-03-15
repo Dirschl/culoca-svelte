@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 // Use environment variables with fallbacks for build process
 const supabaseUrl = (typeof process !== 'undefined' && process.env?.PUBLIC_SUPABASE_URL) || 
@@ -13,7 +13,7 @@ const supabaseAnonKey = (typeof process !== 'undefined' && process.env?.PUBLIC_S
                        (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_ANON_KEY);
 
 // Create client with proper error handling for build process
-let supabase;
+let supabase: SupabaseClient;
 try {
   if (!supabaseAnonKey) {
     // For build process, create a dummy client that won't be used

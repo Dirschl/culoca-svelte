@@ -48,6 +48,20 @@
     isOpen = false;
     dispatch('close');
   }
+
+  function handleOverlayKeydown(event: KeyboardEvent) {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      closeModal();
+    }
+  }
+
+  function handleTrackKeydown(event: KeyboardEvent, track: any) {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      selectTrack(track);
+    }
+  }
   
   function selectTrack(track: any) {
     selectedTrack = track;
@@ -119,11 +133,18 @@
 </script>
 
 {#if isOpen}
-  <div class="modal-overlay" on:click={closeModal}>
-    <div class="modal-content" on:click|stopPropagation>
+  <div
+    class="modal-overlay"
+    role="button"
+    tabindex="0"
+    on:click={closeModal}
+    on:keydown={handleOverlayKeydown}
+    aria-label="Track-Dialog schließen"
+  >
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="track-modal-title" on:click|stopPropagation>
       <div class="modal-header">
-        <h2>🗺️ GPS-Tracks</h2>
-        <button class="close-btn" on:click={closeModal}>&times;</button>
+        <h2 id="track-modal-title">🗺️ GPS-Tracks</h2>
+        <button type="button" class="close-btn" on:click={closeModal}>&times;</button>
       </div>
       
       <div class="modal-body">
@@ -138,9 +159,12 @@
             <div class="tracks-list">
               <h3>Gespeicherte Touren ({savedTracks.length})</h3>
               {#each savedTracks as track}
-                <div 
+                <div
                   class="track-item {selectedTrack?.id === track.id ? 'selected' : ''}"
+                  role="button"
+                  tabindex="0"
                   on:click={() => selectTrack(track)}
+                  on:keydown={(event) => handleTrackKeydown(event, track)}
                 >
                   <div class="track-info">
                     <h4>{track.name}</h4>
@@ -151,7 +175,8 @@
                       <span>📍 {track.points.length} Punkte</span>
                     </div>
                   </div>
-                  <button 
+                  <button
+                    type="button"
                     class="delete-btn"
                     on:click|stopPropagation={() => deleteTrack(track.id)}
                     title="Track löschen"

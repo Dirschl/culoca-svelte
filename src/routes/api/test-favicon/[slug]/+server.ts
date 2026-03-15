@@ -57,8 +57,8 @@ export const GET = async ({ params }) => {
     console.error('Test favicon error:', err);
     return json({ 
       error: 'Unexpected error', 
-      message: err.message,
+      message: err instanceof Error ? err.message : 'Unknown error',
       slug 
     });
   }
-}; 
+};

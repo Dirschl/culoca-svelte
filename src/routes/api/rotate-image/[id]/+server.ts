@@ -15,6 +15,9 @@ export const POST: RequestHandler = async ({ params, request }) => {
     
     // Supabase-Client mit Service Role Key für Storage-Operationen
     const supabase = supabaseServiceKey ? createClient(supabaseUrl, supabaseServiceKey) : null;
+    if (!supabase) {
+      return json({ success: false, error: 'Missing service role key' }, { status: 500 });
+    }
     
     // User prüfen mit separatem Client für Auth
     const authSupabase = createClient(supabaseUrl, (process.env.PUBLIC_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY) || 'dummy-key-for-build', {

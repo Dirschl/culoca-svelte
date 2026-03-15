@@ -1,5 +1,28 @@
 import { json } from '@sveltejs/kit';
 import { supabaseAdmin } from '$lib/supabaseAdmin.js';
+import type { User } from '@supabase/supabase-js';
+
+type UserProfileRow = {
+  id: string;
+  full_name: string | null;
+  accountname: string | null;
+  role_id: number | null;
+  privacy_mode: string | null;
+  save_originals: boolean | null;
+  use_justified_layout: boolean | null;
+  show_welcome: boolean | null;
+};
+
+type UpdatePayload = {
+  email?: string;
+  full_name?: string;
+  accountname?: string;
+  role_id?: number | null;
+  privacy_mode?: string | null;
+  save_originals?: boolean;
+  use_justified_layout?: boolean;
+  show_welcome?: boolean;
+};
 
 export const POST = async ({ request }) => {
   try {
@@ -7,13 +30,13 @@ export const POST = async ({ request }) => {
       return json({ error: 'Admin operations not available - SUPABASE_SERVICE_ROLE_KEY missing' }, { status: 503 });
     }
 
-    const { userId, updates } = await request.json();
+    const { userId, updates } = (await request.json()) as { userId: string; updates: UpdatePayload };
 
     if (!userId) {
       return json({ error: 'User ID is required' }, { status: 400 });
     }
 
-    const results = {};
+    const results: Record<string, string> = {};
 
     // Update auth user if email is being changed
     if (updates.email) {
@@ -39,7 +62,7 @@ export const POST = async ({ request }) => {
             return json({ error: `Failed to check existing emails: ${listError.message}` }, { status: 500 });
           }
 
-          const existingUser = existingUsers.users.find(user => 
+          const existingUser = existingUsers.users.find((user: User) => 
             user.email === updates.email && user.id !== userId
           );
 
@@ -61,9 +84,9 @@ export const POST = async ({ request }) => {
           results.auth = 'updated';
           console.log('✅ Auth user email updated successfully');
         }
-      } catch (error) {
+      } catch (error: unknown) {
         console.error('Error in auth update:', error);
-        return json({ error: `Auth update failed: ${error.message}` }, { status: 500 });
+        return json({ error: `Auth update failed: ${error instanceof Error ? error.message : 'Unknown error'}` }, { status: 500 });
       }
     }
 
@@ -75,7 +98,7 @@ export const POST = async ({ request }) => {
           .from('profiles')
           .select('accountname')
           .eq('id', userId)
-          .single();
+          .single<{ accountname: string | null }>();
         
         if (currentProfileError) {
           console.error('Error getting current profile:', currentProfileError);
@@ -97,20 +120,20 @@ export const POST = async ({ request }) => {
             return json({ error: `Failed to check existing accountnames: ${listError.message}` }, { status: 500 });
           }
 
-          const existingProfile = existingProfiles.find(profile => profile.id !== userId);
+          const existingProfile = (existingProfiles || []).find((profile: { id: string; accountname: string | null }) => profile.id !== userId);
 
           if (existingProfile) {
             return json({ error: `Accountname "${updates.accountname}" wird bereits von Benutzer ${existingProfile.id} verwendet` }, { status: 400 });
           }
         }
-      } catch (error) {
+      } catch (error: unknown) {
         console.error('Error in accountname conflict check:', error);
-        return json({ error: `Accountname conflict check failed: ${error.message}` }, { status: 500 });
+        return json({ error: `Accountname conflict check failed: ${error instanceof Error ? error.message : 'Unknown error'}` }, { status: 500 });
       }
     }
 
     // Update profile
-    const profileUpdates = {};
+    const profileUpdates: Partial<UserProfileRow> = {};
     if (updates.full_name !== undefined) profileUpdates.full_name = updates.full_name;
     if (updates.accountname !== undefined && updates.accountname.trim() !== '') {
       profileUpdates.accountname = updates.accountname.trim();
@@ -142,8 +165,8 @@ export const POST = async ({ request }) => {
     console.log(`✅ User ${userId} updated successfully:`, results);
     return json({ success: true, results });
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error in update-user API:', error);
     return json({ error: 'Internal server error' }, { status: 500 });
   }
-}; 
+};

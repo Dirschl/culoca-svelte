@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { supabase } from '$lib/supabaseClient.ts';
+  import { supabase } from '$lib/supabaseClient';
   import InfoPageLayout from '$lib/InfoPageLayout.svelte';
   
   let user: any = null;
@@ -56,7 +56,7 @@
   }
   
   // Update role permissions
-  async function updateRolePermissions(roleId: number, permissions: any) {
+  async function updateRolePermissions(roleId: number, permissions: Record<string, boolean>) {
     try {
       const { error: updateError } = await supabase
         .from('roles')
@@ -71,6 +71,17 @@
       error = 'Fehler beim Aktualisieren der Rolle';
       console.error(err);
     }
+  }
+
+  function getRolePermissions(role: any): Array<[string, boolean]> {
+    return Object.entries((role?.permissions || {}) as Record<string, boolean>);
+  }
+
+  function handlePermissionChange(role: any, permission: string, event: Event) {
+    const target = event.currentTarget as HTMLInputElement;
+    const newPermissions = { ...(role?.permissions || {}) as Record<string, boolean> };
+    newPermissions[permission] = target.checked;
+    updateRolePermissions(role.id, newPermissions);
   }
   
   onMount(() => {
@@ -116,16 +127,12 @@
               
               <div class="permissions">
                 <h4>Berechtigungen:</h4>
-                {#each Object.entries(role.permissions) as [permission, value]}
+                {#each getRolePermissions(role) as [permission, value]}
                   <label class="permission-item">
                     <input 
                       type="checkbox" 
                       checked={value}
-                      on:change={(e) => {
-                        const newPermissions = { ...role.permissions };
-                        newPermissions[permission] = e.target.checked;
-                        updateRolePermissions(role.id, newPermissions);
-                      }}
+                      on:change={(e) => handlePermissionChange(role, permission, e)}
                     />
                     <span>{permission}</span>
                   </label>

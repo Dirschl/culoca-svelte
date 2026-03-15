@@ -382,7 +382,7 @@ function createSessionStore() {
 				console.log('✅ User role updated to:', roleId);
 				
 				// Reload permissions with new role
-				await loadPermissions(userId);
+				await sessionStore.loadPermissions(userId);
 				
 				return true;
 			} catch (error) {

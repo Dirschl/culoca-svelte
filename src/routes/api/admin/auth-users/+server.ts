@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { supabaseAdmin } from '$lib/supabaseAdmin.js';
+import type { User } from '@supabase/supabase-js';
 
 export const GET = async () => {
   try {
@@ -15,7 +16,7 @@ export const GET = async () => {
     }
 
     // Filter to only return necessary fields
-    const filteredUsers = users.users.map(user => ({
+    const filteredUsers = users.users.map((user: User) => ({
       id: user.id,
       email: user.email,
       email_confirmed_at: user.email_confirmed_at,
@@ -25,13 +26,12 @@ export const GET = async () => {
       user_metadata: user.user_metadata,
       app_metadata: user.app_metadata,
       identities: user.identities,
-      last_sign_in_with: user.last_sign_in_with,
       phone: user.phone,
       phone_confirmed_at: user.phone_confirmed_at
     }));
 
     return json(filteredUsers);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error in auth-users API:', error);
     return json({ error: 'Internal server error' }, { status: 500 });
   }
@@ -56,7 +56,7 @@ export const POST = async ({ request }) => {
       return json({ error: error.message }, { status: 500 });
     }
 
-    const existingUser = users.users.find(user => user.email === email);
+    const existingUser = users.users.find((user: User) => user.email === email);
     
     return json({
       exists: !!existingUser,
@@ -67,7 +67,7 @@ export const POST = async ({ request }) => {
         created_at: existingUser.created_at
       } : null
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error checking email:', error);
     return json({ error: 'Internal server error' }, { status: 500 });
   }

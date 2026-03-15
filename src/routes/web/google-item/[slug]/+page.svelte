@@ -4,6 +4,7 @@
   export let data: PageData;
   
   const { item } = data;
+  let isButtonHovered = false;
 </script>
 
 <svelte:head>
@@ -57,23 +58,16 @@
 
   <!-- Culoca Button -->
   <div style="margin-top: 30px;">
-    <a 
-      href={item.culoca_url} 
-      target="_blank"
-      style="
-        display: inline-block;
-        background: #ff6600;
-        color: white;
-        padding: 15px 30px;
-        text-decoration: none;
-        border-radius: 6px;
-        font-weight: bold;
-        font-size: 16px;
-        box-shadow: 0 2px 8px rgba(255, 102, 0, 0.3);
-        transition: background 0.2s;
-      "
-      onmouseover="this.style.background='#e55a00'"
-      onmouseout="this.style.background='#ff6600'"
+      <a 
+        href={item.culoca_url} 
+        target="_blank"
+        on:mouseenter={() => {
+          isButtonHovered = true;
+        }}
+        on:mouseleave={() => {
+          isButtonHovered = false;
+        }}
+        style={`display: inline-block; background: ${isButtonHovered ? '#e55a00' : '#ff6600'}; color: white; padding: 15px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px; box-shadow: 0 2px 8px rgba(255, 102, 0, 0.3); transition: background 0.2s;`}
     >
       Jetzt zu Culoca wechseln
     </a>

@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
@@ -8,9 +8,9 @@ function readEnvLocal() {
     if (typeof process !== 'undefined') {
       const envPath = join(process.cwd(), '.env.local');
       const envContent = readFileSync(envPath, 'utf8');
-      const envVars = {};
+      const envVars: Record<string, string> = {};
       
-      envContent.split('\n').forEach(line => {
+      envContent.split('\n').forEach((line: string) => {
         const [key, ...valueParts] = line.split('=');
         if (key && valueParts.length > 0) {
           const value = valueParts.join('=').trim();
@@ -22,10 +22,10 @@ function readEnvLocal() {
       
       return envVars;
     }
-  } catch (error) {
-    console.log('Could not read .env.local directly:', error.message);
+  } catch (error: unknown) {
+    console.log('Could not read .env.local directly:', error instanceof Error ? error.message : error);
   }
-  return {};
+  return {} as Record<string, string>;
 }
 
 // Use environment variables with fallbacks for build process
@@ -49,7 +49,7 @@ console.log('🔍 Debug: supabaseServiceKey found:', !!supabaseServiceKey);
 console.log('🔍 Debug: supabaseServiceKey length:', supabaseServiceKey?.length || 0);
 
 // Create admin client only when service key is available
-let supabaseAdmin = null;
+let supabaseAdmin: SupabaseClient | null = null;
 
 if (supabaseServiceKey) {
   supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);

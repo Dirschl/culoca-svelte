@@ -1,6 +1,7 @@
 import type { PageServerLoad } from './$types';
 import { createClient } from '@supabase/supabase-js';
 import { DEFAULT_CONTENT_TYPES } from '$lib/content/types';
+import { getPublicItemHref } from '$lib/content/routing';
 
 export const ssr = true;
 
@@ -38,6 +39,9 @@ export const load: PageServerLoad = async () => {
     created_at: string | null;
     starts_at: string | null;
     ends_at: string | null;
+    country_slug?: string | null;
+    district_slug?: string | null;
+    municipality_slug?: string | null;
   };
 
   type Section = {
@@ -66,7 +70,7 @@ export const load: PageServerLoad = async () => {
 
       const { data, error } = await supabase
         .from('items')
-        .select('id, slug, title, description, caption, canonical_path, path_512, width, height, created_at, starts_at, ends_at')
+        .select('id, slug, title, description, caption, canonical_path, country_slug, district_slug, municipality_slug, path_512, width, height, created_at, starts_at, ends_at')
         .eq('type_id', type.id)
         .eq('is_private', false)
         .eq('admin_hidden', false)
@@ -82,7 +86,10 @@ export const load: PageServerLoad = async () => {
         slug: type.slug,
         name: type.name,
         description: type.description,
-        items: data as SectionItem[],
+        items: (data as SectionItem[]).map((item) => ({
+          ...item,
+          canonical_path: getPublicItemHref(item)
+        })),
         totalCount: count
       } satisfies Section;
     } catch {

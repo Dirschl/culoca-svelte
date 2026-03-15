@@ -7,6 +7,12 @@ import { Buffer } from 'buffer';
 import { createClient as createWebdavClient } from 'webdav';
 import dotenv from 'dotenv';
 import { jwtDecode } from 'jwt-decode'; // npm install jwt-decode, Typ: any
+import {
+  analyzeImageModeration,
+  refreshSimilarityVectorForItem,
+  resolveLocationFieldsFromOriginalName
+} from '$lib/server/itemProcessing';
+import { sanitizeKeywords } from '$lib/content/keywords';
 dotenv.config();
 
 // -- Helper: fix IPTC strings that were decoded as Latin-1 instead of UTF-8
@@ -73,6 +79,10 @@ function slugify(text: string): string {
     .substring(0, 100);
 }
 
+function hasCompleteGeoFields(source: { country_slug?: string | null; district_slug?: string | null; municipality_slug?: string | null }) {
+  return !!(source.country_slug && source.district_slug && source.municipality_slug);
+}
+
 export const POST = async ({ request }) => {
   try {
     console.log('=== UPLOAD API CALLED ===');
@@ -110,9 +120,7 @@ export const POST = async ({ request }) => {
     const jwt = authHeader ? authHeader.replace('Bearer ', '') : null;
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       global: {
-        headers: {
-          Authorization: jwt ? `Bearer ${jwt}` : undefined
-        }
+        headers: jwt ? { Authorization: `Bearer ${jwt}` } : {}
       }
     });
     
@@ -324,6 +332,10 @@ export const POST = async ({ request }) => {
         const formTypeId = form.get('type_id') as string;
         const formLat = form.get('lat') as string;
         const formLon = form.get('lon') as string;
+        const formContent = form.get('content') as string;
+        const formExternalUrl = form.get('external_url') as string;
+        const formVideoUrl = form.get('video_url') as string;
+        const formGroupSlug = form.get('group_slug') as string;
 
         if (formTitle) title = formTitle;
         if (formDescription) description = formDescription;
@@ -439,12 +451,7 @@ export const POST = async ({ request }) => {
         // Wenn Keywords-String vorhanden → in Array umwandeln (Postgres text[] erwartet JS-Array)
         let keywordsArray: string[] | null = null;
         if (keywords) {
-          keywordsArray = keywords.split(',').map((k) => k.trim()).filter(Boolean);
-          // Begrenze Keywords auf maximal 50 Stück (Frontend erlaubt auch 50)
-          if (keywordsArray.length > 50) {
-            keywordsArray = keywordsArray.slice(0, 50);
-            console.log('⚠️ Keywords truncated to 50 items to match frontend validation');
-          }
+          keywordsArray = sanitizeKeywords(keywords);
         }
 
         // --- Fallback-Logik für title und description ---
@@ -696,10 +703,48 @@ export const POST = async ({ request }) => {
           original_url: originalUrl, // Include original_url in main record
           is_private: privacyMode === 'private', // Set is_private based on user's privacy mode
           type_id: formTypeId ? parseInt(formTypeId) : 1, // Default: 1 = Foto
+          content: formContent?.trim() || null,
+          external_url: formExternalUrl?.trim() || null,
+          video_url: formVideoUrl?.trim() || null,
+          group_slug: formGroupSlug?.trim() || null,
           ...(keywordsArray ? { keywords: keywordsArray } : {}),
           exif_data: Object.keys(exifToStore).length ? exifToStore : null,
           slug // <--- Slug speichern
         };
+
+        try {
+          const moderation = await analyzeImageModeration(buf, originalData.type || 'image/jpeg');
+          if (moderation) {
+            dbRecord.page_settings = {
+              moderation
+            };
+          }
+        } catch (moderationError) {
+          console.warn('⚠️ Moderation check failed, continuing without moderation payload:', moderationError);
+        }
+
+        if (keywordsArray) {
+          keywordsArray = sanitizeKeywords(keywordsArray, {
+            countryName: dbRecord.country_name,
+            stateName: dbRecord.state_name,
+            regionName: dbRecord.region_name,
+            districtName: dbRecord.district_name,
+            municipalityName: dbRecord.municipality_name,
+            localityName: dbRecord.locality_name
+          });
+          dbRecord.keywords = keywordsArray;
+        }
+
+        const locationFields = await resolveLocationFieldsFromOriginalName(supabase, baseName);
+        if (locationFields) {
+          Object.assign(dbRecord, locationFields);
+        } else {
+          dbRecord.location_needs_review = true;
+        }
+
+        if (hasCompleteGeoFields(dbRecord)) {
+          dbRecord.location_needs_review = false;
+        }
 
         // Füge EXIF-Felder nur hinzu, wenn sie nicht null sind
         if (title) dbRecord.title = title;
@@ -753,8 +798,14 @@ export const POST = async ({ request }) => {
             original_url: originalUrl, // Include original_url in fallback record
             is_private: privacyMode === 'private', // Set is_private based on user's privacy mode
             type_id: formTypeId ? parseInt(formTypeId) : 1, // Default: 1 = Foto
+            content: formContent?.trim() || null,
+            external_url: formExternalUrl?.trim() || null,
+            video_url: formVideoUrl?.trim() || null,
+            group_slug: formGroupSlug?.trim() || null,
             ...(keywordsArray ? { keywords: keywordsArray } : {}),
-            exif_data: Object.keys(exifToStore).length ? exifToStore : null
+            exif_data: Object.keys(exifToStore).length ? exifToStore : null,
+            slug,
+            page_settings: dbRecord.page_settings || null
           };
           
           console.log('Attempting fallback insert with:', JSON.stringify(fallbackRecord, null, 2));
@@ -795,6 +846,13 @@ export const POST = async ({ request }) => {
         }
 
         console.log('Database insert successful:', dbData);
+
+        try {
+          await refreshSimilarityVectorForItem(dbData as any);
+        } catch (vectorError) {
+          console.warn('Failed to refresh similarity vector after upload:', vectorError);
+        }
+
         results.push(dbData);
         successfulUploads.push(filename);
         console.log(`✅ Successfully processed: ${filename}`);
@@ -807,9 +865,7 @@ export const POST = async ({ request }) => {
             // Erstelle neuen Supabase-Client mit aktuellem JWT für Token-Erneuerung
             const refreshSupabase = createClient(supabaseUrl, supabaseAnonKey, {
               global: {
-                headers: {
-                  Authorization: jwt ? `Bearer ${jwt}` : undefined
-                }
+                headers: jwt ? { Authorization: `Bearer ${jwt}` } : {}
               }
             });
             

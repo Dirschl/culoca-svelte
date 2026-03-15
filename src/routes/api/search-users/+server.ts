@@ -65,7 +65,6 @@ export const GET: RequestHandler = async ({ url, request }) => {
       return json({ users: [] });
     }
 
-    return json({ users: users || [] });
   } catch (error) {
     console.error('Error in GET /api/search-users:', error);
     return json({ error: 'Server-Fehler' }, { status: 500 });

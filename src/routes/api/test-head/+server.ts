@@ -132,7 +132,13 @@ function extractMainImage(headContent: string) {
 }
 
 function extractFaviconInfo(headContent: string) {
-  const favicons = [];
+  const favicons: Array<{
+    url: string;
+    sizes: string | null;
+    type: string | null;
+    rel: string | null;
+    fullTag: string;
+  }> = [];
   
   // Extract all favicon link tags
   const faviconMatches = headContent.match(/<link[^>]*rel="(?:icon|shortcut icon|apple-touch-icon)"[^>]*>/gi) || [];
@@ -169,7 +175,12 @@ function extractTitle(headContent: string) {
 
 function extractMetaTags(headContent: string) {
   const metaMatches = headContent.match(/<meta[^>]*>/gi) || [];
-  const metaTags = [];
+  const metaTags: Array<{
+    name: string | null;
+    property: string | null;
+    content: string | null;
+    fullTag: string;
+  }> = [];
   
   metaMatches.forEach(match => {
     const nameMatch = match.match(/name="([^"]+)"/i);

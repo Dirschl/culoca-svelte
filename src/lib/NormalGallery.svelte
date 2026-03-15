@@ -22,6 +22,7 @@
   let lastScrollTime = 0;
   let lastScrollTop = 0;
   let scrollVelocity = 0;
+  $: galleryLayoutItems = $galleryItems as any;
 
   // Reactive statement to update stats when gallery items change
   $: {
@@ -106,7 +107,7 @@
 
 {#if $galleryItems.length > 0}
   <GalleryLayout
-    items={$galleryItems}
+    items={galleryLayoutItems}
     layout={useJustifiedLayout ? 'justified' : 'grid'}
     {showDistance}
     {showCompass}

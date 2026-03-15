@@ -115,8 +115,8 @@
       Für Fragen zu Lizenzen oder kommerzieller Nutzung kontaktieren Sie bitte:
     </p>
     <ul>
-      <li><strong>Email:</strong> <a href="mailto:johann.dirschl@gmx.de" style="color: var(--text-secondary); transition: color 0.2s ease;" onmouseover="this.style.color='#ee7221'" onmouseout="this.style.color='var(--text-secondary)'">johann.dirschl@gmx.de</a></li>
-      <li><strong>Telefon:</strong> <a href="tel:+491799766666" style="color: var(--text-secondary); transition: color 0.2s ease;" onmouseover="this.style.color='#ee7221'" onmouseout="this.style.color='var(--text-secondary)'">+49 179 9766666</a></li>
+      <li><strong>Email:</strong> <a class="contact-link" href="mailto:johann.dirschl@gmx.de">johann.dirschl@gmx.de</a></li>
+      <li><strong>Telefon:</strong> <a class="contact-link" href="tel:+491799766666">+49 179 9766666</a></li>
     </ul>
   </div>
   
@@ -134,4 +134,15 @@
       die auf der jeweiligen Bildseite angegeben sind.
     </p>
   </div>
-</InfoPageLayout> 
+</InfoPageLayout>
+
+<style>
+  .contact-link {
+    color: var(--text-secondary);
+    transition: color 0.2s ease;
+  }
+
+  .contact-link:hover {
+    color: #ee7221;
+  }
+</style>

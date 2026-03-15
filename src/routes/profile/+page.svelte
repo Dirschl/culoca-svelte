@@ -5,6 +5,7 @@
   import { page } from '$app/stores';
   import SiteNav from '$lib/SiteNav.svelte';
   import { sanitizeReturnTo } from '$lib/returnTo';
+  import { fetchProfileReviewItems } from '$lib/profile/review';
 
   let user: any = null;
   let profile: any = null;
@@ -53,6 +54,7 @@
   let userId = '';
   let errorLogFiles: string[] = [];
   let returnTo = '/';
+  let reviewCount = 0;
 
   $: nameValid = name.length >= 2 && name.length <= 60;
   $: phoneValid = phone.length === 0 || /^\+?[0-9\- ]{7,20}$/.test(phone);
@@ -85,6 +87,7 @@
     }
     user = currentUser;
     await loadProfile();
+    await loadReviewCount();
     loading = false;
     userId = user.id;
     const { data, error } = await supabase.storage.from('errorlogs').list('');
@@ -134,6 +137,18 @@
       }
     } catch (error) {
       console.error('Error loading profile:', error);
+    }
+  }
+
+  async function loadReviewCount() {
+    if (!user?.id) return;
+
+    try {
+      const reviewItems = await fetchProfileReviewItems(supabase, user.id);
+      reviewCount = reviewItems.length;
+    } catch (error) {
+      console.error('Error loading review count:', error);
+      reviewCount = 0;
     }
   }
 
@@ -442,6 +457,28 @@
 
         <!-- Profil-Formular -->
         <form class="profile-form" on:submit|preventDefault={saveProfile}>
+          <div class="card card--review">
+            <h3 class="section-title">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2L1 21h22L12 2zm0 5 6.53 12H5.47L12 7zm-1 3v4h2v-4h-2zm0 6v2h2v-2h-2z"/>
+              </svg>
+              Datenpruefung
+            </h3>
+            {#if reviewCount > 0}
+              <div class="review-alert">
+                <strong>{reviewCount}</strong> Eintraege brauchen noch fehlende Daten oder Ortspruefung.
+              </div>
+              <div class="review-actions">
+                <a class="review-link" href="/profile/review">Offene Eintraege anzeigen</a>
+                <a class="review-link review-link--secondary" href="/foto/upload">Neues Foto hochladen</a>
+              </div>
+            {:else}
+              <div class="review-ok">
+                Keine offenen Daten. Dein Bestand ist aktuell sauber gepflegt.
+              </div>
+            {/if}
+          </div>
+
           <!-- Persönliche Informationen -->
           <div class="card">
             <h3 class="section-title">

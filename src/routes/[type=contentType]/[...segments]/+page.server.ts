@@ -24,7 +24,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
   });
 
   if ('redirectTo' in result) {
-    throw redirect(301, result.redirectTo);
+    throw redirect(301, result.redirectTo as string);
   }
 
   return result;

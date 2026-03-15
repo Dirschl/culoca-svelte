@@ -1,6 +1,13 @@
 import { json } from '@sveltejs/kit';
 import { supabaseAdmin } from '$lib/supabaseAdmin.js';
 
+type UpdateResultEntry = {
+  success?: boolean;
+  count?: number;
+  data?: unknown;
+  error?: string;
+};
+
 export const POST = async ({ request }) => {
   try {
     if (!supabaseAdmin) {
@@ -15,7 +22,7 @@ export const POST = async ({ request }) => {
 
     console.log(`🔄 Force updating user: ${userId}`, updates);
 
-    const results = {};
+    const results: Record<string, UpdateResultEntry> = {};
 
     // Force update profile with admin privileges
     if (updates.profile) {
@@ -54,9 +61,9 @@ export const POST = async ({ request }) => {
           console.log('✅ Auth user force updated successfully');
           results.auth = { success: true, data: authData };
         }
-      } catch (error) {
+      } catch (error: unknown) {
         console.error('Error force updating auth user:', error);
-        results.auth = { error: error.message };
+        results.auth = { error: error instanceof Error ? error.message : 'Unknown error' };
       }
     }
 
@@ -100,8 +107,8 @@ export const POST = async ({ request }) => {
     console.log('🔄 Force update completed:', results);
     return json({ success: true, results });
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error in force-update-user API:', error);
     return json({ error: 'Internal server error' }, { status: 500 });
   }
-}; 
+};

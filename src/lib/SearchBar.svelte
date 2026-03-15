@@ -40,21 +40,27 @@
   <div class="search-container">
     <div class="search-box">
       <!-- Layout Toggle Icon - zeigt wohin man wechseln kann -->
-      {#if useJustifiedLayout}
-        <!-- Aktuell Justified → Zeige Grid Icon (Wohin wechseln) -->
-        <svg class="layout-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" on:click={handleLayoutToggle} title="Zu Grid-Layout wechseln">
-          <rect x="3" y="3" width="7" height="7" rx="1"/>
-          <rect x="14" y="3" width="7" height="7" rx="1"/>
-          <rect x="3" y="14" width="7" height="7" rx="1"/>
-          <rect x="14" y="14" width="7" height="7" rx="1"/>
-        </svg>
-      {:else}
-        <!-- Aktuell Grid → Zeige Justified Icon (Wohin wechseln) -->
-        <svg class="layout-icon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" on:click={handleLayoutToggle} title="Zu Justified-Layout wechseln">
-          <rect x="2" y="6" width="20" height="4" rx="1"/>
-          <rect x="2" y="14" width="20" height="4" rx="1"/>
-      </svg>
-      {/if}
+      <button
+        type="button"
+        class="layout-toggle-btn"
+        on:click={handleLayoutToggle}
+        aria-label={useJustifiedLayout ? 'Zum Grid-Layout wechseln' : 'Zum Justified-Layout wechseln'}
+        title={useJustifiedLayout ? 'Zum Grid-Layout wechseln' : 'Zum Justified-Layout wechseln'}
+      >
+        {#if useJustifiedLayout}
+          <svg class="layout-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="7" rx="1"/>
+            <rect x="14" y="3" width="7" height="7" rx="1"/>
+            <rect x="3" y="14" width="7" height="7" rx="1"/>
+            <rect x="14" y="14" width="7" height="7" rx="1"/>
+          </svg>
+        {:else}
+          <svg class="layout-icon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <rect x="2" y="6" width="20" height="4" rx="1"/>
+            <rect x="2" y="14" width="20" height="4" rx="1"/>
+          </svg>
+        {/if}
+      </button>
       <input 
         type="text" 
         placeholder="Suche"
@@ -114,9 +120,23 @@
   }
   .layout-icon {
     color: var(--text-secondary);
-    cursor: pointer;
     transition: color 0.2s ease;
+  }
+  .layout-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    margin: 0;
+    border: none;
+    background: transparent;
+    cursor: pointer;
     flex-shrink: 0;
+    color: var(--text-secondary);
+  }
+  .layout-toggle-btn:hover .layout-icon,
+  .layout-toggle-btn:focus-visible .layout-icon {
+    color: var(--text-primary);
   }
 
   .layout-icon:hover {

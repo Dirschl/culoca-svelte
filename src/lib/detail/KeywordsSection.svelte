@@ -34,7 +34,7 @@
       autocapitalize="sentences"
     ></textarea>
     <span class="char-count" class:valid={keywordsValid} class:too-many={keywordsTooMany}>
-      {keywordsCount}/50
+      {keywordsCount}/30
     </span>
   </div>
 {:else}

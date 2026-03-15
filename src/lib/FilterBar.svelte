@@ -22,7 +22,7 @@
 	// Props removed as they are not used in the component
 	// GPS status from filterStore instead of props
 	$: gpsStatus = $filterStore.gpsAvailable ? 'active' : 'none';
-	$: lastGPSUpdateTime = $filterStore.lastGpsPosition?.timestamp ?? null;
+	$: lastGPSUpdateTime = (($filterStore.lastGpsPosition as { timestamp?: number } | null)?.timestamp) ?? null;
 	export let isManual3x3Mode = false;
 	// Original gallery coordinates from filterStore instead of props
 	$: originalGalleryLat = $filterStore.lastGpsPosition?.lat ?? null;
@@ -31,6 +31,8 @@
 	
 	// State für GPS-Anfragen
 	let isGpsRequestInProgress = false;
+	let cachedLat: number | null = null;
+	let cachedLon: number | null = null;
 	
 
 	
@@ -154,9 +156,9 @@
 								{userFilterInfo.name.charAt(0).toUpperCase()}
 							</div>
 						{/if}
-						<span class="user-name" class:clickable={isPermalinkMode} on:click={() => isPermalinkMode && navigateToPermalink()}>
+						<button type="button" class="user-name" class:clickable={isPermalinkMode} on:click={() => isPermalinkMode && navigateToPermalink()}>
 							{userFilterInfo.name}
-						</span>
+						</button>
 						<!-- Show X button if removal is allowed -->
 						{#if userFilterInfo.canRemove}
 							<button 
@@ -182,9 +184,9 @@
 								{$userFilter.username.charAt(0).toUpperCase()}
 							</div>
 						{/if}
-						<span class="user-name" class:clickable={isPermalinkMode} on:click={() => isPermalinkMode && navigateToPermalink()}>
+						<button type="button" class="user-name" class:clickable={isPermalinkMode} on:click={() => isPermalinkMode && navigateToPermalink()}>
 							{$userFilter.accountName || $userFilter.username}
-						</span>
+						</button>
 						<button 
 							class="remove-filter"
 							on:click={() => filterStore.clearUserFilter()}
@@ -207,9 +209,9 @@
 								{customerBrandInfo.name.charAt(0).toUpperCase()}
 							</div>
 						{/if}
-						<span class="customer-name" class:clickable={isPermalinkMode} on:click={() => isPermalinkMode && navigateToPermalink()}>
+						<button type="button" class="customer-name" class:clickable={isPermalinkMode} on:click={() => isPermalinkMode && navigateToPermalink()}>
 							{customerBrandInfo.name}
-						</span>
+						</button>
 						<!-- Show X button if removal is allowed -->
 						{#if customerBrandInfo.canRemove}
 							<button 
@@ -256,7 +258,7 @@
 						<svg width="18" height="18" viewBox="0 0 83.86 100.88" fill="currentColor" class="location-icon">
 							<path d="M0,41.35c0-5.67,1.1-11.03,3.29-16.07,2.19-5.04,5.19-9.43,8.98-13.17,3.79-3.74,8.25-6.69,13.36-8.86,5.11-2.17,10.54-3.25,16.29-3.25s11.18,1.08,16.29,3.25c5.11,2.17,9.56,5.12,13.36,8.86,3.79,3.74,6.79,8.13,8.98,13.17,2.19,5.04,3.29,10.4,3.29,16.07s-1.1,11.03-3.29,16.07c-2.2,5.04-5.19,9.43-8.98,13.17-3.8,3.74-8.25,6.7-13.36,8.86-5.11,2.17-9.49,21.42-15.25,21.42s-12.23-19.25-17.34-21.42c-5.11-2.17-9.56-5.12-13.36-8.86-3.79-3.74-6.79-8.13-8.98-13.17-2.2-5.04-3.29-10.4-3.29-16.07ZM25.16,41.35c0,2.29.44,4.43,1.32,6.44.88,2.01,2.07,3.76,3.59,5.26,1.52,1.5,3.29,2.68,5.33,3.55,2.04.87,4.21,1.3,6.53,1.3s4.49-.43,6.53-1.3c2.04-.87,3.81-2.05,5.33-3.55,1.52-1.5,2.71-3.25,3.59-5.26.88-2.01,1.32-4.15,1.32-6.44s-.44-4.43-1.32-6.44c-.88-2.01-2.08-3.76-3.59-5.26-1.52-1.5-3.29-2.68-5.33-3.55-2.03-.87-4.21-1.3-6.53-1.3s-4.49.43-6.53,1.3c-2.04.87-3.81,2.05-5.33,3.55-1.52,1.5-2.72,3.25-3.59,5.26-.88,2.01-1.32,4.16-1.32,6.44Z"/>
 						</svg>
-						<span class="location-name" 
+						<button type="button" class="location-name" 
 							on:click={() => {
 								console.log('[FilterBar] Location filter clear clicked');
 								console.log('[FilterBar] isPermalinkMode:', isPermalinkMode);
@@ -282,7 +284,7 @@
 							title="Filter entfernen"
 						>
 							{$locationFilter.name}
-						</span>
+						</button>
 					</div>
 				{:else if userLat !== null && userLon !== null}
 					<div class="gps-status active">
@@ -365,7 +367,7 @@
 							</span>
 						</button>
 						{#if !isManual3x3Mode && originalGalleryLat && originalGalleryLon}
-							<div class="original-gps-coords" 
+							<button type="button" class="original-gps-coords" 
 								on:click={() => {
 									console.log('[FilterBar] Original GPS coords clicked - updating GPS then reloading');
 									
@@ -410,7 +412,7 @@
 								title="Aktuelle GPS-Koordinaten aktualisieren"
 							>
 								{formatCoordinates(originalGalleryLat, originalGalleryLon)}
-							</div>
+							</button>
 						{/if}
 					</div>
 				{:else}
@@ -571,6 +573,11 @@
 	.location-name {
 		cursor: pointer;
 		transition: color 0.2s ease;
+		border: none;
+		background: transparent;
+		padding: 0;
+		font: inherit;
+		color: inherit;
 	}
 
 	.location-name:hover {
@@ -591,42 +598,6 @@
 	}
 
 	:global(.dark) .gps-status.active {
-		color: var(--text-primary, #f9fafb);
-	}
-
-	/* Cached GPS - Theme-aware */
-	.gps-status.cached {
-		color: var(--text-primary, #1f2937);
-	}
-
-	:global(.dark) .gps-status.cached {
-		color: var(--text-primary, #f9fafb);
-	}
-
-	/* Checking GPS - Theme-aware */
-	.gps-status.checking {
-		color: var(--text-primary, #1f2937);
-	}
-
-	:global(.dark) .gps-status.checking {
-		color: var(--text-primary, #f9fafb);
-	}
-
-	/* Denied GPS - Theme-aware */
-	.gps-status.denied {
-		color: var(--text-primary, #1f2937);
-	}
-
-	:global(.dark) .gps-status.denied {
-		color: var(--text-primary, #f9fafb);
-	}
-
-	/* Unavailable GPS - Theme-aware */
-	.gps-status.unavailable {
-		color: var(--text-primary, #1f2937);
-	}
-
-	:global(.dark) .gps-status.unavailable {
 		color: var(--text-primary, #f9fafb);
 	}
 
@@ -687,10 +658,6 @@
 		color: var(--culoca-orange, #ee7221);
 		font-weight: 500;
 		opacity: 1;
-	}
-
-	.gps-text {
-		font-weight: 500;
 	}
 
 	/* Remove Button Styling - Larger for better usability */
@@ -756,10 +723,23 @@
 		transition: color 0.2s ease;
 		margin-top: 4px;
 		border-radius: 4px;
+		border: none;
+		background: transparent;
+		padding: 0;
+		font: inherit;
 	}
 
 	.original-gps-coords:hover {
 		color: #d65a1a; /* Dunkleres Orange beim Hover */
 		background: var(--bg-hover, rgba(238, 114, 33, 0.1));
+	}
+
+	.user-name,
+	.customer-name {
+		border: none;
+		background: transparent;
+		padding: 0;
+		font: inherit;
+		color: inherit;
 	}
 </style> 

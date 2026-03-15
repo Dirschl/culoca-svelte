@@ -1,6 +1,7 @@
 import { writable, get } from 'svelte/store';
 import { resetGallery } from './galleryStore';
 import { browser } from '$app/environment';
+import type { FilterState } from './filterStore';
 
 export const searchQuery = writable('');
 export const isSearching = writable(false);
@@ -53,7 +54,7 @@ export async function performSearch(q: string, trigger = true) {
     let resetParams: any = {};
     try {
       const { filterStore } = await import('./filterStore');
-      const filterState = get(filterStore);
+      const filterState = get(filterStore) as FilterState;
       if (filterState.userFilter && filterState.userFilter.userId) {
         resetParams.user_id = filterState.userFilter.userId;
         console.log('🔍 SearchStore: Applying user filter when clearing search:', filterState.userFilter.userId);
@@ -100,7 +101,7 @@ export async function performSearch(q: string, trigger = true) {
       // WICHTIG: User-Filter aus dem Store holen und anwenden
       try {
         const { filterStore } = await import('./filterStore');
-        const filterState = get(filterStore);
+        const filterState = get(filterStore) as FilterState;
         if (filterState.userFilter && filterState.userFilter.userId) {
           searchParams.user_id = filterState.userFilter.userId;
           console.log('🔍 SearchStore: Applying user filter from store:', filterState.userFilter.userId);
@@ -148,7 +149,7 @@ export function clearSearch() {
   // WICHTIG: User-Filter aus dem Store holen und anwenden
   try {
     const { filterStore } = require('./filterStore');
-    const filterState = get(filterStore);
+    const filterState = get(filterStore) as FilterState;
     if (filterState.userFilter && filterState.userFilter.userId) {
       resetParams.user_id = filterState.userFilter.userId;
       console.log('🔍 SearchStore: Applying user filter when clearing search:', filterState.userFilter.userId);

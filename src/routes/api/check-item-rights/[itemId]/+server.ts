@@ -5,13 +5,13 @@ import type { RequestHandler } from './$types';
 // GET: Rechte für ein spezifisches Item prüfen
 export const GET: RequestHandler = async ({ params, url, locals }) => {
   try {
-    const session = await locals.getSession();
-    if (!session) {
+    const user = locals.user;
+    if (!user) {
       return json({ error: 'Nicht angemeldet' }, { status: 401 });
     }
 
     const itemId = params.itemId;
-    const userId = session.user.id;
+    const userId = user.id;
     const rightType = url.searchParams.get('type') || 'download'; // 'download', 'edit', 'delete'
 
     if (!itemId) {
@@ -45,13 +45,13 @@ export const GET: RequestHandler = async ({ params, url, locals }) => {
 // GET: Alle Rechte für ein Item abrufen
 export const POST: RequestHandler = async ({ params, request, locals }) => {
   try {
-    const session = await locals.getSession();
-    if (!session) {
+    const user = locals.user;
+    if (!user) {
       return json({ error: 'Nicht angemeldet' }, { status: 401 });
     }
 
     const itemId = params.itemId;
-    const userId = session.user.id;
+    const userId = user.id;
 
     if (!itemId) {
       return json({ error: 'Item-ID erforderlich' }, { status: 400 });

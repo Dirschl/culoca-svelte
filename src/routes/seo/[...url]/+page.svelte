@@ -32,9 +32,82 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
-  import { goto } from '$app/navigation';
   import SiteNav from '$lib/SiteNav.svelte';
   import SiteFooter from '$lib/SiteFooter.svelte';
+
+  type MetaTag = {
+    name?: string;
+    property?: string;
+    content?: string;
+  };
+
+  type LinkTag = {
+    rel?: string;
+    href?: string;
+    url?: string;
+    sizes?: string;
+    type?: string;
+  };
+
+  type JsonLdNode = Record<string, unknown> & {
+    caption?: string;
+    keywords?: string;
+    contentLocation?: {
+      name?: string;
+    };
+    ['@type']?: string;
+  };
+
+  type JsonLdEntry = {
+    index: number;
+    type?: string;
+    name?: string;
+    formatted: string;
+    data?: JsonLdNode;
+  };
+
+  type MainImage = {
+    type?: string;
+    source?: string;
+    url: string;
+  };
+
+  type FaviconInfo = {
+    count: number;
+    favicons: LinkTag[];
+    hasMultipleSizes?: boolean;
+    hasAppleTouchIcon?: boolean;
+  };
+
+  type ResponseInfo = {
+    status?: number;
+    statusText?: string;
+    contentType?: string;
+    server?: string;
+  };
+
+  type CulocaLogoFallback = {
+    hasCulocaLogoReference?: boolean;
+    hasFallbackReference?: boolean;
+    culocaLogoReferences: string[];
+    fallbackReferences: string[];
+  };
+
+  type HeadData = {
+    success?: boolean;
+    error?: string;
+    title?: string;
+    headContent?: string;
+    rawHtml?: string;
+    metaTags?: MetaTag[];
+    linkTags?: LinkTag[];
+    scriptTags?: unknown[];
+    jsonLdData?: JsonLdEntry[];
+    mainImage?: MainImage | null;
+    faviconInfo?: FaviconInfo;
+    responseInfo?: ResponseInfo;
+    culocaLogoFallback?: CulocaLogoFallback;
+  };
 
   export let data: { targetUrl: string; directUrl: boolean };
 
@@ -44,7 +117,7 @@
   let isLoading = false;
   let error = '';
 
-  let headData: any = null;
+  let headData: HeadData | null = null;
   let isHeadLoading = false;
   let headError = '';
   let activeTab = 'images';
@@ -66,6 +139,66 @@
   let editableLocation = '';
   let editableOgImage = '';
   let editableIcon = '';
+
+  function getMetaContent(tags: MetaTag[] | undefined, predicate: (tag: MetaTag) => boolean): string {
+    return tags?.find(predicate)?.content || '';
+  }
+
+  function getJsonLdCaption(entries: JsonLdEntry[] | undefined): string {
+    return entries?.find((entry: JsonLdEntry) => typeof entry.data?.caption === 'string')?.data?.caption || '';
+  }
+
+  function getJsonLdKeywords(entries: JsonLdEntry[] | undefined): string {
+    return entries?.find((entry: JsonLdEntry) => typeof entry.data?.keywords === 'string')?.data?.keywords || '';
+  }
+
+  function getJsonLdLocation(entries: JsonLdEntry[] | undefined): string {
+    return entries?.find((entry: JsonLdEntry) => typeof entry.data?.contentLocation?.name === 'string')?.data?.contentLocation?.name || '';
+  }
+
+  function getJsonLdType(entries: JsonLdEntry[] | undefined): string {
+    return entries?.[0]?.data?.['@type'] || 'WebPage';
+  }
+
+  function getIconHref(links: LinkTag[] | undefined): string {
+    return links?.find((tag: LinkTag) => tag.rel === 'icon')?.href || '';
+  }
+
+  function getCodeBlocks(entries: JsonLdEntry[] | undefined): string {
+    return entries?.map((item: JsonLdEntry) => `=== ${item.index}. ${item.type}: ${item.name} ===\n${item.formatted}`).join('\n\n') || '';
+  }
+
+  function hideImageOnError(event: Event) {
+    const image = event.currentTarget as HTMLImageElement | null;
+    if (image) image.style.display = 'none';
+  }
+
+  function getBotViewIframe(): HTMLIFrameElement | null {
+    return document.querySelector('.bot-view-iframe');
+  }
+
+  function reloadBotViewIframe() {
+    const iframe = getBotViewIframe();
+    if (iframe) iframe.src = iframe.src;
+  }
+
+  function toggleBotViewWidth() {
+    const iframe = getBotViewIframe();
+    if (iframe) iframe.style.width = iframe.style.width === '100%' ? '375px' : '100%';
+  }
+
+  function toggleBotViewHeight() {
+    const iframe = getBotViewIframe();
+    if (iframe) iframe.style.height = iframe.style.height === '600px' ? '400px' : '600px';
+  }
+
+  function getFaviconSizes(sizes: string): string[] {
+    return sizes.split(' ').filter((size: string) => size.includes('x'));
+  }
+
+  function getErrorMessage(err: unknown): string {
+    return err instanceof Error ? err.message : 'Fehler beim Laden der HTML Head Daten';
+  }
 
   function clearInput() {
     testUrl = '';
@@ -116,14 +249,14 @@
     const promptText = `Bitte optimiere die SEO-Daten für die Seite ${testUrl}:
 
 Title: "${editableTitle || headData?.title || 'Titel eingeben'}"
-Description: "${editableDescription || headData?.metaTags?.find((tag) => tag.name === 'description' || tag.property === 'og:description')?.content || 'Description eingeben'}"
-Caption: "${editableCaption || headData?.metaTags?.find((tag) => tag.name === 'caption' || tag.property === 'og:caption')?.content || headData?.jsonLdData?.[0]?.data?.caption || 'Caption eingeben'}"
+Description: "${editableDescription || getMetaContent(headData?.metaTags, (tag: MetaTag) => tag.name === 'description' || tag.property === 'og:description') || 'Description eingeben'}"
+Caption: "${editableCaption || getMetaContent(headData?.metaTags, (tag: MetaTag) => tag.name === 'caption' || tag.property === 'og:caption') || getJsonLdCaption(headData?.jsonLdData) || 'Caption eingeben'}"
 Seitentyp: ${editablePageType}
-Keywords: "${editableKeywords || headData?.metaTags?.find((tag) => tag.name === 'keywords')?.content || 'Keywords eingeben'}"
-Autor: "${editableAuthor || headData?.metaTags?.find((tag) => tag.name === 'author' || tag.property === 'og:author')?.content || 'Autor eingeben'}"
-Standort: "${editableLocation || headData?.metaTags?.find((tag) => tag.name === 'geo.region' || tag.property === 'og:locale')?.content || 'Standort eingeben'}"
-og:image: "${editableOgImage || headData?.metaTags?.find((tag) => tag.property === 'og:image')?.content || 'og:image eingeben'}"
-Icon: "${editableIcon || headData?.linkTags?.find((tag) => tag.rel === 'icon')?.href || 'Icon eingeben'}"
+Keywords: "${editableKeywords || getMetaContent(headData?.metaTags, (tag: MetaTag) => tag.name === 'keywords') || 'Keywords eingeben'}"
+Autor: "${editableAuthor || getMetaContent(headData?.metaTags, (tag: MetaTag) => tag.name === 'author' || tag.property === 'og:author') || 'Autor eingeben'}"
+Standort: "${editableLocation || getMetaContent(headData?.metaTags, (tag: MetaTag) => tag.name === 'geo.region' || tag.property === 'og:locale') || 'Standort eingeben'}"
+og:image: "${editableOgImage || getMetaContent(headData?.metaTags, (tag: MetaTag) => tag.property === 'og:image') || 'og:image eingeben'}"
+Icon: "${editableIcon || getIconHref(headData?.linkTags) || 'Icon eingeben'}"
 
 Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auch das entsprechende JSON-LD Schema.`;
 
@@ -267,31 +400,31 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
         headData = result;
 
         editableTitle = result.title || '';
-        const description = result.metaTags?.find((tag) => tag.name === 'description' || tag.property === 'og:description')?.content;
+        const description = getMetaContent(result.metaTags, (tag: MetaTag) => tag.name === 'description' || tag.property === 'og:description');
         editableDescription = description || '';
 
-        const caption = result.metaTags?.find((tag) => tag.name === 'caption' || tag.property === 'og:caption')?.content;
+        const caption = getMetaContent(result.metaTags, (tag: MetaTag) => tag.name === 'caption' || tag.property === 'og:caption');
         editableCaption = caption || '';
 
-        if (!caption && headData?.jsonLdData?.[0]?.data?.caption) {
-          editableCaption = headData.jsonLdData[0].data.caption;
+        if (!caption) {
+          editableCaption = getJsonLdCaption(result.jsonLdData);
         }
 
-        const pageType = result.jsonLdData?.[0]?.data?.['@type'] || 'WebPage';
+        const pageType = getJsonLdType(result.jsonLdData);
         editablePageType = pageType;
 
-        const keywords = result.metaTags?.find((tag) => tag.name === 'keywords')?.content;
+        const keywords = getMetaContent(result.metaTags, (tag: MetaTag) => tag.name === 'keywords');
         editableKeywords = keywords || '';
 
-        const author = result.metaTags?.find((tag) => tag.name === 'author' || tag.property === 'og:author')?.content;
+        const author = getMetaContent(result.metaTags, (tag: MetaTag) => tag.name === 'author' || tag.property === 'og:author');
         editableAuthor = author || '';
 
-        const location = result.metaTags?.find((tag) => tag.name === 'geo.region' || tag.property === 'og:locale')?.content;
+        const location = getMetaContent(result.metaTags, (tag: MetaTag) => tag.name === 'geo.region' || tag.property === 'og:locale');
         editableLocation = location || '';
 
         const isCulocaUrl = testUrl.toLowerCase().includes('culoca') || testUrl.toLowerCase().includes('localhost');
-        const ogImage = result.metaTags?.find((tag) => tag.property === 'og:image')?.content;
-        const icon = result.linkTags?.find((tag) => tag.rel === 'icon')?.href;
+        const ogImage = getMetaContent(result.metaTags, (tag: MetaTag) => tag.property === 'og:image');
+        const icon = getIconHref(result.linkTags);
 
         editableOgImage = ogImage || (isCulocaUrl ? 'culoca-see-you-local-entdecke-deine-umgebung.jpg' : '');
         editableIcon = icon || (isCulocaUrl ? 'culoca-icon.svg' : '');
@@ -304,8 +437,8 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
       } else {
         throw new Error(result.error || 'Unbekannter Fehler');
       }
-    } catch (err: any) {
-      headError = err.message || 'Fehler beim Laden der HTML Head Daten';
+    } catch (err: unknown) {
+      headError = getErrorMessage(err);
     } finally {
       isHeadLoading = false;
       isLoading = false;
@@ -496,7 +629,7 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
                 <div class="seo-item">
                   <h6>Description:</h6>
                   {#if headData.metaTags}
-                    {@const description = headData.metaTags.find((tag) => tag.name === 'description' || tag.property === 'og:description')?.content}
+                    {@const description = getMetaContent(headData.metaTags, (tag) => tag.name === 'description' || tag.property === 'og:description')}
                     {#if description}
                       {@const descLength = editableDescription.length || description.length}
                       {@const descStatus = descLength >= 120 && descLength <= 160 ? 'Optimal' : descLength < 120 ? 'Zu kurz' : 'Zu lang'}
@@ -520,8 +653,8 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
                 <div class="seo-item">
                   <h6>Caption:</h6>
                   {#if headData}
-                    {@const captionFromMeta = headData.metaTags?.find((tag) => tag.name === 'caption' || tag.property === 'og:caption')?.content}
-                    {@const captionFromJsonLd = headData.jsonLdData?.find((ld) => ld.data?.caption)?.data?.caption}
+                    {@const captionFromMeta = getMetaContent(headData.metaTags, (tag) => tag.name === 'caption' || tag.property === 'og:caption')}
+                    {@const captionFromJsonLd = getJsonLdCaption(headData.jsonLdData)}
                     {@const caption = captionFromMeta || captionFromJsonLd}
                     {#if caption}
                       {@const captionLength = editableCaption.length || caption.length}
@@ -551,7 +684,7 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
                 <div class="seo-item">
                   <h6>Seitentyp (JSON-LD @type):</h6>
                   {#if headData.jsonLdData}
-                    {@const pageType = headData.jsonLdData[0]?.data?.['@type'] || 'WebPage'}
+                    {@const pageType = getJsonLdType(headData.jsonLdData)}
                     <p><strong>Aktueller Typ:</strong> {pageType}</p>
                   {:else}
                     <p><strong>Aktueller Typ:</strong> WebPage (Standard)</p>
@@ -577,8 +710,8 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
                 <div class="seo-item">
                   <h6>Keywords:</h6>
                   {#if headData}
-                    {@const keywordsFromMeta = headData.metaTags?.find((tag) => tag.name === 'keywords')?.content}
-                    {@const keywordsFromJsonLd = headData.jsonLdData?.find((ld) => ld.data?.keywords)?.data?.keywords}
+                    {@const keywordsFromMeta = getMetaContent(headData.metaTags, (tag) => tag.name === 'keywords')}
+                    {@const keywordsFromJsonLd = getJsonLdKeywords(headData.jsonLdData)}
                     {@const keywords = keywordsFromMeta || keywordsFromJsonLd}
                     {#if keywords}
                       <p><strong>Aktuelle Keywords:</strong> {keywords}</p>
@@ -597,7 +730,7 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
                 <div class="seo-item">
                   <h6>Autor:</h6>
                   {#if headData.metaTags}
-                    {@const author = headData.metaTags.find((tag) => tag.name === 'author' || tag.property === 'og:author')?.content}
+                    {@const author = getMetaContent(headData.metaTags, (tag) => tag.name === 'author' || tag.property === 'og:author')}
                     {#if author}
                       <p><strong>Aktueller Autor:</strong> {author}</p>
                     {/if}
@@ -615,8 +748,8 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
                 <div class="seo-item">
                   <h6>Standort:</h6>
                   {#if headData}
-                    {@const locationFromMeta = headData.metaTags?.find((tag) => tag.name === 'geo.region' || tag.property === 'og:locale')?.content}
-                    {@const locationFromJsonLd = headData.jsonLdData?.find((ld) => ld.data?.contentLocation?.name)?.data?.contentLocation?.name}
+                    {@const locationFromMeta = getMetaContent(headData.metaTags, (tag) => tag.name === 'geo.region' || tag.property === 'og:locale')}
+                    {@const locationFromJsonLd = getJsonLdLocation(headData.jsonLdData)}
                     {@const location = locationFromMeta || locationFromJsonLd}
                     {#if location}
                       <p><strong>Aktueller Standort:</strong> {location}</p>
@@ -635,7 +768,7 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
                 <div class="seo-item">
                   <h6>og:image:</h6>
                   {#if headData}
-                    {@const ogImageFromMeta = headData.metaTags?.find((tag) => tag.property === 'og:image')?.content}
+                    {@const ogImageFromMeta = getMetaContent(headData.metaTags, (tag) => tag.property === 'og:image')}
                     {@const isCulocaUrl = testUrl.toLowerCase().includes('culoca') || testUrl.toLowerCase().includes('localhost')}
                     {@const ogImage = ogImageFromMeta || (isCulocaUrl ? 'culoca-see-you-local-entdecke-deine-umgebung.jpg' : '')}
                     {#if ogImage}
@@ -655,7 +788,7 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
                 <div class="seo-item">
                   <h6>Icon:</h6>
                   {#if headData}
-                    {@const iconFromLink = headData.linkTags?.find((tag) => tag.rel === 'icon')?.href}
+                    {@const iconFromLink = getIconHref(headData.linkTags)}
                     {@const isCulocaUrl = testUrl.toLowerCase().includes('culoca') || testUrl.toLowerCase().includes('localhost')}
                     {@const icon = iconFromLink || (isCulocaUrl ? 'culoca-icon.svg' : '')}
                     {#if icon}
@@ -683,14 +816,14 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
                       >Bitte optimiere die SEO-Daten für die Seite {testUrl}:
 
 Title: "{editableTitle || headData.title || 'Titel eingeben'}"
-Description: "{editableDescription || headData.metaTags?.find((tag) => tag.name === 'description' || tag.property === 'og:description')?.content || 'Description eingeben'}"
-Caption: "{editableCaption || headData.metaTags?.find((tag) => tag.name === 'caption' || tag.property === 'og:caption')?.content || headData.jsonLdData?.find((ld) => ld.data?.caption)?.data?.caption || 'Caption eingeben'}"
+Description: "{editableDescription || getMetaContent(headData.metaTags, (tag) => tag.name === 'description' || tag.property === 'og:description') || 'Description eingeben'}"
+Caption: "{editableCaption || getMetaContent(headData.metaTags, (tag) => tag.name === 'caption' || tag.property === 'og:caption') || getJsonLdCaption(headData.jsonLdData) || 'Caption eingeben'}"
 Seitentyp: {editablePageType}
-Keywords: "{editableKeywords || headData.metaTags?.find((tag) => tag.name === 'keywords')?.content || headData.jsonLdData?.find((ld) => ld.data?.keywords)?.data?.keywords || 'Keywords eingeben'}"
-Autor: "{editableAuthor || headData.metaTags?.find((tag) => tag.name === 'author' || tag.property === 'og:author')?.content || 'Autor eingeben'}"
-Standort: "{editableLocation || headData.metaTags?.find((tag) => tag.name === 'geo.region' || tag.property === 'og:locale')?.content || headData.jsonLdData?.find((ld) => ld.data?.contentLocation?.name)?.data?.contentLocation?.name || 'Standort eingeben'}"
-og:image: "{editableOgImage || headData.metaTags?.find((tag) => tag.property === 'og:image')?.content || 'og:image eingeben'}"
-Icon: "{editableIcon || headData.linkTags?.find((tag) => tag.rel === 'icon')?.href || 'Icon eingeben'}"
+Keywords: "{editableKeywords || getMetaContent(headData.metaTags, (tag) => tag.name === 'keywords') || getJsonLdKeywords(headData.jsonLdData) || 'Keywords eingeben'}"
+Autor: "{editableAuthor || getMetaContent(headData.metaTags, (tag) => tag.name === 'author' || tag.property === 'og:author') || 'Autor eingeben'}"
+Standort: "{editableLocation || getMetaContent(headData.metaTags, (tag) => tag.name === 'geo.region' || tag.property === 'og:locale') || getJsonLdLocation(headData.jsonLdData) || 'Standort eingeben'}"
+og:image: "{editableOgImage || getMetaContent(headData.metaTags, (tag) => tag.property === 'og:image') || 'og:image eingeben'}"
+Icon: "{editableIcon || getIconHref(headData.linkTags) || 'Icon eingeben'}"
 
 Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auch das entsprechende JSON-LD Schema.</textarea>
                       <button
@@ -719,7 +852,7 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
                       <p><strong>Quelle:</strong> {headData.mainImage.source}</p>
                       <p><strong>URL:</strong> <a href={headData.mainImage.url} target="_blank" rel="noopener">{headData.mainImage.url}</a></p>
                       <div class="image-preview">
-                        <img src={headData.mainImage.url} alt="Hauptbild Vorschau" on:error={(e) => e.target.style.display = 'none'} />
+                        <img src={headData.mainImage.url} alt="Hauptbild Vorschau" on:error={hideImageOnError} />
                       </div>
                     </div>
                   </div>
@@ -731,22 +864,22 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
                 {/if}
 
                 <div class="favicon-section">
-                  <h6>Favicons ({headData.faviconInfo.count} gefunden):</h6>
-                  {#if headData.faviconInfo.favicons.length > 0}
+                  <h6>Favicons ({headData.faviconInfo?.count || 0} gefunden):</h6>
+                  {#if headData.faviconInfo && headData.faviconInfo.favicons.length > 0}
                     <div class="favicon-list">
                       {#each headData.faviconInfo.favicons as favicon}
                         <div class="favicon-item">
                           <div class="favicon-info">
-                            <p><strong>URL:</strong> <a href={favicon.url} target="_blank" rel="noopener">{favicon.url}</a></p>
+                            <p><strong>URL:</strong> <a href={favicon.url || favicon.href} target="_blank" rel="noopener">{favicon.url || favicon.href}</a></p>
                             {#if favicon.sizes}<p><strong>Größen:</strong> {favicon.sizes}</p>{/if}
                             {#if favicon.type}<p><strong>Typ:</strong> {favicon.type}</p>{/if}
                             {#if favicon.rel}<p><strong>Rel:</strong> {favicon.rel}</p>{/if}
                           </div>
                           <div class="favicon-preview">
                             <img
-                              src={favicon.url}
+                              src={favicon.url || favicon.href}
                               alt="Favicon Vorschau"
-                              on:error={(e) => { e.target.style.display = 'none'; }}
+                              on:error={hideImageOnError}
                             />
                           </div>
                         </div>
@@ -758,17 +891,17 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
                       <div class="favicon-sizes-grid">
                         {#each headData.faviconInfo.favicons as favicon}
                           {#if favicon.sizes}
-                            {#each favicon.sizes.split(' ').filter((size) => size.includes('x')) as size}
+                            {#each getFaviconSizes(favicon.sizes) as size}
                               {@const [width, height] = size.split('x').map(Number)}
                               {#if width && height && width <= 512 && height <= 512}
                                 <div class="favicon-size-item">
                                   <div class="favicon-size-label">{size}</div>
                                   <div class="favicon-size-display" style="width: {width}px; height: {height}px;">
                                     <img
-                                      src={favicon.url}
+                                      src={favicon.url || favicon.href}
                                       alt="Favicon {size}"
                                       style="width: 100%; height: 100%; object-fit: contain;"
-                                      on:error={(e) => { e.target.style.display = 'none'; }}
+                                      on:error={hideImageOnError}
                                     />
                                   </div>
                                 </div>
@@ -821,7 +954,7 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
                     <div class="jsonld-actions">
                       <button
                         class="code-action-btn"
-                        on:click={() => copyJsonLdContent(headData.jsonLdData.map((item) => `=== ${item.index}. ${item.type}: ${item.name} ===\n${item.formatted}`).join('\n\n'))}
+                        on:click={() => copyJsonLdContent(getCodeBlocks(headData?.jsonLdData))}
                         title="JSON-LD Code kopieren"
                       >
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -839,7 +972,7 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
                         </svg>
                       </button>
                     </div>
-                    <pre class="jsonld-content"><code>{headData.jsonLdData.map((item) => `=== ${item.index}. ${item.type}: ${item.name} ===\n${item.formatted}`).join('\n\n')}</code></pre>
+                    <pre class="jsonld-content"><code>{getCodeBlocks(headData?.jsonLdData)}</code></pre>
                   </div>
                 </div>
               {:else}
@@ -851,7 +984,7 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
                   <div class="formatted-actions">
                     <button
                       class="code-action-btn"
-                      on:click={() => copyFormattedContent(headData.headContent)}
+                      on:click={() => copyFormattedContent(headData?.headContent || '')}
                       title="Formatierten Code kopieren"
                     >
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -923,7 +1056,7 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
                       <div class="raw-html-actions">
                         <button
                           class="code-action-btn"
-                          on:click={() => copyRawHtml(headData.rawHtml)}
+                          on:click={() => copyRawHtml(headData?.rawHtml || '')}
                           title="HTML-Quelltext kopieren"
                         >
                           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -979,7 +1112,7 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
                     <div class="bot-view-container">
                       <div class="bot-view-header">
                         <div class="bot-view-controls">
-                          <button class="bot-view-btn" on:click={() => { const iframe = document.querySelector('.bot-view-iframe'); if (iframe) iframe.src = iframe.src; }} title="Vorschau neu laden">
+                          <button class="bot-view-btn" on:click={reloadBotViewIframe} title="Vorschau neu laden">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>
                             Neu laden
                           </button>
@@ -1013,15 +1146,15 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
                     <div class="bot-view-container">
                       <div class="bot-view-header">
                         <div class="bot-view-controls">
-                          <button class="bot-view-btn" on:click={() => { const iframe = document.querySelector('.bot-view-iframe'); if (iframe) iframe.src = iframe.src; }} title="Vorschau neu laden">
+                          <button class="bot-view-btn" on:click={reloadBotViewIframe} title="Vorschau neu laden">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>
                             Neu laden
                           </button>
-                          <button class="bot-view-btn" on:click={() => { const iframe = document.querySelector('.bot-view-iframe'); if (iframe) iframe.style.width = iframe.style.width === '100%' ? '375px' : '100%'; }} title="Mobile/Desktop Ansicht wechseln">
+                          <button class="bot-view-btn" on:click={toggleBotViewWidth} title="Mobile/Desktop Ansicht wechseln">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
                             Mobile/Desktop
                           </button>
-                          <button class="bot-view-btn" on:click={() => { const iframe = document.querySelector('.bot-view-iframe'); if (iframe) iframe.style.height = iframe.style.height === '600px' ? '400px' : '600px'; }} title="Höhe anpassen">
+                          <button class="bot-view-btn" on:click={toggleBotViewHeight} title="Höhe anpassen">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
                             Höhe
                           </button>
@@ -1042,7 +1175,7 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
                         <h6>HTML Bot View Details:</h6>
                         <div class="bot-view-stats">
                           <div class="bot-stat"><strong>Title:</strong> {headData.title || 'Kein Title gefunden'}</div>
-                          <div class="bot-stat"><strong>Description:</strong> {headData.metaTags?.find((tag) => tag.name === 'description' || tag.property === 'og:description')?.content || 'Keine Description gefunden'}</div>
+                          <div class="bot-stat"><strong>Description:</strong> {getMetaContent(headData.metaTags, (tag) => tag.name === 'description' || tag.property === 'og:description') || 'Keine Description gefunden'}</div>
                           <div class="bot-stat"><strong>Meta Tags:</strong> {headData.metaTags?.length || 0} gefunden</div>
                           <div class="bot-stat"><strong>JSON-LD:</strong> {headData.jsonLdData?.length || 0} Schema(s) gefunden</div>
                           <div class="bot-stat"><strong>Favicons:</strong> {headData.faviconInfo?.count || 0} gefunden</div>

@@ -160,7 +160,7 @@ export const GET = async ({ url, request }) => {
       });
       
       // Sortiere nach Distanz (nächste zuerst)
-      itemsWithDistance.sort((a, b) => (a.distance || Infinity) - (b.distance || Infinity));
+      itemsWithDistance.sort((a, b) => (((a as any).distance) || Infinity) - (((b as any).distance) || Infinity));
       
       // Pagination anwenden
       const pagedItems = itemsWithDistance.slice(offset, offset + effectiveLimit);
@@ -190,7 +190,7 @@ export const GET = async ({ url, request }) => {
             totalItems: itemsWithDistance.length,
             returnedItems: pagedItems.length,
             usingServerSideSorting: true,
-            firstItemDistance: pagedItems[0]?.distance || null
+            firstItemDistance: (pagedItems[0] as any)?.distance || null
           }
         });
     }

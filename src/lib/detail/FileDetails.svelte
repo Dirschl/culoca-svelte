@@ -1,6 +1,7 @@
 <script lang="ts">
   export let image: any;
   export let isCreator: boolean;
+  export let canEditQuickFields = false;
   export let editMode = false;
   export let editingFilename: boolean;
   export let filenameEditValue: string;
@@ -15,11 +16,34 @@
   export let fileSizes: { size64: number | null; size512: number | null; size2048: number | null };
   export let formatFileSize: (bytes: number) => string;
   export let browser: boolean;
+  export let rerenderingVariants = false;
+  export let rerenderVariants: (() => void) | null = null;
+  export let replacingOriginal = false;
+  export let replaceOriginalFile: ((file: File) => void | Promise<void>) | null = null;
+
+  let replaceOriginalInput: HTMLInputElement | null = null;
+
+  function openReplaceOriginalDialog() {
+    if (!replaceOriginalFile || !browser || replacingOriginal) return;
+    replaceOriginalInput?.click();
+  }
+
+  async function handleReplaceOriginalChange(event: Event) {
+    const target = event.currentTarget as HTMLInputElement;
+    const file = target.files?.[0];
+    if (!file || !replaceOriginalFile) return;
+
+    try {
+      await replaceOriginalFile(file);
+    } finally {
+      target.value = '';
+    }
+  }
 </script>
 
 <h2>File Details</h2>
 
-<div class="filename" class:editable={isCreator && editMode} class:editing={editingFilename}>
+<div class="filename" class:editable={canEditQuickFields} class:editing={editingFilename}>
   {#if editingFilename}
     <div class="filename-edit-container">
       <input
@@ -41,16 +65,14 @@
       </span>
     </div>
   {:else}
-    <button type="button" class="filename-text" on:click={startEditFilename} disabled={!isCreator || !editMode}>
+    <button type="button" class="filename-text" on:click={startEditFilename} disabled={!canEditQuickFields}>
       {image.original_name || 'Unbekannt'}
     </button>
   {/if}
 </div>
 
-<div class="filename">{browser ? window.location.href : ''}</div>
-
 {#if image.slug}
-  <div class="filename" class:editable={isCreator && editMode} class:editing={editingSlug}>
+  <div class="filename" class:editable={canEditQuickFields} class:editing={editingSlug}>
     {#if editingSlug}
       <div class="filename-edit-container">
         <input
@@ -72,18 +94,44 @@
         </span>
       </div>
     {:else}
-      <button type="button" class="filename-text" on:click={startEditSlug} disabled={!isCreator || !editMode}>
+      <button type="button" class="filename-text" on:click={startEditSlug} disabled={!canEditQuickFields}>
         Slug: {image.slug}
       </button>
     {/if}
   </div>
 {/if}
 
-<div class="filename">ID: {image?.id}</div>
+{#if isCreator && editMode}
+  <div class="filename">ID: {image?.id}</div>
+{/if}
 <div class="filename">
   64px: {fileSizes && fileSizes.size64 ? formatFileSize(fileSizes.size64) : 'unbekannt'} |
   512px: {fileSizes && fileSizes.size512 ? formatFileSize(fileSizes.size512) : 'unbekannt'} |
   2048px: {fileSizes && fileSizes.size2048 ? formatFileSize(fileSizes.size2048) : 'unbekannt'}
+  {#if canEditQuickFields && editMode && rerenderVariants}
+    <span class="file-action-separator">|</span>
+    <button type="button" class="file-action-link" on:click={rerenderVariants} disabled={rerenderingVariants}>
+      {rerenderingVariants ? 'Rendere Varianten neu...' : 'Varianten neu rendern'}
+    </button>
+  {/if}
+  {#if canEditQuickFields && editMode && replaceOriginalFile}
+    <span class="file-action-separator">|</span>
+    <button
+      type="button"
+      class="file-action-link"
+      on:click={openReplaceOriginalDialog}
+      disabled={replacingOriginal}
+    >
+      {replacingOriginal ? 'Ersetze Original...' : 'Original ersetzen'}
+    </button>
+    <input
+      bind:this={replaceOriginalInput}
+      class="visually-hidden"
+      type="file"
+      accept="image/*"
+      on:change={handleReplaceOriginalChange}
+    />
+  {/if}
 </div>
 
 <style>
@@ -128,6 +176,7 @@
     align-items: center;
     gap: 0.5rem;
     padding: 0.25rem;
+    width: 100%;
   }
 
   .filename-edit-input {
@@ -135,7 +184,9 @@
     padding: 0.2rem 0.5rem;
     border-radius: 6px;
     border: 1px solid #ccc;
-    width: 220px;
+    width: 100%;
+    flex: 1 1 auto;
+    min-width: 0;
     color: #222;
     background: #fff;
   }
@@ -154,6 +205,7 @@
   .filename-text {
     cursor: default;
     display: inline-block;
+    width: 100%;
     padding: 0.25rem 0.5rem;
     border-radius: 4px;
     margin: -0.25rem -0.5rem;
@@ -167,27 +219,53 @@
     color: inherit;
   }
 
-  .meta-grid {
-    margin-top: 0.75rem;
-    display: grid;
-    gap: 0.5rem;
+  .file-action-separator {
+    margin: 0 0.35rem;
+    color: var(--text-muted);
   }
 
-  .meta-row {
-    display: grid;
-    gap: 0.2rem;
+  .file-action-link {
+    border: 0;
+    padding: 0;
+    background: transparent;
+    color: var(--culoca-orange);
+    font: inherit;
+    cursor: pointer;
+    text-decoration: underline;
   }
 
-  .meta-label {
-    font-size: 0.78rem;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--text-secondary);
+  .file-action-link:disabled {
+    opacity: 0.7;
+    cursor: progress;
   }
 
-  .meta-value {
-    color: var(--text-primary);
-    word-break: break-word;
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  @media (max-width: 900px) {
+    h2,
+    .filename {
+      text-align: center;
+    }
+
+    .filename-edit-container {
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .filename-text {
+      width: 100%;
+      text-align: center;
+    }
   }
 
 </style>

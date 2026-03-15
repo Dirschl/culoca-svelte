@@ -28,6 +28,13 @@
   let newLat = '';
   let newLon = '';
 
+  function handleOverlayKeydown(event: KeyboardEvent, close: () => void) {
+    if (event.key === 'Escape' || event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      close();
+    }
+  }
+
   onMount(async () => {
     try {
       // Check if user is admin
@@ -619,38 +626,38 @@
             Seite {currentPage + 1} von {totalPages} ({totalItems} Items insgesamt)
           </div>
           <div style="display: flex; gap: 0.5rem;">
-            <button 
+            <button
+              class="pagination-button"
               on:click={() => goToPage(0)}
               disabled={currentPage === 0}
-              style="padding: 0.5rem 1rem; background: #374151; color: #f9fafb; border: none; border-radius: 4px; cursor: pointer; font-size: 0.875rem; opacity: 1;"
-              on:disabled={(e) => e.target.style.opacity = '0.5'}
+              style="padding: 0.5rem 1rem; background: #374151; color: #f9fafb; border: none; border-radius: 4px; cursor: pointer; font-size: 0.875rem;"
             >
               ⏮️ Erste
             </button>
-            <button 
+            <button
+              class="pagination-button"
               on:click={() => goToPage(currentPage - 1)}
               disabled={currentPage === 0}
-              style="padding: 0.5rem 1rem; background: #374151; color: #f9fafb; border: none; border-radius: 4px; cursor: pointer; font-size: 0.875rem; opacity: 1;"
-              on:disabled={(e) => e.target.style.opacity = '0.5'}
+              style="padding: 0.5rem 1rem; background: #374151; color: #f9fafb; border: none; border-radius: 4px; cursor: pointer; font-size: 0.875rem;"
             >
               ⏪ Zurück
             </button>
             <span style="padding: 0.5rem 1rem; background: #f59e0b; color: #1f2937; border-radius: 4px; font-size: 0.875rem; font-weight: 500;">
               {currentPage + 1}
             </span>
-            <button 
+            <button
+              class="pagination-button"
               on:click={() => goToPage(currentPage + 1)}
               disabled={currentPage >= totalPages - 1}
-              style="padding: 0.5rem 1rem; background: #374151; color: #f9fafb; border: none; border-radius: 4px; cursor: pointer; font-size: 0.875rem; opacity: 1;"
-              on:disabled={(e) => e.target.style.opacity = '0.5'}
+              style="padding: 0.5rem 1rem; background: #374151; color: #f9fafb; border: none; border-radius: 4px; cursor: pointer; font-size: 0.875rem;"
             >
               Weiter ⏩
             </button>
-            <button 
+            <button
+              class="pagination-button"
               on:click={() => goToPage(totalPages - 1)}
               disabled={currentPage >= totalPages - 1}
-              style="padding: 0.5rem 1rem; background: #374151; color: #f9fafb; border: none; border-radius: 4px; cursor: pointer; font-size: 0.875rem; opacity: 1;"
-              on:disabled={(e) => e.target.style.opacity = '0.5'}
+              style="padding: 0.5rem 1rem; background: #374151; color: #f9fafb; border: none; border-radius: 4px; cursor: pointer; font-size: 0.875rem;"
             >
               Letzte ⏭️
             </button>
@@ -663,7 +670,13 @@
 
 <!-- Owner Change Modal -->
 {#if showOwnerModal && editingItem}
-  <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.8); display: flex; align-items: center; justify-content: center; z-index: 1000;" on:click={closeOwnerModal}>
+  <div
+    style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.8); display: flex; align-items: center; justify-content: center; z-index: 1000;"
+    on:click={closeOwnerModal}
+    on:keydown={(event) => handleOverlayKeydown(event, closeOwnerModal)}
+    role="button"
+    tabindex="0"
+  >
     <div style="max-width: 500px; width: 90%; background: #1f2937; border: 2px solid #374151; border-radius: 12px; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5); overflow: hidden;" on:click|stopPropagation>
       
       <!-- Header -->
@@ -671,9 +684,8 @@
         <h3 style="margin: 0; font-size: 18px; color: #f9fafb; font-weight: 600;">Besitzer ändern</h3>
         <button 
           on:click={closeOwnerModal} 
+          class="modal-close-button"
           style="background: none; border: none; font-size: 20px; color: #9ca3af; cursor: pointer; padding: 5px; border-radius: 4px; transition: background-color 0.2s;"
-          on:mouseenter={(e) => e.target.style.backgroundColor = '#374151'}
-          on:mouseleave={(e) => e.target.style.backgroundColor = 'transparent'}
         >
           ✕
         </button>
@@ -719,19 +731,16 @@
       <div style="padding: 15px 20px 20px 20px; border-top: 1px solid #374151; display: flex; justify-content: flex-end; gap: 12px; background: #111827;">
         <button 
           on:click={closeOwnerModal} 
+          class="modal-cancel-button"
           style="padding: 10px 20px; font-size: 14px; font-weight: 500; background: #4b5563; border: 1px solid #6b7280; color: #f9fafb; border-radius: 6px; cursor: pointer; transition: all 0.2s;"
-          on:mouseenter={(e) => e.target.style.backgroundColor = '#6b7280'}
-          on:mouseleave={(e) => e.target.style.backgroundColor = '#4b5563'}
         >
           Abbrechen
         </button>
         <button
+          class="modal-save-button"
           disabled={!newUserId.trim() || userIdValidation.includes('❌')}
           on:click={changeItemOwner}
-          style="padding: 10px 20px; font-size: 14px; font-weight: 500; background: #f59e0b; border: 1px solid #d97706; color: white; border-radius: 6px; cursor: pointer; transition: all 0.2s; opacity: 1;"
-          on:mouseenter={(e) => !e.target.disabled && (e.target.style.opacity = '0.8')}
-          on:mouseleave={(e) => e.target.style.opacity = '1'}
-          on:disabled={(e) => e.target.style.opacity = '0.5'}
+          style="padding: 10px 20px; font-size: 14px; font-weight: 500; background: #f59e0b; border: 1px solid #d97706; color: white; border-radius: 6px; cursor: pointer; transition: all 0.2s;"
         >
           Speichern
         </button>
@@ -742,7 +751,13 @@
 
 <!-- GPS Location Modal -->
 {#if showGPSModal && editingGPSItem}
-  <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.8); display: flex; align-items: center; justify-content: center; z-index: 1000;" on:click={closeGPSModal}>
+  <div
+    style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.8); display: flex; align-items: center; justify-content: center; z-index: 1000;"
+    on:click={closeGPSModal}
+    on:keydown={(event) => handleOverlayKeydown(event, closeGPSModal)}
+    role="button"
+    tabindex="0"
+  >
     <div style="max-width: 500px; width: 90%; background: #1f2937; border: 2px solid #374151; border-radius: 12px; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5); overflow: hidden;" on:click|stopPropagation>
       
       <!-- Header -->
@@ -750,9 +765,8 @@
         <h3 style="margin: 0; font-size: 18px; color: #f9fafb; font-weight: 600;">GPS Koordinaten ändern</h3>
         <button 
           on:click={closeGPSModal} 
+          class="modal-close-button"
           style="background: none; border: none; font-size: 20px; color: #9ca3af; cursor: pointer; padding: 5px; border-radius: 4px; transition: background-color 0.2s;"
-          on:mouseenter={(e) => e.target.style.backgroundColor = '#374151'}
-          on:mouseleave={(e) => e.target.style.backgroundColor = 'transparent'}
         >
           ✕
         </button>
@@ -825,19 +839,16 @@
       <div style="padding: 15px 20px 20px 20px; border-top: 1px solid #374151; display: flex; justify-content: flex-end; gap: 12px; background: #111827;">
         <button 
           on:click={closeGPSModal} 
+          class="modal-cancel-button"
           style="padding: 10px 20px; font-size: 14px; font-weight: 500; background: #4b5563; border: 1px solid #6b7280; color: #f9fafb; border-radius: 6px; cursor: pointer; transition: all 0.2s;"
-          on:mouseenter={(e) => e.target.style.backgroundColor = '#6b7280'}
-          on:mouseleave={(e) => e.target.style.backgroundColor = '#4b5563'}
         >
           Abbrechen
         </button>
         <button
+          class="modal-save-button"
           disabled={!newLat || !newLon}
           on:click={saveGPSLocation}
-          style="padding: 10px 20px; font-size: 14px; font-weight: 500; background: #f59e0b; border: 1px solid #d97706; color: white; border-radius: 6px; cursor: pointer; transition: all 0.2s; opacity: 1;"
-          on:mouseenter={(e) => !e.target.disabled && (e.target.style.opacity = '0.8')}
-          on:mouseleave={(e) => e.target.style.opacity = '1'}
-          on:disabled={(e) => e.target.style.opacity = '0.5'}
+          style="padding: 10px 20px; font-size: 14px; font-weight: 500; background: #f59e0b; border: 1px solid #d97706; color: white; border-radius: 6px; cursor: pointer; transition: all 0.2s;"
         >
           Speichern
         </button>
@@ -886,5 +897,23 @@
       grid-template-columns: 1fr !important;
       gap: 0.5rem !important;
     }
+  }
+
+  .pagination-button:disabled,
+  .modal-save-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .modal-close-button:hover {
+    background-color: #374151;
+  }
+
+  .modal-cancel-button:hover {
+    background-color: #6b7280;
+  }
+
+  .modal-save-button:hover:not(:disabled) {
+    opacity: 0.8;
   }
 </style> 

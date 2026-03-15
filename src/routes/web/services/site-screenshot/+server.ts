@@ -39,14 +39,14 @@ function releaseScreenshotSlot(): void {
 
 interface ScreenshotOptions {
   url: string;
-  width?: number;
-  height?: number;
-  fullPage?: boolean;
-  format?: 'png' | 'jpeg';
-  quality?: number;
-  waitUntil?: 'load' | 'networkidle' | 'domcontentloaded';
-  timeout?: number;
-  useBotUserAgent?: boolean; // Use bot User-Agent when bot=1 parameter is present (for Real Cookie Manager)
+  width: number;
+  height: number;
+  fullPage: boolean;
+  format: 'png' | 'jpeg';
+  quality: number;
+  waitUntil: 'load' | 'networkidle' | 'domcontentloaded';
+  timeout: number;
+  useBotUserAgent: boolean; // Use bot User-Agent when bot=1 parameter is present (for Real Cookie Manager)
 }
 
 interface ScreenshotResult {
@@ -174,6 +174,13 @@ export const GET: RequestHandler = async ({ url }) => {
     }
 
     const screenshot = result.buffer;
+    if (!screenshot) {
+      releaseScreenshotSlot();
+      return json({
+        error: 'Failed to generate screenshot buffer',
+        url: targetUrl
+      }, { status: 500 });
+    }
 
     // Return image
     const contentType = options.format === 'png' ? 'image/png' : 'image/jpeg';
@@ -308,6 +315,13 @@ export const POST: RequestHandler = async ({ request }) => {
     }
 
     const screenshot = result.buffer;
+    if (!screenshot) {
+      releaseScreenshotSlot();
+      return json({
+        error: 'Failed to generate screenshot buffer',
+        url: targetUrlParam
+      }, { status: 500 });
+    }
 
     // Return JSON with base64 encoded image (better for WordPress)
     const base64 = screenshot.toString('base64');
@@ -802,7 +816,8 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
         }
         // Handle SVGAnimatedString for SVG elements
         if (className && typeof className === 'object' && 'baseVal' in className) {
-          return className.baseVal || '';
+          const svgClassName = className as { baseVal?: string };
+          return svgClassName.baseVal || '';
         }
         // Fallback: try to get classList
         if (element.classList) {
@@ -1452,11 +1467,11 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
           // Check if browser.pages exists and is a function
           if (typeof browser.pages === 'function') {
             const pages = await browser.pages();
-            await Promise.all(pages.map(page => page.close().catch(() => {})));
+            await Promise.all(pages.map((page: any) => page.close().catch(() => {})));
           } else if (context) {
             // Fallback: close all pages in context if browser.pages() doesn't exist
             const pages = context.pages();
-            await Promise.all(pages.map(page => page.close().catch(() => {})));
+            await Promise.all(pages.map((page: any) => page.close().catch(() => {})));
           }
         } catch (pagesError) {
           // Ignore errors when closing pages (browser might already be closing)
@@ -1532,11 +1547,11 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
             // Check if browser.pages exists and is a function
             if (typeof browser.pages === 'function') {
               const pages = await browser.pages();
-              await Promise.all(pages.map(page => page.close().catch(() => {})));
+              await Promise.all(pages.map((page: any) => page.close().catch(() => {})));
             } else if (context) {
               // Fallback: close all pages in context if browser.pages() doesn't exist
               const pages = context.pages();
-              await Promise.all(pages.map(page => page.close().catch(() => {})));
+              await Promise.all(pages.map((page: any) => page.close().catch(() => {})));
             }
           } catch (pagesError) {
             // Ignore errors when closing pages (browser might already be closing)
@@ -1574,4 +1589,3 @@ async function generateScreenshot(options: ScreenshotOptions): Promise<Screensho
     };
   }
 }
-

@@ -1,6 +1,13 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 
+type HealthEntry = {
+  url: string;
+  status: number;
+  isRedirect: boolean;
+  error: string | null;
+};
+
 export const GET: RequestHandler = async () => {
   try {
     const { supabase } = await import('$lib/supabaseClient');
@@ -16,7 +23,12 @@ export const GET: RequestHandler = async () => {
       return json({ error: 'Database error', details: error }, { status: 500 });
     }
 
-    const healthResults = {
+    const healthResults: {
+      staticPages: HealthEntry[];
+      itemPages: HealthEntry[];
+      imageUrls: HealthEntry[];
+      summary: { total: number; errors: number; redirects: number; ok: number };
+    } = {
       staticPages: [],
       itemPages: [],
       imageUrls: [],
@@ -54,12 +66,12 @@ export const GET: RequestHandler = async () => {
         else healthResults.summary.errors++;
         
         healthResults.summary.total++;
-      } catch (error) {
+      } catch (error: unknown) {
         healthResults.staticPages.push({
           url,
           status: 0,
           isRedirect: false,
-          error: error.message
+          error: error instanceof Error ? error.message : 'Unknown error'
         });
         healthResults.summary.errors++;
         healthResults.summary.total++;
@@ -87,12 +99,12 @@ export const GET: RequestHandler = async () => {
         else healthResults.summary.errors++;
         
         healthResults.summary.total++;
-      } catch (error) {
+      } catch (error: unknown) {
         healthResults.itemPages.push({
           url,
           status: 0,
           isRedirect: false,
-          error: error.message
+          error: error instanceof Error ? error.message : 'Unknown error'
         });
         healthResults.summary.errors++;
         healthResults.summary.total++;
@@ -122,12 +134,12 @@ export const GET: RequestHandler = async () => {
         else healthResults.summary.errors++;
         
         healthResults.summary.total++;
-      } catch (error) {
+      } catch (error: unknown) {
         healthResults.imageUrls.push({
           url: imageUrl,
           status: 0,
           isRedirect: false,
-          error: error.message
+          error: error instanceof Error ? error.message : 'Unknown error'
         });
         healthResults.summary.errors++;
         healthResults.summary.total++;
@@ -141,8 +153,8 @@ export const GET: RequestHandler = async () => {
       timestamp: new Date().toISOString()
     });
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error in sitemap health check:', error);
     return json({ error: 'Internal server error' }, { status: 500 });
   }
-}; 
+};

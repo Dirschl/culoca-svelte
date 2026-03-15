@@ -2,6 +2,8 @@ import type { PageServerLoad } from './$types';
 import { createClient } from '@supabase/supabase-js';
 import { error } from '@sveltejs/kit';
 import { DEFAULT_CONTENT_TYPE_BY_SLUG } from '$lib/content/types';
+import { getHubSeoPolicy } from '$lib/seo/policy';
+import { getPublicItemHref } from '$lib/content/routing';
 
 export const ssr = true;
 
@@ -104,7 +106,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
   const buildBaseQuery = () => {
     let query = supabase
       .from('items')
-      .select('id, slug, title, description, caption, canonical_path, path_512, width, height, created_at, starts_at, ends_at, external_url, lat, lon, original_name')
+      .select('id, slug, title, description, caption, canonical_path, country_slug, district_slug, municipality_slug, path_512, width, height, created_at, starts_at, ends_at, external_url, lat, lon, original_name')
       .eq('type_id', typeDef.id)
       .eq('is_private', false)
       .eq('admin_hidden', false)
@@ -188,6 +190,9 @@ export const load: PageServerLoad = async ({ params, url }) => {
     lat: (item.lat || null) as number | null,
     lon: (item.lon || null) as number | null,
     original_name: (item.original_name || null) as string | null,
+    country_slug: (item.country_slug || null) as string | null,
+    district_slug: (item.district_slug || null) as string | null,
+    municipality_slug: (item.municipality_slug || null) as string | null,
     child_count: 0
   }));
 
@@ -235,7 +240,17 @@ export const load: PageServerLoad = async ({ params, url }) => {
     }));
   }
 
+  items = items.map((item) => ({
+    ...item,
+    canonical_path: getPublicItemHref(item)
+  }));
+
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+  const seoPolicy = getHubSeoPolicy({
+    basePath: `/${typeDef.slug}`,
+    page,
+    hasSearch: !!search
+  });
 
   return {
     typeDef: {
@@ -249,6 +264,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
     search,
     totalPages,
     totalCount,
-    pageSize: PAGE_SIZE
+    pageSize: PAGE_SIZE,
+    seoPolicy
   };
 };

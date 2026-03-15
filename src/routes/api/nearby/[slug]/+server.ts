@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import { supabase } from '$lib/supabaseClient';
 import { safeFunctionCall } from '$lib/databaseConfig';
 import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
+import { getPublicItemHref } from '$lib/content/routing';
 
 function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371e3; // Earth's radius in meters
@@ -108,7 +109,7 @@ export async function GET({ params }: any) {
           
           const { data: fallbackData, error: fallbackError } = await supabase
             .from('items')
-            .select('id, slug, canonical_path, path_512, path_2048, path_64, original_name, title, description, caption, lat, lon, width, height, is_private, gallery, group_root_item_id, profile_id')
+            .select('id, slug, canonical_path, country_slug, district_slug, municipality_slug, path_512, path_2048, path_64, original_name, title, description, caption, lat, lon, width, height, is_private, gallery, group_root_item_id, profile_id')
             .not('lat', 'is', null)
             .not('lon', 'is', null)
             .not('path_512', 'is', null)
@@ -133,7 +134,10 @@ export async function GET({ params }: any) {
                 return {
                   id: item.id,
                   slug: item.slug,
-                  canonical_path: item.canonical_path,
+                  canonical_path: getPublicItemHref(item),
+                  country_slug: item.country_slug ?? null,
+                  district_slug: item.district_slug ?? null,
+                  municipality_slug: item.municipality_slug ?? null,
                   lat: item.lat,
                   lon: item.lon,
                   distance,
@@ -155,9 +159,19 @@ export async function GET({ params }: any) {
               .slice(0, 300);
           }
         } else {
+          const nearbyIds = (nearbyData || []).map((item: any) => item.id).filter(Boolean);
+          const { data: geoData } = nearbyIds.length
+            ? await supabase
+                .from('items')
+                .select('id, slug, canonical_path, country_slug, district_slug, municipality_slug')
+                .in('id', nearbyIds)
+            : { data: [] as any[] };
+          const geoById = new Map((geoData || []).map((item: any) => [item.id, item]));
+
           nearby = (nearbyData || [])
             .filter((item: any) => item.id !== image.id)
             .map((item: any) => {
+              const geoItem = geoById.get(item.id) || item;
               // Use SEO-friendly URLs for better Google indexing
               const seoSrc = getSeoImageUrl(item.slug, item.path_512, '512');
               const seoSrcHD = getSeoImageUrl(item.slug, item.path_2048 || item.path_512, '2048');
@@ -166,7 +180,10 @@ export async function GET({ params }: any) {
               return {
                 id: item.id,
                 slug: item.slug,
-                canonical_path: item.canonical_path,
+                canonical_path: getPublicItemHref(geoItem),
+                country_slug: geoItem.country_slug ?? null,
+                district_slug: geoItem.district_slug ?? null,
+                municipality_slug: geoItem.municipality_slug ?? null,
                 lat: item.lat,
                 lon: item.lon,
                 distance: item.distance,

@@ -1,6 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
+  import SiteNav from '$lib/SiteNav.svelte';
+  import SiteFooter from '$lib/SiteFooter.svelte';
+  import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
   import { darkMode } from '$lib/darkMode';
   import { filterStore, getEffectiveGpsPosition } from '$lib/filterStore';
   import { goto } from '$app/navigation';
@@ -9,9 +12,10 @@
   import { authFetch } from '$lib/authFetch';
   import { browser } from '$app/environment';
   import { supabase } from '$lib/supabaseClient';
-  import { getStoredOrComputedCanonicalPath, slugifySegment } from '$lib/content/routing';
+  import { buildGeoHubPath, getStoredOrComputedCanonicalPath, slugifySegment } from '$lib/content/routing';
   import { sanitizeContentHtml } from '$lib/content/html';
   import { isDetailPath, LAST_LOCAL_ROUTE_KEY, sanitizeReturnTo } from '$lib/returnTo';
+  import { DEFAULT_CONTENT_TYPES } from '$lib/content/types';
   import {
     DEFAULT_EVENT_SETTINGS,
     buildEventPageSettings,
@@ -21,6 +25,11 @@
     isUpcomingOrCurrentEvent,
     type EventSettings
   } from '$lib/events';
+  import { buildKeywordHubPath } from '$lib/seo/hubs';
+  import { buildBreadcrumbJsonLd, buildGeoPlaceGraph, trimText } from '$lib/seo/site';
+  import { getAdministrativeHierarchy, normalizeAdminDisplayLabel } from '$lib/content/locationTaxonomy';
+  import { reverseGeocodeCoordinates, searchLocationHierarchy, type SearchGeocodeResult } from '$lib/content/geocoding';
+  import { KEYWORDS_MAX, sanitizeKeywords } from '$lib/content/keywords';
 
   // Client-seitige Umleitung für bekannte Fälle (nur für User, nicht für Bots)
   if (browser) {
@@ -81,6 +90,10 @@ let showRightsManager = false;
     return String(value);
   }
 
+  function relatedThumbUrl(item: { slug: string; path_512?: string | null }) {
+    return item.path_512 ? getSeoImageUrl(item.slug, item.path_512, '512') : '';
+  }
+
   export let data: any;
   let image = data?.image ?? null;
   let error = data?.error ?? '';
@@ -88,7 +101,7 @@ let showRightsManager = false;
   let seoLinks = data?.seoLinks ?? { newer: null, older: null };
   let canonicalPath = data?.canonicalPath ?? (image?.slug ? `/item/${image.slug}` : '');
   let contentType = data?.type ?? null;
-  let availableTypes = data?.availableTypes ?? [];
+  let availableTypes: Array<{ id: number; name?: string; slug?: string }> = data?.availableTypes ?? [];
   let rootItem = data?.rootItem ?? image;
   let contextItem = data?.contextItem ?? image;
   let groupItems = data?.groupItems ?? [];
@@ -97,6 +110,9 @@ let showRightsManager = false;
   let loading = !image;
   let profile = null;
   let metaTags = data?.metaTags ?? null;
+  let seoHubs = data?.seoHubs ?? { typePath: null, typeLabel: null, keywordLinks: [], photographerPath: null, photographerLabel: null, placePath: null, placeLabel: null };
+  let relatedContent = data?.relatedContent ?? { sameType: [], sameCreator: [], sameKeyword: [], samePlace: [] };
+  let nearbyFallbackRecommendations: Array<{ title: string; href: string; description: string }> = [];
   let showImageCaptions = true; // Default to true
   let editMode = false;
   let adobeStockUrlEdit = '';
@@ -106,6 +122,19 @@ let showRightsManager = false;
   let adobeMessage = '';
   let lastAdobeItemId = '';
   let imageBackHref = sanitizeReturnTo($page.url.searchParams.get('returnTo'), '/');
+  let autoEditAppliedFor = '';
+  let similarMotifPage = 1;
+  const SIMILAR_MOTIFS_PAGE_SIZE = 20;
+  const TYPE_ICONS: Record<string, string> = {
+    foto: '📷',
+    event: '📅',
+    firma: '🏢',
+    link: '🔗',
+    text: '📝',
+    video: '🎬',
+    musik: '🎵',
+    'ki-bild': '✨'
+  };
 
   // SEO/Meta: Slug statt ID verwenden - reaktiv auf URL-Parameter
   let itemSlug: string = '';
@@ -120,6 +149,106 @@ let showRightsManager = false;
   $: canonicalPath = data?.canonicalPath ?? canonicalPath;
   $: contentType = data?.type ?? contentType;
   $: availableTypes = data?.availableTypes ?? availableTypes;
+  $: seoHubs = data?.seoHubs ?? seoHubs;
+  $: relatedContent = data?.relatedContent ?? relatedContent;
+  $: if (image?.id) {
+    similarMotifPage = 1;
+  }
+  $: nearbyFallbackRecommendations = [
+    ...(seoHubs?.placePath && seoHubs?.placeLabel ? [{ title: `Mehr Inhalte aus ${seoHubs.placeLabel}`, href: seoHubs.placePath, description: 'Ortsbezogener Hub mit weiteren Details und Motiven.' }] : []),
+    ...(seoHubs?.photographerPath && seoHubs?.photographerLabel ? [{ title: `Mehr von ${seoHubs.photographerLabel}`, href: seoHubs.photographerPath, description: 'Alle öffentlichen Inhalte dieses Fotografen.' }] : []),
+    ...(seoHubs?.typePath && seoHubs?.typeLabel ? [{ title: `${seoHubs.typeLabel} entdecken`, href: seoHubs.typePath, description: 'Zur kuratierten Übersicht dieses Seitentyps.' }] : [])
+  ];
+  $: geoAdminHierarchy = getAdministrativeHierarchy({
+    countryCode: image?.country_code,
+    countrySlug: image?.country_slug,
+    countryName: image?.country_name,
+    districtCode: image?.district_code,
+    districtSlug: image?.district_slug,
+    districtName: image?.district_name
+  });
+  $: geoCountryLabel =
+    normalizeAdminDisplayLabel(
+      geoAdminHierarchy.countryName || image?.country_name || image?.country_slug?.toUpperCase() || image?.country_code
+    ) || 'Land';
+  $: geoStateLabel = normalizeAdminDisplayLabel(image?.state_name || geoAdminHierarchy.stateName || null);
+  $: geoRegionLabel = normalizeAdminDisplayLabel(image?.region_name || geoAdminHierarchy.regionName || null);
+  $: geoDistrictLabel =
+    normalizeAdminDisplayLabel(image?.district_name || image?.district_slug || image?.district_code) || 'Landkreis';
+  $: geoMunicipalityLabel =
+    normalizeAdminDisplayLabel(image?.municipality_name || image?.municipality_slug) || 'Gemeinde';
+  $: geoNeedsAttention = !!(
+    image?.location_needs_review ||
+    !image?.country_slug ||
+    !image?.district_slug ||
+    !image?.municipality_slug
+  );
+  $: showGeoState = !!geoStateLabel;
+  $: showGeoRegion =
+    !!geoRegionLabel &&
+    normalizeGeoComparisonValue(geoRegionLabel) !== normalizeGeoComparisonValue(geoStateLabel) &&
+    normalizeGeoComparisonValue(geoRegionLabel) !== normalizeGeoComparisonValue(geoDistrictLabel);
+  $: geoCountryPath = image?.country_slug ? `/${image.country_slug}` : null;
+  $: geoDistrictPath =
+    image?.country_slug && image?.district_slug
+      ? buildGeoHubPath({
+          countrySlug: image.country_slug,
+          districtSlug: image.district_slug
+        })
+      : null;
+  $: geoMunicipalityPath =
+    image?.country_slug && image?.district_slug && image?.municipality_slug
+      ? buildGeoHubPath({
+          countrySlug: image.country_slug,
+          districtSlug: image.district_slug,
+          municipalitySlug: image.municipality_slug
+        })
+      : null;
+  $: geoBreadcrumbLinks = [
+    { name: 'Culoca', path: '/' },
+    ...(geoCountryPath ? [{ name: geoCountryLabel, path: geoCountryPath }] : []),
+    ...(geoDistrictPath ? [{ name: geoDistrictLabel, path: geoDistrictPath }] : []),
+    ...(geoMunicipalityPath ? [{ name: geoMunicipalityLabel, path: geoMunicipalityPath }] : []),
+    { name: image?.title || image?.original_name || itemSlug, path: canonicalPath || `/item/${itemSlug}` }
+  ];
+  $: geoDisplayBreadcrumbs = dedupeGeoCrumbs([
+    { name: 'Culoca', path: '/' },
+    ...(geoCountryPath ? [{ name: geoCountryLabel, path: geoCountryPath }] : []),
+    ...(showGeoState ? [{ name: geoStateLabel!, path: null }] : []),
+    ...(showGeoRegion ? [{ name: geoRegionLabel!, path: null }] : []),
+    ...(geoDistrictPath ? [{ name: geoDistrictLabel, path: geoDistrictPath }] : []),
+    ...(geoMunicipalityPath ? [{ name: geoMunicipalityLabel, path: geoMunicipalityPath }] : [])
+  ]);
+  $: itemBreadcrumbJsonLd = buildBreadcrumbJsonLd(geoBreadcrumbLinks);
+  $: geoPlaceGraph = buildGeoPlaceGraph({
+    currentPath: canonicalPath || `/item/${itemSlug}`,
+    currentName:
+      normalizeAdminDisplayLabel(image?.locality_name) ||
+      normalizeAdminDisplayLabel(image?.municipality_name) ||
+      normalizeAdminDisplayLabel(image?.district_name) ||
+      normalizeAdminDisplayLabel(image?.country_name) ||
+      normalizeUtf8(image?.title || itemSlug || 'Ort'),
+    countryName: geoCountryLabel,
+    countryPath: geoCountryPath,
+    stateName: geoStateLabel,
+    regionName: showGeoRegion ? geoRegionLabel : null,
+    districtName: geoDistrictLabel,
+    districtPath: geoDistrictPath,
+    municipalityName: image?.municipality_slug ? geoMunicipalityLabel : null,
+    municipalityPath: geoMunicipalityPath,
+    localityName: normalizeAdminDisplayLabel(image?.locality_name || null),
+    latitude: image?.lat ?? null,
+    longitude: image?.lon ?? null
+  });
+  $: similarMotifItems = relatedContent?.sameKeyword || [];
+  $: similarMotifTotalPages = Math.max(1, Math.ceil(similarMotifItems.length / SIMILAR_MOTIFS_PAGE_SIZE));
+  $: if (similarMotifPage > similarMotifTotalPages) {
+    similarMotifPage = similarMotifTotalPages;
+  }
+  $: visibleSimilarMotifItems = similarMotifItems.slice(
+    (similarMotifPage - 1) * SIMILAR_MOTIFS_PAGE_SIZE,
+    similarMotifPage * SIMILAR_MOTIFS_PAGE_SIZE
+  );
   $: rootItem = data?.rootItem ?? image;
   $: contextItem = data?.contextItem ?? image;
   $: groupItems = data?.groupItems ?? [];
@@ -149,6 +278,25 @@ let showRightsManager = false;
         return 0;
       })
     : [];
+  $: if (browser && image?.id && canEditItem) {
+    const shouldAutoEdit = $page.url.searchParams.get('edit') === '1';
+    const focusTarget = $page.url.searchParams.get('focus') || '';
+    const autoEditKey = `${image.id}:${shouldAutoEdit ? '1' : '0'}:${focusTarget}`;
+
+    if (shouldAutoEdit && autoEditAppliedFor !== autoEditKey) {
+      autoEditAppliedFor = autoEditKey;
+      editMode = true;
+
+      setTimeout(() => {
+        if (focusTarget === 'title') startEditTitle();
+        else if (focusTarget === 'description') startEditDescription();
+        else if (focusTarget === 'caption') startEditCaption();
+        else if (focusTarget === 'keywords') startEditKeywords();
+        else if (focusTarget === 'filename') startEditFilename();
+        else if (focusTarget === 'slug') startEditSlug();
+      }, 150);
+    }
+  }
 
   function getPageSettingBoolean(
     settings: Record<string, unknown> | null | undefined,
@@ -157,6 +305,27 @@ let showRightsManager = false;
     if (!settings || typeof settings !== 'object' || Array.isArray(settings)) return null;
     const value = settings[key];
     return typeof value === 'boolean' ? value : null;
+  }
+
+  function normalizeGeoComparisonValue(value: string | null | undefined): string {
+    return (value || '').trim().toLocaleLowerCase('de-DE');
+  }
+
+  function dedupeGeoCrumbs<T extends { name: string; path: string | null }>(crumbs: T[]): T[] {
+    const deduped: T[] = [];
+
+    for (const crumb of crumbs) {
+      const last = deduped[deduped.length - 1];
+      if (last && normalizeGeoComparisonValue(last.name) === normalizeGeoComparisonValue(crumb.name)) {
+        if (!last.path && crumb.path) {
+          deduped[deduped.length - 1] = crumb;
+        }
+        continue;
+      }
+      deduped.push(crumb);
+    }
+
+    return deduped;
   }
 
   function getNearbyGalleryMode(settings: Record<string, unknown> | null | undefined) {
@@ -316,19 +485,6 @@ let showRightsManager = false;
     // Erstelle neuen Favicon-Link mit Cache-Buster
     const faviconLink = document.createElement('link');
     faviconLink.rel = 'icon';
-
-  // Slider-Fortschritt aktualisieren
-  function updateSliderProgress(slider: HTMLInputElement) {
-    const min = +slider.min || 0, max = +slider.max || 100, val = +slider.value;
-    const pct = ((val - min) * 100 / (max - min)) + '%';
-    slider.style.setProperty('--pct', pct);
-  }
-
-  // Slider-Event-Handler
-  function handleSliderInput(event: Event) {
-    const slider = event.target as HTMLInputElement;
-    updateSliderProgress(slider);
-  }
     faviconLink.type = 'image/jpeg';
     
     let faviconUrl = '';
@@ -344,6 +500,21 @@ let showRightsManager = false;
       faviconLink.href = `${faviconUrl}?t=${timestamp}`;
       document.head.appendChild(faviconLink);
     }
+  }
+
+  // Slider-Fortschritt aktualisieren
+  function updateSliderProgress(slider: HTMLInputElement) {
+    const min = +slider.min || 0;
+    const max = +slider.max || 100;
+    const val = +slider.value;
+    const pct = ((val - min) * 100 / (max - min)) + '%';
+    slider.style.setProperty('--pct', pct);
+  }
+
+  // Slider-Event-Handler
+  function handleSliderInput(event: Event) {
+    const slider = event.target as HTMLInputElement;
+    updateSliderProgress(slider);
   }
 
   // Für CreatorCard
@@ -500,7 +671,8 @@ let showRightsManager = false;
         });
       });
       
-      const { lat, lon } = position.coords;
+      const lat = position.coords.latitude;
+      const lon = position.coords.longitude;
       console.log('[Item Detail] Got GPS position from browser:', { lat, lon });
       
       // Update filterStore with GPS position
@@ -585,7 +757,7 @@ let showRightsManager = false;
         try {
           const parsed = JSON.parse(storedFilters);
           console.log('[Item Detail] Parsed stored filters:', parsed);
-        } catch (e) {
+        } catch (e: unknown) {
           console.log('[Item Detail] Failed to parse stored filters:', e);
         }
       }
@@ -696,21 +868,23 @@ let showRightsManager = false;
       }
     }
   }
-  function onRadiusInput(e) {
-    radius = +e.target.value;
+  function onRadiusInput(e: Event) {
+    const target = e.currentTarget as HTMLInputElement;
+    radius = +target.value;
     // Ensure radius never exceeds 2000m
     if (radius > 2000) {
       radius = 2000;
     }
     
     // Update slider progress
-    const slider = e.target as HTMLInputElement;
+    const slider = target;
     const min = +slider.min || 0, max = +slider.max || 100, val = +slider.value;
     const pct = ((val - min) * 100 / (max - min)) + '%';
     slider.style.setProperty('--pct', pct);
   }
-  function onRadiusChange(e) {
-    radius = +e.target.value;
+  function onRadiusChange(e: Event) {
+    const target = e.currentTarget as HTMLInputElement;
+    radius = +target.value;
     // Ensure radius never exceeds 2000m
     if (radius > 2000) {
       radius = 2000;
@@ -746,6 +920,16 @@ let showRightsManager = false;
   let filenameEditValue = '';
   let editingSlug = false;
   let slugEditValue = '';
+  let editingGeoFields = false;
+  let countryNameEditValue = '';
+  let districtNameEditValue = '';
+  let municipalityNameEditValue = '';
+  let localityNameEditValue = '';
+  let geoSearchQuery = '';
+  let geoSearchResults: SearchGeocodeResult[] = [];
+  let geoSearchLoading = false;
+  let geoSearchError = '';
+  let geoSearchTimeout: ReturnType<typeof setTimeout> | null = null;
   let managementForm = {
     type_id: 1,
     group_slug: '',
@@ -795,7 +979,7 @@ let showRightsManager = false;
     });
     goto('/');
   }
-  function formatFileSize(bytes) {
+  function formatFileSize(bytes: number | null | undefined) {
     if (!bytes) return '';
     const kb = bytes / 1024;
     const mb = bytes / (1024 * 1024);
@@ -805,7 +989,7 @@ let showRightsManager = false;
       return kb.toFixed(0) + ' KB';
     }
   }
-  function formatExposureTime(value) {
+  function formatExposureTime(value: string | number | null | undefined) {
     if (value === undefined || value === null) return '';
     if (typeof value === 'string') {
       return value.includes('/') ? value + ' s' : value + ' s';
@@ -817,7 +1001,7 @@ let showRightsManager = false;
     }
     return String(value);
   }
-  function handleKey(e, fn) {
+  function handleKey(e: KeyboardEvent, fn: () => void) {
     if (e.key === 'Enter' || e.key === ' ') {
       fn();
     }
@@ -830,6 +1014,7 @@ let showRightsManager = false;
     if (editingKeywords) await saveKeywords();
     if (editingFilename) await saveFilename();
     if (editingSlug) await saveSlug();
+    if (editingGeoFields) await saveGeoFields();
   }
 
   function toDateTimeLocal(value: string | null | undefined) {
@@ -894,6 +1079,141 @@ let showRightsManager = false;
     rootSearchResults = [];
     groupSlugSuggestions = [];
     managementSaveMessage = '';
+  }
+
+  function startEditGeoFields() {
+    if (currentUser && image && canEditItem && editMode) {
+      editingGeoFields = true;
+      countryNameEditValue = image.country_name || image.country_slug || image.country_code || '';
+      districtNameEditValue = image.district_name || image.district_slug || image.district_code || '';
+      municipalityNameEditValue = image.municipality_name || image.municipality_slug || '';
+      localityNameEditValue = image.locality_name || '';
+      geoSearchQuery = '';
+      geoSearchResults = [];
+      geoSearchLoading = false;
+      geoSearchError = '';
+    }
+  }
+
+  function cancelEditGeoFields() {
+    editingGeoFields = false;
+    countryNameEditValue = image?.country_name || image?.country_slug || image?.country_code || '';
+    districtNameEditValue = image?.district_name || image?.district_slug || image?.district_code || '';
+    municipalityNameEditValue = image?.municipality_name || image?.municipality_slug || '';
+    localityNameEditValue = image?.locality_name || '';
+    geoSearchQuery = '';
+    geoSearchResults = [];
+    geoSearchLoading = false;
+    geoSearchError = '';
+  }
+
+  async function persistGeoFields(countryName: string, districtName: string, municipalityName: string, localityName: string) {
+    try {
+      const res = await authFetch(`/api/item/${image.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          country_name: countryName.trim(),
+          district_name: districtName.trim(),
+          municipality_name: municipalityName.trim(),
+          locality_name: localityName.trim() || null
+        })
+      });
+      if (!res.ok) return;
+      const result = await res.json();
+      if (result?.item) {
+        image = { ...image, ...result.item };
+      }
+      editingGeoFields = false;
+
+      if (browser) {
+        const targetPath =
+          getStoredOrComputedCanonicalPath({
+            item: image,
+            rootItem: image?.group_root_item_id ? selectedRootItem || rootItem : { ...rootItem, ...image },
+            type: contentType
+          }) || canonicalPath || window.location.pathname;
+
+        await goto(`${targetPath}${window.location.search}`, {
+          invalidateAll: true,
+          replaceState: true,
+          noScroll: true
+        });
+      }
+    } catch (err) {
+      console.error('Failed to save geo fields:', err);
+    }
+  }
+
+  async function saveGeoFields() {
+    if (!editingGeoFields || !currentUser || !image || !(isCreator || $unifiedRightsStore.rights?.edit)) return;
+    await persistGeoFields(countryNameEditValue, districtNameEditValue, municipalityNameEditValue, localityNameEditValue);
+    editingGeoFields = false;
+  }
+
+  async function autofillGeoFieldsFromCoordinates() {
+    if (!image?.lat || !image?.lon || !currentUser || !canEditItem || !editMode) return;
+
+    try {
+      const geocoded = await reverseGeocodeCoordinates(Number(image.lat), Number(image.lon));
+      if (!geocoded) return;
+
+      editingGeoFields = true;
+      countryNameEditValue = geocoded.countryName || countryNameEditValue || image.country_name || '';
+      districtNameEditValue = geocoded.districtName || districtNameEditValue || image.district_name || '';
+      municipalityNameEditValue = geocoded.municipalityName || municipalityNameEditValue || image.municipality_name || '';
+      localityNameEditValue = geocoded.localityName || localityNameEditValue || image.locality_name || '';
+      await persistGeoFields(countryNameEditValue, districtNameEditValue, municipalityNameEditValue, localityNameEditValue);
+    } catch (err) {
+      console.error('Failed to autofill geo fields from coordinates:', err);
+    }
+  }
+
+  async function runGeoSearch() {
+    const query = geoSearchQuery.trim();
+    if (query.length < 3) {
+      geoSearchResults = [];
+      geoSearchError = '';
+      geoSearchLoading = false;
+      return;
+    }
+
+    geoSearchLoading = true;
+    geoSearchError = '';
+
+    try {
+      const results = await searchLocationHierarchy(query);
+      geoSearchResults = results;
+      geoSearchError = results.length ? '' : 'Kein passender Ort oder keine Landmarke gefunden.';
+    } catch (err) {
+      console.error('Failed to search geo hierarchy:', err);
+      geoSearchResults = [];
+      geoSearchError = 'Ortssuche ist gerade nicht verfügbar.';
+    } finally {
+      geoSearchLoading = false;
+    }
+  }
+
+  function handleGeoSearchInput() {
+    geoSearchError = '';
+    if (geoSearchTimeout) clearTimeout(geoSearchTimeout);
+    geoSearchTimeout = setTimeout(() => {
+      void runGeoSearch();
+    }, 300);
+  }
+
+  function selectGeoSearchResult(result: SearchGeocodeResult) {
+    if (geoSearchTimeout) {
+      clearTimeout(geoSearchTimeout);
+      geoSearchTimeout = null;
+    }
+    countryNameEditValue = result.countryName || countryNameEditValue;
+    districtNameEditValue = result.districtName || districtNameEditValue;
+    municipalityNameEditValue = result.municipalityName || municipalityNameEditValue;
+    localityNameEditValue = result.localityName || localityNameEditValue;
+    geoSearchQuery = result.displayName || '';
+    geoSearchResults = [];
+    geoSearchError = '';
   }
 
   $: if (image?.id && image.id !== lastManagementImageId) {
@@ -1280,18 +1600,14 @@ let showRightsManager = false;
   async function saveKeywords() {
     if (!editingKeywords || !currentUser || !image || !(isCreator || $unifiedRightsStore.rights?.edit)) return;
     const newKeywords = keywordsEditValue.trim();
-    
-    // Verbesserte Keywords-Verarbeitung
-    const keywordsArray = newKeywords
-      .split(',')
-      .map(k => k.trim())
-      .filter(k => k.length > 0);
-    
-    // Prüfe auf 50 Keywords Limit
-    if (keywordsArray.length > 50) {
-      console.warn('Keywords truncated to 50 items');
-      keywordsArray.splice(50); // Behalte nur die ersten 50
-    }
+    const keywordsArray = sanitizeKeywords(newKeywords, {
+      countryName: image.country_name,
+      stateName: image.state_name,
+      regionName: image.region_name,
+      districtName: image.district_name,
+      municipalityName: image.municipality_name,
+      localityName: image.locality_name
+    });
     
     try {
       const res = await authFetch(`/api/item/${image.id}`, {
@@ -1301,6 +1617,7 @@ let showRightsManager = false;
       });
       if (!res.ok) return;
       image.keywords = keywordsArray;
+      keywordsEditValue = keywordsArray.join(', ');
       editingKeywords = false;
     } catch (err) { console.error('Failed to save keywords:', err); }
   }
@@ -1311,7 +1628,7 @@ let showRightsManager = false;
   }
   // --- Filename ---
   function startEditFilename() {
-    if (currentUser && image && canEditItem && editMode) {
+    if (currentUser && image && canEditItem) {
       editingFilename = true;
       filenameEditValue = image.original_name || '';
       setTimeout(() => {
@@ -1335,7 +1652,12 @@ let showRightsManager = false;
         body: JSON.stringify({ original_name: newFilename })
       });
       if (!res.ok) return;
-      image.original_name = newFilename;
+      const result = await res.json();
+      if (result?.item) {
+        image = { ...image, ...result.item };
+      } else {
+        image.original_name = newFilename;
+      }
       editingFilename = false;
     } catch (err) { console.error('Failed to save filename:', err); }
   }
@@ -1346,7 +1668,7 @@ let showRightsManager = false;
   }
   // --- Slug ---
   function startEditSlug() {
-    if (currentUser && image && canEditItem && editMode) {
+    if (currentUser && image && canEditItem) {
       editingSlug = true;
       slugEditValue = image.slug || '';
       setTimeout(() => {
@@ -1469,14 +1791,30 @@ let showRightsManager = false;
     const item = nearby.find(i => i.id === itemId);
     return item ? item.group_root_item_id === currentVariantRootId : false;
   }
-  function formatRadius(meters) {
+  function formatRadius(meters: number) {
     return meters >= 1000
       ? (meters / 1000).toFixed(1).replace('.', ',') + ' km'
       : meters + ' m';
   }
 
   // Dateigrößen für 64px, 512px, 2048px
-  let fileSizes = { size64: null, size512: null, size2048: null };
+  let fileSizes: { size64: number | null; size512: number | null; size2048: number | null } = { size64: null, size512: null, size2048: null };
+  let rerenderingVariants = false;
+  let replacingOriginal = false;
+
+  function normalizeKeywords(value: string[] | string | null | undefined): string[] {
+    if (!value) return [];
+    const source = Array.isArray(value) ? value : value.split(',');
+    return source
+      .map((keyword: string) => keyword.trim())
+      .filter((keyword: string) => keyword.length > 0)
+      .slice(0, 15)
+      .map((keyword: string) => keyword.normalize('NFC'));
+  }
+
+  function normalizeUtf8(str: string | null | undefined): string {
+    return str ? str.normalize('NFC') : '';
+  }
 
   function buildPublicStorageUrl(bucket: string, path: string | null | undefined) {
     if (!path) return null;
@@ -1536,6 +1874,68 @@ let showRightsManager = false;
   $: if (image && browser) {
     fileSizes = { size64: null, size512: null, size2048: null };
     setTimeout(fetchFileSizes, 1000);
+  }
+
+  async function rerenderImageVariants() {
+    if (!browser || !image?.id || !currentUser || !(isCreator || $unifiedRightsStore.rights?.edit) || !editMode) return;
+    if (rerenderingVariants) return;
+
+    rerenderingVariants = true;
+    try {
+      const res = await authFetch(`/api/item/${image.id}/rerender`, {
+        method: 'POST'
+      });
+
+      const result = await res.json().catch(() => null);
+      if (!res.ok || !result?.success) {
+        throw new Error(result?.error || 'Varianten konnten nicht neu gerendert werden.');
+      }
+
+      if (result.item) {
+        image = { ...image, ...result.item };
+      }
+
+      fileSizes = { size64: null, size512: null, size2048: null };
+      setTimeout(fetchFileSizes, 1200);
+    } catch (err) {
+      console.error('Failed to rerender variants:', err);
+      alert(err instanceof Error ? err.message : 'Varianten konnten nicht neu gerendert werden.');
+    } finally {
+      rerenderingVariants = false;
+    }
+  }
+
+  async function replaceOriginalImage(file: File) {
+    if (!browser || !image?.id || !currentUser || !(isCreator || $unifiedRightsStore.rights?.edit) || !editMode) return;
+    if (replacingOriginal) return;
+
+    replacingOriginal = true;
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await authFetch(`/api/item/${image.id}/rerender`, {
+        method: 'POST',
+        body: formData
+      });
+
+      const result = await res.json().catch(() => null);
+      if (!res.ok || !result?.success) {
+        throw new Error(result?.error || 'Original konnte nicht ersetzt werden.');
+      }
+
+      if (result.item) {
+        image = { ...image, ...result.item };
+      }
+
+      fileSizes = { size64: null, size512: null, size2048: null };
+      setTimeout(fetchFileSizes, 1200);
+    } catch (err) {
+      console.error('Failed to replace original image:', err);
+      alert(err instanceof Error ? err.message : 'Original konnte nicht ersetzt werden.');
+    } finally {
+      replacingOriginal = false;
+    }
   }
 
   // Scroll event listener for scroll-to-top button
@@ -1763,7 +2163,7 @@ let showRightsManager = false;
 
 <svelte:head>
   <title>{image?.title || `Item ${itemSlug} - culoca.com`}</title>
-  <meta name="description" content={image?.description || image?.caption || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
+  <meta name="description" content={trimText(image?.description || image?.caption || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.')}>
   
   <link rel="canonical" href={canonicalUrl}>
   {#if seoLinks?.newer?.canonicalPath}
@@ -1880,12 +2280,7 @@ let showRightsManager = false;
       (image.created_at ? new Date(image.created_at).toISOString() : null)}
     
     <!-- Process keywords: limit to 8-15 precise keywords, convert to array -->
-    {@const keywordsArray = image.keywords 
-      ? (Array.isArray(image.keywords) ? image.keywords : image.keywords.split(',').map(k => k.trim()))
-          .filter(k => k && k.length > 0)
-          .slice(0, 15)
-          .map(k => k.normalize('NFC')) // UTF-8 NFC normalization
-      : []}
+    {@const keywordsArray = normalizeKeywords(image.keywords)}
     
     {@const rawCaption = image.exif_data?.Caption || image.title || itemName}
     {@const exifCaption = image.exif_data?.Caption ? decodeURIComponent(escape(rawCaption)) : (image.title || itemName)}
@@ -1897,19 +2292,20 @@ let showRightsManager = false;
     {@const copyrightNotice = `© ${createdYear} ${creatorName} | culoca.com. Alle Rechte vorbehalten.`}
     
     <!-- UTF-8 Normalization: Ensure NFC (not NFD) to prevent encoding issues like "SchoÃßbach" -->
-    {@const normalizeUTF8 = (str) => str ? str.normalize('NFC') : str}
-    {@const normalizedItemName = normalizeUTF8(itemName)}
-    {@const normalizedCaption = normalizeUTF8(caption)}
-    {@const normalizedDescription = normalizeUTF8(image.description || caption || '')}
-    {@const normalizedCreatorName = normalizeUTF8(creatorName)}
-    {@const normalizedCreditText = normalizeUTF8(creditText)}
-    {@const normalizedCopyrightNotice = normalizeUTF8(copyrightNotice)}
-    {@const normalizedContentLocationName = normalizeUTF8(image.title || itemName)}
+    {@const normalizedItemName = normalizeUtf8(itemName)}
+    {@const normalizedCaption = normalizeUtf8(caption)}
+    {@const normalizedDescription = normalizeUtf8(image.description || caption || '')}
+    {@const normalizedCreatorName = normalizeUtf8(creatorName)}
+    {@const normalizedCreditText = normalizeUtf8(creditText)}
+    {@const normalizedCopyrightNotice = normalizeUtf8(copyrightNotice)}
+    {@const normalizedContentLocationName = normalizeUtf8(geoPlaceGraph.currentPlaceName)}
     
     {@html `<script type="application/ld+json">
     ${JSON.stringify({
       "@context": "https://schema.org",
       "@graph": [
+        itemBreadcrumbJsonLd,
+        ...geoPlaceGraph.nodes,
         {
           "@type": "ImageObject",
           "@id": imageUrl2048,
@@ -1936,13 +2332,9 @@ let showRightsManager = false;
             "name": normalizedCreatorName
           },
           "contentLocation": {
+            "@id": geoPlaceGraph.currentPlaceId,
             "@type": "Place",
-            "name": normalizedContentLocationName,
-            "geo": {
-              "@type": "GeoCoordinates",
-              "latitude": image.lat || 0,
-              "longitude": image.lon || 0
-            }
+            "name": normalizedContentLocationName
           },
           ...(uploadDate && { "datePublished": uploadDate }),
           ...(dateModified && { "dateModified": dateModified }),
@@ -1956,6 +2348,9 @@ let showRightsManager = false;
           "@id": itemUrl,
           "url": itemUrl,
           "name": normalizedItemName,
+          "about": {
+            "@id": geoPlaceGraph.currentPlaceId
+          },
           "primaryImageOfPage": {
             "@id": imageUrl2048
           }
@@ -1967,6 +2362,7 @@ let showRightsManager = false;
 </svelte:head>
 
 <div class="page">
+  <SiteNav />
   {#key itemSlug}
     {#if loading}
       <div class="loading">
@@ -2113,7 +2509,7 @@ let showRightsManager = false;
             </div>
             {#if showGroupSlugInfo}
               <div class="group-slug-info-box">
-                Vergeben sie einen eindeutigen Gruppen Slug, falls Unterelemente hinzugefuegt werden sollen. Sie erhalten dann eine eigene Landingpage fuer z.B. Musikalben, Bildergalerien etc...
+                Vergeben sie einen eindeutigen Gruppen Slug, falls Unterelemente hinzugefügt werden sollen. Sie erhalten dann eine eigene Landingpage für z.B. Musikalben, Bildergalerien etc...
               </div>
             {/if}
             <div class="title-group-slug-input-row">
@@ -2185,9 +2581,9 @@ let showRightsManager = false;
               </span>
             </div>
           {:else}
-            <span class="title-text" on:click={startEditTitle}>
+            <button type="button" class="title-text" on:click={startEditTitle}>
               {image.title || image.original_name || `Bild ${image.id?.substring(0, 8)}...`}
-            </span>
+            </button>
           {/if}
         </h1>
         {#if canEditItem}
@@ -2214,13 +2610,13 @@ let showRightsManager = false;
                 </span>
               </div>
             {:else}
-              <span class="caption-text" on:click={startEditCaption}>
+              <button type="button" class="caption-text" on:click={startEditCaption}>
                 {#if image.caption}
                   <em>{@html image.caption.replace(/\\n/g, '<br>').replace(/\n/g, '<br>')}</em>
                 {:else}
                   <em class="placeholder">Klicke hier um eine emotionale Beschreibung hinzuzufügen</em>
                 {/if}
-              </span>
+              </button>
             {/if}
           </p>
         {:else if image.caption}
@@ -2253,13 +2649,13 @@ let showRightsManager = false;
               </span>
             </div>
           {:else}
-            <span class="description-text" on:click={startEditDescription}>
+            <button type="button" class="description-text" on:click={startEditDescription}>
                 {#if image.description}
                   {image.description}
                 {:else}
                   <span class="placeholder">Keine Beschreibung verfügbar</span>
                 {/if}
-              </span>
+              </button>
             {/if}
         {#if hasEventDetails && !(canEditItem && editMode)}
           <div class="event-detail-list">
@@ -2353,6 +2749,7 @@ let showRightsManager = false;
           onGalleryToggle={handleNearbyGalleryToggle}
           getGalleryStatus={getNearbyGalleryStatus}
           layout={galleryLayout}
+          fallbackRecommendations={nearbyFallbackRecommendations}
         />
       </section>
     {/if}
@@ -2365,8 +2762,7 @@ let showRightsManager = false;
           {#each nearby.slice(0, 300) as item}
             <li>
               <a href={item.canonicalPath || `/item/${item.slug}`} 
-                 title="{item.caption || item.description}"
-                 alt="{item.title} ({Math.round(item.distance)}m)">
+                 title="{item.caption || item.description}">
                 {item.title} ({Math.round(item.distance)}m)
               </a>
             </li>
@@ -2377,9 +2773,9 @@ let showRightsManager = false;
     <div class="meta-section single-exif">
       <!-- Column 1: Keywords -->
       <div class="keywords-column">
-        <h2 class="keywords-title" class:editable={canEditItem && editMode} class:editing={editingKeywords} on:click={startEditKeywords}>
+        <button type="button" class="keywords-title" class:editable={canEditItem && editMode} class:editing={editingKeywords} on:click={startEditKeywords}>
           Keywords
-        </h2>
+        </button>
         {#if editingKeywords}
           <div class="keywords-edit-container">
             <textarea
@@ -2395,13 +2791,13 @@ let showRightsManager = false;
               autocapitalize="sentences"
               placeholder="Keywords durch Kommas getrennt eingeben..."
             ></textarea>
-            <span class="char-count" class:limit-reached={keywordsEditValue.split(',').filter(k => k.trim().length > 0).length >= 50}>{keywordsEditValue.split(',').filter(k => k.trim().length > 0).length}/50</span>
+            <span class="char-count" class:limit-reached={keywordsEditValue.split(',').filter(k => k.trim().length > 0).length >= 30}>{keywordsEditValue.split(',').filter(k => k.trim().length > 0).length}/30</span>
           </div>
         {:else}
           {#if image.keywords && image.keywords.length}
             <div class="keywords">
               {#each image.keywords as kw}
-                <a href="/?s={encodeURIComponent(kw)}" class="chip keyword-link">{kw}</a>
+                <a href={buildKeywordHubPath(kw)} class="chip keyword-link">{kw}</a>
               {/each}
             </div>
           {:else}
@@ -2410,9 +2806,116 @@ let showRightsManager = false;
             </div>
           {/if}
         {/if}
+        <div class="geo-navigation-inline">
+          <div class="geo-navigation-head">
+            <h2>Geo-Navigation</h2>
+            {#if canEditItem && editMode}
+              {#if editingGeoFields}
+                <div class="geo-edit-actions">
+                  {#if image?.lat && image?.lon}
+                    <button type="button" class="geo-edit-btn" on:click={autofillGeoFieldsFromCoordinates}>Ortsdaten aus GPS ermitteln</button>
+                  {/if}
+                  <button type="button" class="geo-edit-btn geo-edit-btn--primary" on:click={saveGeoFields}>Speichern</button>
+                  <button type="button" class="geo-edit-btn" on:click={cancelEditGeoFields}>Abbrechen</button>
+                </div>
+              {:else}
+                <button type="button" class="geo-edit-btn" class:geo-edit-btn--warn={geoNeedsAttention} on:click={startEditGeoFields}>
+                  {geoNeedsAttention ? 'Ortsdaten prüfen' : 'Ortsdaten bearbeiten'}
+                </button>
+              {/if}
+            {/if}
+          </div>
+
+          <nav class="geo-breadcrumbs" aria-label="Geo-Breadcrumb">
+            {#each geoDisplayBreadcrumbs as crumb, index}
+              {#if crumb.path}
+                <a href={crumb.path} aria-current={index === geoDisplayBreadcrumbs.length - 1 ? 'page' : undefined}>{crumb.name}</a>
+              {:else}
+                <span class="geo-crumb-static">{crumb.name}</span>
+              {/if}
+              {#if index < geoDisplayBreadcrumbs.length - 1}
+                <span>/</span>
+              {/if}
+            {/each}
+          </nav>
+
+          <div class="geo-field-grid">
+            {#if editingGeoFields}
+              <div class="geo-search-box">
+                <span class="geo-label">Ort oder Landmarke suchen</span>
+                <input
+                  bind:value={geoSearchQuery}
+                  class="geo-input"
+                  placeholder="z. B. Brandenburger Tor, Wurmannsquick oder Friesing"
+                  on:input={handleGeoSearchInput}
+                />
+                {#if geoSearchLoading}
+                  <div class="geo-search-status">Suche läuft...</div>
+                {:else if geoSearchError}
+                  <div class="geo-search-status geo-search-status--error">{geoSearchError}</div>
+                {/if}
+                {#if geoSearchResults.length > 0}
+                  <div class="geo-search-results">
+                    {#each geoSearchResults as result}
+                      <button type="button" class="geo-search-result" on:click={() => selectGeoSearchResult(result)}>
+                        <strong>{result.displayName}</strong>
+                        <span>
+                          {[
+                            result.countryName,
+                            result.stateName,
+                            result.districtName,
+                            result.municipalityName,
+                            result.localityName
+                          ].filter(Boolean).join(' / ')}
+                        </span>
+                      </button>
+                    {/each}
+                  </div>
+                {/if}
+              </div>
+            {/if}
+            <div class="geo-field">
+              <span class="geo-label">Land</span>
+              {#if editingGeoFields}
+                <input bind:value={countryNameEditValue} class="geo-input" placeholder="Deutschland" />
+              {:else}
+                <span class="geo-value">{geoCountryLabel}</span>
+              {/if}
+            </div>
+            {#if showGeoState || editingGeoFields}
+              <div class="geo-field">
+                <span class="geo-label">Bundesland</span>
+                <span class="geo-value">{geoStateLabel || 'Noch nicht zugewiesen'}</span>
+              </div>
+            {/if}
+            {#if showGeoRegion || editingGeoFields}
+              <div class="geo-field">
+                <span class="geo-label">Bezirk / Region</span>
+                <span class="geo-value">{geoRegionLabel || 'Noch nicht zugewiesen'}</span>
+              </div>
+            {/if}
+            <div class="geo-field">
+              <span class="geo-label">Landkreis / Region</span>
+              {#if editingGeoFields}
+                <input bind:value={districtNameEditValue} class="geo-input" placeholder="Landkreis Altötting" />
+              {:else}
+                <span class="geo-value">{geoDistrictLabel}</span>
+              {/if}
+            </div>
+            <div class="geo-field">
+              <span class="geo-label">Gemeinde</span>
+              {#if editingGeoFields}
+                <input bind:value={municipalityNameEditValue} class="geo-input" placeholder="Reischach" />
+              {:else}
+                <span class="geo-value">{geoMunicipalityLabel}</span>
+              {/if}
+            </div>
+          </div>
+        </div>
         <FileDetails
           {image}
           isCreator={canEditItem}
+          canEditQuickFields={canEditItem}
           {editMode}
           {editingFilename}
           bind:filenameEditValue
@@ -2427,6 +2930,10 @@ let showRightsManager = false;
           {fileSizes}
           {formatFileSize}
           {browser}
+          {rerenderingVariants}
+          rerenderVariants={rerenderImageVariants}
+          {replacingOriginal}
+          replaceOriginalFile={replaceOriginalImage}
         />
 
         {#if isCreator}
@@ -2471,7 +2978,7 @@ let showRightsManager = false;
       </div>
       <!-- Column 2: All EXIF/Meta -->
       <div class="meta-column">
-        <h2 class="exif-toggle" on:click={() => showFullExif = true} on:keydown={(e) => handleKey(e, () => showFullExif = true)}>Aufnahmedaten</h2>
+        <button type="button" class="exif-toggle" on:click={() => showFullExif = true}>Aufnahmedaten</button>
         <!-- Immer die Basisdaten anzeigen -->
         {#if true}
           <!-- Essential EXIF data -->
@@ -2537,25 +3044,25 @@ let showRightsManager = false;
         {#if image.profile}
           <div class="creator-header">
             {#if image.profile.avatar_url}
-              <img
-                src={image.profile.avatar_url.startsWith('http') ? image.profile.avatar_url : `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/avatars/${image.profile.avatar_url}`}
-                alt="Avatar"
-                class="avatar clickable-avatar"
-                on:click={setUserFilter}
-                title={`Nur Bilder von ${image.profile.full_name} anzeigen`}
-              />
+              <button type="button" class="avatar-button clickable-avatar" on:click={setUserFilter} title={`Nur Bilder von ${image.profile.full_name} anzeigen`}>
+                <img
+                  src={image.profile.avatar_url.startsWith('http') ? image.profile.avatar_url : `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/avatars/${image.profile.avatar_url}`}
+                  alt="Avatar"
+                  class="avatar"
+                />
+              </button>
             {:else}
-              <div class="avatar-placeholder clickable-avatar" on:click={setUserFilter} title={`Nur Bilder von ${image.profile.full_name} anzeigen`}>
+              <button type="button" class="avatar-placeholder clickable-avatar" on:click={setUserFilter} title={`Nur Bilder von ${image.profile.full_name} anzeigen`}>
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
                 </svg>
-              </div>
+              </button>
             {/if}
           </div>
           <div class="creator-details">
-            <h3 class="creator-name clickable-name" on:click={setUserFilter} on:keydown={(e) => handleKey(e, setUserFilter)} title={`Nur Bilder von ${image.profile.full_name} anzeigen`}>
+            <button type="button" class="creator-name clickable-name" on:click={setUserFilter} title={`Nur Bilder von ${image.profile.full_name} anzeigen`}>
               {image.profile.full_name}
-            </h3>
+            </button>
             <div class="creator-address">
               {#if image.profile.show_address && image.profile.address}
                 <div>{@html image.profile.address.replace(/\n/g, '<br>')}</div>
@@ -2647,6 +3154,82 @@ let showRightsManager = false;
         }
       }}
     />
+    {#if similarMotifItems.length}
+      <section class="similar-motifs-panel">
+        <div class="similar-motifs-head">
+          <div>
+            <h2>Ähnliche Motive aus Vektoranalyse</h2>
+            <p>
+              {similarMotifItems.length.toLocaleString('de-DE')} thematisch passende Fotos, semantisch
+              gruppiert statt zufällig über Keywords.
+            </p>
+          </div>
+        </div>
+
+        <div class="similar-motifs-grid">
+          {#each visibleSimilarMotifItems as item (item.id)}
+            <article class="similar-item-card">
+              <a href={item.canonicalPath} class="similar-item-link">
+                {#if item.path_512}
+                  <div class="similar-item-thumb" style={`--thumb-preview:url('${relatedThumbUrl(item)}')`}>
+                    <img
+                      src={relatedThumbUrl(item)}
+                      alt={item.title || 'Aehnliches Motiv'}
+                      width="320"
+                      height="213"
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  </div>
+                {/if}
+                <div class="similar-item-body">
+                  <h3>{item.title}</h3>
+                  <p>{trimText(item.description || item.caption || 'Aehnliches Motiv auf Culoca.', 100)}</p>
+                </div>
+              </a>
+            </article>
+          {/each}
+        </div>
+
+        {#if similarMotifTotalPages > 1}
+          <nav class="pagination similar-pagination" aria-label="Pagination ähnliche Motive">
+            <button
+              type="button"
+              class="pg-link"
+              on:click={() => (similarMotifPage = Math.max(1, similarMotifPage - 1))}
+              disabled={similarMotifPage === 1}
+            >
+              Zurück
+            </button>
+
+            {#each Array.from({ length: similarMotifTotalPages }, (_, i) => i + 1) as p}
+              {#if p === 1 || p === similarMotifTotalPages || (p >= similarMotifPage - 2 && p <= similarMotifPage + 2)}
+                <button
+                  type="button"
+                  class="pg-link"
+                  class:pg-active={p === similarMotifPage}
+                  aria-current={p === similarMotifPage ? 'page' : undefined}
+                  on:click={() => (similarMotifPage = p)}
+                >
+                  {p}
+                </button>
+              {:else if p === similarMotifPage - 3 || p === similarMotifPage + 3}
+                <span class="pg-dots" aria-hidden="true">...</span>
+              {/if}
+            {/each}
+
+            <button
+              type="button"
+              class="pg-link"
+              on:click={() => (similarMotifPage = Math.min(similarMotifTotalPages, similarMotifPage + 1))}
+              disabled={similarMotifPage === similarMotifTotalPages}
+            >
+              Weiter
+            </button>
+          </nav>
+        {/if}
+      </section>
+    {/if}
 
     <!-- Item Rights Manager Overlay -->
     {#if showRightsManager && image}
@@ -2733,6 +3316,7 @@ let showRightsManager = false;
     </button>
   {/if}
 
+
   <!-- Scroll to Top / Fullscreen FAB - ersetzt sich gegenseitig -->
   {#if showScrollToTop}
     <button
@@ -2762,33 +3346,12 @@ let showRightsManager = false;
         <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
       </svg>
     </button>
-  {/if}
-    {/key}
+    {/if}
+  {/key}
+  <SiteFooter />
 </div>
 
 <style>
-  .meta-section-grid {
-    display: grid;
-    grid-template-columns: 2fr 1fr 1fr;
-    gap: 2rem;
-    margin-top: 2.5rem;
-    margin-bottom: 2.5rem;
-    align-items: flex-start;
-  }
-  .meta-col {
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-  }
-  .meta-col-1 {
-    /* Optional: für größere Breite */
-  }
-  .meta-col-2 {
-    /* Optional: für mittlere Spalte */
-  }
-  .meta-col-3 {
-    /* Optional: für rechte Spalte */
-  }
   .title-text:hover,
   .description-text:hover {
     color: var(--culoca-orange, #ee7221);
@@ -2876,16 +3439,6 @@ let showRightsManager = false;
     background: transparent;
   }
 
-  .description.placeholder {
-    color: var(--text-muted);
-    font-style: italic;
-    background: transparent;
-  }
-  .passepartout-container .description.placeholder {
-    color: var(--bg-secondary);
-    font-style: italic;
-    background: transparent;
-  }
   .title.editable {
     cursor: pointer;
     transition: color 0.2s;
@@ -2902,6 +3455,10 @@ let showRightsManager = false;
     padding: 0.25rem 0.5rem;
     border-radius: 4px;
     margin: -0.25rem -0.5rem;
+    border: none;
+    background: transparent;
+    font: inherit;
+    color: inherit;
   }
   .title.editable:hover .title-text {
     color: var(--culoca-orange);
@@ -2969,6 +3526,11 @@ let showRightsManager = false;
     padding: 0.25rem 0.5rem;
     border-radius: 4px;
     margin: -0.25rem -0.5rem;
+    border: none;
+    background: transparent;
+    font: inherit;
+    color: inherit;
+    text-align: inherit;
   }
   .description.editable:hover .description-text {
     color: var(--culoca-orange);
@@ -3038,23 +3600,6 @@ let showRightsManager = false;
     font-weight: 400;
     color: var(--text-muted);
     margin-left: 0.3rem;
-  }
-  .hidden-count {
-    font-size: 0.85rem;
-    font-weight: 400;
-    color: var(--text-muted);
-    margin-left: 0.3rem;
-    cursor: pointer;
-    transition: color 0.2s;
-    opacity: 0.7;
-  }
-  .hidden-count:hover {
-    color: var(--culoca-orange);
-    opacity: 1;
-  }
-  .hidden-count.active {
-    color: var(--culoca-orange);
-    opacity: 1;
   }
   /* Range-Slider mit gefüllter Spur */
   .radius-control input[type="range"] {
@@ -3126,48 +3671,6 @@ let showRightsManager = false;
   .radius-control input[type="range"]:hover::-moz-range-thumb { 
     transform: scale(.98); 
   }
-  .transition-area {
-    position: relative;
-    background: var(--bg-secondary);
-    padding: 1rem 0.5rem;
-    margin-top: -2px;
-    overflow: hidden;
-  }
-  .controls-section {
-    position: relative;
-    z-index: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.7rem;
-    margin-bottom: 0.2rem;
-    background: transparent;
-    margin-top: 12px;
-  }
-  .action-buttons {
-    display: flex;
-    gap: 0.7rem;
-    justify-content: center;
-    margin-top: 0;
-    margin-bottom: 0.2rem;
-    background: transparent;
-  }
-  .info-section {
-    background: var(--bg-primary);
-    color: var(--text-primary);
-    margin-top: 0;
-    padding: 0;
-  }
-  .centered-content {
-    text-align: center;
-    margin-bottom: 2rem;
-    background: transparent;
-    padding: 0;
-  }
-  .edge-to-edge-gallery {
-    width: 100%;
-    margin: 0 auto;
-  }
   .meta-section.single-exif {
     display: grid;
     grid-template-columns: 2.5fr 1fr 1fr;
@@ -3178,6 +3681,118 @@ let showRightsManager = false;
     padding: 1rem;
     align-items: flex-start;
     overflow: hidden;
+  }
+  .geo-navigation-inline {
+    display: grid;
+    gap: 0.9rem;
+    margin-top: 0.25rem;
+    margin-bottom: 1.15rem;
+  }
+  .geo-navigation-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: center;
+  }
+  .geo-breadcrumbs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+  }
+  .geo-breadcrumbs a {
+    color: inherit;
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .geo-crumb-static {
+    color: inherit;
+    font-weight: 600;
+  }
+  .geo-breadcrumbs a:hover {
+    color: var(--culoca-orange);
+  }
+  .geo-field-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.85rem;
+  }
+  .geo-search-box {
+    grid-column: 1 / -1;
+    display: grid;
+    gap: 0.45rem;
+  }
+  .geo-field {
+    display: grid;
+    gap: 0.3rem;
+  }
+  .geo-label {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-secondary);
+  }
+  .geo-value {
+    font-size: 1rem;
+    color: var(--text-primary);
+    word-break: break-word;
+  }
+  .geo-input {
+    width: 100%;
+    padding: 0.45rem 0.65rem;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font: inherit;
+  }
+  .geo-search-status {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+  }
+  .geo-search-status--error {
+    color: #991b1b;
+  }
+  .geo-search-results {
+    display: grid;
+    gap: 0.45rem;
+  }
+  .geo-search-result {
+    display: grid;
+    gap: 0.2rem;
+    text-align: left;
+    border: 1px solid var(--border-color);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    border-radius: 10px;
+    padding: 0.7rem 0.8rem;
+    cursor: pointer;
+    font: inherit;
+  }
+  .geo-edit-actions {
+    display: flex;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+  }
+  .geo-edit-btn {
+    border: 1px solid var(--border-color);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    border-radius: 999px;
+    padding: 0.55rem 0.95rem;
+    font: inherit;
+    cursor: pointer;
+  }
+  .geo-edit-btn--primary {
+    background: var(--culoca-orange);
+    color: #fff;
+    border-color: var(--culoca-orange);
+  }
+  .geo-edit-btn--warn {
+    background: color-mix(in srgb, #b91c1c 14%, var(--bg-primary));
+    color: #991b1b;
+    border-color: color-mix(in srgb, #b91c1c 55%, transparent);
   }
   .meta-column, .column-card, .keywords-column {
     display: flex;
@@ -3195,6 +3810,11 @@ let showRightsManager = false;
   .exif-toggle {
     cursor: pointer;
     transition: color 0.2s ease;
+    border: none;
+    background: transparent;
+    font: inherit;
+    text-align: left;
+    padding: 0;
   }
   .exif-toggle:hover {
     color: var(--culoca-orange);
@@ -3231,6 +3851,12 @@ let showRightsManager = false;
     justify-content: flex-start;
     margin-bottom: 1rem;
   }
+  .avatar-button {
+    border: none;
+    background: transparent;
+    padding: 0;
+    display: inline-flex;
+  }
   .clickable-avatar, .avatar-placeholder {
     cursor: pointer;
     transition: all 0.2s ease;
@@ -3254,6 +3880,12 @@ let showRightsManager = false;
   .creator-name {
     cursor: pointer;
     transition: color 0.2s ease;
+    border: none;
+    background: transparent;
+    padding: 0;
+    font: inherit;
+    color: inherit;
+    text-align: left;
   }
   .creator-name:hover {
     color: var(--culoca-orange);
@@ -3372,6 +4004,9 @@ let showRightsManager = false;
     color: var(--text-primary);
     margin: 0 0 1rem 0;
     padding: 0;
+    border: none;
+    background: transparent;
+    text-align: left;
   }
   .keywords-title.editable {
     cursor: pointer;
@@ -3395,7 +4030,13 @@ let showRightsManager = false;
   }
   .caption-text {
     display: block;
+    width: 100%;
     background: transparent;
+    border: none;
+    padding: 0;
+    font: inherit;
+    color: inherit;
+    text-align: center;
   }
   .caption-edit-container {
     position: relative;
@@ -3421,10 +4062,6 @@ let showRightsManager = false;
   }
   .caption-edit-input.valid {
     border-color: var(--success-color);
-  }
-  .caption.placeholder {
-    color: var(--text-muted);
-    font-style: italic;
   }
   .keywords-title.editable:hover {
     color: var(--culoca-orange);
@@ -3468,42 +4105,6 @@ let showRightsManager = false;
   .char-count.valid {
     color: var(--success-color);
   }
-  .char-count.too-many {
-    color: var(--error-color);
-  }
-  .map-pin-btn {
-    display: block;
-    margin-left: 1rem;
-    vertical-align: middle;
-  }
-  .map-pin-btn:hover svg path {
-    fill: var(--culoca-orange, #ee7221);
-  }
-  /* Filename Edit Styles (aus Sicherung) */
-  .filename-edit-container {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    justify-content: flex-end;
-    background: transparent;
-  }
-  .filename-edit-input {
-    background: var(--bg-secondary);
-    border: 2px solid var(--border-color);
-    border-radius: 4px;
-    color: var(--text-primary);
-    font-size: 1rem;
-    padding: 0.5rem;
-    text-align: left;
-    width: 100%;
-    transition: border-color 0.2s, background-color 0.3s ease, color 0.3s ease;
-    font-family: inherit;
-  }
-  .filename-edit-input:focus {
-    outline: none;
-    border-color: var(--accent-color);
-    background: var(--bg-tertiary);
-  }
   .char-count {
     font-size: 0.8rem;
     color: var(--text-muted);
@@ -3517,6 +4118,21 @@ let showRightsManager = false;
       grid-template-columns: 1fr;
       padding: 1rem 0.5rem;
       gap: 1.5rem;
+    }
+    .geo-navigation-inline {
+      justify-items: center;
+      text-align: center;
+    }
+    .geo-breadcrumbs {
+      justify-content: center;
+    }
+    .geo-field-grid {
+      grid-template-columns: 1fr;
+      width: 100%;
+    }
+    .geo-field {
+      justify-items: center;
+      text-align: center;
     }
     .keywords-column, .meta-column, .column-card {
       text-align: center;
@@ -3542,6 +4158,10 @@ let showRightsManager = false;
     .meta-section.single-exif {
       grid-template-columns: 1fr;
       gap: 2rem;
+    }
+    .geo-navigation-head {
+      align-items: flex-start;
+      flex-direction: column;
     }
     .keywords-column, .meta-column, .column-card {
       text-align: center;
@@ -4079,7 +4699,7 @@ let showRightsManager = false;
   }
 
   .content-panel {
-    max-width: 1100px;
+    max-width: 1400px;
     margin: 1rem auto;
     padding: 1rem 1.1rem;
     border: 1px solid var(--border-color);
@@ -4210,44 +4830,197 @@ let showRightsManager = false;
     border: 0;
   }
 
-  .group-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 0.75rem;
+  .similar-motifs-panel {
+    width: 100%;
+    padding: 1.25rem 1rem 1rem;
+    background: var(--passepartout-bg);
   }
 
-  .group-card {
+  .similar-motifs-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .similar-motifs-head h2 {
+    margin: 0;
+  }
+
+  .similar-motifs-head p {
+    margin: 0.45rem 0 0;
+    color: var(--text-secondary);
+    max-width: 72ch;
+  }
+
+  .similar-motifs-grid {
     display: grid;
-    grid-template-columns: 56px 1fr;
-    gap: 0.75rem;
-    align-items: center;
-    padding: 0.75rem;
-    border: 1px solid var(--border-color);
-    border-radius: 12px;
-    color: inherit;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+  }
+
+  .similar-item-card {
+    overflow: hidden;
+    background: transparent;
+    border: 0;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+
+  .similar-item-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.1);
+  }
+
+  .similar-item-link {
+    display: flex;
+    flex-direction: column;
     text-decoration: none;
+    color: inherit;
+    height: 100%;
+  }
+
+  .similar-item-thumb {
+    position: relative;
+    aspect-ratio: 3 / 2;
+    overflow: hidden;
+    background: var(--bg-tertiary);
+  }
+
+  .similar-item-thumb::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: var(--thumb-preview);
+    background-size: cover;
+    background-position: center;
+    transform: scale(1.08);
+    filter: blur(14px) saturate(0.9);
+    opacity: 0.5;
+  }
+
+  .similar-item-thumb img {
+    position: relative;
+    z-index: 1;
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    transition: transform 0.3s;
+  }
+
+  .similar-item-card:hover .similar-item-thumb img {
+    transform: scale(1.04);
+  }
+
+  .similar-item-body {
+    padding: 0.75rem 0.85rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    flex: 1;
     background: var(--bg-primary);
   }
 
-  .group-card.active {
-    border-color: var(--accent-color);
-  }
-
-  .group-card img {
-    width: 56px;
-    height: 56px;
-    object-fit: cover;
-    border-radius: 10px;
-  }
-
-  .group-card strong,
-  .group-card span {
-    display: block;
-  }
-
-  .group-card span {
-    margin-top: 0.25rem;
-    color: var(--text-secondary);
+  .similar-item-body h3 {
+    margin: 0;
     font-size: 0.9rem;
+    font-weight: 600;
+    line-height: 1.35;
+    color: var(--text-primary);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .similar-item-body p {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    line-height: 1.45;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .similar-pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.35rem;
+    margin-top: 2.5rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .pg-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 36px;
+    height: 36px;
+    padding: 0 0.6rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    text-decoration: none;
+    transition: background 0.15s, color 0.15s, border-color 0.15s, opacity 0.15s;
+  }
+
+  .similar-pagination button.pg-link {
+    font-family: inherit;
+    cursor: pointer;
+  }
+
+  .pg-link:hover:not(:disabled) {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border-color: var(--text-muted);
+  }
+
+  .pg-link:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+
+  .pg-active {
+    background: var(--culoca-orange);
+    color: #fff;
+    border-color: var(--culoca-orange);
+    pointer-events: none;
+  }
+
+  .pg-dots {
+    padding: 0 0.25rem;
+    color: var(--text-muted);
+  }
+
+  @media (max-width: 960px) {
+    .similar-motifs-grid {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+
+  @media (max-width: 720px) {
+    .similar-motifs-panel {
+      padding: 0 1rem;
+    }
+
+    .similar-motifs-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  @media (max-width: 520px) {
+    .similar-motifs-grid {
+      grid-template-columns: 1fr;
+    }
   }
 </style> 

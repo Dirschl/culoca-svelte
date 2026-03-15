@@ -5,9 +5,12 @@
   import { hasAdminPermission, isAuthenticated, customerBranding } from '$lib/sessionStore';
   import { supabase } from '$lib/supabaseClient';
   import { currentPathWithSearch, sanitizeReturnTo } from '$lib/returnTo';
+  import { fetchAllReviewItems, fetchProfileReviewItems } from '$lib/profile/review';
 
   let mobileOpen = false;
   let openDropdown: string | null = null;
+  let reviewCount = 0;
+  let adminReviewCount = 0;
 
   const navLinks = [
     { href: '/foto', label: 'Fotos' },
@@ -35,6 +38,7 @@
     { href: '/admin/roles', label: 'Rollen' },
     { href: '/admin/users', label: 'Benutzer' },
     { href: '/admin/items', label: 'Items' },
+    { href: '/admin/moderation', label: 'Moderation' },
     { href: '/admin/analytics', label: 'Analytics' },
   ];
 
@@ -42,6 +46,8 @@
     { href: '/settings', label: 'Einstellungen' },
     { href: '/standort', label: 'Standort' },
     { href: '/profile', label: 'Profil' },
+    { href: '/profile/review', label: 'Daten prüfen' },
+    { href: '/foto/upload', label: 'Foto-Upload' },
     { href: '/profile/freigaben', label: 'Freigaben' },
   ];
 
@@ -50,6 +56,37 @@
   $: userMenuLabel = $isAuthenticated && displayName ? displayName : ($isAuthenticated ? 'Konto' : 'Login');
   $: userMenuActive = isActive('/settings') || isActive('/standort') || isActive('/profile') || isActive('/profile/freigaben') || isActive('/login') || ($hasAdminPermission && adminLinks.some(l => isActive(l.href)));
   $: inheritedReturnTo = sanitizeReturnTo($page.url.searchParams.get('returnTo'), currentPathWithSearch($page.url));
+
+  async function refreshReviewCount() {
+    if (!$isAuthenticated) {
+      reviewCount = 0;
+      adminReviewCount = 0;
+      return;
+    }
+
+    const { data } = await supabase.auth.getUser();
+    if (!data.user) {
+      reviewCount = 0;
+      adminReviewCount = 0;
+      return;
+    }
+
+    try {
+      const ownReviewItems = await fetchProfileReviewItems(supabase, data.user.id);
+      reviewCount = ownReviewItems.length;
+
+      if ($hasAdminPermission) {
+        const allReviewItems = await fetchAllReviewItems(supabase);
+        adminReviewCount = allReviewItems.filter((item) => item.profile_id && item.profile_id !== data.user.id).length;
+      } else {
+        adminReviewCount = 0;
+      }
+    } catch (error) {
+      console.error('Failed to load review count:', error);
+      reviewCount = 0;
+      adminReviewCount = 0;
+    }
+  }
 
   function getUserLinkHref(href: string): string {
     return `${href}?returnTo=${encodeURIComponent(inheritedReturnTo)}`;
@@ -93,7 +130,20 @@
     goto('/');
   }
 
+  function getReviewTargetHref() {
+    return getUserLinkHref('/profile/review');
+  }
+
+  function handleReviewBadgeClick(event: MouseEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    closeDropdowns();
+    closeMobile();
+    goto(getReviewTargetHref());
+  }
+
   onMount(() => {
+    refreshReviewCount();
     const handler = (e: MouseEvent) => {
       if (!(e.target as HTMLElement)?.closest('.dropdown')) {
         closeDropdowns();
@@ -183,6 +233,17 @@
         >
           <svg class="user-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
           {userMenuLabel}
+          {#if reviewCount > 0}
+            <button
+              type="button"
+              class="review-badge review-badge--button"
+              aria-label={`${reviewCount} offene Daten`}
+              title={$hasAdminPermission ? 'Zur Moderationsliste' : 'Zur Review-Liste'}
+              on:click={handleReviewBadgeClick}
+            >
+              {reviewCount}
+            </button>
+          {/if}
           {#if $isAuthenticated}
             <svg class="dd-arrow" class:dd-open={openDropdown === 'user'} width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5l3 3 3-3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>
           {/if}
@@ -190,13 +251,23 @@
         {#if $isAuthenticated && openDropdown === 'user'}
           <div class="dropdown-menu dropdown-menu--user">
             {#each userLinks as link}
-              <a href={getUserLinkHref(link.href)} class="dropdown-item" class:active={isActive(link.href)} on:click={closeDropdowns}>{link.label}</a>
+              <a href={getUserLinkHref(link.href)} class="dropdown-item" class:active={isActive(link.href)} on:click={closeDropdowns}>
+                {link.label}
+                {#if link.href === '/profile/review' && reviewCount > 0}
+                  <span class="review-badge review-badge--inline">{reviewCount}</span>
+                {/if}
+              </a>
             {/each}
             {#if $hasAdminPermission}
               <div class="dropdown-divider"></div>
               <span class="dropdown-label">Admin</span>
               {#each adminLinks as link}
-                <a href={link.href} class="dropdown-item" class:active={isActive(link.href)} on:click={closeDropdowns}>{link.label}</a>
+                <a href={link.href} class="dropdown-item" class:active={isActive(link.href)} on:click={closeDropdowns}>
+                  {link.label}
+                  {#if link.href === '/admin/moderation' && adminReviewCount > 0}
+                    <span class="review-badge review-badge--inline">{adminReviewCount}</span>
+                  {/if}
+                </a>
               {/each}
             {/if}
             <div class="dropdown-divider"></div>
@@ -213,12 +284,22 @@
         {#if $isAuthenticated}
           <span class="nav-group-label">{userMenuLabel}</span>
           {#each userLinks as link}
-            <a href={getUserLinkHref(link.href)} class="nav-link nav-link--sub" class:active={isActive(link.href)} on:click={closeMobile}>{link.label}</a>
+            <a href={getUserLinkHref(link.href)} class="nav-link nav-link--sub" class:active={isActive(link.href)} on:click={closeMobile}>
+              {link.label}
+              {#if link.href === '/profile/review' && reviewCount > 0}
+                <span class="review-badge review-badge--inline">{reviewCount}</span>
+              {/if}
+            </a>
           {/each}
           {#if $hasAdminPermission}
             <span class="nav-group-label nav-group-label--nested">Admin</span>
             {#each adminLinks as link}
-              <a href={link.href} class="nav-link nav-link--sub" class:active={isActive(link.href)} on:click={closeMobile}>{link.label}</a>
+              <a href={link.href} class="nav-link nav-link--sub" class:active={isActive(link.href)} on:click={closeMobile}>
+                {link.label}
+                {#if link.href === '/admin/moderation' && adminReviewCount > 0}
+                  <span class="review-badge review-badge--inline">{adminReviewCount}</span>
+                {/if}
+              </a>
             {/each}
           {/if}
           <button class="nav-link nav-link--sub nav-link--logout" on:click={handleLogout}>
@@ -382,6 +463,28 @@
     gap: 0.4rem;
   }
   .user-icon { flex-shrink: 0; opacity: 0.7; }
+  .review-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.35rem;
+    height: 1.35rem;
+    padding: 0 0.35rem;
+    border-radius: 999px;
+    background: #c1121f;
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .review-badge--button {
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .review-badge--inline {
+    margin-left: auto;
+  }
 
   /* Mobile helpers */
   .mobile-only { display: none; }

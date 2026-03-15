@@ -20,6 +20,14 @@ Disallow: /admin/
 Disallow: /api/
 Disallow: /auth/
 Disallow: /simulation/
+Disallow: /*?*sort=
+Disallow: /*?*radius=
+Disallow: /*?*lat=
+Disallow: /*?*lon=
+Disallow: /*?*locationFilter
+Disallow: /*?*mobile=
+Disallow: /*?*returnTo=
+Disallow: /*?*bot=
 
 # Spezifische API-Endpunkte explizit blockieren
 Disallow: /api/admin/

@@ -112,8 +112,8 @@
       <li><strong>Firma:</strong> DIRSCHL.com GmbH</li>
       <li><strong>Geschäftsführer:</strong> Johann Dirschl</li>
       <li><strong>Adresse:</strong> Waldberg 84, 84571 Reischach</li>
-      <li><strong>Telefon:</strong> <a href="tel:+491799766666" style="color: var(--text-secondary); transition: color 0.2s ease;" onmouseover="this.style.color='#ee7221'" onmouseout="this.style.color='var(--text-secondary)'">+49 179 9766666</a></li>
-      <li><strong>E-Mail:</strong> <a href="mailto:johann.dirschl@gmx.de" style="color: var(--text-secondary); transition: color 0.2s ease;" onmouseover="this.style.color='#ee7221'" onmouseout="this.style.color='var(--text-secondary)'">johann.dirschl@gmx.de</a></li>
+      <li><strong>Telefon:</strong> <a class="contact-link" href="tel:+491799766666">+49 179 9766666</a></li>
+      <li><strong>E-Mail:</strong> <a class="contact-link" href="mailto:johann.dirschl@gmx.de">johann.dirschl@gmx.de</a></li>
     </ul>
   </div>
   
@@ -177,8 +177,8 @@
       Sie sich bitte an:
     </p>
     <ul>
-      <li><strong>E-Mail:</strong> <a href="mailto:johann.dirschl@gmx.de" style="color: var(--text-secondary); transition: color 0.2s ease;" onmouseover="this.style.color='#ee7221'" onmouseout="this.style.color='var(--text-secondary)'">johann.dirschl@gmx.de</a></li>
-      <li><strong>Telefon:</strong> <a href="tel:+491799766666" style="color: var(--text-secondary); transition: color 0.2s ease;" onmouseover="this.style.color='#ee7221'" onmouseout="this.style.color='var(--text-secondary)'">+49 179 9766666</a></li>
+      <li><strong>E-Mail:</strong> <a class="contact-link" href="mailto:johann.dirschl@gmx.de">johann.dirschl@gmx.de</a></li>
+      <li><strong>Telefon:</strong> <a class="contact-link" href="tel:+491799766666">+49 179 9766666</a></li>
     </ul>
   </div>
   
@@ -194,120 +194,13 @@
 </InfoPageLayout>
 
 <style>
-  .fullscreen-page {
-    display: flex;
-    flex-direction: column;
-    min-height: 100vh;
-    background: var(--bg-primary);
-    color: var(--text-primary);
-  }
-
-  .page-header {
-    display: flex;
-    justify-content: flex-start;
-    align-items: center;
-    padding: 1rem 2rem;
-    background: var(--bg-secondary);
-    box-shadow: 0 2px 8px var(--shadow);
-  }
-  
-  .back-button {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    background: var(--culoca-orange);
-    color: white;
-    padding: 0.75rem 1.25rem;
-    border-radius: 8px;
-    font-weight: 500;
-    font-size: 0.9rem;
-    transition: background 0.2s;
-    border: none;
-    cursor: pointer;
-  }
-  
-  .back-button:hover {
-    background: var(--accent-color);
-  }
-
-  .content {
-    flex-grow: 1;
-    padding: 2rem;
-    max-width: 1200px;
-    margin: 0 auto;
-    width: 100%;
-  }
-
-  section#datenschutz {
-    background: var(--bg-primary);
-    color: var(--text-primary);
-    font-size: 1rem;
-    line-height: 1.7;
-  }
-
-  section#datenschutz h2 {
-    margin: 0 0 2rem 0;
-    font-size: 2.5rem;
-    color: var(--text-primary);
-  }
-
-  section#datenschutz h3 {
-    margin: 2.5rem 0 1rem 0;
-    font-size: 1.5rem;
-    color: var(--text-primary);
-  }
-
-  section#datenschutz h4 {
-    margin: 1.5rem 0 0.5rem 0;
-    font-size: 1.2rem;
-    color: var(--text-primary);
-  }
-
-  section#datenschutz p,
-  section#datenschutz ul,
-  section#datenschutz li {
+  .contact-link {
     color: var(--text-secondary);
-    margin-bottom: 1rem;
-    font-size: 1.1rem;
+    transition: color 0.2s ease;
   }
 
-  section#datenschutz ul {
-    margin-left: 1.5rem;
-    margin-bottom: 1.5rem;
+  .contact-link:hover {
+    color: #ee7221;
   }
 
-  section#datenschutz a {
-    color: var(--culoca-orange);
-    text-decoration: none;
-  }
-
-  section#datenschutz a:hover {
-    color: var(--accent-color);
-    text-decoration: underline;
-  }
-
-  @media (max-width: 768px) {
-    .page-header {
-      padding: 1rem;
-    }
-
-    .content {
-      padding: 1.5rem 1rem;
-    }
-
-    section#datenschutz h2 {
-      font-size: 2rem;
-      margin-bottom: 1.5rem;
-    }
-
-    section#datenschutz h3 {
-      font-size: 1.3rem;
-      margin: 2rem 0 0.8rem 0;
-    }
-
-    .back-button {
-      padding: 0.6rem 1rem;
-      font-size: 0.85rem;
-    }
-  }
 </style> 

@@ -43,7 +43,8 @@
     const session = get(sessionStore);
     isLoggedIn = session.isAuthenticated;
     currentUserId = session.userId || '';
-    userName = session.user?.user_metadata?.name || session.user?.user_metadata?.full_name || '';
+    const sessionUser = (session as any).user;
+    userName = sessionUser?.user_metadata?.name || sessionUser?.user_metadata?.full_name || '';
   }
 
   async function loadWelcomeContent() {

@@ -29,8 +29,8 @@
   };
 
   const htmlTools: HtmlSnippet[] = [
-    { label: 'H2', title: 'Zwischenueberschrift H2', start: '<h2>', end: '</h2>', placeholder: 'Zwischenueberschrift' },
-    { label: 'H3', title: 'Zwischenueberschrift H3', start: '<h3>', end: '</h3>', placeholder: 'Abschnitt' },
+    { label: 'H2', title: 'Zwischenüberschrift H2', start: '<h2>', end: '</h2>', placeholder: 'Zwischenüberschrift' },
+    { label: 'H3', title: 'Zwischenüberschrift H3', start: '<h3>', end: '</h3>', placeholder: 'Abschnitt' },
     { label: 'P', title: 'Absatz', start: '<p>', end: '</p>', placeholder: 'Text' },
     { label: 'BR', title: 'Zeilenumbruch', start: '<br>' },
     { label: 'UL', title: 'Unsortierte Liste', start: '<ul>\n  <li>', end: '</li>\n</ul>', placeholder: 'Punkt' },
@@ -439,105 +439,6 @@
     color: var(--text-primary);
     border-color: var(--border-color);
   }
-  .radius-control {
-    width: 100%;
-    margin: 0.2rem auto 0.1rem auto;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    background: transparent;
-  }
-  .radius-value {
-    color: var(--text-secondary);
-    font-weight: 500;
-    font-size: 1rem;
-    margin-bottom: 0.1rem;
-    text-align: center;
-    background: transparent;
-  }
-  .nearby-count {
-    font-size: 0.85rem;
-    font-weight: 400;
-    color: var(--text-muted);
-    margin-left: 0.3rem;
-  }
-  .hidden-count {
-    font-size: 0.85rem;
-    font-weight: 400;
-    color: var(--text-muted);
-    margin-left: 0.3rem;
-    cursor: pointer;
-    transition: color 0.2s;
-    opacity: 0.7;
-  }
-  .hidden-count:hover {
-    color: var(--culoca-orange);
-    opacity: 1;
-  }
-  .hidden-count.active {
-    color: var(--culoca-orange);
-    opacity: 1;
-  }
-  .radius-control input[type="range"] {
-    width: 100vw;
-    max-width: 100vw;
-    margin: 0 -50vw 0 -50vw;
-    left: 50%;
-    position: relative;
-    display: block;
-    background: transparent;
-    -webkit-appearance: none;
-    appearance: none;
-    --thumb: 30px;
-    --track: 2px;
-    --pct: 0%;
-  }
-  .radius-control input[type="range"]::-webkit-slider-runnable-track {
-    height: var(--track);
-    border-radius: 999px;
-    background:
-      linear-gradient(to right,
-        var(--tw-ring-color) 0%,
-        var(--tw-ring-color) var(--pct),
-        #e5e7eb var(--pct),
-        #e5e7eb 100%);
-  }
-  .radius-control input[type="range"]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: var(--thumb);
-    height: var(--thumb);
-    border-radius: 50%;
-    background: var(--accent-color);
-    border: 2px solid var(--bg-primary);
-    cursor: pointer;
-    margin-top: calc((var(--track) - var(--thumb)) / 2);
-    transition: transform .1s ease;
-  }
-  .radius-control input[type="range"]::-moz-range-track {
-    height: var(--track);
-    background: #e5e7eb;
-    border-radius: 999px;
-  }
-  .radius-control input[type="range"]::-moz-range-progress {
-    height: var(--track);
-    background: var(--tw-ring-color);
-    border-radius: 999px;
-  }
-  .radius-control input[type="range"]::-moz-range-thumb {
-    width: var(--thumb);
-    height: var(--thumb);
-    border-radius: 50%;
-    background: var(--accent-color);
-    border: 2px solid var(--bg-primary);
-    cursor: pointer;
-    transition: transform .1s ease;
-  }
-  .radius-control input[type="range"]:hover::-webkit-slider-thumb,
-  .radius-control input[type="range"]:hover::-moz-range-thumb {
-    transform: scale(.98);
-  }
-
   @media (max-width: 700px) {
     .external-url-row,
     .content-editor-row {

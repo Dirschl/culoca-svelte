@@ -74,6 +74,6 @@ export async function POST() {
     
   } catch (error) {
     console.error('❌ Unexpected error:', error);
-    return json({ success: false, error: error.message });
+    return json({ success: false, error: error instanceof Error ? error.message : 'Unknown error' });
   }
-} 
+}

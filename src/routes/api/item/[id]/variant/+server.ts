@@ -142,7 +142,7 @@ export async function PATCH({ params, request }: any) {
   }
 
   if (!(await canEditItem(serverClient, sourceItem.id, auth.user.id))) {
-    return json({ error: 'Keine Berechtigung fuer dieses Item' }, { status: 403 });
+    return json({ error: 'Keine Berechtigung für dieses Item' }, { status: 403 });
   }
 
   if (action === 'detach') {
@@ -189,7 +189,7 @@ export async function PATCH({ params, request }: any) {
   }
 
   if (!(await canEditItem(serverClient, targetRoot.id, auth.user.id))) {
-    return json({ error: 'Keine Berechtigung fuer das Ziel-Item' }, { status: 403 });
+    return json({ error: 'Keine Berechtigung für das Ziel-Item' }, { status: 403 });
   }
 
   const sourceChildIds = await loadChildIds(serverClient, sourceItem.id);
@@ -211,7 +211,7 @@ export async function PATCH({ params, request }: any) {
     for (const childId of sourceChildIds) {
       if (!(await canEditItem(serverClient, childId, auth.user.id))) {
         return json(
-          { error: 'Keine Berechtigung fuer alle betroffenen Kind-Items' },
+          { error: 'Keine Berechtigung für alle betroffenen Kind-Items' },
           { status: 403 }
         );
       }

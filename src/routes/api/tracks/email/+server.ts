@@ -1,5 +1,4 @@
-import { json } from '@sveltejs/kit';
-import { error } from '@sveltejs/kit';
+import { json, error } from '@sveltejs/kit';
 import { supabase } from '$lib/supabaseClient';
 
 export const POST = async ({ request, locals }) => {
@@ -9,7 +8,7 @@ export const POST = async ({ request, locals }) => {
     // Validate user session
     const user = locals.user;
     if (!user) {
-      return error(401, 'Not authenticated');
+      throw error(401, 'Not authenticated');
     }
     
     // Get user profile to check email preferences
@@ -20,18 +19,18 @@ export const POST = async ({ request, locals }) => {
       .single();
     
     if (!profile) {
-      return error(404, 'Profile not found');
+      throw error(404, 'Profile not found');
     }
     
     // Check if user has enabled email exports
     if (!profile.gpx_export_enabled) {
-      return error(403, 'GPS export not enabled');
+      throw error(403, 'GPS export not enabled');
     }
     
     // Use profile email if no specific email provided
     const recipientEmail = email || profile.gps_email;
     if (!recipientEmail) {
-      return error(400, 'No email address configured');
+      throw error(400, 'No email address configured');
     }
     
     // Create email content
@@ -103,7 +102,7 @@ Dein Culoca-Team
       
     } catch (emailError) {
       console.error('Email service error:', emailError);
-      return error(500, 'Failed to send email');
+      throw error(500, 'Failed to send email');
     }
     
     return json({ 
@@ -114,7 +113,7 @@ Dein Culoca-Team
     
   } catch (err) {
     console.error('Error sending track email:', err);
-    return error(500, 'Failed to send track email');
+    throw error(500, 'Failed to send track email');
   }
 };
 

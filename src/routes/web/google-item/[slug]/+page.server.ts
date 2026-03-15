@@ -41,7 +41,7 @@ export const load: PageServerLoad = async ({ params }) => {
         lon: item.lon,
         path_2048: item.path_2048,
         created_at: item.created_at,
-        creator: item.profiles?.full_name || 'Unbekannt',
+        creator: (((Array.isArray(item.profiles) ? item.profiles[0] : item.profiles) as { full_name?: string } | null)?.full_name) || 'Unbekannt',
         culoca_url: `https://culoca.com/item/${item.slug}`
       }
     };

@@ -64,7 +64,7 @@ export const DEFAULT_CONTENT_TYPES: ContentTypeDefinition[] = [
     id: 4,
     name: 'Text',
     slug: 'text',
-    description: 'Textbeitraege und Artikel',
+    description: 'Textbeiträge und Artikel',
     show_image: true,
     show_gallery: false,
     show_audio: false,

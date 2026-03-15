@@ -8,6 +8,31 @@
   import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
   import { appendReturnTo } from '$lib/content/routing';
   import { getEffectiveGpsPosition } from '$lib/filterStore';
+  import { absoluteUrl, buildBreadcrumbJsonLd, DEFAULT_OG_IMAGE, trimText } from '$lib/seo/site';
+
+  type FotoListItem = {
+    id: string;
+    slug: string;
+    title?: string | null;
+    description?: string | null;
+    caption?: string | null;
+    canonical_path: string | null;
+    path_512: string | null;
+    width?: number | null;
+    height?: number | null;
+    created_at?: string | null;
+    starts_at?: string | null;
+    ends_at?: string | null;
+    external_url?: string | null;
+    lat?: number | null;
+    lon?: number | null;
+    is_private?: boolean | null;
+    profile_id?: string | null;
+    original_name?: string | null;
+    child_count?: number;
+    variants?: Array<{ slug: string; path_512: string | null }>;
+    distance?: number | null;
+  };
 
   export let data: PageData;
 
@@ -21,12 +46,17 @@
     musik: '🎵',
     'ki-bild': '✨'
   };
-
   $: icon = TYPE_ICONS[data.typeDef.slug] || '';
   $: isFotoType = data.typeDef.slug === 'foto';
-  $: pageTitle = `${data.typeDef.name} - Culoca`;
-  $: metaDesc = `Alle ${data.typeDef.name}-Einträge auf Culoca. ${data.typeDef.description}. ${data.totalCount} Einträge verfügbar.`;
-  let clientItems: any[] | null = null;
+  $: pageTitle = data.page > 1
+    ? `${data.typeDef.name}: Seite ${data.page} | Culoca`
+    : `${data.typeDef.name}: Inhalte, Motive und Übersichten | Culoca`;
+  $: metaDesc = trimText(
+    data.search
+      ? `${data.typeDef.name} Suche auf Culoca für "${data.search}". Suchergebnisse bleiben crawlbar verlinkt, werden aber nicht indexiert.`
+      : `Alle ${data.typeDef.name}-Einträge auf Culoca. ${data.typeDef.description}. ${data.totalCount} Einträge verfügbar.`
+  );
+  let clientItems: FotoListItem[] | null = null;
   let clientTotalCount: number | null = null;
   let clientPage = 1;
   let currentGpsPosition: { lat: number; lon: number } | null = browser ? getStoredGpsPosition() : null;
@@ -67,6 +97,24 @@
   $: displayedTotalPages = Math.max(1, Math.ceil(displayedTotalCount / data.pageSize));
   $: hasDistanceData = displayedItems.some((item: any) => item?.distance !== undefined && item?.distance !== null);
   $: currentListPath = pageUrl(effectivePage);
+  $: canonicalUrl = absoluteUrl(data.seoPolicy.canonicalPath);
+  $: typeHubJsonLd = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      buildBreadcrumbJsonLd([
+        { name: 'Culoca', path: '/' },
+        { name: data.typeDef.name, path: data.seoPolicy.canonicalPath }
+      ]),
+      {
+        '@type': 'CollectionPage',
+        name: `${data.typeDef.name} auf Culoca`,
+        description: data.typeDef.description,
+        url: canonicalUrl,
+        numberOfItems: data.totalCount,
+        isPartOf: { '@type': 'WebSite', name: 'Culoca', url: 'https://culoca.com' }
+      }
+    ]
+  };
   let animatedPreviewUrls: Record<string, string> = {};
   let variantImageIndexes: Record<string, number> = {};
   let variantTimer: ReturnType<typeof setInterval> | null = null;
@@ -313,7 +361,7 @@
       const currentUserId = authData.user?.id || null;
       const pageFetchSize = 1000;
       let from = 0;
-      const allRows: any[] = [];
+      const allRows: FotoListItem[] = [];
       while (true) {
         let pageQuery = supabase
           .from('items')
@@ -339,7 +387,7 @@
         }
 
         allRows.push(
-          ...rows.filter((item) => {
+          ...rows.filter((item: FotoListItem) => {
             const isVisible =
               (currentUserId && item.profile_id === currentUserId) ||
               item.is_private === false ||
@@ -434,23 +482,23 @@
     }
   }
 
-  function variantThumbUrls(item: any): string[] {
+  function variantThumbUrls(item: FotoListItem): string[] {
     if (!isFotoType) return [];
     const variants = Array.isArray(item.variants) ? item.variants : [];
     const rootUrl = thumbUrl(item);
     return variants
-      .filter((variant) => variant?.slug && variant?.path_512)
-      .map((variant) => getSeoImageUrl(variant.slug, variant.path_512, '512'))
+      .filter((variant: { slug: string; path_512: string | null } | undefined) => variant?.slug && variant?.path_512)
+      .map((variant: { slug: string; path_512: string | null }) => getSeoImageUrl(variant.slug, variant.path_512, '512'))
       .filter((url): url is string => Boolean(url) && url !== rootUrl);
   }
 
-  function rotationThumbUrls(item: any): string[] {
+  function rotationThumbUrls(item: FotoListItem): string[] {
     const rootUrl = thumbUrl(item);
     const variantUrls = variantThumbUrls(item);
     return variantUrls.length ? [rootUrl, ...variantUrls] : [rootUrl];
   }
 
-  function currentThumbUrl(item: any): string {
+  function currentThumbUrl(item: FotoListItem): string {
     return animatedPreviewUrls[item.id] || thumbUrl(item);
   }
 
@@ -538,7 +586,7 @@
     if (!isFotoType) return;
     console.log(
       '[foto-list] loaded items:',
-      displayedItems.map((item: any) => ({
+      displayedItems.map((item: FotoListItem) => ({
         id: item.id,
         slug: item.slug,
         child_count: item.child_count || 0,
@@ -554,7 +602,7 @@
     }, 1000);
 
     const start = async () => {
-      const hasVariants = displayedItems.some((item: any) => variantThumbUrls(item).length > 0);
+      const hasVariants = displayedItems.some((item: FotoListItem) => variantThumbUrls(item).length > 0);
       if (hasVariants) {
         preloadVariantImages();
         startVariantRotation();
@@ -564,7 +612,7 @@
     if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
       idleHandle = window.requestIdleCallback(start, { timeout: 900 });
     } else {
-      idleHandle = window.setTimeout(start, 600);
+      idleHandle = (window as Window).setTimeout(start, 600);
     }
   });
 
@@ -584,16 +632,17 @@
 <svelte:head>
   <title>{pageTitle}</title>
   <meta name="description" content={metaDesc} />
-  <link rel="canonical" href="https://culoca.com/{data.typeDef.slug}" />
-  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href={canonicalUrl} />
+  <meta name="robots" content={data.seoPolicy.robots} />
 
   <meta property="og:locale" content="de_DE" />
   <meta property="og:type" content="website" />
   <meta property="og:title" content={pageTitle} />
   <meta property="og:description" content={metaDesc} />
-  <meta property="og:url" content="https://culoca.com/{data.typeDef.slug}" />
+  <meta property="og:url" content={canonicalUrl} />
   <meta property="og:site_name" content="Culoca" />
-  <meta name="twitter:card" content="summary" />
+  <meta property="og:image" content={DEFAULT_OG_IMAGE} />
+  <meta name="twitter:card" content="summary_large_image" />
 
   {#if data.page > 1}
     <link rel="prev" href={pageUrl(data.page - 1)} />
@@ -602,15 +651,7 @@
     <link rel="next" href={pageUrl(data.page + 1)} />
   {/if}
 
-  {@html `<script type="application/ld+json">${JSON.stringify({
-    "@context": "https://schema.org",
-    "@type": "CollectionPage",
-    "name": data.typeDef.name + " auf Culoca",
-    "description": data.typeDef.description,
-    "url": "https://culoca.com/" + data.typeDef.slug,
-    "numberOfItems": data.totalCount,
-    "isPartOf": { "@type": "WebSite", "name": "Culoca", "url": "https://culoca.com" }
-  })}</script>`}
+  {@html `<script type="application/ld+json">${JSON.stringify(typeHubJsonLd)}</script>`}
 </svelte:head>
 
 <div class="page">
@@ -635,6 +676,15 @@
             {data.typeDef.description}
           {/if}
         </p>
+        <p class="hub-intro">
+          {#if data.search}
+            Diese Seite zeigt gefilterte Treffer für <strong>{data.search}</strong>. Die Trefferlisten bleiben für interne Links nutzbar, indexiert wird aber nur die kuratierte Hauptseite.
+          {:else if data.page > 1}
+            Seite {data.page} vertieft den Hub mit weiteren Einträgen, während die erste Seite den kanonischen Einstieg für Suchmaschinen bildet.
+          {:else}
+            Dieser Hub kombiniert Themenkontext, interne Navigation und aktuelle Inhalte, damit die Übersicht mehr ist als eine reine Liste.
+          {/if}
+        </p>
         {#if isFotoType}
           <form class="foto-search" action={`/${data.typeDef.slug}`} method="GET" on:submit={handleFotoSearchSubmit}>
             <input
@@ -643,7 +693,6 @@
               placeholder="Fotos durchsuchen"
               bind:value={searchQuery}
               on:input={handleFotoSearchInput}
-              on:search={handleFotoSearchEvent}
             />
           </form>
           {#if shouldPreferGpsSorting && !useGpsApi}
@@ -655,6 +704,28 @@
           {:else}
             <p class="foto-search-hint">Ohne GPS werden die neuesten Fotos zuerst gezeigt.</p>
           {/if}
+
+          <div class="foto-upload-panel">
+            <div class="foto-upload-copy">
+              <p class="foto-upload-eyebrow">Foto Upload</p>
+              <h2>Fotos auf Culoca brauchen einen Ortsbezug</h2>
+              <p>
+                Fotos, die du hier veröffentlichst, können alle Culoca-Nutzer sehen. Deshalb sollten Motiv,
+                Beschreibung und vor allem die Ortsdaten sauber gepflegt sein.
+              </p>
+              <ul>
+                <li>Neue oder unvollständige Fotos am besten über den neuen Foto-Upload anlegen.</li>
+                <li>Bereits vollständig vorbereitete Serien können weiter über den Batch-Uploader laufen.</li>
+                <li>Fehlende Angaben erscheinen danach rot im Konto unter Daten prüfen.</li>
+              </ul>
+            </div>
+
+            <div class="foto-upload-actions">
+              <a class="foto-upload-link foto-upload-link--primary" href="/foto/upload">Zum Foto-Upload</a>
+              <a class="foto-upload-link" href="/bulk-upload">Zum Batch-Uploader</a>
+              <a class="foto-upload-link" href="/profile/review">Daten prüfen</a>
+            </div>
+          </div>
         {/if}
       </div>
     </header>
@@ -859,11 +930,102 @@
     color: var(--text-muted);
     font-size: 0.82rem;
   }
+  .foto-upload-panel {
+    display: grid;
+    grid-template-columns: minmax(0, 1.65fr) minmax(240px, 0.9fr);
+    gap: 1rem;
+    margin-top: 1rem;
+    padding: 1rem 1.1rem;
+    border-radius: 20px;
+    border: 1px solid var(--border-color);
+    background:
+      linear-gradient(135deg, rgba(238, 114, 33, 0.09), transparent 48%),
+      var(--bg-secondary);
+  }
+  .foto-upload-eyebrow {
+    margin: 0 0 0.3rem;
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--culoca-orange);
+  }
+  .foto-upload-copy h2 {
+    margin: 0 0 0.45rem;
+    font-size: clamp(1.1rem, 2.2vw, 1.45rem);
+    line-height: 1.15;
+  }
+  .foto-upload-copy p {
+    margin: 0;
+    color: var(--text-secondary);
+  }
+  .foto-upload-copy ul {
+    margin: 0.8rem 0 0;
+    padding-left: 1.15rem;
+    color: var(--text-secondary);
+  }
+  .foto-upload-actions {
+    display: grid;
+    gap: 0.75rem;
+    align-content: start;
+  }
+  .foto-upload-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 46px;
+    padding: 0.8rem 1rem;
+    border-radius: 999px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .foto-upload-link--primary {
+    background: var(--culoca-orange);
+    color: #fff;
+    border-color: var(--culoca-orange);
+  }
   .hub-sep {
     margin: 0 0.3rem;
     opacity: 0.5;
   }
-
+  .hub-shortcuts {
+    padding-top: 1.2rem;
+  }
+  .shortcut-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+  .shortcut-kicker {
+    margin: 0 0 0.35rem;
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--culoca-orange);
+  }
+  .shortcut-head h2 {
+    margin: 0;
+    font-size: clamp(1.1rem, 2vw, 1.5rem);
+  }
+  .shortcut-actions {
+    display: flex;
+    gap: 0.8rem;
+    flex-wrap: wrap;
+  }
+  .shortcut-actions a {
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .shortcut-actions a:hover {
+    color: var(--culoca-orange);
+  }
   /* ---- Content ---- */
   .hub-content .hub-inner {
     padding-top: 2rem;
@@ -1065,10 +1227,17 @@
   }
   @media (max-width: 680px) {
     .hub-inner { padding-left: 1.25rem; padding-right: 1.25rem; }
+    .shortcut-head {
+      flex-direction: column;
+      align-items: flex-start;
+    }
     .items-grid { grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
     .foto-search {
       flex-direction: column;
       max-width: none;
+    }
+    .foto-upload-panel {
+      grid-template-columns: 1fr;
     }
   }
   @media (max-width: 420px) {

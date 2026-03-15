@@ -42,6 +42,15 @@
     }
   });
 
+  function getAuthRedirectUrl(type?: 'recovery') {
+    if (typeof window === 'undefined') return undefined;
+    const url = new URL('/auth/callback', window.location.origin);
+    if (type) {
+      url.searchParams.set('type', type);
+    }
+    return url.toString();
+  }
+
   async function loginWithProvider(provider: 'google' | 'facebook') {
     loginLoading = true;
     loginError = '';
@@ -49,9 +58,7 @@
 
     sessionStore.clearSession();
 
-    const redirectTo = typeof window !== 'undefined' && window.location.hostname !== 'localhost'
-      ? `${window.location.origin}/auth/callback`
-      : undefined;
+    const redirectTo = getAuthRedirectUrl();
 
     const { error: authError } = await supabase.auth.signInWithOAuth({
       provider,
@@ -74,11 +81,16 @@
 
     if (authError) {
       loginError = authError.message;
-    } else if (data.user) {
-      sessionStore.setUser(data.user.id, true);
+    } else if (data.session?.user) {
+      sessionStore.setUser(data.session.user.id, true);
       loginEmail = '';
       loginPassword = '';
       goto('/');
+    } else if (data.user) {
+      loginError = 'Anmeldung unvollständig: Es wurde kein aktiver Login-Status erstellt.';
+      console.warn('Login returned a user without an active session:', data.user.id);
+    } else {
+      loginError = 'Anmeldung fehlgeschlagen: Es wurde keine Sitzung erstellt.';
     }
 
     loginLoading = false;
@@ -124,8 +136,9 @@
     loginError = '';
     loginInfo = '';
 
+    const redirectTo = getAuthRedirectUrl('recovery');
     const { error } = await supabase.auth.resetPasswordForEmail(loginEmail, {
-      redirectTo: `${window.location.origin}/auth/callback?type=recovery`
+      redirectTo
     });
 
     if (error) {
@@ -200,11 +213,11 @@
             <form class="auth-form" on:submit|preventDefault={loginWithEmail}>
               <label class="field">
                 <span>E-Mail</span>
-                <input type="email" bind:value={loginEmail} placeholder="name@beispiel.de" required />
+                <input type="email" bind:value={loginEmail} placeholder="name@beispiel.de" autocomplete="email" required />
               </label>
               <label class="field">
                 <span>Passwort</span>
-                <input type="password" bind:value={loginPassword} placeholder="Passwort" required />
+                <input type="password" bind:value={loginPassword} placeholder="Passwort" autocomplete="current-password" required />
               </label>
               <button class="primary-btn" type="submit" disabled={loginLoading}>
                 {loginLoading ? 'Anmelden…' : 'Anmelden'}

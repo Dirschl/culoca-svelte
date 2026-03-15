@@ -16,6 +16,18 @@ export type ContentItemLike = {
   ends_at?: string | null;
   is_private?: boolean | null;
   show_in_main_feed?: boolean | null;
+  country_slug?: string | null;
+  district_slug?: string | null;
+  municipality_slug?: string | null;
+};
+
+export type GeoPathLike = {
+  country_slug?: string | null;
+  district_slug?: string | null;
+  municipality_slug?: string | null;
+  slug?: string | null;
+  canonical_path?: string | null;
+  canonicalPath?: string | null;
 };
 
 export function normalizePath(path: string): string {
@@ -79,12 +91,71 @@ export function computeCanonicalPath(args: {
   return `/${typeSlug}/${item.slug}`;
 }
 
+export function hasGeoHierarchy(item: Pick<GeoPathLike, 'country_slug' | 'district_slug' | 'municipality_slug'>): boolean {
+  return !!(item.country_slug && item.district_slug && item.municipality_slug);
+}
+
+export function buildGeoHubPath(args: {
+  countrySlug: string;
+  districtSlug?: string | null;
+  municipalitySlug?: string | null;
+}): string {
+  const parts = [
+    slugifySegment(args.countrySlug),
+    args.districtSlug ? slugifySegment(args.districtSlug) : null,
+    args.municipalitySlug ? slugifySegment(args.municipalitySlug) : null
+  ].filter(Boolean);
+
+  return parts.length ? `/${parts.join('/')}` : '/';
+}
+
+export function buildGeoItemPath(args: {
+  countrySlug: string;
+  districtSlug: string;
+  municipalitySlug: string;
+  itemSlug: string;
+}): string {
+  return buildGeoHubPath({
+    countrySlug: args.countrySlug,
+    districtSlug: args.districtSlug,
+    municipalitySlug: args.municipalitySlug
+  }) + `/${slugifySegment(args.itemSlug)}`;
+}
+
+export function computeGeoAwareCanonicalPath(args: {
+  item: ContentItemLike;
+  rootItem?: ContentItemLike | null;
+  type?: Partial<ContentTypeDefinition> | null;
+}): string | null {
+  const { item, rootItem } = args;
+  const geoSource = hasGeoHierarchy(item)
+    ? item
+    : rootItem && hasGeoHierarchy(rootItem)
+      ? rootItem
+      : null;
+
+  if (item.slug && geoSource) {
+    return buildGeoItemPath({
+      countrySlug: geoSource.country_slug as string,
+      districtSlug: geoSource.district_slug as string,
+      municipalitySlug: geoSource.municipality_slug as string,
+      itemSlug: item.slug
+    });
+  }
+
+  return computeCanonicalPath(args);
+}
+
 export function getStoredOrComputedCanonicalPath(args: {
   item: ContentItemLike;
   rootItem?: ContentItemLike | null;
   type?: Partial<ContentTypeDefinition> | null;
 }): string | null {
-  const computed = computeCanonicalPath(args);
+  const computed = computeGeoAwareCanonicalPath(args);
+  const prefersGeoPath = hasGeoHierarchy(args.item) || (!!args.rootItem && hasGeoHierarchy(args.rootItem));
+  if (prefersGeoPath && computed) {
+    return normalizePath(computed);
+  }
   return normalizePath(args.item.canonical_path || computed || '');
 }
 
@@ -92,8 +163,19 @@ export function getPublicItemHref(item: {
   slug?: string | null;
   canonical_path?: string | null;
   canonicalPath?: string | null;
+  country_slug?: string | null;
+  district_slug?: string | null;
+  municipality_slug?: string | null;
 }): string {
   const canonicalPath = item.canonicalPath || item.canonical_path;
+  if (item.slug && hasGeoHierarchy(item)) {
+    return buildGeoItemPath({
+      countrySlug: item.country_slug as string,
+      districtSlug: item.district_slug as string,
+      municipalitySlug: item.municipality_slug as string,
+      itemSlug: item.slug
+    });
+  }
   if (canonicalPath) return normalizePath(canonicalPath);
   return item.slug ? `/item/${item.slug}` : '/';
 }

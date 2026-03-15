@@ -307,9 +307,9 @@
     shareUrl.searchParams.set('lat', center.lat.toFixed(6));
     shareUrl.searchParams.set('lon', center.lng.toFixed(6));
     shareUrl.searchParams.set('zoom', zoom.toString());
-    shareUrl.searchParams.set('map_type', viewType);
-    if (userFilter) {
-      shareUrl.searchParams.set('user', userFilter.accountname);
+    shareUrl.searchParams.set('map_type', viewType || 'standard');
+    if (userFilter?.accountName) {
+      shareUrl.searchParams.set('user', userFilter.accountName);
     }
     
     shareMapUrl = shareUrl.toString();
@@ -446,7 +446,6 @@
       scrollWheelZoom: true,
       boxZoom: true,
       keyboard: true,
-      tap: true, // Wichtig für iOS!
       tapTolerance: 15, // Erhöht für besseres Touch-Handling auf iOS
       bounceAtZoomLimits: true
     }).setView([initialLat, initialLon], initialZoom);

@@ -8,15 +8,36 @@
   import FloatingActionButtons from '$lib/FloatingActionButtons.svelte';
   import { getPublicItemHref } from '$lib/content/routing';
 
+  let L: any;
+
+  type SimulationImage = {
+    id: string;
+    slug?: string;
+    canonical_path?: string | null;
+    lat: number | null;
+    lon: number | null;
+    path_512?: string | null;
+    path_2048?: string | null;
+    path_64?: string | null;
+    title?: string | null;
+    description?: string | null;
+    width?: number | null;
+    height?: number | null;
+    keywords?: string[] | null;
+    original_name?: string | null;
+    original_url?: string | null;
+    distance?: number;
+  };
+
   // Simulation state
   let simulationActive = false;
   let simulatedLat: number = 52.5200; // Default, will be updated when images are loaded
   let simulatedLon: number = 13.4050; // Default, will be updated when images are loaded
-  let gpsUpdateInterval: number | null = null;
+  let gpsUpdateInterval: ReturnType<typeof setInterval> | null = null;
   let mapEl: HTMLDivElement;
   let map: any;
   let mapMarkers: any[] = [];
-  let allImages: any[] = [];
+  let allImages: SimulationImage[] = [];
   let totalImages = 0;
   let imagesWithGPS = 0;
   let imagesWithoutGPS = 0;
@@ -24,7 +45,7 @@
   let duplicateCount = 0;
   let loading = true;
   let searchQuery = '';
-  let searchResults: any[] = [];
+  let searchResults: SimulationImage[] = [];
 
   // App state (right side)
   const pics = writable<any[]>([]);
@@ -48,14 +69,14 @@
   let showIncompleteList = false;
 
   // Store lists for quick access from details sections
-  let noGpsImagesList: any[] = [];
-  let incompleteImagesList: any[] = [];
+  let noGpsImagesList: SimulationImage[] = [];
+  let incompleteImagesList: SimulationImage[] = [];
   let showWithoutGpsList = false;
   
   // Dynamic loading tracking
   let dynamicLoader: any = null;
   let lastLoadCheckPosition: { lat: number; lon: number } | null = null;
-  let loadCheckInterval: number | null = null;
+  let loadCheckInterval: ReturnType<typeof setInterval> | null = null;
 
   onMount(async () => {
     await loadAllImages();
@@ -74,7 +95,7 @@
     
     // Send initial GPS data to iframe after a short delay to ensure it's loaded
     setTimeout(() => {
-      const iframe = document.querySelector('.app-iframe') as HTMLIFrameElement;
+      const iframe = document.querySelector('.app-iframe') as HTMLIFrameElement | null;
       if (iframe && iframe.contentWindow) {
         console.log('Sending initial GPS data to iframe:', { lat: simulatedLat, lon: simulatedLon });
         iframe.contentWindow.postMessage({
@@ -103,7 +124,7 @@
   // Start position monitoring for dynamic loading
   function startPositionMonitoring() {
     // Monitor position changes and dynamically load images
-    setInterval(async () => {
+    loadCheckInterval = setInterval(async () => {
       const currentPos = { lat: simulatedLat, lon: simulatedLon };
       
       // Skip if position hasn't changed significantly
@@ -127,8 +148,8 @@
       }
       
       // Update image counts
-      const imagesWithGPSData = allImages.filter((img: any) => img.lat && img.lon);
-      const imagesWithoutGPSData = allImages.filter((img: any) => !img.lat || !img.lon);
+      const imagesWithGPSData = allImages.filter((img: SimulationImage) => img.lat && img.lon);
+      const imagesWithoutGPSData = allImages.filter((img: SimulationImage) => !img.lat || !img.lon);
       imagesWithGPS = imagesWithGPSData.length;
       imagesWithoutGPS = imagesWithoutGPSData.length;
       
@@ -145,15 +166,15 @@
       updateGalleryWithNewImages(allImages);
       
       console.log(`📊 Dynamic load complete: ${allImages.length} total images (${imagesWithGPS} with GPS)`);
-    }, 2000) as any; // Check every 2 seconds
+    }, 2000); // Check every 2 seconds
   }
 
-  function updateGalleryWithNewImages(newImages: any[]) {
+  function updateGalleryWithNewImages(newImages: SimulationImage[]) {
     // Update pics store with current nearby images based on simulation position
     const nearbyImages = newImages
-      .filter((img: any) => img.lat && img.lon)
-      .map((img: any) => {
-        const distance = getDistanceInMeters(simulatedLat, simulatedLon, img.lat, img.lon);
+      .filter((img: SimulationImage) => img.lat != null && img.lon != null)
+      .map((img: SimulationImage) => {
+        const distance = getDistanceInMeters(simulatedLat, simulatedLon, img.lat as number, img.lon as number);
         return {
           ...img,
           distance: distance,
@@ -175,7 +196,7 @@
 
 
   // Direct database query for simulation images with batch loading (bypasses all API limitations)
-  async function loadSimulationImagesDirectFromDB(): Promise<any[]> {
+  async function loadSimulationImagesDirectFromDB(): Promise<SimulationImage[]> {
     try {
       console.log('[Simulation DirectDB] Loading simulation images with batch loading...');
       
@@ -185,7 +206,7 @@
       
       // Batch loading to get more than 1000 items
       const batchSize = Infinity; // Kein Limit - alle Bilder
-      let allImages = [];
+      let allImages: SimulationImage[] = [];
       let hasMore = true;
       let offset = 0;
       const maxBatches = 10; // Load up to 10,000 images
@@ -441,7 +462,7 @@
       
       // Request gallery data from iframe after it loads
       setTimeout(() => {
-        const iframe = document.querySelector('.app-iframe') as HTMLIFrameElement;
+        const iframe = document.querySelector('.app-iframe') as HTMLIFrameElement | null;
         if (iframe && iframe.contentWindow) {
           console.log('📤 Requesting gallery data from iframe...');
           iframe.contentWindow.postMessage({
@@ -514,7 +535,7 @@
       userMarker.getElement().style.cursor = 'grabbing';
     });
 
-    userMarker.on('drag', (e) => {
+    userMarker.on('drag', (e: any) => {
       const newLat = e.target.getLatLng().lat;
       const newLon = e.target.getLatLng().lng;
       
@@ -522,7 +543,7 @@
       updateSimulatedPositionDirect(newLat, newLon);
     });
 
-    userMarker.on('dragend', (e) => {
+    userMarker.on('dragend', (e: any) => {
       userMarker.getElement().style.cursor = 'grab';
       const newLat = e.target.getLatLng().lat;
       const newLon = e.target.getLatLng().lng;
@@ -587,12 +608,12 @@
     addGridOverlay();
     
     // Filter images to only those in the current 3x3 grid
-    let imagesWithGPS = allImages.filter(img => img.lat && img.lon);
+    let imagesWithGPS = allImages.filter((img: SimulationImage) => img.lat && img.lon);
     if (dynamicLoader && simulatedLat && simulatedLon) {
       const currentGrid = dynamicLoader.latLonToGrid(simulatedLat, simulatedLon);
       const requiredCells = dynamicLoader.getRequiredCells(currentGrid);
-      const requiredCellKeys = new Set(requiredCells.map(cell => `${cell.x},${cell.y}`));
-      imagesWithGPS = imagesWithGPS.filter(img => {
+      const requiredCellKeys = new Set(requiredCells.map((cell: any) => `${cell.x},${cell.y}`));
+      imagesWithGPS = imagesWithGPS.filter((img: SimulationImage) => {
         const grid = dynamicLoader.latLonToGrid(img.lat, img.lon);
         return requiredCellKeys.has(`${grid.x},${grid.y}`);
       });
@@ -610,7 +631,6 @@
           
       // @ts-ignore
       const marker = L.marker([img.lat, img.lon], {
-        isImageMarker: true, // Flag to identify image markers
         // @ts-ignore
         icon: L.divIcon({
           className: 'image-marker',
@@ -625,6 +645,7 @@
           iconAnchor: [24, 24]
         })
       });
+      marker.options.isImageMarker = true;
 
       marker.on('click', () => {
         // Navigate to image detail page with anchor parameter
@@ -639,7 +660,7 @@
     if (imagesWithGPS.length > 0 && !userHasSetZoom) {
       // Create a feature group with all image markers
       // @ts-ignore
-      const group = new L.featureGroup();
+      const group = L.featureGroup();
       
       // Add all image markers to the group
       map.eachLayer((layer: any) => {
@@ -744,7 +765,7 @@
     console.log(`🗺️ Required cells:`, requiredCells);
     
     // Draw each cell
-    requiredCells.forEach((cell, index) => {
+    requiredCells.forEach((cell: any, index: number) => {
       const cellCenter = dynamicLoader.gridToLatLon(cell.x, cell.y);
       const isLoaded = dynamicLoader.isCellLoaded(cell.x, cell.y);
       const isCenter = currentCenterCell && cell.x === currentCenterCell.x && cell.y === currentCenterCell.y;
@@ -780,8 +801,8 @@
         color: color,
         weight: weight,
         fillOpacity: opacity,
-        isGridOverlay: true
       });
+      rect.options.isGridOverlay = true;
       
       // Add tooltip with cell info
       const tooltipText = `
@@ -806,7 +827,7 @@
     updateURLHash(simulatedLat, simulatedLon, true);
     
     // Immediately send GPS data to iframe
-    const iframe = document.querySelector('.app-iframe') as HTMLIFrameElement;
+    const iframe = document.querySelector('.app-iframe') as HTMLIFrameElement | null;
     if (iframe && iframe.contentWindow) {
       console.log('Sending initial GPS data to iframe:', { lat: simulatedLat, lon: simulatedLon });
       iframe.contentWindow.postMessage({
@@ -831,7 +852,7 @@
     // Send GPS data every 3 seconds (less frequent to avoid excessive updates)
     gpsUpdateInterval = setInterval(() => {
       if (simulationActive) {
-        const iframe = document.querySelector('.app-iframe') as HTMLIFrameElement;
+        const iframe = document.querySelector('.app-iframe') as HTMLIFrameElement | null;
         if (iframe && iframe.contentWindow) {
           console.log('🔄 Sending continuous GPS update:', { lat: simulatedLat, lon: simulatedLon });
           iframe.contentWindow.postMessage({
@@ -860,7 +881,7 @@
     stopContinuousGPSUpdates();
     
     // Send stop message to iframe
-    const iframe = document.querySelector('.app-iframe') as HTMLIFrameElement;
+    const iframe = document.querySelector('.app-iframe') as HTMLIFrameElement | null;
     if (iframe && iframe.contentWindow) {
       console.log('Sending GPS simulation stop message to iframe');
       iframe.contentWindow.postMessage({
@@ -926,7 +947,7 @@
       console.log('Sending GPS data to iframe:', { lat, lon });
       
       // Send GPS data to iframe via postMessage only
-      const iframe = document.querySelector('.app-iframe') as HTMLIFrameElement;
+      const iframe = document.querySelector('.app-iframe') as HTMLIFrameElement | null;
       if (iframe && iframe.contentWindow) {
         iframe.contentWindow.postMessage({
           type: 'gps-simulation',
@@ -943,7 +964,7 @@
       updateURLHash(simulatedLat, simulatedLon, true);
     } else {
       // Clear hash
-      const iframe = document.querySelector('.app-iframe') as HTMLIFrameElement;
+      const iframe = document.querySelector('.app-iframe') as HTMLIFrameElement | null;
       if (iframe && iframe.contentWindow) {
         const iframeUrl = new URL(iframe.src);
         iframeUrl.hash = '';
@@ -972,7 +993,8 @@
           }); // Kein Limit - alle Ergebnisse
   }
 
-  function selectLocation(image: any) {
+  function selectLocation(image: SimulationImage) {
+    if (image.lat == null || image.lon == null) return;
     simulatedLat = image.lat;
     simulatedLon = image.lon;
     updateSimulatedPosition(simulatedLat, simulatedLon);
@@ -982,14 +1004,14 @@
 
   function fitMapToMarkers() {
     if (mapMarkers.length > 0) {
-      const group = new L.featureGroup(mapMarkers);
+      const group = L.featureGroup(mapMarkers);
       map.fitBounds(group.getBounds().pad(0.1));
     }
   }
 
   function exitSimulation() {
     // Stop simulation in iframe
-    const iframe = document.querySelector('.app-iframe');
+    const iframe = document.querySelector('.app-iframe') as HTMLIFrameElement | null;
     if (iframe && iframe.contentWindow) {
       iframe.contentWindow.postMessage({
         type: 'gps-simulation-stop'
@@ -1000,7 +1022,7 @@
 
   function stopSimulationViaIframe() {
     // Update iframe src with stop parameter to trigger simulation stop
-    const iframe = document.querySelector('.app-iframe');
+    const iframe = document.querySelector('.app-iframe') as HTMLIFrameElement | null;
     if (iframe && iframe.tagName === 'IFRAME') {
       const iframeElement = iframe as HTMLIFrameElement;
       iframeElement.src = '/galerie?stop=simulation';
@@ -1064,7 +1086,6 @@
 </svelte:head>
 
 <FloatingActionButtons
-  showTestMode={true}
   isLoggedIn={true}
   simulationMode={true}
   on:testMode={() => window.location.href = '/galerie'}
@@ -1118,7 +1139,6 @@
               alt={img.title || 'Bild'}
               class="compact-thumbnail"
               loading="lazy"
-              onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
             />
             <div class="compact-placeholder" style="display: none;">📷</div>
             <div class="compact-info">
@@ -1146,7 +1166,6 @@
               alt={img.title || 'Bild'}
               class="compact-thumbnail"
               loading="lazy"
-              onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
             />
             <div class="compact-placeholder" style="display: none;">📷</div>
             <div class="compact-info">

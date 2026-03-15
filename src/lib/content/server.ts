@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { error } from '@sveltejs/kit';
 import {
+  buildGeoHubPath,
   computeCanonicalPath,
   getStoredOrComputedCanonicalPath,
   getTypeBySlug,
@@ -9,11 +10,30 @@ import {
   type ContentItemLike
 } from '$lib/content/routing';
 import { DEFAULT_CONTENT_TYPE_BY_ID, type ContentTypeDefinition } from '$lib/content/types';
+import {
+  buildKeywordHubPath,
+  buildPhotographerHubPath,
+  buildPlaceHubPath,
+  getKeywordHubLinks,
+  pickPlaceLabel
+} from '$lib/seo/hubs';
 
 type ItemRecord = ContentItemLike & {
   user_id?: string | null;
   profile_id?: string | null;
   original_name?: string | null;
+  country_code?: string | null;
+  country_name?: string | null;
+  state_name?: string | null;
+  state_slug?: string | null;
+  region_name?: string | null;
+  region_slug?: string | null;
+  district_code?: string | null;
+  district_name?: string | null;
+  municipality_name?: string | null;
+  location_source?: string | null;
+  location_confidence?: number | null;
+  location_needs_review?: boolean | null;
   path_2048?: string | null;
   path_512?: string | null;
   path_64?: string | null;
@@ -46,6 +66,15 @@ type ItemRecord = ContentItemLike & {
   adobe_stock_error?: string | null;
 };
 
+type SimilarityMatchRow = {
+  item_id: string;
+  similarity: number;
+};
+
+const MIN_SIMILARITY_SCORE = 0.72;
+const PREFERRED_SIMILARITY_COUNT = 60;
+const MATCH_RPC_FETCH_COUNT = 80;
+
 function createServerSupabase() {
   const supabaseUrl = (process.env.PUBLIC_SUPABASE_URL ||
     process.env.VITE_SUPABASE_URL ||
@@ -60,6 +89,92 @@ function createServerSupabase() {
   return createClient(supabaseUrl, supabaseKey, {
     auth: { persistSession: false }
   });
+}
+
+async function getSemanticSimilarItems(
+  supabase: ReturnType<typeof createServerSupabase>,
+  item: ItemRecord,
+  rootItem: ItemRecord,
+  type: Partial<ContentTypeDefinition> | null,
+  baseSelect: string
+) {
+  if (type?.slug !== 'foto') {
+    return [];
+  }
+
+  const fetchMatches = async (filterDistrict: string | null) => {
+    const { data: matches, error: matchError } = await supabase.rpc('match_similar_items', {
+      source_item_id: rootItem.id,
+      match_count: MATCH_RPC_FETCH_COUNT,
+      filter_type_id: item.type_id || null,
+      exclude_root: rootItem.id,
+      filter_country: item.country_slug || null,
+      filter_district: filterDistrict
+    });
+
+    if (matchError || !Array.isArray(matches) || matches.length === 0) {
+      return [];
+    }
+
+    return (matches as SimilarityMatchRow[]).filter(
+      (row) => Number(row.similarity || 0) >= MIN_SIMILARITY_SCORE
+    );
+  };
+
+  try {
+    const localMatches = await fetchMatches(item.district_slug || null);
+    const fallbackMatches =
+      localMatches.length >= PREFERRED_SIMILARITY_COUNT
+        ? []
+        : await fetchMatches(null);
+
+    const dedupedMatches = [...localMatches, ...fallbackMatches]
+      .filter(
+        (row, index, rows) =>
+          rows.findIndex((candidate) => candidate.item_id === row.item_id) === index
+      )
+      .slice(0, PREFERRED_SIMILARITY_COUNT);
+
+    if (dedupedMatches.length === 0) {
+      return [];
+    }
+
+    const ids = dedupedMatches
+      .map((row: SimilarityMatchRow) => row.item_id)
+      .filter(Boolean);
+
+    if (!ids.length) {
+      return [];
+    }
+
+    const { data: rows, error: rowsError } = await supabase
+      .from('items')
+      .select(baseSelect)
+      .in('id', ids)
+      .eq('admin_hidden', false)
+      .is('group_root_item_id', null)
+      .not('slug', 'is', null)
+      .or('is_private.eq.false,is_private.is.null');
+
+    if (rowsError || !rows) {
+      return [];
+    }
+
+    const typedRows = (rows || []) as unknown as ItemRecord[];
+    const byId = new Map<string, ItemRecord>(typedRows.map((row) => [row.id, row]));
+    const orderedRows = dedupedMatches
+      .map((match: SimilarityMatchRow) => byId.get(match.item_id))
+      .filter((row): row is ItemRecord => Boolean(row));
+
+    return orderedRows
+      .map((row) => ({
+        ...row,
+        similarity:
+          dedupedMatches.find((match: SimilarityMatchRow) => match.item_id === row.id)?.similarity || 0
+      }));
+  } catch {
+    return [];
+  }
 }
 
 const ITEM_SELECT = `
@@ -101,6 +216,21 @@ const ITEM_SELECT = `
   sort_order,
   show_in_main_feed,
   canonical_path,
+  country_code,
+  country_slug,
+  state_name,
+  state_slug,
+  region_name,
+  region_slug,
+  district_code,
+  district_slug,
+  municipality_slug,
+  country_name,
+  district_name,
+  municipality_name,
+  location_source,
+  location_confidence,
+  location_needs_review,
   starts_at,
   ends_at,
   external_url,
@@ -219,7 +349,8 @@ async function getSeoLinks(
     return { newer: null, older: null };
   }
 
-  const baseSelect = 'id, slug, title, created_at, type_id, group_root_item_id, group_slug, canonical_path';
+  const baseSelect =
+    'id, slug, title, created_at, type_id, group_root_item_id, group_slug, canonical_path, country_slug, district_slug, municipality_slug';
 
   const [{ data: newerItem }, { data: olderItem }, typeMap] = await Promise.all([
     supabase
@@ -279,6 +410,58 @@ function makeGroupPreview(item: ItemRecord, type: Partial<ContentTypeDefinition>
     gallery: item.gallery ?? true,
     canonicalPath,
     isActive: item.id === rootItem.id
+  };
+}
+
+async function getRelatedItems(
+  supabase: ReturnType<typeof createServerSupabase>,
+  item: ItemRecord,
+  rootItem: ItemRecord,
+  type: Partial<ContentTypeDefinition> | null
+) {
+  const baseSelect =
+    'id, slug, title, description, caption, canonical_path, path_512, width, height, created_at, profile_id, keywords, page_settings, country_slug, district_slug, municipality_slug, country_name, district_name, municipality_name';
+
+  const placeLabel = pickPlaceLabel(
+    (item.page_settings as Record<string, unknown> | null)?.location_name as string | null | undefined,
+    item.keywords || []
+  );
+
+  const semanticSimilarRows = await getSemanticSimilarItems(supabase, item, rootItem, type, baseSelect);
+
+  const toPreview = (row: ItemRecord) => ({
+    id: row.id,
+    slug: row.slug,
+    title: row.title || row.original_name || 'Item',
+    description: row.description || row.caption || '',
+    caption: row.caption || row.description || '',
+    canonicalPath: getStoredOrComputedCanonicalPath({ item: row, type }),
+    path_512: row.path_512,
+    width: row.width,
+    height: row.height
+  });
+
+  return {
+    sameType: [],
+    sameCreator: [],
+    sameKeyword: ((semanticSimilarRows || []) as ItemRecord[]).map((row: ItemRecord) => toPreview(row)),
+    samePlace: [],
+    keywordLinks: getKeywordHubLinks(item.keywords || []),
+    placeLabel,
+    placePath:
+      item.country_slug && item.district_slug && item.municipality_slug
+        ? buildGeoHubPath({
+            countrySlug: item.country_slug,
+            districtSlug: item.district_slug,
+            municipalitySlug: item.municipality_slug
+          })
+        : placeLabel
+          ? buildPlaceHubPath(placeLabel)
+          : null,
+    photographerPath:
+      item.profile_id && (item as any).profile?.accountname
+        ? buildPhotographerHubPath((item as any).profile.accountname)
+        : null
   };
 }
 
@@ -351,9 +534,12 @@ export async function loadContentPage(args: {
   const availableTypes = Array.from(typeMap.values())
     .filter((candidate): candidate is Partial<ContentTypeDefinition> & { id: number } => typeof candidate?.id === 'number')
     .sort((a, b) => (a.id || 0) - (b.id || 0));
+  const imageWithProfile = { ...item, profile: profileData.profile, full_name: profileData.full_name };
+  const related = await getRelatedItems(supabase, imageWithProfile, rootItem, type);
+  const typePath = type?.slug ? `/${type.slug}` : null;
 
   return {
-    image: { ...item, profile: profileData.profile, full_name: profileData.full_name },
+    image: imageWithProfile,
     error: null,
     nearby: [],
     seoLinks,
@@ -364,6 +550,22 @@ export async function loadContentPage(args: {
     contextItem,
     groupItems: siblings,
     activeGroupItemId: item.id,
-    availableTypes
+    availableTypes,
+    seoHubs: {
+      typePath,
+      typeLabel: type?.name || null,
+      keywordLinks: related.keywordLinks,
+      photographerPath:
+        profileData.profile?.accountname ? buildPhotographerHubPath(profileData.profile.accountname) : null,
+      photographerLabel: profileData.profile?.full_name || profileData.profile?.accountname || null,
+      placePath: related.placePath,
+      placeLabel: related.placeLabel
+    },
+    relatedContent: {
+      sameType: related.sameType,
+      sameCreator: related.sameCreator,
+      sameKeyword: related.sameKeyword,
+      samePlace: related.samePlace
+    }
   };
 }

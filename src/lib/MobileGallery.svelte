@@ -92,7 +92,8 @@
 
   async function loadInitialGridImages(lat: number, lon: number) {
     loading = true;
-    dynamicLoader.setCurrentUserId(get(sessionStore).isAuthenticated ? get(sessionStore).userId : null);
+    const session = get(sessionStore) as any;
+    dynamicLoader.setCurrentUserId(session?.isAuthenticated ? session.userId : null);
     
     // Load images like simulation (direct return from loadImagesForPosition)
     const newImages = await dynamicLoader.loadImagesForPosition(lat, lon);
@@ -312,8 +313,8 @@
       const sortedItems = [...$gridItems].sort((a: any, b: any) => {
         if (!a.lat || !a.lon || !b.lat || !b.lon) return 0;
         
-        const distanceA = getDistanceInMeters(userLat, userLon, a.lat, a.lon);
-        const distanceB = getDistanceInMeters(userLat, userLon, b.lat, b.lon);
+        const distanceA = getDistanceInMeters(userLat ?? 0, userLon ?? 0, a.lat, a.lon);
+        const distanceB = getDistanceInMeters(userLat ?? 0, userLon ?? 0, b.lat, b.lon);
         
         return distanceA - distanceB;
       });

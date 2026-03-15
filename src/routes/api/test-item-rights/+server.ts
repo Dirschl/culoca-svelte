@@ -2,6 +2,21 @@ import { json } from '@sveltejs/kit';
 import { createClient } from '@supabase/supabase-js';
 import type { RequestHandler } from './$types';
 
+type TestResultEntry = {
+  exists: boolean;
+  error: string | null;
+  count?: number;
+};
+
+type TestResults = {
+  tables: Record<string, TestResultEntry>;
+  functions: Record<string, TestResultEntry>;
+  user: {
+    id: string;
+    hasImages?: TestResultEntry;
+  };
+};
+
 export const GET: RequestHandler = async ({ request }) => {
   // Create Supabase client directly
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -31,7 +46,7 @@ export const GET: RequestHandler = async ({ request }) => {
     
     console.log('🔍 Testing item-rights system for user:', userId);
     
-    const results = {
+    const results: TestResults = {
       tables: {},
       functions: {},
       user: { id: userId }
@@ -51,7 +66,7 @@ export const GET: RequestHandler = async ({ request }) => {
     } catch (error) {
       results.tables.profile_rights = {
         exists: false,
-        error: error.message
+        error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
 
@@ -69,7 +84,7 @@ export const GET: RequestHandler = async ({ request }) => {
     } catch (error) {
       results.tables.item_rights = {
         exists: false,
-        error: error.message
+        error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
 
@@ -88,7 +103,7 @@ export const GET: RequestHandler = async ({ request }) => {
     } catch (error) {
       results.functions.check_item_rights = {
         exists: false,
-        error: error.message
+        error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
 
@@ -106,7 +121,7 @@ export const GET: RequestHandler = async ({ request }) => {
     } catch (error) {
       results.functions.get_user_item_rights = {
         exists: false,
-        error: error.message
+        error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
 
@@ -126,7 +141,7 @@ export const GET: RequestHandler = async ({ request }) => {
     } catch (error) {
       results.user.hasImages = {
         exists: false,
-        error: error.message
+        error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
 

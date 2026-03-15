@@ -4,7 +4,7 @@ import { supabase } from '$lib/supabaseClient';
 
 export const GET: RequestHandler = async ({ locals }) => {
   try {
-    const { data: { user } } = await locals.getSession();
+    const user = locals.user;
     
     if (!user) {
       return json({ hasAdminPermission: false });

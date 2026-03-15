@@ -1,6 +1,8 @@
 <script lang="ts">
   import { onMount, onDestroy, createEventDispatcher } from 'svelte';
   import { goto } from '$app/navigation';
+  import { getPublicItemHref } from '$lib/content/routing';
+  let L: any;
   export let image: any;
   export let isCreator: boolean = false;
   export let hasEditRights: boolean = false; // New prop for unified rights
@@ -35,7 +37,7 @@
     }
   }
   const dispatch = createEventDispatcher();
-  let map;
+  let map: any = null;
   let mapEl: HTMLDivElement | null = null;
   // Map Picker State
   let showMapPicker = false;
@@ -47,8 +49,8 @@
   let mapPickerSearch = '';
   let mapPickerSearchResults: any[] = [];
   let isGettingUserLocation = false;
-  let currentMarker = null;
-  let nearbyMarkers = [];
+  let currentMarker: any = null;
+  let nearbyMarkers: any[] = [];
   let mapKey = 0;
   let lastNearbyCount = 0;
   let lastNearbyKey = '';
@@ -62,7 +64,7 @@
     if (typeof window !== 'undefined' && window.L && window.L.DomUtil) {
       const container = window.L.DomUtil.get('mapid');
       if (container && typeof container === 'object') {
-        container._leaflet_id = null;
+        (container as any)._leaflet_id = null;
       }
     }
   }
@@ -70,7 +72,7 @@
   function renderMarkers() {
     if (!map || !image?.lat || !image?.lon) return;
     // Entferne alle alten Marker außer den Tile-Layern
-    map.eachLayer((layer) => {
+    map.eachLayer((layer: any) => {
       if (layer instanceof L.Marker) {
         map.removeLayer(layer);
       }
@@ -92,7 +94,7 @@
     // Nearby Marker
     nearbyMarkers = [];
     if (nearby && nearby.length > 0) {
-      nearby.forEach((nearbyItem) => {
+      nearby.forEach((nearbyItem: any) => {
         const nearbyThumbnailUrl = nearbyItem.src64 || nearbyItem.src;
         const nearbyIcon = L.divIcon({
           className: 'custom-marker nearby-image',
@@ -103,11 +105,11 @@
         });
         const nearbyMarker = map ? L.marker([nearbyItem.lat, nearbyItem.lon], { icon: nearbyIcon }).addTo(map) : null;
         if (nearbyMarker) {
-                    nearbyMarker.on('click', (event) => {
+          nearbyMarker.on('click', () => {
             if (nearbyItem.slug) {
               // Leaflet event doesn't have preventDefault/stopPropagation like DOM events
               // Just navigate directly
-              const url = new URL(nearbyItem.canonicalPath || nearbyItem.canonical_path || `/item/${nearbyItem.slug}`, window.location.origin);
+              const url = new URL(getPublicItemHref(nearbyItem), window.location.origin);
               window.location.href = url.toString();
             } else {
               alert('Kein Slug für dieses Item vorhanden!');
@@ -117,7 +119,7 @@
             <div style="text-align: center; min-width: 200px;">
               <strong>${nearbyItem.title || 'Item'}</strong><br>
               <small>Entfernung: ${getDistanceFromLatLonInMeters(image.lat, image.lon, nearbyItem.lat, nearbyItem.lon)}</small><br>
-              ${nearbyItem.slug ? `<a href="javascript:void(0)" onclick="(() => { const url = new URL('${nearbyItem.canonicalPath || nearbyItem.canonical_path || `/item/${nearbyItem.slug}`}', window.location.origin); window.location.href = url.toString(); })()" style="color: #0066cc; text-decoration: none; font-weight: 500; cursor: pointer;" title="Weitere Bilder in der Nähe">Item anzeigen →</a>` : `<span style='color: #888;'>Kein Slug vorhanden</span>`}
+              ${nearbyItem.slug ? `<a href="javascript:void(0)" onclick="(() => { const url = new URL('${getPublicItemHref(nearbyItem)}', window.location.origin); window.location.href = url.toString(); })()" style="color: #0066cc; text-decoration: none; font-weight: 500; cursor: pointer;" title="Weitere Bilder in der Nähe">Item anzeigen →</a>` : `<span style='color: #888;'>Kein Slug vorhanden</span>`}
             </div>
           `;
           nearbyMarker.bindPopup(popupContent);
@@ -127,7 +129,7 @@
     }
     // Fit map to show all markers
     if (map && (nearby?.length > 0)) {
-      const allMarkers = [currentMarker, ...nearbyMarkers];
+      const allMarkers = [currentMarker, ...nearbyMarkers].filter(Boolean);
       const group = L.featureGroup(allMarkers);
       setTimeout(() => {
         try {
@@ -143,7 +145,7 @@
   function initMap() {
     if (!mapEl) return;
     import('leaflet').then((Lmod) => {
-      const L = Lmod.default || Lmod;
+      L = Lmod.default || Lmod;
       removeMap();
       map = L.map(mapEl, { zoomControl: true }).setView([image.lat, image.lon], 13);
       if (!document.getElementById('leaflet-css')) {
@@ -222,11 +224,12 @@
     if (!mapPickerContainer || mapPickerMap) return;
     const initialLat = mapPickerLat ?? 48.1351;
     const initialLon = mapPickerLon ?? 11.5820;
-    mapPickerMap = leaflet.map(mapPickerContainer, { zoomControl: true }).setView([initialLat, initialLon], 13);
-    const standardLayer = leaflet.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    const leafletApi: any = leaflet.default || leaflet;
+    mapPickerMap = leafletApi.map(mapPickerContainer, { zoomControl: true }).setView([initialLat, initialLon], 13);
+    const standardLayer = leafletApi.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap contributors'
     });
-    const hybridLayer = leaflet.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    const hybridLayer = leafletApi.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
       attribution: '© Esri, DigitalGlobe, GeoEye, Earthstar Geographics, CNES/Airbus DS, USDA, USGS, AeroGRID, IGN, and the GIS User Community'
     });
     if (mapPickerType === 'standard') {
@@ -315,7 +318,7 @@
   }
 
   $: {
-    const filteredNearbyKey = JSON.stringify(nearby.map(i => i.id));
+    const filteredNearbyKey = JSON.stringify(nearby.map((i: any) => i.id));
     if (map && image && image.lat && image.lon) {
       if (filteredNearbyKey !== lastNearbyKey) {
         lastNearbyKey = filteredNearbyKey;
@@ -400,7 +403,7 @@
       {#if mapPickerSearchResults.length > 0}
         <div class="map-search-results">
           {#each mapPickerSearchResults as result}
-            <div class="map-search-result" on:click={() => selectSearchResult(result)}>{result.display_name}</div>
+            <button type="button" class="map-search-result" on:click={() => selectSearchResult(result)}>{result.display_name}</button>
           {/each}
         </div>
       {/if}

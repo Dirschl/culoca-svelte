@@ -146,7 +146,7 @@ export async function GET({ url }: any) {
     const locationFilterLon = parseFloat(url.searchParams.get('locationFilterLon') || '0');
     const userId = url.searchParams.get('user_id');
     const typeId = parseInt(url.searchParams.get('type_id') || '0') || null;
-    const pageSize = 50;
+    const pageSize = Math.min(100, Math.max(1, parseInt(url.searchParams.get('page_size') || '50') || 50));
     
     console.log('[Search API] Request params:', { page, search, lat, lon, locationFilterLat, locationFilterLon, userId });
 
@@ -226,7 +226,7 @@ export async function GET({ url }: any) {
       user_lat: lat || 0,
       user_lon: lon || 0,
       page_value: page,
-      page_size_value: 50,
+      page_size_value: pageSize,
       current_user_id: effectiveUserId,
       search_term: searchTerm
     });

@@ -8,26 +8,88 @@
   import { onMount } from 'svelte';
   import { supabase } from '$lib/supabaseClient';
   import { goto } from '$app/navigation';
-  import { darkMode } from '$lib/darkMode';
   import InfoPageLayout from '$lib/InfoPageLayout.svelte';
+
+  type ProfileUser = {
+    id: string;
+    full_name: string | null;
+    accountname: string | null;
+    email: string | null;
+    created_at: string;
+    avatar_url: string | null;
+    privacy_mode: string | null;
+    save_originals: boolean | null;
+    use_justified_layout: boolean | null;
+    show_welcome: boolean | null;
+    role_id: number | null;
+  };
+
+  type AuthUser = {
+    id: string;
+    email?: string | null;
+    email_confirmed_at?: string | null;
+    last_sign_in_at?: string | null;
+    updated_at?: string | null;
+    created_at?: string | null;
+    app_metadata?: {
+      provider?: string;
+      providers?: string[];
+    } | null;
+  };
+
+  type Role = {
+    id: number;
+    display_name: string;
+    description?: string | null;
+  };
+
+  type EditableUser = ProfileUser & {
+    auth_email: string;
+    email_confirmed: boolean;
+  };
+
+  type UserUpdates = {
+    full_name: string;
+    accountname: string;
+    email: string;
+    role_id: number;
+    privacy_mode: string;
+    save_originals: boolean;
+    use_justified_layout: boolean;
+    show_welcome: boolean;
+  };
+
+  type OnlineStatus = {
+    isOnline: boolean;
+    lastSeen: Date | null;
+  };
 
   // Base URL for API calls
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5173';
 
   let isLoading = true;
   let isAdmin = false;
-  let users: any[] = [];
-  let filteredUsers: any[] = [];
+  let users: ProfileUser[] = [];
+  let filteredUsers: ProfileUser[] = [];
   let searchTerm = '';
   let currentPage = 0;
   let totalPages = 0;
   let itemsPerPage = 20;
-  let selectedUser: any = null;
+  let selectedUser: ProfileUser | null = null;
   let showModal = false;
   let showEditModal = false;
-  let editingUser: any = null;
-  let authUsers: any[] = [];
-  let roles: any[] = [];
+  let editingUser: EditableUser | null = null;
+  let authUsers: AuthUser[] = [];
+  let roles: Role[] = [];
+
+  function getErrorMessage(error: unknown): string {
+    return error instanceof Error ? error.message : 'Unbekannter Fehler';
+  }
+
+  function getFormValue(formData: FormData, key: string): string {
+    const value = formData.get(key);
+    return typeof value === 'string' ? value : '';
+  }
 
   onMount(async () => {
     // Wait for authentication to be ready
@@ -159,7 +221,7 @@
     }
   }
 
-  async function deleteUser(userId) {
+  async function deleteUser(userId: string) {
     if (!confirm('Möchten Sie diesen Benutzer wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.')) {
       return;
     }
@@ -189,11 +251,11 @@
       alert('Benutzer wurde permanent gelöscht!');
     } catch (error) {
       console.error('Error deleting user:', error);
-      alert(`Fehler beim Löschen: ${error.message}`);
+      alert(`Fehler beim Löschen: ${getErrorMessage(error)}`);
     }
   }
 
-  async function deleteUserProfile(userId) {
+  async function deleteUserProfile(userId: string) {
     if (!confirm('Möchten Sie nur das Profil dieses Benutzers löschen? Der Benutzer bleibt in der Auth-Tabelle.')) {
       return;
     }
@@ -223,11 +285,11 @@
       alert('Benutzerprofil wurde gelöscht!');
     } catch (error) {
       console.error('Error deleting user profile:', error);
-      alert(`Fehler beim Löschen: ${error.message}`);
+      alert(`Fehler beim Löschen: ${getErrorMessage(error)}`);
     }
   }
 
-  function showUserDetails(user) {
+  function showUserDetails(user: ProfileUser) {
     selectedUser = user;
     showModal = true;
   }
@@ -237,9 +299,9 @@
     selectedUser = null;
   }
 
-  function editUser(user) {
+  function editUser(user: ProfileUser) {
     // Find auth user data for this profile
-    const authUser = authUsers.find(auth => auth.id === user.id);
+    const authUser = authUsers.find((auth: AuthUser) => auth.id === user.id);
     editingUser = {
       ...user,
       auth_email: authUser?.email || 'Keine E-Mail gefunden',
@@ -253,7 +315,7 @@
     editingUser = null;
   }
 
-  async function checkEmailExists(email) {
+  async function checkEmailExists(email: string) {
     try {
       console.log('Checking email from:', `${baseUrl}/api/admin/auth-users`);
       const response = await fetch(`${baseUrl}/api/admin/auth-users`, {
@@ -278,8 +340,12 @@
     }
   }
 
-  async function updateUser(updates) {
+  async function updateUser(updates: UserUpdates) {
     try {
+      if (!editingUser) {
+        return;
+      }
+
       // If email is being changed, check if it exists
       if (updates.email && updates.email !== editingUser.auth_email) {
         console.log(`🔍 Checking if email ${updates.email} exists...`);
@@ -320,11 +386,11 @@
       alert('Benutzer erfolgreich aktualisiert!');
     } catch (error) {
       console.error('Error updating user:', error);
-      alert(`Fehler beim Aktualisieren: ${error.message}`);
+      alert(`Fehler beim Aktualisieren: ${getErrorMessage(error)}`);
     }
   }
 
-  async function refreshCache(table = null, userId = null) {
+  async function refreshCache(table: 'profiles' | 'items' | null = null, userId: string | null = null) {
     try {
       console.log(`🔄 Refreshing cache for table: ${table || 'all'}, userId: ${userId || 'all'}`);
       
@@ -352,11 +418,11 @@
       alert('Cache erfolgreich aktualisiert!');
     } catch (error) {
       console.error('Error refreshing cache:', error);
-      alert(`Fehler beim Cache-Refresh: ${error.message}`);
+      alert(`Fehler beim Cache-Refresh: ${getErrorMessage(error)}`);
     }
   }
 
-  async function forceUpdateUser(userId, updates) {
+  async function forceUpdateUser(userId: string, updates: Record<string, unknown>) {
     try {
       console.log(`🔄 Force updating user: ${userId}`, updates);
       
@@ -387,7 +453,7 @@
       alert('Benutzer erfolgreich force-updated!');
     } catch (error) {
       console.error('Error force updating user:', error);
-      alert(`Fehler beim Force-Update: ${error.message}`);
+      alert(`Fehler beim Force-Update: ${getErrorMessage(error)}`);
     }
   }
 
@@ -408,7 +474,7 @@
     }
   }
 
-  function formatDate(dateString) {
+  function formatDate(dateString: string) {
     return new Date(dateString).toLocaleDateString('de-DE', {
       day: '2-digit',
       month: '2-digit',
@@ -418,7 +484,7 @@
     });
   }
 
-  function getOptimizedAvatarUrl(avatarUrl) {
+  function getOptimizedAvatarUrl(avatarUrl: string) {
     console.log('🔍 Optimizing avatar URL:', avatarUrl);
     
     // Handle Google OAuth avatars - optimize size and remove problematic parameters
@@ -441,23 +507,23 @@
     return avatarUrl;
   }
 
-  function getInitials(name) {
+  function getInitials(name: string) {
     return name
       .split(' ')
-      .map(word => word.charAt(0))
+      .map((word: string) => word.charAt(0))
       .join('')
       .toUpperCase()
       .slice(0, 2);
   }
 
-  function getLoginMethods(authUser) {
+  function getLoginMethods(authUser: AuthUser | undefined) {
     if (!authUser) return ['Unbekannt'];
     
     // Check app_metadata.providers first (array format) - this is the most reliable
     const providers = authUser.app_metadata?.providers || [];
     console.log('🔍 Providers array:', providers);
     
-    const methods = [];
+    const methods: string[] = [];
     if (providers.includes('google')) methods.push('Google');
     if (providers.includes('facebook')) methods.push('Facebook');
     if (providers.includes('github')) methods.push('GitHub');
@@ -481,7 +547,7 @@
     return methods.length > 0 ? methods : ['Unbekannt'];
   }
 
-  function getLoginIcon(loginMethod) {
+  function getLoginIcon(loginMethod: string) {
     switch (loginMethod) {
       case 'Google': return 'google';
       case 'Facebook': return 'facebook';
@@ -491,12 +557,12 @@
     }
   }
 
-  function getRoleName(roleId) {
-    const role = roles.find(r => r.id === roleId);
+  function getRoleName(roleId: number | null) {
+    const role = roles.find((r: Role) => r.id === roleId);
     return role ? role.display_name : 'Unbekannt';
   }
 
-  function getOnlineStatus(authUser) {
+  function getOnlineStatus(authUser: AuthUser | undefined): OnlineStatus {
     if (!authUser) return { isOnline: false, lastSeen: null };
     
     // For current user, always show as online
@@ -520,6 +586,25 @@
   }
 
   // Reactive statements
+  function handleExternalAvatarError(event: Event, avatarUrl: string) {
+    const image = event.currentTarget as HTMLImageElement | null;
+    console.error('❌ External avatar failed to load:', avatarUrl);
+    console.error('❌ Error details:', event);
+    if (!image) return;
+    image.style.display = 'none';
+    const fallback = image.nextElementSibling as HTMLDivElement | null;
+    if (fallback) {
+      fallback.style.display = 'flex';
+    }
+  }
+
+  function handleOverlayKeydown(event: KeyboardEvent, close: () => void) {
+    if (event.key === 'Escape' || event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      close();
+    }
+  }
+
   $: if (searchTerm !== undefined) {
     currentPage = 0;
     loadUsers();
@@ -636,15 +721,7 @@
                               src={getOptimizedAvatarUrl(user.avatar_url)}
                               alt={user.full_name || user.accountname || 'User'}
                               style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;"
-                              on:error={(e) => {
-                                console.error('❌ External avatar failed to load:', user.avatar_url);
-                                console.error('❌ Error details:', e);
-                                // Hide the broken image and show initials instead
-                                e.target.style.display = 'none';
-                                if (e.target.nextElementSibling) {
-                                  e.target.nextElementSibling.style.display = 'flex';
-                                }
-                              }}
+                              on:error={(event) => handleExternalAvatarError(event, user.avatar_url || '')}
                             />
                             <div style="display: none; width: 100%; height: 100%; align-items: center; justify-content: center; background: var(--admin-primary); color: white; border-radius: 50%; font-weight: bold;">
                               {getInitials(user.full_name || user.accountname || 'U')}
@@ -717,9 +794,7 @@
                     {#if user.accountname}
                       <a 
                         href="/{user.accountname}" 
-                        style="color: #f59e0b; text-decoration: none; font-weight: 500;"
-                        on:mouseenter={(e) => e.target.style.textDecoration = 'underline'}
-                        on:mouseleave={(e) => e.target.style.textDecoration = 'none'}
+                        class="account-link"
                       >
                         {user.accountname}
                       </a>
@@ -815,7 +890,13 @@
 
 <!-- User Details Modal -->
 {#if showModal && selectedUser}
-  <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.8); display: flex; align-items: center; justify-content: center; z-index: 9999; overflow-y: auto; padding: 20px;" on:click={closeModal}>
+  <div
+    style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.8); display: flex; align-items: center; justify-content: center; z-index: 9999; overflow-y: auto; padding: 20px;"
+    on:click={closeModal}
+    on:keydown={(event) => handleOverlayKeydown(event, closeModal)}
+    role="button"
+    tabindex="0"
+  >
     <div style="max-width: 500px; width: 90%; max-height: 90vh; background: #1f2937; border: 2px solid #374151; border-radius: 12px; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5); overflow-y: auto;" on:click|stopPropagation>
       <div class="admin-modal-header">
         <h3 class="admin-modal-title">Benutzer Details</h3>
@@ -872,7 +953,13 @@
 
 <!-- Edit User Modal -->
 {#if showEditModal && editingUser}
-  <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.8); display: flex; align-items: center; justify-content: center; z-index: 9999; overflow-y: auto; padding: 20px;" on:click={closeEditModal}>
+  <div
+    style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.8); display: flex; align-items: center; justify-content: center; z-index: 9999; overflow-y: auto; padding: 20px;"
+    on:click={closeEditModal}
+    on:keydown={(event) => handleOverlayKeydown(event, closeEditModal)}
+    role="button"
+    tabindex="0"
+  >
     <div style="max-width: 600px; width: 90%; max-height: 90vh; background: #1f2937; border: 2px solid #374151; border-radius: 12px; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5); overflow-y: auto;" on:click|stopPropagation>
       
       <!-- Header -->
@@ -880,9 +967,8 @@
         <h3 style="margin: 0; font-size: 18px; color: #f9fafb; font-weight: 600;">Benutzer bearbeiten</h3>
         <button 
           on:click={closeEditModal} 
+          class="icon-button"
           style="background: none; border: none; font-size: 20px; color: #9ca3af; cursor: pointer; padding: 5px; border-radius: 4px; transition: background-color 0.2s;"
-          on:mouseenter={(e) => e.target.style.backgroundColor = '#374151'}
-          on:mouseleave={(e) => e.target.style.backgroundColor = 'transparent'}
         >
           ✕
         </button>
@@ -991,7 +1077,7 @@
               {/each}
             </select>
             <div style="margin-top: 8px; font-size: 14px; font-weight: 500; color: #d1d5db;">
-              Aktuelle Rolle: {roles.find(r => r.id === editingUser.role_id)?.display_name || 'Unbekannt'}
+              Aktuelle Rolle: {roles.find(r => r.id === (editingUser?.role_id ?? null))?.display_name || 'Unbekannt'}
             </div>
           </div>
           
@@ -1058,9 +1144,8 @@
       <div style="padding: 15px 20px 20px 20px; border-top: 1px solid #374151; display: flex; justify-content: flex-end; gap: 12px; background: #111827;">
         <button 
           on:click={closeEditModal} 
+          class="edit-cancel-button"
           style="padding: 10px 20px; font-size: 14px; font-weight: 500; background: #4b5563; border: 1px solid #6b7280; color: #f9fafb; border-radius: 6px; cursor: pointer; transition: all 0.2s;"
-          on:mouseenter={(e) => e.target.style.backgroundColor = '#6b7280'}
-          on:mouseleave={(e) => e.target.style.backgroundColor = '#4b5563'}
         >
           Abbrechen
         </button>
@@ -1074,11 +1159,11 @@
             }
             const formData = new FormData(form);
             const updates = {
-              full_name: formData.get('full_name'),
-              accountname: formData.get('accountname'),
-              email: formData.get('email'),
-              role_id: parseInt(formData.get('role_id')),
-              privacy_mode: formData.get('privacy_mode'),
+              full_name: getFormValue(formData, 'full_name'),
+              accountname: getFormValue(formData, 'accountname'),
+              email: getFormValue(formData, 'email'),
+              role_id: parseInt(getFormValue(formData, 'role_id'), 10),
+              privacy_mode: getFormValue(formData, 'privacy_mode'),
               save_originals: formData.get('save_originals') === 'true',
               use_justified_layout: formData.get('use_justified_layout') === 'true',
               show_welcome: formData.get('show_welcome') === 'true'
@@ -1086,9 +1171,8 @@
             console.log('Updating user with:', updates);
             updateUser(updates);
           }}
+          class="edit-save-button"
           style="padding: 10px 20px; font-size: 14px; font-weight: 500; background: #f59e0b; border: 1px solid #d97706; color: white; border-radius: 6px; cursor: pointer; transition: all 0.2s; opacity: 1;"
-          on:mouseenter={(e) => e.target.style.opacity = '0.8'}
-          on:mouseleave={(e) => e.target.style.opacity = '1'}
         >
           Speichern
         </button>
@@ -1218,6 +1302,28 @@
   
   .admin-btn-secondary:hover {
     background: var(--bg-secondary);
+  }
+
+  .account-link {
+    color: #f59e0b;
+    text-decoration: none;
+    font-weight: 500;
+  }
+
+  .account-link:hover {
+    text-decoration: underline;
+  }
+
+  .icon-button:hover {
+    background-color: #374151;
+  }
+
+  .edit-cancel-button:hover {
+    background-color: #6b7280;
+  }
+
+  .edit-save-button:hover {
+    opacity: 0.8;
   }
   
   .pagination {

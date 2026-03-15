@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import sharp from 'sharp';
 
 // Use environment variables with fallbacks for build process
@@ -14,7 +14,7 @@ const supabaseServiceKey = (typeof process !== 'undefined' && process.env?.SUPAB
                           (typeof import.meta !== 'undefined' && import.meta.env?.SUPABASE_SERVICE_ROLE_KEY);
 
 // Create client with proper error handling for build process
-let supabase;
+let supabase: SupabaseClient;
 try {
   if (!supabaseServiceKey) {
     // For build process, create a dummy client that won't be used

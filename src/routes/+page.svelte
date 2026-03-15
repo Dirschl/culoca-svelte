@@ -8,6 +8,7 @@
   import { readRememberedLocation, type RememberedLocation } from '$lib/locationPreferences';
   import { appendReturnTo } from '$lib/content/routing';
   import { supabase } from '$lib/supabaseClient';
+  import { buildBreadcrumbJsonLd, DEFAULT_OG_IMAGE, trimText } from '$lib/seo/site';
 
   export let data: PageData;
   let savedLocation: RememberedLocation | null = null;
@@ -90,6 +91,23 @@
   $: if ($isAuthenticated && !currentUserFullName) {
     loadCurrentUserFullName();
   }
+  $: homeJsonLd = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'WebSite',
+        name: 'Culoca',
+        url: 'https://culoca.com',
+        description: 'GPS-basierte Plattform zum Entdecken und Teilen von Fotos, Events, Firmen und mehr.',
+        potentialAction: {
+          '@type': 'SearchAction',
+          target: 'https://culoca.com/foto?suche={search_term_string}',
+          'query-input': 'required name=search_term_string'
+        }
+      },
+      buildBreadcrumbJsonLd([{ name: 'Culoca', path: '/' }])
+    ]
+  };
 
   onMount(() => {
     savedLocation = readRememberedLocation();
@@ -100,33 +118,22 @@
 </script>
 
 <svelte:head>
-  <title>Culoca - Entdecke die Welt durch Fotos &amp; GPS-Inhalte</title>
-  <meta name="description" content="Entdecke und teile Fotos, Events, Firmen und mehr mit GPS-Standort. Culoca zeigt lokale Inhalte aus deiner Umgebung." />
+  <title>Culoca: Fotos, Orte, Themen und lokale Inhalte</title>
+  <meta name="description" content={trimText('Culoca verbindet Fotos, Orte, Themen und lokale Inhalte in indexierbaren Hubs. Entdecke Bilder, Events, Firmen und Detailseiten mit klarer interner Verlinkung.')} />
   <meta name="keywords" content="GPS, Fotos, Events, Firmen, Galerie, lokale Suche, Culoca, Standort, Entdecken" />
   <link rel="canonical" href="https://culoca.com/" />
   <meta name="robots" content="index, follow" />
 
   <meta property="og:locale" content="de_DE" />
   <meta property="og:type" content="website" />
-  <meta property="og:title" content="Culoca - Entdecke die Welt durch Fotos & GPS-Inhalte" />
-  <meta property="og:description" content="Entdecke und teile Fotos, Events, Firmen und mehr mit GPS-Standort." />
+  <meta property="og:title" content="Culoca: Fotos, Orte, Themen und lokale Inhalte" />
+  <meta property="og:description" content="Indexierbare Hubs für Fotos, Orte, Schlagworte, Events und Fotografen auf Culoca." />
   <meta property="og:url" content="https://culoca.com/" />
   <meta property="og:site_name" content="Culoca" />
-  <meta property="og:image" content="https://culoca.com/culoca-logo-512px.png" />
+  <meta property="og:image" content={DEFAULT_OG_IMAGE} />
   <meta name="twitter:card" content="summary_large_image" />
 
-  {@html `<script type="application/ld+json">${JSON.stringify({
-    "@context": "https://schema.org",
-    "@type": "WebSite",
-    "name": "Culoca",
-    "url": "https://culoca.com",
-    "description": "GPS-basierte Plattform zum Entdecken und Teilen von Fotos, Events, Firmen und mehr.",
-    "potentialAction": {
-      "@type": "SearchAction",
-      "target": "https://culoca.com/galerie?search={search_term_string}",
-      "query-input": "required name=search_term_string"
-    }
-  })}</script>`}
+  {@html `<script type="application/ld+json">${JSON.stringify(homeJsonLd)}</script>`}
 </svelte:head>
 
 <div class="page">
@@ -150,6 +157,10 @@
               {#if data.totalItems > 0}
                 <span class="hero-count">Aktuell {data.totalItems.toLocaleString('de-DE')} Einträge.</span>
               {/if}
+            </p>
+            <p class="hero-seo-copy">
+              Die Startseite ist der kuratierte Einstieg in die wichtigsten Content-Hubs von Culoca:
+              Typseiten, Schlagwortseiten, Ortsbezug und Detailseiten sind sauber miteinander verknüpft.
             </p>
             <div class="hero-actions">
               <a href="/galerie" class={savedLocation?.source === 'gps' ? 'btn-secondary' : 'btn-primary'}>Galerie</a>

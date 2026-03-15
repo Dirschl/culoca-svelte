@@ -62,7 +62,7 @@ export const GET: RequestHandler = async () => {
         
         const { data, error } = await supabase
           .from('items')
-          .select('id, slug, title, description, path_2048, path_512, created_at, updated_at, type_id, group_root_item_id, group_slug, canonical_path, show_in_main_feed, is_private, ends_at')
+          .select('id, slug, title, description, path_2048, path_512, created_at, updated_at, type_id, group_root_item_id, group_slug, canonical_path, country_slug, district_slug, municipality_slug, show_in_main_feed, is_private, ends_at, profile_id')
           .not('slug', 'is', null)
           .not('path_512', 'is', null)
           // Public items include false and null (legacy rows)
@@ -114,7 +114,7 @@ export const GET: RequestHandler = async () => {
     if (rootIds.length > 0) {
       const { data: rootRows } = await supabase
         .from('items')
-        .select('id, slug, type_id, group_slug, canonical_path')
+        .select('id, slug, type_id, group_slug, canonical_path, country_slug, district_slug, municipality_slug')
         .in('id', rootIds);
 
       for (const rootRow of rootRows || []) {
@@ -147,17 +147,42 @@ export const GET: RequestHandler = async () => {
       xml += '  </url>\n';
     }
 
-    // Add crawlable hub pagination pages so bots can discover all item links
+    // Add only shallow pagination pages. Deeper pages stay crawlable via links but do not consume sitemap budget.
     for (const [, typeDef] of DEFAULT_CONTENT_TYPE_BY_ID.entries()) {
       const typeItems = sitemapItems.filter(item => item.type_id === typeDef.id);
       const typePages = Math.max(1, Math.ceil(typeItems.length / 24));
-      for (let p = 2; p <= typePages; p++) {
+      for (let p = 2; p <= Math.min(typePages, 2); p++) {
         xml += '  <url>\n';
         xml += `    <loc>${baseUrl}/${typeDef.slug}?seite=${p}</loc>\n`;
         const currentDate = new Date().toISOString().split('T')[0];
         xml += `    <lastmod>${currentDate}</lastmod>\n`;
         xml += '    <priority>0.6</priority>\n';
         xml += '    <changefreq>daily</changefreq>\n';
+        xml += '  </url>\n';
+      }
+    }
+
+    const itemCountsByProfile = new Map<string, number>();
+    for (const item of sitemapItems) {
+      if (!item.profile_id) continue;
+      itemCountsByProfile.set(item.profile_id, (itemCountsByProfile.get(item.profile_id) || 0) + 1);
+    }
+
+    const publicProfileIds = Array.from(itemCountsByProfile.keys());
+    if (publicProfileIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, accountname')
+        .in('id', publicProfileIds)
+        .not('accountname', 'is', null);
+
+      for (const profile of profiles || []) {
+        if (!profile.accountname) continue;
+        xml += '  <url>\n';
+        xml += `    <loc>${baseUrl}/fotograf/${profile.accountname}</loc>\n`;
+        xml += `    <lastmod>${new Date().toISOString().split('T')[0]}</lastmod>\n`;
+        xml += '    <priority>0.7</priority>\n';
+        xml += '    <changefreq>weekly</changefreq>\n';
         xml += '  </url>\n';
       }
     }

@@ -1,6 +1,5 @@
 <script lang="ts">
   export let profile: any;
-  export let isCreator: boolean;
   export let setUserFilter: () => void;
 </script>
 
@@ -9,15 +8,21 @@
     <h2 class="creator-title">Ersteller</h2>
     <div class="creator-header">
       {#if profile.avatar_url}
-        <img 
-          src={profile.avatar_url.startsWith('http') ? profile.avatar_url : `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/avatars/${profile.avatar_url}`} 
-          alt="Avatar" 
-          class="avatar clickable-avatar"
+        <button
+          type="button"
+          class="avatar-button clickable-avatar"
           on:click={setUserFilter}
           title={`Nur Bilder von ${profile.full_name} anzeigen`}
-        />
+        >
+          <img 
+            src={profile.avatar_url.startsWith('http') ? profile.avatar_url : `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/avatars/${profile.avatar_url}`} 
+            alt="Avatar" 
+            class="avatar"
+          />
+        </button>
       {:else}
-        <div 
+        <button
+          type="button"
           class="avatar-placeholder clickable-avatar"
           on:click={setUserFilter}
           title={`Nur Bilder von ${profile.full_name} anzeigen`}
@@ -25,13 +30,13 @@
           <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
           </svg>
-        </div>
+        </button>
       {/if}
     </div>
     <div class="creator-details">
-      <h3 class="creator-name clickable-name" on:click={setUserFilter} title={`Nur Bilder von ${profile.full_name} anzeigen`}>
+      <button type="button" class="creator-name clickable-name" on:click={setUserFilter} title={`Nur Bilder von ${profile.full_name} anzeigen`}>
         {profile.full_name}
-      </h3>
+      </button>
       <div class="creator-address">
         {#if profile.show_address && profile.address}
           <div>{@html profile.address.replace(/\n/g, '<br>')}</div>
@@ -128,17 +133,20 @@
   justify-content: flex-start;
   margin-bottom: 0.5rem;
 }
-.avatar, .avatar-placeholder {
+.avatar, .avatar-placeholder, .avatar-button {
   width: 64px;
   height: 64px;
   border-radius: 50%;
-  object-fit: cover;
   background: transparent;
   border: none;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 0;
+}
+.avatar {
+  object-fit: cover;
 }
 .avatar-placeholder svg {
   width: 32px;
@@ -155,6 +163,10 @@
   margin: 0.2rem 0 0.5rem 0;
   color: var(--text-primary);
   cursor: pointer;
+  background: transparent;
+  border: none;
+  padding: 0;
+  text-align: left;
 }
 .creator-address {
   font-size: 1rem;

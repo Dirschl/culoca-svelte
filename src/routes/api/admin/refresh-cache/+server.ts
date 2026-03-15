@@ -1,6 +1,13 @@
 import { json } from '@sveltejs/kit';
 import { supabaseAdmin } from '$lib/supabaseAdmin.js';
 
+type RefreshResultEntry = {
+  success?: boolean;
+  count?: number;
+  data?: unknown;
+  error?: string;
+};
+
 export const POST = async ({ request }) => {
   try {
     if (!supabaseAdmin) {
@@ -11,7 +18,7 @@ export const POST = async ({ request }) => {
 
     console.log(`🔄 Refreshing cache for table: ${table}, userId: ${userId || 'all'}`);
 
-    let results = {};
+    let results: Record<string, RefreshResultEntry> = {};
 
     // Refresh profiles table
     if (!table || table === 'profiles') {
@@ -65,9 +72,9 @@ export const POST = async ({ request }) => {
           console.log('✅ Auth users cache refreshed');
           results.auth = { success: true, count: users?.users?.length || 0 };
         }
-      } catch (error) {
+      } catch (error: unknown) {
         console.error('Error refreshing auth users:', error);
-        results.auth = { error: error.message };
+        results.auth = { error: error instanceof Error ? error.message : 'Unknown error' };
       }
     }
 
@@ -108,8 +115,8 @@ export const POST = async ({ request }) => {
     console.log('🔄 Cache refresh completed:', results);
     return json({ success: true, results });
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error in refresh-cache API:', error);
     return json({ error: 'Internal server error' }, { status: 500 });
   }
-}; 
+};

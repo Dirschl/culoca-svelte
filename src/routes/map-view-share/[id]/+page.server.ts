@@ -27,9 +27,8 @@ try {
 }
 
 export const load: PageServerLoad = async ({ params }) => {
+  const { id } = params;
   try {
-    const { id } = params;
-    
     console.log('Loading share data for ID:', id);
     
     // Update last_visit timestamp

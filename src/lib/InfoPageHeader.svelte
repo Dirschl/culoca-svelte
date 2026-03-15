@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { supabase } from './supabaseClient.ts';
+  import { supabase } from './supabaseClient';
   import { hasAdminPermission } from './sessionStore';
   
   export let currentPage: 'system' | 'license' | 'impressum' | 'datenschutz' | 'admin' = 'system';
@@ -63,7 +63,8 @@
     
     // Close dropdown when clicking outside
     document.addEventListener('click', (e) => {
-      if (!e.target.closest('.dropdown')) {
+      const target = e.target as HTMLElement | null;
+      if (!target?.closest('.dropdown')) {
         closeDropdown();
       }
     });

@@ -4,8 +4,8 @@
   import { filterStore, getEffectiveGpsPosition } from '$lib/filterStore';
 
   let gpsStatus = 'Not tested';
-  let effectiveGps = null;
-  let filterStoreState = null;
+  let effectiveGps: { lat: number; lon: number } | null = null;
+  let filterStoreState: unknown = null;
 
   async function testGps() {
     if (!browser) return;
@@ -21,7 +21,8 @@
         });
       });
       
-      const { lat, lon } = position.coords;
+      const lat = position.coords.latitude;
+      const lon = position.coords.longitude;
       gpsStatus = `GPS obtained: ${lat}, ${lon}`;
       
       // Update filterStore

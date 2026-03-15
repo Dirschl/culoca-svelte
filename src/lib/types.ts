@@ -2,7 +2,12 @@ export type NewsFlashImage = {
   id: string;
   slug?: string;
   canonical_path?: string;
+  country_slug?: string | null;
+  district_slug?: string | null;
+  municipality_slug?: string | null;
   path_512: string;
+  width?: number;
+  height?: number;
   path_2048?: string;
   original_name?: string;
   created_at?: string;

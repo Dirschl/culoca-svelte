@@ -31,6 +31,7 @@ class IntelligentImageLoader {
   private loadedRegions: LoadedRegion[] = [];
   private readonly MAX_IMAGES_IN_MEMORY = Infinity; // Keine Begrenzung
   private readonly MAX_RADIUS_KM = Infinity; // Keine Begrenzung
+  private readonly MIN_RADIUS_KM = 0;
   private readonly BATCH_SIZE = Infinity; // Kein Limit - alle Bilder
   
   /**
@@ -134,7 +135,7 @@ class IntelligentImageLoader {
       
       console.log(`[IntelligentLoader] Fallback query returned ${fallbackData?.length || 0} images`);
       
-      const fallbackImages = (fallbackData || []).map(item => ({
+      const fallbackImages: LoadedImage[] = (fallbackData || []).map(item => ({
         id: item.id,
         lat: item.lat,
         lon: item.lon,
@@ -156,7 +157,7 @@ class IntelligentImageLoader {
       console.log(`[IntelligentLoader] Using server-sorted images - first 3 distances:`, fallbackImages.slice(0, 3).map(img => img.distance?.toFixed(0) + 'm'));
       
       // No radius filtering - use all images
-      const radiusFilteredImages = fallbackImages;
+      const radiusFilteredImages: LoadedImage[] = fallbackImages;
       console.log(`[IntelligentLoader] Using all ${radiusFilteredImages.length} images without radius filtering`);
       
       // Ensure the selected item (if any) is always first
@@ -178,8 +179,8 @@ class IntelligentImageLoader {
           const allSelectedItem = this.loadedImages.get(selectedItemId);
           if (allSelectedItem) {
             // Add the selected item to the beginning with distance 0
-            allSelectedItem.distance = 0;
-            radiusFilteredImages.unshift(allSelectedItem);
+            const selectedImage: LoadedImage = { ...allSelectedItem, distance: 0 };
+            radiusFilteredImages.unshift(selectedImage);
             console.log(`[IntelligentLoader] Added selected item ${selectedItemId} to first position with 0m distance`);
           }
         }

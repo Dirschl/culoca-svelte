@@ -125,7 +125,7 @@ export async function GET({ url }: any) {
     const locationFilterLon = parseFloat(url.searchParams.get('locationFilterLon') || '0');
     const userId = url.searchParams.get('user_id');
     const typeId = parseInt(url.searchParams.get('type_id') || '0') || null;
-    const pageSize = 50;
+    const pageSize = Math.min(100, Math.max(1, parseInt(url.searchParams.get('page_size') || '50') || 50));
     
     // Request params (debug removed)
 

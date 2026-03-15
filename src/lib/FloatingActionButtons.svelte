@@ -26,7 +26,7 @@
   let isRecording = false;
   let currentTrack: any = null;
   
-  trackStore.subscribe(state => {
+  trackStore.subscribe((state: any) => {
     isRecording = state.isRecording;
     currentTrack = state.currentTrack;
   });

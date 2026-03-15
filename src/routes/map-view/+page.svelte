@@ -18,13 +18,18 @@
       filterStore.setLocationFilter({
         lat: mapParams.lat,
         lon: mapParams.lon,
+        name: 'Kartenansicht',
         fromItem: false
       });
     }
     
     if (mapParams.user) {
       // Set user filter
-      filterStore.setUserFilter(mapParams.user);
+      filterStore.setUserFilter({
+        userId: mapParams.user,
+        username: mapParams.user,
+        accountName: mapParams.user
+      });
     }
     
     mapInitialized = true;

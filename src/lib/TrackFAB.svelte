@@ -8,7 +8,7 @@
   let currentTrack: any = null;
   let showTrackModal = false;
   
-  trackStore.subscribe(state => {
+  trackStore.subscribe((state: any) => {
     isRecording = state.isRecording;
     currentTrack = state.currentTrack;
   });
@@ -191,8 +191,8 @@
   }
 </style>
 
-<script context="module">
-  function formatDistance(meters) {
+<script context="module" lang="ts">
+  function formatDistance(meters: number) {
     if (meters < 1000) {
       return `${Math.round(meters)}m`;
     } else {
@@ -200,7 +200,7 @@
     }
   }
   
-  function formatDuration(ms) {
+  function formatDuration(ms: number) {
     const seconds = Math.floor(ms / 1000);
     const minutes = Math.floor(seconds / 60);
     const hours = Math.floor(minutes / 60);

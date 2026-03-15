@@ -71,7 +71,7 @@
         translateKeys: false,
         translateValues: false,
         mergeOutput: false
-      });
+      } as any);
 
       rawExifData = data;
       exifData = data;
@@ -135,8 +135,9 @@
       }
       
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       console.error('EXIF parsing error:', error);
-      exifData = { error: error.message };
+      exifData = { error: message };
     }
     
     isProcessing = false;

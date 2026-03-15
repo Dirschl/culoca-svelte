@@ -1,12 +1,12 @@
 import { json, error } from '@sveltejs/kit';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 // Service role client for admin operations
 const supabaseUrl = (process.env.PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL) || 'https://caskhmcbvtevdwsolvwk.supabase.co';
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 // Create client with proper error handling for build process
-let supabaseAdmin;
+let supabaseAdmin: SupabaseClient;
 try {
   if (!supabaseServiceKey) {
     // For build process, create a dummy client that won't be used
@@ -81,13 +81,13 @@ export const POST = async ({ request }) => {
       message: 'User created successfully'
     });
 
-  } catch (err) {
+  } catch (err: unknown) {
     console.error('Admin create user error:', err);
     
-    if (err.status) {
+    if (typeof err === 'object' && err !== null && 'status' in err) {
       throw err; // Re-throw SvelteKit errors
     }
     
-    throw error(500, `Internal server error: ${err.message}`);
+    throw error(500, `Internal server error: ${err instanceof Error ? err.message : 'Unknown error'}`);
   }
 }; 

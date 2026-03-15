@@ -112,6 +112,7 @@
   import { searchQuery, isSearching, useSearchResults, performSearch, clearSearch, setSearchQuery } from '$lib/searchStore';
   import { sessionStore, hasPublicContentPermission } from '$lib/sessionStore';
   import { filterStore, locationFilter, userFilter } from '$lib/filterStore';
+  import type { LocationFilter, UserFilter } from '$lib/filterStore';
   import { page as pageStore } from '$app/stores';
   import { galleryStats } from '$lib/galleryStats';
   import { dynamicImageLoader } from '$lib/dynamicImageLoader';
@@ -120,16 +121,10 @@
   import { getEffectiveGpsPosition } from '$lib/filterStore';
   import { supabase } from '$lib/supabaseClient';
   import { get } from 'svelte/store';
+  import { getPublicItemHref } from '$lib/content/routing';
 
   // Gallery store
   const pics = galleryItems;
-
-  // Effective GPS position for components
-  $: effectiveLat = getEffectiveGpsPosition()?.lat || userLat;
-  $: effectiveLon = getEffectiveGpsPosition()?.lon || userLon;
-
-  // Check if location filter is active
-  $: hasLocationFilter = !!$locationFilter;
 
   // Permission states - now using sessionStore
   $: hasPublicContentPermissionValue = $hasPublicContentPermission;
@@ -172,6 +167,9 @@
   let gpsWatchId: number | null = null;
   let galleryInitialized = false;
   let gpsUpdateTimeout: any = null;
+  let effectiveLat: number | null = null;
+  let effectiveLon: number | null = null;
+  let hasLocationFilter = false;
   
   // Ursprüngliche GPS-Koordinaten für Normal Mode (werden nur einmal gesetzt)
   let originalGalleryLat: number | null = null;
@@ -333,7 +331,7 @@
       
       const { data, error } = await supabase
         .from('profiles')
-        .select('show_distance, show_compass, autoguide, enable_search, use_justified_layout, newsflash_mode, home_lat, home_lon')
+        .select('show_distance, show_compass, autoguide, enable_search, use_justified_layout, newsflash_mode, show_image_captions, home_lat, home_lon')
         .eq('id', user.id)
         .single();
         
@@ -893,8 +891,8 @@
   }
 
   // NEU: Reaktive Gallery-Neuladen bei Filter-Änderungen
-  let lastLocationFilter = null;
-  let lastUserFilter = null;
+  let lastLocationFilter: LocationFilter | null = null;
+  let lastUserFilter: UserFilter | null = null;
   let isHandlingFilterChange = false; // Prevent infinite loops
   
   $: if (browser && galleryInitialized && !isHandlingFilterChange) {
@@ -1108,7 +1106,7 @@
     // Event-Listener für FilterBar Events
     window.addEventListener('toggle3x3Mode', handleToggle3x3Mode);
     window.addEventListener('openMap', handleOpenMap);
-    window.addEventListener('locationSelected', handleLocationSelected);
+    window.addEventListener('locationSelected', handleLocationSelected as EventListener);
     
     // GPS-Simulation Message-Listener
     const handleGPSSimulation = (event: MessageEvent) => {
@@ -1116,13 +1114,15 @@
         console.log('[GPS-Simulation] Received GPS data from simulation:', event.data);
         
         // Setze simulierte GPS-Daten als echte GPS-Position
-        userLat = event.data.lat;
-        userLon = event.data.lon;
+        const simulatedLat = Number(event.data.lat);
+        const simulatedLon = Number(event.data.lon);
+        userLat = simulatedLat;
+        userLon = simulatedLon;
         gpsStatus = 'active';
         lastGPSUpdateTime = Date.now();
         
         // WICHTIG: GPS-Position in filterStore speichern für getEffectiveGpsPosition()
-        filterStore.updateGpsStatus(true, { lat: userLat, lon: userLon });
+        filterStore.updateGpsStatus(true, { lat: simulatedLat, lon: simulatedLon });
         
         console.log('[GPS-Simulation] Updated GPS position:', { userLat, userLon });
         
@@ -1403,7 +1403,7 @@
       window.removeEventListener('scroll', onScrollForAudioguide);
       window.removeEventListener('toggle3x3Mode', handleToggle3x3Mode);
       window.removeEventListener('openMap', handleOpenMap);
-      window.removeEventListener('locationSelected', handleLocationSelected);
+      window.removeEventListener('locationSelected', handleLocationSelected as EventListener);
       window.removeEventListener('message', handleGPSSimulation);
       if (rotationInterval) {
         clearInterval(rotationInterval);
@@ -2124,9 +2124,6 @@
     }
   }
   
-  let effectiveLat: number | null = null;
-  let effectiveLon: number | null = null;
-  
   // Derive hasLocationFilter from filterStore
   $: hasLocationFilter = $filterStore.locationFilter !== null;
   
@@ -2245,6 +2242,16 @@
     }
   }
 
+  function botGalleryHref(item: {
+    canonical_path?: string | null;
+    slug?: string | null;
+    country_slug?: string | null;
+    district_slug?: string | null;
+    municipality_slug?: string | null;
+  }): string {
+    return getPublicItemHref(item);
+  }
+
 </script>
 
 {#if browser && mobileModeLocationPromptPending && !showFullscreenMap && !userLat && !userLon && !isBot && typeof window !== 'undefined' && false}
@@ -2353,7 +2360,7 @@
   {#if isBot && data.newsFlashItems?.length}
     <section class="bot-gallery" aria-label="Bot Gallery">
       {#each data.newsFlashItems as img}
-        <a class="bot-gallery-item" href={img.canonical_path || `/item/${img.slug}/`} rel="follow">
+        <a class="bot-gallery-item" href={botGalleryHref(img)} rel="follow">
           <span class="bot-gallery-title">{img.title || img.original_name || img.slug}</span>
         </a>
       {/each}
@@ -2455,9 +2462,9 @@
       settingsIconRotation={settingsIconRotation}
       continuousRotation={continuousRotation}
       rotationSpeed={rotationSpeed}
-      on:upload={() => isLoggedIn ? window.location.href = '/bulk-upload' : window.location.href = '/login'}
+      on:upload={() => isLoggedIn ? window.location.href = '/foto/upload' : window.location.href = '/login'}
       on:publicContent={() => {}}
-      on:bulkUpload={() => isLoggedIn ? window.location.href = '/bulk-upload' : window.location.href = '/login'}
+      on:bulkUpload={() => isLoggedIn ? window.location.href = '/foto/upload' : window.location.href = '/login'}
       on:profile={() => isLoggedIn ? window.location.href = '/profile' : window.location.href = '/login'}
       on:settings={() => isLoggedIn ? window.location.href = '/settings' : window.location.href = '/login'}
       on:map={() => { window.location.href = buildMapViewHref(); }}
@@ -2497,7 +2504,14 @@
         }
       }}
       on:imageClick={(event) => {
-        const imageHref = event.detail.canonicalPath || event.detail.canonical_path || (event.detail.imageSlug || event.detail.slug ? `/item/${event.detail.imageSlug || event.detail.slug}` : '/');
+        const imageHref = getPublicItemHref({
+          slug: event.detail.imageSlug || event.detail.slug || null,
+          canonicalPath: event.detail.canonicalPath || null,
+          canonical_path: event.detail.canonical_path || null,
+          country_slug: event.detail.country_slug || null,
+          district_slug: event.detail.district_slug || null,
+          municipality_slug: event.detail.municipality_slug || null
+        });
         const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`;
         window.location.href = imageHref.includes('?')
           ? `${imageHref}&returnTo=${encodeURIComponent(returnTo)}`

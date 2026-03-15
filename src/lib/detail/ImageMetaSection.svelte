@@ -7,7 +7,7 @@
 
 <!-- Nur noch EXIF/Meta-Daten anzeigen, ohne äußeres Grid -->
 <div class="meta-column">
-  <h2 class="exif-toggle" on:click={() => showFullExif = !showFullExif}>Aufnahmedaten</h2>
+  <button type="button" class="exif-toggle" on:click={() => showFullExif = !showFullExif}>Aufnahmedaten</button>
   {#if !showFullExif}
     <!-- Essential EXIF data -->
     {#if image.width && image.height}
@@ -109,42 +109,21 @@
 </div>
 
 <style>
-.meta-column h2 {
+.exif-toggle {
+  cursor: pointer;
+  transition: color 0.2s ease;
+  border: none;
+  background: transparent;
+  font: inherit;
   font-size: 1.2rem;
   font-weight: 600;
   color: var(--text-primary);
   margin: 0 0 1rem;
   padding: 0;
-}
-.meta-section.single-exif {
-  display: grid;
-  grid-template-columns: 1fr 1.2fr 1fr;
-  gap: 2rem;
-  margin: 2rem 0 1.5rem 0;
-  background: transparent;
-  border-radius: 0;
-  padding: 1rem;
-  align-items: flex-start;
-  overflow: hidden;
-}
-.meta-column, .column-card, .keywords-column {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-  background: transparent;
-}
-.exif-toggle {
-  cursor: pointer;
-  transition: color 0.2s ease;
+  text-align: left;
 }
 .exif-toggle:hover {
   color: var(--culoca-orange);
-}
-.filename {
-  color: var(--text-secondary);
-  font-size: 0.9rem;
-  font-family: 'Courier New', monospace;
-  word-break: break-all;
 }
 .meta-line {
   color: var(--text-secondary);
@@ -152,30 +131,5 @@
   padding: 0.05em 0;
   word-break: break-word;
   background: transparent;
-}
-.column-card {
-  background: transparent;
-  box-shadow: none;
-  padding: 0;
-  border-radius: 0;
-}
-@media (max-width: 900px) {
-  .meta-section.single-exif {
-    grid-template-columns: 1fr;
-    padding: 1rem 0.5rem;
-    gap: 1.5rem;
-  }
-  .keywords-column, .meta-column, .column-card {
-    text-align: center;
-  }
-}
-@media (max-width: 1200px) {
-  .meta-section.single-exif {
-    grid-template-columns: 1fr;
-    gap: 2rem;
-  }
-  .keywords-column, .meta-column, .column-card {
-    text-align: center;
-  }
 }
 </style> 

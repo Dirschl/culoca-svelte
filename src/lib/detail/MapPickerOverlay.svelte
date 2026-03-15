@@ -156,7 +156,7 @@
       {#if mapPickerSearchResults.length > 0}
         <div class="map-search-results">
           {#each mapPickerSearchResults as result}
-            <div class="map-search-result" on:click={() => selectSearchResult(result)}>{result.display_name}</div>
+            <button type="button" class="map-search-result" on:click={() => selectSearchResult(result)}>{result.display_name}</button>
           {/each}
         </div>
       {/if}
@@ -254,6 +254,12 @@
     border-bottom: 1px solid #e5e7eb;
     font-size: 1rem;
     background-color: #1a1a1a;
+    width: 100%;
+    text-align: left;
+    border-left: none;
+    border-right: none;
+    border-top: none;
+    color: inherit;
   }
   .map-search-result:last-child {
     border-bottom: none;
@@ -345,11 +351,6 @@
     background: #1a1a1a !important;
     color: #fff;
   }
-  /* Override Svelte generated classes for dark mode */
-  :global(html.dark) .map-search-results[class*="s-"] {
-    background: #1a1a1a !important;
-    color: #fff;
-  }
   /* Universal override for any Svelte generated classes */
   :global(html.dark) div[class*="map-search-results"] {
     background: #1a1a1a !important;
@@ -364,10 +365,7 @@
   :global(html.dark) .map-search-result:hover,
   :global(html.dark) .map-search-result:active,
   :global(html.dark) .map-search-result:focus,
-  :global(html.dark) .map-search-result.selected,
-  :global(html.dark) .map-search-result[class*="hover"],
-  :global(html.dark) .map-search-result[class*="active"],
-  :global(html.dark) .map-search-result[class*="selected"] {
+  :global(html.dark) .map-search-result.selected {
     background: var(--accent-color) !important;
     color: #fff !important;
   }

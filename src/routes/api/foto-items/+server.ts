@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { supabase } from '$lib/supabaseClient';
 import { createClient } from '@supabase/supabase-js';
+import { getPublicItemHref } from '$lib/content/routing';
 
 const supabaseUrl = (process.env.PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL) || 'https://caskhmcbvtevdwsolvwk.supabase.co';
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -80,7 +81,7 @@ export async function GET({ url }: any) {
     while (from < totalMatching) {
       let dataQuery = supabaseService
         .from('items')
-        .select('id, slug, title, description, caption, canonical_path, path_512, path_2048, path_64, width, height, created_at, starts_at, ends_at, external_url, lat, lon, is_private, profile_id, original_name, keywords')
+        .select('id, slug, title, description, caption, canonical_path, country_slug, district_slug, municipality_slug, path_512, path_2048, path_64, width, height, created_at, starts_at, ends_at, external_url, lat, lon, is_private, profile_id, original_name, keywords')
         .eq('type_id', 1)
         .eq('admin_hidden', false)
         .is('group_root_item_id', null)
@@ -117,7 +118,7 @@ export async function GET({ url }: any) {
           .not('slug', 'is', null)
           .not('path_512', 'is', null)
           .order('created_at', { ascending: false })
-      : { data: [], error: null };
+      : { data: [] as any[] };
 
     const variantsByRoot = new Map<string, any[]>();
     for (const row of variantRows || []) {
@@ -136,6 +137,7 @@ export async function GET({ url }: any) {
         const hasCoordinates = Number.isFinite(itemLat) && Number.isFinite(itemLon);
         return {
           ...item,
+          canonical_path: getPublicItemHref(item),
           lat: hasCoordinates ? itemLat : item.lat,
           lon: hasCoordinates ? itemLon : item.lon,
           distance: hasGps && hasCoordinates ? getDistanceInMeters(lat, lon, itemLat, itemLon) : null,
