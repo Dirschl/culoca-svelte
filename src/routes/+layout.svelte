@@ -139,5 +139,6 @@
     min-height: 100vh;
     display: flex;
     flex-direction: column;
+    background-color: var(--bg-primary);
   }
 </style>
