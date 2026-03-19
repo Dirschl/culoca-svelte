@@ -2,12 +2,14 @@
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
   import * as exifr from 'exifr';
+  import LocationPickerCard from '$lib/LocationPickerCard.svelte';
   import SiteNav from '$lib/SiteNav.svelte';
   import SiteFooter from '$lib/SiteFooter.svelte';
   import { supabase } from '$lib/supabaseClient';
   import { authFetch } from '$lib/authFetch';
   import { ITEM_TYPES, getAvailableTypes, getTypeDescription } from '$lib/constants/itemTypes';
   import {
+    getDistrictFilenameToken,
     inferLocationTaxonomyFromOriginalName,
     normalizeAdminDisplayLabel,
     parseOriginalFilenameLocation
@@ -26,6 +28,7 @@
     preview: string;
     originalFileName: string;
     title: string;
+    caption: string;
     description: string;
     keywords: string;
     typeId: number;
@@ -34,6 +37,7 @@
     externalUrl: string;
     videoUrl: string;
     countryCode: string;
+    districtCode: string;
     districtName: string;
     municipalityName: string;
     localityName: string;
@@ -46,6 +50,7 @@
     isUploading: boolean;
     uploadProgress: number;
     showAdvancedFields: boolean;
+    showMapEditor: boolean;
     placeSearchQuery: string;
     placeSearchResults: SearchGeocodeResult[];
     placeSearchLoading: boolean;
@@ -108,24 +113,56 @@
     return '';
   }
 
+  function normalizeNameTokens(value: string): string[] {
+    return normalizeFieldValue(value)
+      .toLowerCase()
+      .replace(/[()]/g, ' ')
+      .split(/\s+/)
+      .filter(Boolean);
+  }
+
+  function stripAuthorFromMotif(motif: string, author: string): string {
+    const normalizedMotif = normalizeFieldValue(motif);
+    const authorTokens = normalizeNameTokens(author);
+    if (!normalizedMotif || authorTokens.length < 2) return normalizedMotif;
+
+    const motifTokens = normalizeNameTokens(normalizedMotif);
+    const authorTokenSet = new Set(authorTokens);
+    const sharedCount = motifTokens.filter((token) => authorTokenSet.has(token)).length;
+
+    if (sharedCount < authorTokens.length) {
+      return normalizedMotif;
+    }
+
+    const authorPattern = authorTokens.map((token) => token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('[\\s,_-]+');
+    const reversedPattern = [...authorTokens].reverse().map((token) => token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('[\\s,_-]+');
+
+    return normalizedMotif
+      .replace(new RegExp(`\\b${authorPattern}\\b`, 'iu'), ' ')
+      .replace(new RegExp(`\\b${reversedPattern}\\b`, 'iu'), ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
   function getRecommendedOriginalFilename(item: UploadItem): string | null {
     const countryCode = normalizeFieldValue(item.countryCode || '').toUpperCase();
-    const districtName = normalizeFieldValue(item.districtName);
+    const districtToken = normalizeFieldValue(item.districtCode || getDistrictFilenameToken(item.districtName) || '');
     const municipalityName = normalizeFieldValue(item.municipalityName);
     const localityName = normalizeFieldValue(item.localityName);
-    const motifName = normalizeFieldValue(item.motifName);
+    const authorLabel = normalizeFieldValue(currentProfileLabel);
+    const motifName = stripAuthorFromMotif(normalizeFieldValue(item.motifName), authorLabel);
 
-    if (!countryCode || !districtName || !municipalityName || !motifName) {
+    if (!countryCode || !districtToken || !municipalityName || !motifName) {
       return null;
     }
 
     const technicalSuffix = extractTechnicalSuffix(item.originalFileName);
     const { ext } = splitFilename(item.originalFileName);
-    const authorLabel = normalizeFieldValue(currentProfileLabel);
     const detailLabel = [localityName, motifName].filter(Boolean).join(' ');
     const photographerSegment = authorLabel ? ` (${authorLabel})` : '';
+    const technicalSegment = technicalSuffix ? ` ${technicalSuffix}` : '';
 
-    return `${countryCode}_${districtName}_${municipalityName}_${detailLabel}${photographerSegment}${technicalSuffix}${ext}`;
+    return `${countryCode}_${districtToken}_${municipalityName}_${detailLabel}${photographerSegment}${technicalSegment}${ext}`;
   }
 
   function getUploadOriginalFilename(item: UploadItem): string {
@@ -179,7 +216,7 @@
       }
 
       if (!normalizeFieldValue(item.municipalityName)) {
-        errors.push('Für das empfohlene Dateimuster fehlt die Gemeinde');
+        errors.push('Für das empfohlene Dateimuster fehlt Gemeinde / Stadt');
       }
 
       if (!normalizeFieldValue(item.motifName)) {
@@ -392,6 +429,7 @@
         preview: URL.createObjectURL(file),
         originalFileName: file.name,
         title: '',
+        caption: '',
         description: '',
         keywords: '',
         typeId: ITEM_TYPES.PHOTO,
@@ -400,6 +438,7 @@
         externalUrl: '',
         videoUrl: '',
         countryCode: 'D',
+        districtCode: '',
         districtName: '',
         municipalityName: '',
         localityName: '',
@@ -412,6 +451,7 @@
         isUploading: false,
         uploadProgress: 0,
         showAdvancedFields: false,
+        showMapEditor: false,
         placeSearchQuery: '',
         placeSearchResults: [],
         placeSearchLoading: false,
@@ -426,6 +466,10 @@
           fixEncoding(exifData?.iptc?.Headline) ||
           fixEncoding(exifData?.iptc?.ObjectName) ||
           '';
+        const caption =
+          fixEncoding(exifData?.['IPTC:CaptionAbstract']) ||
+          fixEncoding(exifData?.iptc?.CaptionAbstract) ||
+          '';
         const description =
           fixEncoding(exifData?.['IPTC:Description']) ||
           fixEncoding(exifData?.iptc?.Description) ||
@@ -438,6 +482,19 @@
             : fixEncoding(exifData?.Keywords || exifData?.['IPTC:Keywords'] || '') || '';
 
         item.title = headline?.trim() || '';
+        if (!item.title) {
+          for (const [key, value] of Object.entries(exifData || {})) {
+            const keyLower = key.toLowerCase();
+            if (
+              typeof value === 'string' &&
+              (keyLower.endsWith('title') || keyLower.endsWith('headline') || keyLower.endsWith('objectname'))
+            ) {
+              item.title = fixEncoding(value)?.trim() || '';
+              if (item.title) break;
+            }
+          }
+        }
+        item.caption = caption?.trim() || '';
         item.description = description?.trim() || '';
         item.keywords = keywords?.trim() || '';
         if (typeof exifData?.latitude === 'number' && typeof exifData?.longitude === 'number') {
@@ -451,6 +508,7 @@
       const inferredFilename = inferLocationTaxonomyFromOriginalName(file.name);
       if (inferredFilename) {
         item.countryCode = inferredFilename.countryCode;
+        item.districtCode = inferredFilename.districtCode || '';
         item.districtName =
           normalizeAdminDisplayLabel(inferredFilename.districtName || inferredFilename.districtCode) ||
           inferredFilename.districtCode;
@@ -461,6 +519,7 @@
         const parsedFilename = parseOriginalFilenameLocation(file.name);
         if (parsedFilename) {
           item.countryCode = parsedFilename.countryCode;
+          item.districtCode = parsedFilename.districtCode || '';
           item.districtName = normalizeAdminDisplayLabel(parsedFilename.districtCode) || parsedFilename.districtCode;
           item.municipalityName =
             normalizeAdminDisplayLabel(parsedFilename.municipalityName) || parsedFilename.municipalityName;
@@ -492,6 +551,17 @@
     files = files.filter((item) => item.id !== id);
   }
 
+  function applyMapSelection(item: UploadItem, event: CustomEvent<{ lat: number; lon: number; label: string | null }>) {
+    item.lat = event.detail.lat;
+    item.lon = event.detail.lon;
+    if (event.detail.label?.trim()) {
+      item.placeSearchQuery = event.detail.label.trim();
+    }
+    validateItem(item);
+    files = [...files];
+    showMessage('Standort auf der Karte aktualisiert.', 'success');
+  }
+
   async function uploadOriginalToSupabase(file: File, id: string) {
     const path = `${id}.jpg`;
     const { error } = await supabase.storage.from('originals').upload(path, file, {
@@ -519,6 +589,7 @@
       formData.append('original_path', originalPath);
       formData.append('original_filename', getUploadOriginalFilename(item));
       formData.append('title', item.title);
+      if (item.caption.trim()) formData.append('caption', item.caption.trim());
       formData.append('description', item.description);
       formData.append('keywords', item.keywords);
       formData.append('type_id', String(item.typeId));
@@ -633,10 +704,10 @@
     if (!session) return;
     const { data: profile } = await supabase
       .from('profiles')
-      .select('full_name, accountname')
+      .select('full_name')
       .eq('id', session.user.id)
       .single();
-    currentProfileLabel = (profile?.full_name || profile?.accountname || '').trim();
+    currentProfileLabel = (profile?.full_name || '').trim();
     loading = false;
     getBrowserLocation();
   });
@@ -839,6 +910,12 @@
                 </label>
 
                 <label class="field">
+                  <span>Caption</span>
+                  <textarea bind:value={item.caption} rows="3" maxlength="300" />
+                  <small>Optionaler Bilduntertitel oder ergänzender Kurztext.</small>
+                </label>
+
+                <label class="field">
                   <span>Typ</span>
                   <select bind:value={item.typeId}>
                     {#each getAvailableTypes() as type}
@@ -880,7 +957,7 @@
                         placeholder="z. B. Brandenburger Tor, Wurmannsquick oder Friesing"
                         on:input={() => handlePlaceSearchInput(item)}
                       />
-                      <small>Treffer übernehmen Koordinaten sowie Land, Landkreis, Gemeinde und optional Ortsteil.</small>
+                      <small>Treffer übernehmen Koordinaten sowie Land, Landkreis, Gemeinde / Stadt und optional Ortsteil / Stadtteil / Viertel.</small>
                     </label>
                     {#if item.placeSearchLoading}
                       <div class="place-search-status">Suche läuft...</div>
@@ -927,7 +1004,7 @@
                     </label>
 
                     <label class="field">
-                      <span>Gemeinde</span>
+                      <span>Gemeinde / Stadt</span>
                       <input
                         bind:value={item.municipalityName}
                         placeholder="Töging am Inn"
@@ -936,7 +1013,7 @@
                     </label>
 
                     <label class="field">
-                      <span>Ort / Teilort</span>
+                      <span>Ortsteil / Stadtteil / Viertel</span>
                       <input
                         bind:value={item.localityName}
                         placeholder="Engfurt"
@@ -955,8 +1032,10 @@
                   </div>
 
                   <div class="filename-preview">
+                    <span class="filename-preview__label">Original Dateiname</span>
+                    <code>{item.originalFileName}</code>
                     <span class="filename-preview__label">Empfohlener Originaldateiname</span>
-                    <code>{getRecommendedOriginalFilename(item) || 'Landkreis, Gemeinde und Motiv eintragen, um die Vorlage zu sehen.'}</code>
+                    <code>{getRecommendedOriginalFilename(item) || 'Landkreis, Gemeinde / Stadt und Motiv eintragen, um die Vorlage zu sehen.'}</code>
                   </div>
 
                   <label class="filename-toggle">
@@ -979,6 +1058,28 @@
                     <input type="number" step="any" bind:value={item.lon} on:input={() => validateItem(item)} />
                   </label>
                 </div>
+
+                <div class="geo-map-summary">
+                  <div>
+                    <strong>Kartenansicht zur Kontrolle</strong>
+                    <p>
+                      Prüfe die Position im Detailausschnitt und justiere sie bei Bedarf direkt auf der Karte.
+                    </p>
+                  </div>
+                  <button class="secondary-btn" type="button" on:click={() => (item.showMapEditor = !item.showMapEditor)}>
+                    {item.showMapEditor ? 'Karte ausblenden' : 'Karte und Feinjustierung öffnen'}
+                  </button>
+                </div>
+
+                {#if item.showMapEditor}
+                  <LocationPickerCard
+                    initialLat={item.lat}
+                    initialLon={item.lon}
+                    initialLabel={item.placeSearchQuery}
+                    submitLabel="Koordinaten übernehmen"
+                    on:save={(event) => applyMapSelection(item, event)}
+                  />
+                {/if}
 
                 <div class="inline-actions">
                   <button class="secondary-btn" disabled={browserLat == null || browserLon == null} on:click={() => useCurrentLocation(item)}>
@@ -1370,7 +1471,7 @@
 
   .upload-card {
     display: grid;
-    grid-template-columns: 220px 1fr;
+    grid-template-columns: minmax(320px, 0.9fr) minmax(0, 1.1fr);
     overflow: hidden;
   }
 
@@ -1379,15 +1480,24 @@
   }
 
   .preview-wrap {
+    display: grid;
+    place-items: center;
     background: var(--bg-tertiary);
     min-height: 100%;
+    padding: 1rem;
+    border-right: 1px solid color-mix(in srgb, var(--border-color) 75%, transparent);
   }
 
   .preview-wrap img {
     width: 100%;
-    height: 100%;
-    object-fit: cover;
+    max-width: min(100%, 760px);
+    max-height: 78vh;
+    height: auto;
+    object-fit: contain;
     display: block;
+    border-radius: 18px;
+    background: color-mix(in srgb, var(--bg-primary) 88%, transparent);
+    box-shadow: 0 18px 36px rgba(0, 0, 0, 0.12);
   }
 
   .card-body {
@@ -1440,6 +1550,28 @@
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.75rem;
+  }
+
+  .geo-map-summary {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: center;
+    padding: 0.95rem 1rem;
+    border-radius: 16px;
+    background: color-mix(in srgb, var(--bg-tertiary) 90%, transparent);
+    border: 1px solid var(--border-color);
+  }
+
+  .geo-map-summary strong {
+    display: block;
+    margin-bottom: 0.2rem;
+  }
+
+  .geo-map-summary p {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 0.92rem;
   }
 
   .location-actions,
@@ -1602,11 +1734,21 @@
     }
 
     .preview-wrap {
-      max-height: 260px;
+      max-height: none;
+      border-right: 0;
+      border-bottom: 1px solid color-mix(in srgb, var(--border-color) 75%, transparent);
+    }
+
+    .preview-wrap img {
+      max-height: 320px;
     }
 
     .geo-grid {
       grid-template-columns: 1fr;
+    }
+
+    .geo-map-summary {
+      display: grid;
     }
 
     .structured-grid {

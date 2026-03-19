@@ -169,8 +169,9 @@ export const GET: RequestHandler = async ({ params, url, request }) => {
       }
     }
 
-    // 9. Generate ETag for caching (based on image hash or slug + size)
-    const etag = `"${actualSlug}-${requestedSize || 'default'}-${imagePath}"`;
+    // Include the DB timestamp so rerendered variants invalidate caches even when the path stays stable.
+    const cacheVersion = item.updated_at || item.created_at || imagePath;
+    const etag = `"${actualSlug}-${requestedSize || 'default'}-${imagePath}-${cacheVersion}"`;
     
     // 10. Check if client has cached version (If-None-Match header)
     const ifNoneMatch = request.headers.get('if-none-match');
@@ -179,7 +180,7 @@ export const GET: RequestHandler = async ({ params, url, request }) => {
         status: 304,
         headers: {
           'ETag': etag,
-          'Cache-Control': 'public, max-age=31536000, immutable'
+          'Cache-Control': 'public, max-age=3600, stale-while-revalidate=86400'
         }
       });
     }
@@ -191,7 +192,7 @@ export const GET: RequestHandler = async ({ params, url, request }) => {
     // 12. Return image with SEO-friendly headers
     const headers = new Headers({
       'Content-Type': finalContentType,
-      'Cache-Control': 'public, max-age=31536000, immutable', // Cache for 1 year (immutable)
+      'Cache-Control': 'public, max-age=3600, stale-while-revalidate=86400',
       'Content-Disposition': `inline; filename="${actualSlug}${fileExtension}"`,
       'Access-Control-Allow-Origin': '*',
       'ETag': etag,

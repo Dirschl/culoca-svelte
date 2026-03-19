@@ -292,6 +292,7 @@ export const POST = async ({ request }) => {
         let lat: number | null = null;
         let lon: number | null = null;
         let title: string | null = null;
+        let caption: string | null = null;
         let description: string | null = null;
         let keywords: string | null = null;
         let camera: string | null = null;
@@ -327,6 +328,7 @@ export const POST = async ({ request }) => {
 
         // Check for manual input from FormData (bulk upload)
         const formTitle = form.get('title') as string;
+        const formCaption = form.get('caption') as string;
         const formDescription = form.get('description') as string;
         const formKeywords = form.get('keywords') as string;
         const formTypeId = form.get('type_id') as string;
@@ -338,6 +340,7 @@ export const POST = async ({ request }) => {
         const formGroupSlug = form.get('group_slug') as string;
 
         if (formTitle) title = formTitle;
+        if (formCaption) caption = formCaption;
         if (formDescription) description = formDescription;
         if (formKeywords) keywords = formKeywords;
         if (formTypeId) {
@@ -538,6 +541,8 @@ export const POST = async ({ request }) => {
 
         if (upload2048Error) {
           console.error('2048px upload failed:', upload2048Error);
+          const errorMessage = upload2048Error instanceof Error ? upload2048Error.message : String(upload2048Error);
+          throw error(500, `2048px upload failed: ${errorMessage}`);
         } else {
           console.log('2048px upload successful');
         }
@@ -748,6 +753,7 @@ export const POST = async ({ request }) => {
 
         // Füge EXIF-Felder nur hinzu, wenn sie nicht null sind
         if (title) dbRecord.title = title;
+        if (caption) dbRecord.caption = caption;
         if (description) dbRecord.description = description;
         console.log('Inserting database record:', JSON.stringify(dbRecord, null, 2));
         

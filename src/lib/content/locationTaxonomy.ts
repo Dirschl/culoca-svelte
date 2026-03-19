@@ -177,6 +177,24 @@ function resolveDistrictMetadata(token: string | null | undefined): DistrictMeta
   );
 }
 
+export function getDistrictFilenameToken(token: string | null | undefined): string | null {
+  const normalizedToken = sanitizeToken(token || '');
+  if (!normalizedToken) return null;
+
+  const exactKey = Object.keys(DISTRICT_METADATA).find((key) => key.toUpperCase() === normalizedToken.toUpperCase());
+  if (exactKey) {
+    return exactKey;
+  }
+
+  const metadata = resolveDistrictMetadata(normalizedToken);
+  if (!metadata) {
+    return stripDistrictDecorators(normalizedToken) || null;
+  }
+
+  const metadataKey = Object.entries(DISTRICT_METADATA).find(([, value]) => value === metadata)?.[0];
+  return metadataKey || stripDistrictDecorators(normalizedToken) || null;
+}
+
 function extractPhotographerLabel(detail: string): { motifLabel: string; photographerLabel: string | null } {
   const photographerMatch = detail.match(/\(([^)]+)\)/u);
   const photographerLabel = photographerMatch ? sanitizeToken(photographerMatch[1]) : null;

@@ -131,6 +131,61 @@ function deriveOriginalPath(item: ItemRow) {
   return `items/${item.id}.jpg`;
 }
 
+function toBuffer(data: unknown) {
+  if (Buffer.isBuffer(data)) {
+    return data;
+  }
+
+  if (data instanceof ArrayBuffer) {
+    return Buffer.from(new Uint8Array(data));
+  }
+
+  if (ArrayBuffer.isView(data)) {
+    return Buffer.from(data.buffer, data.byteOffset, data.byteLength);
+  }
+
+  if (typeof data === 'string') {
+    return Buffer.from(data);
+  }
+
+  return Buffer.from(data as ArrayLike<number>);
+}
+
+async function loadOriginalBuffer(item: ItemRow) {
+  const errors: string[] = [];
+
+  if (item.original_url) {
+    try {
+      const response = await fetch(item.original_url);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      return Buffer.from(await response.arrayBuffer());
+    } catch (error) {
+      errors.push(`Direkter Abruf der original_url fehlgeschlagen: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  if (process.env.HETZNER_WEBDAV_URL && process.env.HETZNER_WEBDAV_USER && process.env.HETZNER_WEBDAV_PASSWORD) {
+    try {
+      const webdav = createWebdavClient(process.env.HETZNER_WEBDAV_URL, {
+        username: process.env.HETZNER_WEBDAV_USER,
+        password: process.env.HETZNER_WEBDAV_PASSWORD
+      });
+
+      const downloadedOriginal = await webdav.getFileContents(deriveOriginalPath(item), { format: 'binary' });
+      return toBuffer(downloadedOriginal);
+    } catch (error) {
+      errors.push(`WebDAV-Abruf des Originals fehlgeschlagen: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  } else {
+    errors.push('Hetzner-WebDAV ist nicht konfiguriert.');
+  }
+
+  throw new Error(errors.join(' '));
+}
+
 function hasCompleteGeoFields(source: { country_slug?: string | null; district_slug?: string | null; municipality_slug?: string | null }) {
   return !!(source.country_slug && source.district_slug && source.municipality_slug);
 }
@@ -210,27 +265,7 @@ export async function POST({ params, request }: any) {
       replacementOriginalName = file.name || item.original_name;
       replacementOriginalUrl = await uploadOriginalToHetzner(item.id, originalBuffer);
     } else {
-      const webdav = createWebdavClient(process.env.HETZNER_WEBDAV_URL!, {
-        username: process.env.HETZNER_WEBDAV_USER!,
-        password: process.env.HETZNER_WEBDAV_PASSWORD!
-      });
-
-      const downloadedOriginal = await webdav.getFileContents(deriveOriginalPath(item), { format: 'binary' });
-      if (Buffer.isBuffer(downloadedOriginal)) {
-        originalBuffer = downloadedOriginal;
-      } else if (downloadedOriginal instanceof ArrayBuffer) {
-        originalBuffer = Buffer.from(new Uint8Array(downloadedOriginal));
-      } else if (ArrayBuffer.isView(downloadedOriginal)) {
-        originalBuffer = Buffer.from(
-          downloadedOriginal.buffer,
-          downloadedOriginal.byteOffset,
-          downloadedOriginal.byteLength
-        );
-      } else if (typeof downloadedOriginal === 'string') {
-        originalBuffer = Buffer.from(downloadedOriginal);
-      } else {
-        originalBuffer = Buffer.from(downloadedOriginal as unknown as ArrayLike<number>);
-      }
+      originalBuffer = await loadOriginalBuffer(item);
     }
 
     const qualitySettings = getImageQualitySettings();

@@ -617,17 +617,23 @@ let showRightsManager = false;
       const srcsetParts: string[] = [];
       if (image.path_512) {
         // For 512px images, we use them for screens up to 1024px wide
-        srcsetParts.push(`${baseUrl}/${image.slug}-512${fileExtension} 512w`);
+        const sizedUrl512 = appendVersionParam(`${baseUrl}/${image.slug}-512${fileExtension}`, image);
+        if (sizedUrl512) {
+          srcsetParts.push(`${sizedUrl512} 512w`);
+        }
       }
       if (image.path_2048) {
         // For 2048px images, we use them for screens 1024px and wider
-        srcsetParts.push(`${baseUrl}/${image.slug}-2048${fileExtension} 2048w`);
+        const sizedUrl2048 = appendVersionParam(`${baseUrl}/${image.slug}-2048${fileExtension}`, image);
+        if (sizedUrl2048) {
+          srcsetParts.push(`${sizedUrl2048} 2048w`);
+        }
       }
       
       // Fallback: if no srcset, use main image source (2048px version)
       imageSource = image.path_2048
-        ? `${baseUrl}/${image.slug}-2048${fileExtension}`
-        : (image.path_512 ? `${baseUrl}/${image.slug}-512${fileExtension}` : '');
+        ? (appendVersionParam(`${baseUrl}/${image.slug}-2048${fileExtension}`, image) || '')
+        : (image.path_512 ? (appendVersionParam(`${baseUrl}/${image.slug}-512${fileExtension}`, image) || '') : '');
       imageSrcset = srcsetParts.join(', ');
       // sizes: use 512px for mobile (up to 900px), 2048px for desktop
       imageSizes = '(max-width: 900px) 512px, 2048px';
@@ -1831,6 +1837,27 @@ let showRightsManager = false;
     return `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/${bucket}/${path}`;
   }
 
+  function imageVersionToken(source: { updated_at?: string | null; created_at?: string | null } | null | undefined) {
+    const rawValue = source?.updated_at || source?.created_at;
+    if (!rawValue) return null;
+
+    const timestamp = new Date(rawValue).getTime();
+    return Number.isFinite(timestamp) ? String(timestamp) : null;
+  }
+
+  function appendVersionParam(
+    url: string | null,
+    source: { updated_at?: string | null; created_at?: string | null } | null | undefined
+  ) {
+    if (!url) return null;
+
+    const version = imageVersionToken(source);
+    if (!version) return url;
+
+    const separator = url.includes('?') ? '&' : '?';
+    return `${url}${separator}v=${version}`;
+  }
+
   function buildSeoSizedImageUrl(size: '512' | '2048') {
     if (!image?.slug) return null;
 
@@ -1840,7 +1867,7 @@ let showRightsManager = false;
     const extensionMatch = imagePath.match(/\.(jpg|jpeg|webp|png)$/i);
     const fileExtension = extensionMatch ? extensionMatch[0].toLowerCase() : '.jpg';
 
-    return `https://culoca.com/images/${image.slug}-${size}${fileExtension}`;
+    return appendVersionParam(`https://culoca.com/images/${image.slug}-${size}${fileExtension}`, image);
   }
 
   async function fetchRemoteFileSize(url: string | null) {
