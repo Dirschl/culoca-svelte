@@ -1146,9 +1146,6 @@
                   <button class="secondary-btn" disabled={item.lat == null || item.lon == null} on:click={() => autofillGeoFromCoordinates(item)}>
                     Ortsdaten aus GPS-Position ermitteln
                   </button>
-                  <button class="secondary-btn" on:click={() => (item.showAdvancedFields = !item.showAdvancedFields)}>
-                    {item.showAdvancedFields ? 'Erweiterte Felder schließen' : 'Erweiterte Felder'}
-                  </button>
                 </div>
 
                 <div class="structured-box">
@@ -1284,6 +1281,10 @@
                     localityName: item.localityName
                   }).length} Keywords, Zielbereich {KEYWORDS_MIN}-{KEYWORDS_MAX}</small>
                 </label>
+
+                <button class="secondary-btn advanced-toggle-btn" type="button" on:click={() => (item.showAdvancedFields = !item.showAdvancedFields)}>
+                  {item.showAdvancedFields ? 'Erweiterte Felder schließen' : 'Erweiterte Felder'}
+                </button>
 
                 {#if item.showAdvancedFields}
                   <div class="advanced-box">
@@ -1749,6 +1750,10 @@
     display: flex;
     gap: 0.75rem;
     flex-wrap: wrap;
+  }
+
+  .advanced-toggle-btn {
+    justify-self: start;
   }
 
   .advanced-box {
