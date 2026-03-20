@@ -195,24 +195,26 @@ Anforderungen:
 1. Titel: 40-60 Zeichen, sachlich, suchmaschinenfreundlich, möglichst mit Ort oder Motiv. Kein Clickbait.
 2. Caption: 60-180 Zeichen, optionaler Bilduntertitel in einem Satz, sachlich.
 3. Beschreibung: 100-160 Zeichen, beschreibe sichtbare Elemente, Stimmung, Beleuchtung.
-4. Schlüsselwörter: GENAU 30 Begriffe sind zwingend erforderlich. Getrennt durch Kommas. Nutze zuerst alle bereits bekannten Kontextdaten und ergänze sie mit sichtbaren Bildinhalten. Berücksichtige ALLE diese Kategorien:
-   - Orte/Ortsnamen (Stadt, Landkreis, Region, Bundesland, Land)
-   - Geografische Merkmale (Fluss, Berg, Tal, Wiese, Wald, etc.)
-   - Visuelle Elemente (Farben, Objekte, Architektur, Natur)
-   - Stimmung/Atmosphäre (abendlich, morgendlich, winterlich, sonnig, etc.)
-   - Fotografie-Stil/Technik (Luftaufnahme, Makro, Landschaft, etc.)
+4. Schlüsselwörter: GENAU 30 Begriffe sind zwingend erforderlich. Getrennt durch Kommas. Priorisiere sichtbare Bildinhalte deutlich stärker als Verwaltungsdaten. Berücksichtige ALLE diese Kategorien:
+   - Visuelle Elemente (Farben, Objekte, Architektur, Material, Natur, Formen)
+   - Geografische Merkmale (Fluss, Berg, Tal, Wiese, Wald, Ufer, Hang, etc.)
+   - Fotografie-Stil/Technik (Landschaftsfotografie, Tele, Weitwinkel, Detailaufnahme, Panorama, etc.)
    - Personen/Aktivitäten (wenn sichtbar)
    - Jahreszeit/Zeit (wenn erkennbar)
-   - Wetter/Merkmal (Schnee, Regen, Sonne, Nebel, etc.)
+   - Wetter/Merkmal (Schnee, Regen, Sonne, Nebel, Wolken, Frost, etc.)
+   - Orte/Ortsnamen (Stadt, Landkreis, Region, Bundesland, Land) nur ergänzend
 
 WICHTIG: 
 - Zähle die Keywords und stelle sicher, dass es exakt 30 sind
+- Mindestens 20 der 30 Keywords müssen sichtbare oder fotografische Bildinhalte beschreiben
+- Höchstens 6 Keywords dürfen reine Verwaltungs- oder Ortsangaben sein
 - Liefere keine Wortfragmente, Präfixe oder abgestuften Vorsilben wie "S, St, Ste, Stein"
 - Liefere keine Teilwörter, Tippfragmente oder Buchstabenfolgen wie "Spor, Sportp, Steinhause"
 - Ortsbegriffe dürfen nur verwendet werden, wenn sie vollständig ausgeschrieben sind
-- Verwende bekannte Verwaltungsangaben bevorzugt: Land, Bundesland/Kanton, Region/Bezirk, Landkreis, Gemeinde/Stadt, optional Ortsteil
+- Verwende bekannte Verwaltungsangaben sparsam: Land, Bundesland/Kanton, Region/Bezirk, Landkreis, Gemeinde/Stadt, optional Ortsteil
 - Wenn bereits bekannte Keywords vorhanden sind, übernimm die guten Begriffe daraus und ergänze fehlende sinnvolle Begriffe
 - Nutze sowohl spezifische als auch allgemeine Begriffe
+- Schlechte Antwort-Beispiele, die vermieden werden müssen: reine Ortslisten wie "Steinhausen, Deutschland, Bayern, Landkreis Altötting, Erlbach"
 
 Format:
 TITLE: [Dein Titel hier]

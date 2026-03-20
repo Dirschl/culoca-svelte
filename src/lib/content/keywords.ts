@@ -7,8 +7,9 @@ type KeywordContext = {
   localityName?: string | null;
 };
 
-export const KEYWORDS_MIN = 5;
+export const KEYWORDS_MIN = 10;
 export const KEYWORDS_MAX = 30;
+export const DESCRIPTIVE_KEYWORDS_MIN = 6;
 
 function normalizeKeywordToken(value: string): string {
   return value
@@ -38,14 +39,20 @@ function appendUniqueKeyword(target: string[], value: string | null | undefined)
   target.push(trimmed);
 }
 
-export function parseKeywords(value: string | string[] | null | undefined): string[] {
-  const source = Array.isArray(value) ? value : (value || '').split(',');
-  return source
-    .map((entry) => entry.normalize('NFC').trim())
+function getGeoKeywordTerms(context: KeywordContext): string[] {
+  return [
+    context.countryName,
+    context.stateName,
+    context.regionName,
+    context.districtName,
+    context.municipalityName,
+    context.localityName
+  ]
+    .flatMap((entry) => splitCompositeGeoValues(entry))
     .filter(Boolean);
 }
 
-export function sanitizeKeywords(
+function getDescriptiveKeywords(
   value: string | string[] | null | undefined,
   context: KeywordContext = {}
 ): string[] {
@@ -56,14 +63,7 @@ export function sanitizeKeywords(
   }));
 
   const geoTerms = new Set(
-    [
-      context.countryName,
-      context.stateName,
-      context.regionName,
-      context.districtName,
-      context.municipalityName
-    ]
-      .flatMap((entry) => splitCompositeGeoValues(entry))
+    getGeoKeywordTerms(context)
       .map((entry) => normalizeKeywordToken(entry))
       .filter(Boolean)
   );
@@ -98,20 +98,37 @@ export function sanitizeKeywords(
     cleaned.push(keyword);
   }
 
-  const result = cleaned.length > 0 ? [...cleaned] : [...fallbackCleaned];
+  return cleaned.length > 0 ? cleaned : fallbackCleaned;
+}
 
-  [
-    context.countryName,
-    context.stateName,
-    context.regionName,
-    context.districtName,
-    context.municipalityName,
-    context.localityName
-  ]
-    .flatMap((entry) => splitCompositeGeoValues(entry))
-    .forEach((entry) => appendUniqueKeyword(result, entry));
+export function parseKeywords(value: string | string[] | null | undefined): string[] {
+  const source = Array.isArray(value) ? value : (value || '').split(',');
+  return source
+    .map((entry) => entry.normalize('NFC').trim())
+    .filter(Boolean);
+}
+
+export function sanitizeKeywords(
+  value: string | string[] | null | undefined,
+  context: KeywordContext = {}
+): string[] {
+  const descriptiveKeywords = getDescriptiveKeywords(value, context);
+  const result = [...descriptiveKeywords];
+
+  if (descriptiveKeywords.length > 0) {
+    const geoKeywords: string[] = [];
+    getGeoKeywordTerms(context).forEach((entry) => appendUniqueKeyword(geoKeywords, entry));
+    geoKeywords.slice(0, Math.max(0, KEYWORDS_MAX - descriptiveKeywords.length)).forEach((entry) => appendUniqueKeyword(result, entry));
+  }
 
   return result.slice(0, KEYWORDS_MAX);
+}
+
+export function countDescriptiveKeywords(
+  value: string | string[] | null | undefined,
+  context: KeywordContext = {}
+): number {
+  return getDescriptiveKeywords(value, context).length;
 }
 
 export function sanitizeKeywordsText(

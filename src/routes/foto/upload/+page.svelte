@@ -17,8 +17,10 @@
   } from '$lib/content/locationTaxonomy';
   import { reverseGeocodeCoordinates, searchLocationHierarchy, type SearchGeocodeResult } from '$lib/content/geocoding';
   import {
+    DESCRIPTIVE_KEYWORDS_MIN,
     KEYWORDS_MAX,
     KEYWORDS_MIN,
+    countDescriptiveKeywords,
     sanitizeKeywords,
     sanitizeKeywordsText
   } from '$lib/content/keywords';
@@ -230,7 +232,19 @@
       municipalityName: item.municipalityName,
       localityName: item.localityName
     }).length;
-    return keywordCount >= KEYWORDS_MIN && keywordCount <= KEYWORDS_MAX;
+    const descriptiveKeywordCount = countDescriptiveKeywords(item.keywords, {
+      countryName: item.countryName,
+      stateName: item.stateName,
+      regionName: item.regionName,
+      districtName: item.districtName,
+      municipalityName: item.municipalityName,
+      localityName: item.localityName
+    });
+    return (
+      keywordCount >= KEYWORDS_MIN &&
+      keywordCount <= KEYWORDS_MAX &&
+      descriptiveKeywordCount >= DESCRIPTIVE_KEYWORDS_MIN
+    );
   }
 
   function hasMissingAiMetadata(item: UploadItem): boolean {
@@ -309,10 +323,20 @@
       municipalityName: item.municipalityName,
       localityName: item.localityName
     }).length;
+    const descriptiveKeywordCount = countDescriptiveKeywords(item.keywords, {
+      countryName: item.countryName,
+      stateName: item.stateName,
+      regionName: item.regionName,
+      districtName: item.districtName,
+      municipalityName: item.municipalityName,
+      localityName: item.localityName
+    });
     if (!item.keywords.trim()) {
       errors.push('Keywords sind erforderlich');
     } else if (keywordCount < KEYWORDS_MIN || keywordCount > KEYWORDS_MAX) {
       errors.push(`Keywords müssen zwischen ${KEYWORDS_MIN} und ${KEYWORDS_MAX} liegen`);
+    } else if (descriptiveKeywordCount < DESCRIPTIVE_KEYWORDS_MIN) {
+      errors.push(`Mindestens ${DESCRIPTIVE_KEYWORDS_MIN} Keywords müssen sichtbare Bildinhalte statt nur Ortsdaten beschreiben`);
     }
 
     if (item.lat == null || item.lon == null) {
@@ -1430,7 +1454,7 @@
                     districtName: item.districtName,
                     municipalityName: item.municipalityName,
                     localityName: item.localityName
-                  }).length} Keywords, Zielbereich {KEYWORDS_MIN}-{KEYWORDS_MAX}</small>
+                  }).length} Keywords, Zielbereich {KEYWORDS_MIN}-{KEYWORDS_MAX}. Davon mindestens {DESCRIPTIVE_KEYWORDS_MIN} visuelle Begriffe.</small>
                 </label>
 
                 <button class="secondary-btn advanced-toggle-btn" type="button" on:click={() => (item.showAdvancedFields = !item.showAdvancedFields)}>
