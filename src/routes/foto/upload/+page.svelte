@@ -1082,6 +1082,7 @@
                       <input
                         bind:value={item.placeSearchQuery}
                         placeholder="z. B. Brandenburger Tor, Wurmannsquick oder Friesing"
+                        on:keydown|stopPropagation
                         on:input={() => handlePlaceSearchInput(item)}
                       />
                       <small>Treffer übernehmen Koordinaten sowie Land, Landkreis, Gemeinde / Stadt und optional Ortsteil / Stadtteil / Viertel.</small>

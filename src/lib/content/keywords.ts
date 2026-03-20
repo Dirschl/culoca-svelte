@@ -59,11 +59,20 @@ export function sanitizeKeywords(
   );
 
   const seen = new Set<string>();
+  const fallbackCleaned: string[] = [];
   const cleaned: string[] = [];
 
   for (const { original, normalized } of normalizedKeywords) {
     if (!normalized) continue;
     if (/^[a-zäöüß]{1,3}$/iu.test(normalized)) continue;
+    if (geoTerms.has(normalized)) continue;
+    if (seen.has(normalized)) continue;
+    seen.add(normalized);
+    fallbackCleaned.push(original);
+  }
+
+  for (const keyword of fallbackCleaned) {
+    const normalized = normalizeKeywordToken(keyword);
     if (
       normalizedKeywords.some(
         (candidate) =>
@@ -76,22 +85,20 @@ export function sanitizeKeywords(
     ) {
       continue;
     }
-    if (geoTerms.has(normalized)) continue;
-    if (seen.has(normalized)) continue;
-    seen.add(normalized);
-    cleaned.push(original);
+    cleaned.push(keyword);
   }
+
+  const result = cleaned.length >= KEYWORDS_MIN ? cleaned : fallbackCleaned;
 
   const locality = context.localityName?.normalize('NFC').trim();
   if (locality) {
     const normalizedLocality = normalizeKeywordToken(locality);
-    if (normalizedLocality && !seen.has(normalizedLocality)) {
-      cleaned.push(locality);
-      seen.add(normalizedLocality);
+    if (normalizedLocality && !result.some((entry) => normalizeKeywordToken(entry) === normalizedLocality)) {
+      result.push(locality);
     }
   }
 
-  return cleaned.slice(0, KEYWORDS_MAX);
+  return result.slice(0, KEYWORDS_MAX);
 }
 
 export function sanitizeKeywordsText(
