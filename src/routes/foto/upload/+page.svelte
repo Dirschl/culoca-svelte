@@ -508,35 +508,6 @@
     files = [...files];
   }
 
-  function handlePlaceSearchKeydown(item: UploadItem, event: KeyboardEvent) {
-    event.stopPropagation();
-
-    if (event.key !== ' ') {
-      return;
-    }
-
-    event.preventDefault();
-    const input = event.currentTarget as HTMLInputElement | null;
-    const currentValue = item.placeSearchQuery || '';
-    const selectionStart = input?.selectionStart ?? currentValue.length;
-    const selectionEnd = input?.selectionEnd ?? currentValue.length;
-
-    item.placeSearchQuery =
-      currentValue.slice(0, selectionStart) +
-      ' ' +
-      currentValue.slice(selectionEnd);
-
-    requestAnimationFrame(() => {
-      if (input) {
-        const nextPosition = selectionStart + 1;
-        input.selectionStart = nextPosition;
-        input.selectionEnd = nextPosition;
-      }
-    });
-
-    handlePlaceSearchInput(item);
-  }
-
   function selectPlaceSearchResult(item: UploadItem, result: SearchGeocodeResult) {
     if (item.placeSearchTimeout) {
       clearTimeout(item.placeSearchTimeout);
@@ -1044,19 +1015,13 @@
         on:dragover|preventDefault={() => (dragOver = true)}
         on:dragleave={() => (dragOver = false)}
         on:drop={onDrop}
-        on:keydown={(event) => {
-          if (event.target !== event.currentTarget) {
-            return;
-          }
+        on:keydown|self={(event) => {
           if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault();
             fileInput?.click();
           }
         }}
-        on:click={(event) => {
-          if (event.target !== event.currentTarget) {
-            return;
-          }
+        on:click|self={() => {
           fileInput?.click();
         }}
       >
@@ -1133,7 +1098,9 @@
           {#each files as item (item.id)}
             <article class="upload-card" class:upload-card--invalid={!item.isValid}>
               <div class="preview-wrap">
-                <img src={item.preview} alt={item.originalFileName} />
+                <div class="preview-wrap__sticky">
+                  <img src={item.preview} alt={item.originalFileName} />
+                </div>
               </div>
 
               <div class="card-body">
@@ -1161,7 +1128,6 @@
                       <input
                         bind:value={item.placeSearchQuery}
                         placeholder="z. B. Brandenburger Tor, Wurmannsquick oder Friesing"
-                        on:keydown={(event) => handlePlaceSearchKeydown(item, event)}
                         on:input={() => handlePlaceSearchInput(item)}
                       />
                       <small>Treffer übernehmen Koordinaten sowie Land, Landkreis, Gemeinde / Stadt und optional Ortsteil / Stadtteil / Viertel.</small>
@@ -1763,11 +1729,17 @@
     min-height: clamp(420px, calc(100vh - 2rem), 920px);
     padding: 1rem;
     border-right: 1px solid color-mix(in srgb, var(--border-color) 75%, transparent);
-    position: sticky;
-    top: 1rem;
-    align-self: start;
     border-top-left-radius: 24px;
     border-bottom-left-radius: 24px;
+  }
+
+  .preview-wrap__sticky {
+    position: sticky;
+    top: 1rem;
+    width: 100%;
+    display: grid;
+    place-items: center;
+    align-self: start;
   }
 
   .preview-wrap img {
@@ -2040,11 +2012,14 @@
       min-height: auto;
       border-right: 0;
       border-bottom: 1px solid color-mix(in srgb, var(--border-color) 75%, transparent);
-      position: static;
-      top: auto;
       border-top-left-radius: 24px;
       border-top-right-radius: 24px;
       border-bottom-left-radius: 0;
+    }
+
+    .preview-wrap__sticky {
+      position: static;
+      top: auto;
     }
 
     .preview-wrap img {
