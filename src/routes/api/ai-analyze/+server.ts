@@ -5,9 +5,16 @@ interface AIAnalysisRequest {
   imageBase64: string;
   userTitle: string;
   originalTitle?: string;
+  motifName?: string;
+  districtName?: string;
+  municipalityName?: string;
+  localityName?: string;
+  capturedAt?: string | null;
 }
 
 interface AIAnalysisResult {
+  title: string;
+  caption: string;
   description: string;
   keywords: string;
   success: boolean;
@@ -41,7 +48,7 @@ class AIImageAnalyzer {
   async analyzeImage(request: AIAnalysisRequest): Promise<AIAnalysisResult> {
     try {
       console.log('🤖 Building prompt for Gemini API...');
-      const prompt = this.buildPrompt(request.userTitle, request.originalTitle);
+      const prompt = this.buildPrompt(request);
       
       // Try multiple models in order of preference
       // gemini-2.5-flash-lite-preview-09-2025 works reliably
@@ -134,6 +141,8 @@ class AIImageAnalyzer {
       // All models failed
       console.error('❌ All Gemini models failed');
       return {
+        title: '',
+        caption: '',
         description: '',
         keywords: '',
         success: false,
@@ -142,6 +151,8 @@ class AIImageAnalyzer {
     } catch (error) {
       console.error('❌ AI Analysis failed:', error);
       return {
+        title: '',
+        caption: '',
         description: '',
         keywords: '',
         success: false,
@@ -153,19 +164,30 @@ class AIImageAnalyzer {
   /**
    * Build optimized prompt for image analysis
    */
-  private buildPrompt(userTitle: string, originalTitle?: string): string {
-    const context = originalTitle ? `Originaldateiname: ${originalTitle}` : '';
+  private buildPrompt(request: AIAnalysisRequest): string {
+    const context = [
+      request.originalTitle ? `Originaldateiname: ${request.originalTitle}` : '',
+      request.motifName ? `Motiv: ${request.motifName}` : '',
+      request.localityName ? `Ortsteil/Stadtteil/Viertel: ${request.localityName}` : '',
+      request.municipalityName ? `Gemeinde/Stadt: ${request.municipalityName}` : '',
+      request.districtName ? `Landkreis/Bezirk: ${request.districtName}` : '',
+      request.capturedAt ? `Aufnahmedatum: ${request.capturedAt}` : ''
+    ]
+      .filter(Boolean)
+      .join('\n');
     
     return `SPRACHE: Antworte ausschließlich auf Deutsch.
 
-Analysiere dieses Bild und generiere eine Beschreibung und Schlüsselwörter für eine Fotografie-Website.
+Analysiere dieses Bild und generiere Titel, Caption, Beschreibung und Schlüsselwörter für eine Fotografie-Website.
 
-Nutzer-Titel: "${userTitle}"
+Nutzer-Titel oder Arbeitskontext: "${request.userTitle}"
 ${context}
 
 Anforderungen:
-1. Beschreibung: 100-160 Zeichen, beschreibe sichtbare Elemente, Stimmung, Beleuchtung
-2. Schlüsselwörter: GENAU 30-50 Begriffe sind zwingend erforderlich! Getrennt durch Kommas. Berücksichtige ALLE diese Kategorien:
+1. Titel: 40-60 Zeichen, sachlich, suchmaschinenfreundlich, möglichst mit Ort oder Motiv. Kein Clickbait.
+2. Caption: 60-180 Zeichen, optionaler Bilduntertitel in einem Satz, sachlich.
+3. Beschreibung: 100-160 Zeichen, beschreibe sichtbare Elemente, Stimmung, Beleuchtung.
+4. Schlüsselwörter: GENAU 30-50 Begriffe sind zwingend erforderlich. Getrennt durch Kommas. Berücksichtige ALLE diese Kategorien:
    - Orte/Ortsnamen (Stadt, Landkreis, Region, Bundesland, Land)
    - Geografische Merkmale (Fluss, Berg, Tal, Wiese, Wald, etc.)
    - Visuelle Elemente (Farben, Objekte, Architektur, Natur)
@@ -181,6 +203,8 @@ WICHTIG:
 - Nutze sowohl spezifische als auch allgemeine Begriffe
 
 Format:
+TITLE: [Dein Titel hier]
+CAPTION: [Deine Caption hier]
 DESCRIPTION: [Deine Beschreibung hier]
 KEYWORDS: [schlüsselwort1, schlüsselwort2, schlüsselwort3, ..., schlüsselwort30, schlüsselwort31, ...]
 
@@ -193,16 +217,22 @@ WICHTIG: Antworte nur auf Deutsch.`;
   private parseAIResponse(response: string): AIAnalysisResult {
     try {
       const descriptionMatch = response.match(/DESCRIPTION:\s*(.+?)(?=\n|KEYWORDS:|$)/i);
+      const titleMatch = response.match(/TITLE:\s*(.+?)(?=\n|CAPTION:|DESCRIPTION:|KEYWORDS:|$)/i);
+      const captionMatch = response.match(/CAPTION:\s*(.+?)(?=\n|DESCRIPTION:|KEYWORDS:|$)/i);
       const keywordsMatch = response.match(/KEYWORDS:\s*(.+?)(?=\n|$)/i);
 
+      const title = titleMatch?.[1]?.trim() || '';
+      const caption = captionMatch?.[1]?.trim() || '';
       const description = descriptionMatch?.[1]?.trim() || '';
       const keywords = keywordsMatch?.[1]?.trim() || '';
 
-      if (!description || !keywords) {
+      if (!title || !description || !keywords) {
         throw new Error('Could not parse AI response');
       }
 
       return {
+        title,
+        caption,
         description,
         keywords,
         success: true
@@ -210,6 +240,8 @@ WICHTIG: Antworte nur auf Deutsch.`;
     } catch (error) {
       console.error('Failed to parse AI response:', response);
       return {
+        title: '',
+        caption: '',
         description: '',
         keywords: '',
         success: false,
@@ -224,13 +256,18 @@ export async function POST({ request }) {
     console.log('🤖 AI Analysis API called');
     
     const body = await request.json();
-    const { imageBase64, userTitle, originalTitle } = body;
+    const { imageBase64, userTitle, originalTitle, motifName, districtName, municipalityName, localityName, capturedAt } = body;
 
     console.log('🤖 Request data:', {
       hasImageBase64: !!imageBase64,
       imageBase64Length: imageBase64?.length || 0,
       userTitle,
-      originalTitle
+      originalTitle,
+      motifName,
+      districtName,
+      municipalityName,
+      localityName,
+      capturedAt
     });
 
     if (!imageBase64 || !userTitle) {
@@ -245,11 +282,16 @@ export async function POST({ request }) {
     const analyzer = new AIImageAnalyzer();
     
     console.log('🤖 Starting AI analysis...');
-    const result = await analyzer.analyzeImage({
-      imageBase64,
-      userTitle,
-      originalTitle
-    });
+      const result = await analyzer.analyzeImage({
+        imageBase64,
+        userTitle,
+        originalTitle,
+        motifName,
+        districtName,
+        municipalityName,
+        localityName,
+        capturedAt
+      });
 
     console.log('🤖 AI Analysis result:', result);
     return json(result);

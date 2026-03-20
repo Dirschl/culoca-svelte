@@ -1,4 +1,6 @@
 interface AIAnalysisResult {
+  title: string;
+  caption: string;
   description: string;
   keywords: string;
   success: boolean;
@@ -9,6 +11,11 @@ interface AIAnalysisRequest {
   imageBase64: string;
   userTitle: string;
   originalTitle?: string;
+  motifName?: string;
+  districtName?: string;
+  municipalityName?: string;
+  localityName?: string;
+  capturedAt?: string | null;
 }
 
 /**
@@ -50,6 +57,8 @@ export class AIImageAnalyzer {
     } catch (error) {
       console.error('❌ Client: AI Analysis failed:', error);
       return {
+        title: '',
+        caption: '',
         description: '',
         keywords: '',
         success: false,

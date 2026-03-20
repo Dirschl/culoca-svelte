@@ -2,6 +2,7 @@
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
   import * as exifr from 'exifr';
+  import { AIImageAnalyzer } from '$lib/aiImageAnalyzer';
   import LocationPickerCard from '$lib/LocationPickerCard.svelte';
   import SiteNav from '$lib/SiteNav.svelte';
   import SiteFooter from '$lib/SiteFooter.svelte';
@@ -41,16 +42,20 @@
     districtName: string;
     municipalityName: string;
     localityName: string;
+    localitySuggested: boolean;
+    localityConfirmed: boolean;
     motifName: string;
     useStructuredFilename: boolean;
+    capturedAt: string | null;
     lat: number | null;
     lon: number | null;
     errors: string[];
     isValid: boolean;
     isUploading: boolean;
     uploadProgress: number;
+    isGeneratingAi: boolean;
+    aiError: string;
     showAdvancedFields: boolean;
-    showMapEditor: boolean;
     placeSearchQuery: string;
     placeSearchResults: SearchGeocodeResult[];
     placeSearchLoading: boolean;
@@ -74,6 +79,7 @@
   let isGettingLocation = false;
   let currentUserId: string | null = null;
   let currentProfileLabel = '';
+  const aiImageAnalyzer = new AIImageAnalyzer();
 
   $: validCount = files.filter((item) => item.isValid).length;
   $: invalidCount = files.length - validCount;
@@ -144,13 +150,50 @@
       .trim();
   }
 
+  function formatCapturedDate(value: string | null): string | null {
+    if (!value) return null;
+
+    if (/^\d{4}:\d{2}:\d{2}/.test(value)) {
+      const [datePart] = value.split(/\s+/);
+      const [year, month, day] = datePart.split(':');
+      if (year && month && day) {
+        return `${day}.${month}.${year}`;
+      }
+    }
+
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      return null;
+    }
+
+    return new Intl.DateTimeFormat('de-DE', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    }).format(parsed);
+  }
+
+  function appendCapturedDateToMotif(motif: string, capturedAt: string | null): string {
+    const normalizedMotif = normalizeFieldValue(motif);
+    if (!normalizedMotif) return normalizedMotif;
+
+    const formattedDate = formatCapturedDate(capturedAt);
+    if (!formattedDate) return normalizedMotif;
+    if (/\bvom\s+\d{2}\.\d{2}\.\d{4}\b/u.test(normalizedMotif)) return normalizedMotif;
+
+    return `${normalizedMotif} vom ${formattedDate}`;
+  }
+
   function getRecommendedOriginalFilename(item: UploadItem): string | null {
     const countryCode = normalizeFieldValue(item.countryCode || '').toUpperCase();
     const districtToken = normalizeFieldValue(item.districtCode || getDistrictFilenameToken(item.districtName) || '');
     const municipalityName = normalizeFieldValue(item.municipalityName);
     const localityName = normalizeFieldValue(item.localityName);
     const authorLabel = normalizeFieldValue(currentProfileLabel);
-    const motifName = stripAuthorFromMotif(normalizeFieldValue(item.motifName), authorLabel);
+    const motifName = appendCapturedDateToMotif(
+      stripAuthorFromMotif(normalizeFieldValue(item.motifName), authorLabel),
+      item.capturedAt
+    );
 
     if (!countryCode || !districtToken || !municipalityName || !motifName) {
       return null;
@@ -167,6 +210,58 @@
 
   function getUploadOriginalFilename(item: UploadItem): string {
     return item.useStructuredFilename ? getRecommendedOriginalFilename(item) || item.originalFileName : item.originalFileName;
+  }
+
+  function getAiUserTitle(item: UploadItem): string {
+    const existingTitle = normalizeFieldValue(item.title);
+    if (existingTitle) return existingTitle;
+
+    const locationLabel = normalizeFieldValue(
+      [item.localityName, item.municipalityName].filter(Boolean).join(', ')
+    );
+    const motifLabel = normalizeFieldValue(item.motifName);
+    const parts = [motifLabel, locationLabel].filter(Boolean);
+
+    return parts.join(' in ') || item.originalFileName;
+  }
+
+  function hasMissingAiMetadata(item: UploadItem): boolean {
+    return !item.title.trim() || !item.caption.trim() || !item.description.trim() || !item.keywords.trim();
+  }
+
+  function localityNeedsConfirmation(item: UploadItem): boolean {
+    return !!(normalizeFieldValue(item.localityName) && item.localitySuggested && !item.localityConfirmed);
+  }
+
+  function setSuggestedLocality(item: UploadItem, localityName: string | null | undefined) {
+    const normalizedLocality = normalizeFieldValue(localityName || '');
+    item.localityName = normalizedLocality;
+    item.localitySuggested = !!normalizedLocality;
+    item.localityConfirmed = !normalizedLocality;
+  }
+
+  function confirmLocality(item: UploadItem) {
+    item.localityName = normalizeFieldValue(item.localityName);
+    item.localityConfirmed = true;
+    item.localitySuggested = !!item.localityName;
+    validateItem(item);
+    files = [...files];
+  }
+
+  function clearLocality(item: UploadItem) {
+    item.localityName = '';
+    item.localitySuggested = false;
+    item.localityConfirmed = true;
+    validateItem(item);
+    files = [...files];
+  }
+
+  function handleLocalityInput(item: UploadItem) {
+    item.localityName = normalizeFieldValue(item.localityName);
+    item.localityConfirmed = true;
+    item.localitySuggested = false;
+    validateItem(item);
+    files = [...files];
   }
 
   function validateItem(item: UploadItem): boolean {
@@ -208,6 +303,10 @@
 
     if (item.lat == null || item.lon == null) {
       errors.push('GPS-Koordinaten fehlen');
+    }
+
+    if (localityNeedsConfirmation(item)) {
+      errors.push('Ortsteil / Stadtteil / Viertel bitte prüfen, bestätigen oder leer lassen');
     }
 
     if (item.useStructuredFilename) {
@@ -320,7 +419,7 @@
             : 'D';
       item.districtName = geocoded.districtName || item.districtName;
       item.municipalityName = geocoded.municipalityName || item.municipalityName;
-      item.localityName = geocoded.localityName || item.localityName;
+      setSuggestedLocality(item, geocoded.localityName);
 
       validateItem(item);
       files = [...files];
@@ -342,7 +441,7 @@
           : 'D';
     item.districtName = result.districtName || item.districtName;
     item.municipalityName = result.municipalityName || item.municipalityName;
-    item.localityName = result.localityName || item.localityName;
+    setSuggestedLocality(item, result.localityName);
     item.placeSearchQuery = result.displayName || item.placeSearchQuery;
     item.placeSearchResults = [];
     item.placeSearchError = '';
@@ -442,16 +541,20 @@
         districtName: '',
         municipalityName: '',
         localityName: '',
+        localitySuggested: false,
+        localityConfirmed: true,
         motifName: '',
         useStructuredFilename: false,
+        capturedAt: null,
         lat: browserLat,
         lon: browserLon,
         errors: [],
         isValid: false,
         isUploading: false,
         uploadProgress: 0,
+        isGeneratingAi: false,
+        aiError: '',
         showAdvancedFields: false,
-        showMapEditor: false,
         placeSearchQuery: '',
         placeSearchResults: [],
         placeSearchLoading: false,
@@ -480,6 +583,12 @@
           Array.isArray(exifData?.Keywords)
             ? fixEncoding(exifData.Keywords.join(', '))
             : fixEncoding(exifData?.Keywords || exifData?.['IPTC:Keywords'] || '') || '';
+        const createdAt =
+          exifData?.DateTimeOriginal ||
+          exifData?.CreateDate ||
+          exifData?.DateCreated ||
+          exifData?.ModifyDate ||
+          null;
 
         item.title = headline?.trim() || '';
         if (!item.title) {
@@ -497,6 +606,11 @@
         item.caption = caption?.trim() || '';
         item.description = description?.trim() || '';
         item.keywords = keywords?.trim() || '';
+        if (createdAt instanceof Date && !Number.isNaN(createdAt.getTime())) {
+          item.capturedAt = createdAt.toISOString();
+        } else if (typeof createdAt === 'string' && createdAt.trim()) {
+          item.capturedAt = createdAt.trim();
+        }
         if (typeof exifData?.latitude === 'number' && typeof exifData?.longitude === 'number') {
           item.lat = exifData.latitude;
           item.lon = exifData.longitude;
@@ -559,7 +673,53 @@
     }
     validateItem(item);
     files = [...files];
-    showMessage('Standort auf der Karte aktualisiert.', 'success');
+  }
+
+  async function autofillMetadataWithAi(item: UploadItem) {
+    if (item.isGeneratingAi) return;
+
+    if (!hasMissingAiMetadata(item)) {
+      showMessage('Titel, Caption, Beschreibung und Keywords sind bereits vorhanden.', 'info');
+      return;
+    }
+
+    item.isGeneratingAi = true;
+    item.aiError = '';
+    files = [...files];
+
+    try {
+      const imageBase64 = await aiImageAnalyzer.resizeImageForAI(item.file);
+      const result = await aiImageAnalyzer.analyzeImage({
+        imageBase64,
+        userTitle: getAiUserTitle(item),
+        originalTitle: item.originalFileName,
+        motifName: normalizeFieldValue(item.motifName),
+        districtName: normalizeFieldValue(item.districtName),
+        municipalityName: normalizeFieldValue(item.municipalityName),
+        localityName: normalizeFieldValue(item.localityName),
+        capturedAt: item.capturedAt
+      });
+
+      if (!result.success) {
+        throw new Error(result.error || 'KI-Autofill konnte nicht erstellt werden.');
+      }
+
+      if (!item.title.trim()) item.title = result.title.trim();
+      if (!item.caption.trim()) item.caption = result.caption.trim();
+      if (!item.description.trim()) item.description = result.description.trim();
+      if (!item.keywords.trim()) item.keywords = result.keywords.trim();
+
+      validateItem(item);
+      files = [...files];
+      showMessage('Fehlende Textfelder wurden mit KI ergänzt.', 'success');
+    } catch (error) {
+      item.aiError = error instanceof Error ? error.message : 'KI-Autofill fehlgeschlagen.';
+      files = [...files];
+      showMessage(item.aiError, 'error');
+    } finally {
+      item.isGeneratingAi = false;
+      files = [...files];
+    }
   }
 
   async function uploadOriginalToSupabase(file: File, id: string) {
@@ -904,18 +1064,6 @@
                 </div>
 
                 <label class="field">
-                  <span>Titel</span>
-                  <input bind:value={item.title} maxlength={TITLE_MAX_LENGTH} on:input={() => validateItem(item)} />
-                  <small>{item.title.length}/{TITLE_MAX_LENGTH} Zeichen, Zielbereich {TITLE_MIN_LENGTH}-{TITLE_MAX_LENGTH}</small>
-                </label>
-
-                <label class="field">
-                  <span>Caption</span>
-                  <textarea bind:value={item.caption} rows="3" maxlength="300" />
-                  <small>Optionaler Bilduntertitel oder ergänzender Kurztext.</small>
-                </label>
-
-                <label class="field">
                   <span>Typ</span>
                   <select bind:value={item.typeId}>
                     {#each getAvailableTypes() as type}
@@ -924,32 +1072,8 @@
                   </select>
                 </label>
 
-                <label class="field">
-                  <span>Beschreibung</span>
-                  <textarea bind:value={item.description} rows="4" maxlength={DESCRIPTION_MAX_LENGTH} on:input={() => validateItem(item)} />
-                  <small>{item.description.length}/{DESCRIPTION_MAX_LENGTH} Zeichen, Zielbereich {DESCRIPTION_MIN_LENGTH}-{DESCRIPTION_MAX_LENGTH}</small>
-                </label>
-
-                <label class="field">
-                  <span>Keywords</span>
-                  <textarea bind:value={item.keywords} rows="3" on:input={() => validateItem(item)} />
-                      <small>{sanitizeKeywords(item.keywords, {
-                        districtName: item.districtName,
-                        municipalityName: item.municipalityName,
-                        localityName: item.localityName
-                      }).length} Keywords, Zielbereich {KEYWORDS_MIN}-{KEYWORDS_MAX}</small>
-                </label>
-
-                <div class="structured-box">
-                  <div class="structured-box__intro">
-                    <strong>Empfohlenes Dateimuster</strong>
-                    <p>
-                      Optional für Bulk-Workflows. Wenn du Ortsdaten hier pflegst, können Geo-Taxonomie,
-                      Review-Hinweise und spätere Korrekturen deutlich sauberer nachgezogen werden.
-                    </p>
-                  </div>
-
-                  <div class="place-search-box">
+                <div class="place-search-box">
+                  <div class="place-search-row">
                     <label class="field">
                       <span>Ort oder Landmarke suchen</span>
                       <input
@@ -959,29 +1083,77 @@
                       />
                       <small>Treffer übernehmen Koordinaten sowie Land, Landkreis, Gemeinde / Stadt und optional Ortsteil / Stadtteil / Viertel.</small>
                     </label>
-                    {#if item.placeSearchLoading}
-                      <div class="place-search-status">Suche läuft...</div>
-                    {:else if item.placeSearchError}
-                      <div class="place-search-status place-search-status--error">{item.placeSearchError}</div>
-                    {/if}
-                    {#if item.placeSearchResults.length > 0}
-                      <div class="place-search-results">
-                        {#each item.placeSearchResults as result}
-                          <button type="button" class="place-search-result" on:click={() => selectPlaceSearchResult(item, result)}>
-                            <strong>{result.displayName}</strong>
-                            <span>
-                              {[
-                                result.countryName,
-                                result.stateName,
-                                result.districtName,
-                                result.municipalityName,
-                                result.localityName
-                              ].filter(Boolean).join(' / ')}
-                            </span>
-                          </button>
-                        {/each}
-                      </div>
-                    {/if}
+                    <button
+                      class="secondary-btn place-search-row__button"
+                      type="button"
+                      disabled={browserLat == null || browserLon == null}
+                      on:click={() => useCurrentLocation(item)}
+                    >
+                      Aktuelle Position
+                    </button>
+                  </div>
+                  {#if item.placeSearchLoading}
+                    <div class="place-search-status">Suche läuft...</div>
+                  {:else if item.placeSearchError}
+                    <div class="place-search-status place-search-status--error">{item.placeSearchError}</div>
+                  {/if}
+                  {#if item.placeSearchResults.length > 0}
+                    <div class="place-search-results">
+                      {#each item.placeSearchResults as result}
+                        <button type="button" class="place-search-result" on:click={() => selectPlaceSearchResult(item, result)}>
+                          <strong>{result.displayName}</strong>
+                          <span>
+                            {[
+                              result.countryName,
+                              result.stateName,
+                              result.districtName,
+                              result.municipalityName,
+                              result.localityName
+                            ].filter(Boolean).join(' / ')}
+                          </span>
+                        </button>
+                      {/each}
+                    </div>
+                  {/if}
+                </div>
+
+                <LocationPickerCard
+                  initialLat={item.lat}
+                  initialLon={item.lon}
+                  initialLabel={item.placeSearchQuery}
+                  liveUpdate={true}
+                  showSearchTools={false}
+                  showSelectionFooter={false}
+                  showSaveButton={false}
+                  on:save={(event) => applyMapSelection(item, event)}
+                />
+
+                <div class="geo-grid">
+                  <label class="field">
+                    <span>Breitengrad</span>
+                    <input type="number" step="any" bind:value={item.lat} on:input={() => validateItem(item)} />
+                  </label>
+                  <label class="field">
+                    <span>Längengrad</span>
+                    <input type="number" step="any" bind:value={item.lon} on:input={() => validateItem(item)} />
+                  </label>
+                </div>
+
+                <div class="inline-actions">
+                  <button class="secondary-btn" disabled={item.lat == null || item.lon == null} on:click={() => autofillGeoFromCoordinates(item)}>
+                    Ortsdaten aus GPS-Position ermitteln
+                  </button>
+                  <button class="secondary-btn" on:click={() => (item.showAdvancedFields = !item.showAdvancedFields)}>
+                    {item.showAdvancedFields ? 'Erweiterte Felder schließen' : 'Erweiterte Felder'}
+                  </button>
+                </div>
+
+                <div class="structured-box">
+                  <div class="structured-box__intro">
+                    <strong>Ortsdaten und Motiv</strong>
+                    <p>
+                      Diese Angaben steuern Dateimuster, Orts-Taxonomie und die spätere KI-Unterstützung für Titel, Caption, Beschreibung und Keywords.
+                    </p>
                   </div>
 
                   <div class="structured-grid">
@@ -1017,9 +1189,29 @@
                       <input
                         bind:value={item.localityName}
                         placeholder="Engfurt"
-                        on:input={() => validateItem(item)}
+                        on:input={() => handleLocalityInput(item)}
                       />
+                      {#if localityNeedsConfirmation(item)}
+                        <small class="locality-review-note">
+                          Automatisch erkannt. Bitte kurz pruefen und bestaetigen oder leer lassen, wenn es keinen passenden Ortsteil gibt.
+                        </small>
+                      {:else if item.localityName}
+                        <small>Optional. Wenn gesetzt, sollte der Ortsteil genau stimmen.</small>
+                      {:else}
+                        <small>Optional. In vielen Staedten oder Gemeinden gibt es keinen Ortsteil.</small>
+                      {/if}
                     </label>
+
+                    {#if localityNeedsConfirmation(item)}
+                      <div class="locality-review-actions">
+                        <button class="secondary-btn" type="button" on:click={() => confirmLocality(item)}>
+                          Ortsteil bestaetigen
+                        </button>
+                        <button class="secondary-btn" type="button" on:click={() => clearLocality(item)}>
+                          Kein Ortsteil
+                        </button>
+                      </div>
+                    {/if}
 
                     <label class="field structured-grid__motif">
                       <span>Motiv</span>
@@ -1032,8 +1224,7 @@
                   </div>
 
                   <div class="filename-preview">
-                    <span class="filename-preview__label">Original Dateiname</span>
-                    <code>{item.originalFileName}</code>
+                    <span class="filename-preview__label">{item.originalFileName}</span>
                     <span class="filename-preview__label">Empfohlener Originaldateiname</span>
                     <code>{getRecommendedOriginalFilename(item) || 'Landkreis, Gemeinde / Stadt und Motiv eintragen, um die Vorlage zu sehen.'}</code>
                   </div>
@@ -1048,50 +1239,48 @@
                   </small>
                 </div>
 
-                <div class="geo-grid">
-                  <label class="field">
-                    <span>Breitengrad</span>
-                    <input type="number" step="any" bind:value={item.lat} on:input={() => validateItem(item)} />
-                  </label>
-                  <label class="field">
-                    <span>Längengrad</span>
-                    <input type="number" step="any" bind:value={item.lon} on:input={() => validateItem(item)} />
-                  </label>
-                </div>
-
-                <div class="geo-map-summary">
-                  <div>
-                    <strong>Kartenansicht zur Kontrolle</strong>
+                <div class="ai-box">
+                  <div class="ai-box__intro">
+                    <strong>KI für fehlende Texte</strong>
                     <p>
-                      Prüfe die Position im Detailausschnitt und justiere sie bei Bedarf direkt auf der Karte.
+                      Wenn EXIF oder IPTC noch nichts liefern, ergänzt Culoca aus Bild, Ort und Motiv automatisch Titel, Caption, Beschreibung und Keywords.
                     </p>
                   </div>
-                  <button class="secondary-btn" type="button" on:click={() => (item.showMapEditor = !item.showMapEditor)}>
-                    {item.showMapEditor ? 'Karte ausblenden' : 'Karte und Feinjustierung öffnen'}
+                  <button class="secondary-btn" type="button" disabled={item.isGeneratingAi} on:click={() => autofillMetadataWithAi(item)}>
+                    {item.isGeneratingAi ? 'KI analysiert Bild...' : 'Fehlende Felder mit KI ausfüllen'}
                   </button>
+                  {#if item.aiError}
+                    <small class="place-search-status place-search-status--error">{item.aiError}</small>
+                  {/if}
                 </div>
 
-                {#if item.showMapEditor}
-                  <LocationPickerCard
-                    initialLat={item.lat}
-                    initialLon={item.lon}
-                    initialLabel={item.placeSearchQuery}
-                    submitLabel="Koordinaten übernehmen"
-                    on:save={(event) => applyMapSelection(item, event)}
-                  />
-                {/if}
+                <label class="field">
+                  <span>Titel</span>
+                  <input bind:value={item.title} maxlength={TITLE_MAX_LENGTH} on:input={() => validateItem(item)} />
+                  <small>{item.title.length}/{TITLE_MAX_LENGTH} Zeichen, Zielbereich {TITLE_MIN_LENGTH}-{TITLE_MAX_LENGTH}</small>
+                </label>
 
-                <div class="inline-actions">
-                  <button class="secondary-btn" disabled={browserLat == null || browserLon == null} on:click={() => useCurrentLocation(item)}>
-                    Browser-Standort verwenden
-                  </button>
-                  <button class="secondary-btn" disabled={item.lat == null || item.lon == null} on:click={() => autofillGeoFromCoordinates(item)}>
-                    Ortsdaten aus GPS ermitteln
-                  </button>
-                  <button class="secondary-btn" on:click={() => (item.showAdvancedFields = !item.showAdvancedFields)}>
-                    {item.showAdvancedFields ? 'Erweiterte Felder schließen' : 'Erweiterte Felder'}
-                  </button>
-                </div>
+                <label class="field">
+                  <span>Caption</span>
+                  <textarea bind:value={item.caption} rows="3" maxlength="300" />
+                  <small>Optionaler Bilduntertitel oder ergänzender Kurztext.</small>
+                </label>
+
+                <label class="field">
+                  <span>Beschreibung</span>
+                  <textarea bind:value={item.description} rows="4" maxlength={DESCRIPTION_MAX_LENGTH} on:input={() => validateItem(item)} />
+                  <small>{item.description.length}/{DESCRIPTION_MAX_LENGTH} Zeichen, Zielbereich {DESCRIPTION_MIN_LENGTH}-{DESCRIPTION_MAX_LENGTH}</small>
+                </label>
+
+                <label class="field">
+                  <span>Keywords</span>
+                  <textarea bind:value={item.keywords} rows="3" on:input={() => validateItem(item)} />
+                  <small>{sanitizeKeywords(item.keywords, {
+                    districtName: item.districtName,
+                    municipalityName: item.municipalityName,
+                    localityName: item.localityName
+                  }).length} Keywords, Zielbereich {KEYWORDS_MIN}-{KEYWORDS_MAX}</small>
+                </label>
 
                 {#if item.showAdvancedFields}
                   <div class="advanced-box">
@@ -1552,28 +1741,6 @@
     gap: 0.75rem;
   }
 
-  .geo-map-summary {
-    display: flex;
-    justify-content: space-between;
-    gap: 1rem;
-    align-items: center;
-    padding: 0.95rem 1rem;
-    border-radius: 16px;
-    background: color-mix(in srgb, var(--bg-tertiary) 90%, transparent);
-    border: 1px solid var(--border-color);
-  }
-
-  .geo-map-summary strong {
-    display: block;
-    margin-bottom: 0.2rem;
-  }
-
-  .geo-map-summary p {
-    margin: 0;
-    color: var(--text-secondary);
-    font-size: 0.92rem;
-  }
-
   .location-actions,
   .inline-actions {
     display: flex;
@@ -1607,6 +1774,17 @@
   .place-search-box {
     display: grid;
     gap: 0.55rem;
+  }
+
+  .place-search-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.75rem;
+    align-items: end;
+  }
+
+  .place-search-row__button {
+    white-space: nowrap;
   }
 
   .place-search-status {
@@ -1643,6 +1821,18 @@
 
   .structured-grid__motif {
     grid-column: 1 / -1;
+  }
+
+  .locality-review-note {
+    color: #9a3412;
+    font-weight: 600;
+  }
+
+  .locality-review-actions {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
   }
 
   .filename-preview {
@@ -1682,6 +1872,20 @@
 
   .structured-box__hint {
     color: var(--text-secondary);
+  }
+
+  .ai-box {
+    display: grid;
+    gap: 0.75rem;
+    padding: 1rem;
+    border-radius: 16px;
+    background: color-mix(in srgb, var(--bg-tertiary) 92%, #0f766e 8%);
+    border: 1px solid color-mix(in srgb, var(--border-color) 84%, #0f766e 16%);
+  }
+
+  .ai-box__intro {
+    display: grid;
+    gap: 0.2rem;
   }
 
   .advanced-box__intro {
@@ -1747,12 +1951,16 @@
       grid-template-columns: 1fr;
     }
 
-    .geo-map-summary {
-      display: grid;
-    }
-
     .structured-grid {
       grid-template-columns: 1fr;
+    }
+
+    .place-search-row {
+      grid-template-columns: 1fr;
+    }
+
+    .locality-review-actions {
+      flex-direction: column;
     }
   }
 </style>

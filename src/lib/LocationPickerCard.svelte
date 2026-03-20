@@ -5,6 +5,10 @@
   export let initialLon: number | null = null;
   export let initialLabel = '';
   export let submitLabel = 'Standort übernehmen';
+  export let liveUpdate = false;
+  export let showSelectionFooter = true;
+  export let showSaveButton = true;
+  export let showSearchTools = true;
 
   const dispatch = createEventDispatcher<{
     save: { lat: number; lon: number; label: string | null };
@@ -109,6 +113,14 @@
     if (label !== null) {
       selectedLabel = label;
       searchQuery = label;
+    }
+
+    if (liveUpdate) {
+      dispatch('save', {
+        lat,
+        lon,
+        label: selectedLabel?.trim() || searchQuery.trim() || null
+      });
     }
   }
 
@@ -237,52 +249,58 @@
     </button>
   </div>
 
-  <div class="picker-tools">
-    <div class="search-block">
-      <label for="location-search">Ort suchen</label>
-      <input
-        id="location-search"
-        type="search"
-        bind:value={searchQuery}
-        on:input={handleSearchInput}
-        placeholder="z.B. München, Marienplatz"
-      />
-      {#if searchLoading}
-        <p class="search-state">Suche läuft...</p>
-      {/if}
-      {#if searchError}
-        <p class="search-error">{searchError}</p>
-      {/if}
-      {#if searchResults.length > 0}
-        <div class="search-results">
-          {#each searchResults as result (result.place_id)}
-            <button type="button" class="search-result" on:click={() => selectSearchResult(result)}>
-              {result.display_name}
-            </button>
-          {/each}
-        </div>
-      {/if}
-    </div>
+  {#if showSearchTools}
+    <div class="picker-tools">
+      <div class="search-block">
+        <label for="location-search">Ort suchen</label>
+        <input
+          id="location-search"
+          type="search"
+          bind:value={searchQuery}
+          on:input={handleSearchInput}
+          placeholder="z.B. München, Marienplatz"
+        />
+        {#if searchLoading}
+          <p class="search-state">Suche läuft...</p>
+        {/if}
+        {#if searchError}
+          <p class="search-error">{searchError}</p>
+        {/if}
+        {#if searchResults.length > 0}
+          <div class="search-results">
+            {#each searchResults as result (result.place_id)}
+              <button type="button" class="search-result" on:click={() => selectSearchResult(result)}>
+                {result.display_name}
+              </button>
+            {/each}
+          </div>
+        {/if}
+      </div>
 
-    <button type="button" class="gps-btn" on:click={useCurrentLocation} disabled={locating}>
-      {locating ? 'Standort wird ermittelt...' : 'Aktuellen Standort in die Karte laden'}
-    </button>
-  </div>
+      <button type="button" class="gps-btn" on:click={useCurrentLocation} disabled={locating}>
+        {locating ? 'Standort wird ermittelt...' : 'Aktuellen Standort in die Karte laden'}
+      </button>
+    </div>
+  {/if}
 
   <div class="map-shell">
     <div bind:this={mapContainer} class="map"></div>
   </div>
 
-  <div class="picker-footer">
-    <div class="coords">
-      {#if selectedLat !== null && selectedLon !== null}
-        <strong>Gewählter Standort:</strong> {selectedLat.toFixed(6)}, {selectedLon.toFixed(6)}
-      {:else}
-        <strong>Noch kein Standort gewählt</strong>
+  {#if showSelectionFooter}
+    <div class="picker-footer">
+      <div class="coords">
+        {#if selectedLat !== null && selectedLon !== null}
+          <strong>Gewählter Standort:</strong> {selectedLat.toFixed(6)}, {selectedLon.toFixed(6)}
+        {:else}
+          <strong>Noch kein Standort gewählt</strong>
+        {/if}
+      </div>
+      {#if showSaveButton}
+        <button type="button" class="save-btn" on:click={saveSelection}>{submitLabel}</button>
       {/if}
     </div>
-    <button type="button" class="save-btn" on:click={saveSelection}>{submitLabel}</button>
-  </div>
+  {/if}
 </div>
 
 <style>
