@@ -38,6 +38,9 @@
     externalUrl: string;
     videoUrl: string;
     countryCode: string;
+    countryName: string;
+    stateName: string;
+    regionName: string;
     districtCode: string;
     districtName: string;
     municipalityName: string;
@@ -217,8 +220,20 @@
     return parts.join(' in ') || item.originalFileName;
   }
 
+  function hasUsableKeywordSet(item: UploadItem): boolean {
+    const keywordCount = sanitizeKeywords(item.keywords, {
+      countryName: item.countryName,
+      stateName: item.stateName,
+      regionName: item.regionName,
+      districtName: item.districtName,
+      municipalityName: item.municipalityName,
+      localityName: item.localityName
+    }).length;
+    return keywordCount >= KEYWORDS_MIN && keywordCount <= KEYWORDS_MAX;
+  }
+
   function hasMissingAiMetadata(item: UploadItem): boolean {
-    return !item.title.trim() || !item.caption.trim() || !item.description.trim() || !item.keywords.trim();
+    return !item.title.trim() || !item.caption.trim() || !item.description.trim() || !hasUsableKeywordSet(item);
   }
 
   function localityNeedsConfirmation(item: UploadItem): boolean {
@@ -260,6 +275,9 @@
     const errors: string[] = [];
 
     item.keywords = sanitizeKeywordsText(item.keywords, {
+      countryName: item.countryName,
+      stateName: item.stateName,
+      regionName: item.regionName,
       districtName: item.districtName,
       municipalityName: item.municipalityName,
       localityName: item.localityName
@@ -283,6 +301,9 @@
     }
 
     const keywordCount = sanitizeKeywords(item.keywords, {
+      countryName: item.countryName,
+      stateName: item.stateName,
+      regionName: item.regionName,
       districtName: item.districtName,
       municipalityName: item.municipalityName,
       localityName: item.localityName
@@ -412,6 +433,9 @@
           : geocoded.countryName === 'Schweiz'
             ? 'CH'
             : 'D';
+      item.countryName = geocoded.countryName || item.countryName;
+      item.stateName = geocoded.stateName || item.stateName;
+      item.regionName = geocoded.districtName || item.regionName;
       item.districtName = geocoded.districtName || item.districtName;
       item.municipalityName = geocoded.municipalityName || item.municipalityName;
       setSuggestedLocality(item, geocoded.localityName);
@@ -434,6 +458,9 @@
         : result.countryName === 'Schweiz'
           ? 'CH'
           : 'D';
+    item.countryName = result.countryName || item.countryName;
+    item.stateName = result.stateName || item.stateName;
+    item.regionName = result.districtName || item.regionName;
     item.districtName = result.districtName || item.districtName;
     item.municipalityName = result.municipalityName || item.municipalityName;
     setSuggestedLocality(item, result.localityName);
@@ -479,6 +506,35 @@
       void runPlaceSearch(item);
     }, 300);
     files = [...files];
+  }
+
+  function handlePlaceSearchKeydown(item: UploadItem, event: KeyboardEvent) {
+    event.stopPropagation();
+
+    if (event.key !== ' ') {
+      return;
+    }
+
+    event.preventDefault();
+    const input = event.currentTarget as HTMLInputElement | null;
+    const currentValue = item.placeSearchQuery || '';
+    const selectionStart = input?.selectionStart ?? currentValue.length;
+    const selectionEnd = input?.selectionEnd ?? currentValue.length;
+
+    item.placeSearchQuery =
+      currentValue.slice(0, selectionStart) +
+      ' ' +
+      currentValue.slice(selectionEnd);
+
+    requestAnimationFrame(() => {
+      if (input) {
+        const nextPosition = selectionStart + 1;
+        input.selectionStart = nextPosition;
+        input.selectionEnd = nextPosition;
+      }
+    });
+
+    handlePlaceSearchInput(item);
   }
 
   function selectPlaceSearchResult(item: UploadItem, result: SearchGeocodeResult) {
@@ -532,6 +588,9 @@
         externalUrl: '',
         videoUrl: '',
         countryCode: 'D',
+        countryName: 'Deutschland',
+        stateName: '',
+        regionName: '',
         districtCode: '',
         districtName: '',
         municipalityName: '',
@@ -617,6 +676,9 @@
       const inferredFilename = inferLocationTaxonomyFromOriginalName(file.name);
       if (inferredFilename) {
         item.countryCode = inferredFilename.countryCode;
+        item.countryName = inferredFilename.countryName || item.countryName;
+        item.stateName = inferredFilename.stateName || item.stateName;
+        item.regionName = inferredFilename.regionName || item.regionName;
         item.districtCode = inferredFilename.districtCode || '';
         item.districtName =
           normalizeAdminDisplayLabel(inferredFilename.districtName || inferredFilename.districtCode) ||
@@ -688,10 +750,21 @@
         imageBase64,
         userTitle: getAiUserTitle(item),
         originalTitle: item.originalFileName,
+        countryName: normalizeFieldValue(item.countryName),
+        stateName: normalizeFieldValue(item.stateName),
+        regionName: normalizeFieldValue(item.regionName),
         motifName: normalizeFieldValue(item.motifName),
         districtName: normalizeFieldValue(item.districtName),
         municipalityName: normalizeFieldValue(item.municipalityName),
         localityName: normalizeFieldValue(item.localityName),
+        existingKeywords: sanitizeKeywordsText(item.keywords, {
+          countryName: item.countryName,
+          stateName: item.stateName,
+          regionName: item.regionName,
+          districtName: item.districtName,
+          municipalityName: item.municipalityName,
+          localityName: item.localityName
+        }),
         capturedAt: item.capturedAt
       });
 
@@ -702,7 +775,7 @@
       if (!item.title.trim()) item.title = result.title.trim();
       if (!item.caption.trim()) item.caption = result.caption.trim();
       if (!item.description.trim()) item.description = result.description.trim();
-      if (!item.keywords.trim()) item.keywords = result.keywords.trim();
+      if (!hasUsableKeywordSet(item)) item.keywords = result.keywords.trim();
 
       validateItem(item);
       files = [...files];
@@ -754,6 +827,12 @@
       if (item.videoUrl.trim()) formData.append('video_url', item.videoUrl.trim());
       if (item.lat != null) formData.append('lat', String(item.lat));
       if (item.lon != null) formData.append('lon', String(item.lon));
+      if (item.countryName.trim()) formData.append('country_name', item.countryName.trim());
+      if (item.stateName.trim()) formData.append('state_name', item.stateName.trim());
+      if (item.regionName.trim()) formData.append('region_name', item.regionName.trim());
+      if (item.districtName.trim()) formData.append('district_name', item.districtName.trim());
+      if (item.municipalityName.trim()) formData.append('municipality_name', item.municipalityName.trim());
+      if (item.localityName.trim()) formData.append('locality_name', item.localityName.trim());
 
       const response = await authFetch('/api/upload', {
         method: 'POST',
@@ -1082,7 +1161,7 @@
                       <input
                         bind:value={item.placeSearchQuery}
                         placeholder="z. B. Brandenburger Tor, Wurmannsquick oder Friesing"
-                        on:keydown|stopPropagation
+                        on:keydown={(event) => handlePlaceSearchKeydown(item, event)}
                         on:input={() => handlePlaceSearchInput(item)}
                       />
                       <small>Treffer übernehmen Koordinaten sowie Land, Landkreis, Gemeinde / Stadt und optional Ortsteil / Stadtteil / Viertel.</small>
@@ -1277,6 +1356,9 @@
                   <span>Keywords</span>
                   <textarea bind:value={item.keywords} rows="3" on:input={() => validateItem(item)} />
                   <small>{sanitizeKeywords(item.keywords, {
+                    countryName: item.countryName,
+                    stateName: item.stateName,
+                    regionName: item.regionName,
                     districtName: item.districtName,
                     municipalityName: item.municipalityName,
                     localityName: item.localityName
@@ -1665,8 +1747,9 @@
 
   .upload-card {
     display: grid;
-    grid-template-columns: minmax(320px, 0.9fr) minmax(0, 1.1fr);
-    overflow: hidden;
+    grid-template-columns: minmax(360px, 0.82fr) minmax(0, 1.18fr);
+    align-items: start;
+    overflow: visible;
   }
 
   .upload-card--invalid {
@@ -1677,15 +1760,20 @@
     display: grid;
     place-items: center;
     background: var(--bg-tertiary);
-    min-height: 100%;
+    min-height: clamp(420px, calc(100vh - 2rem), 920px);
     padding: 1rem;
     border-right: 1px solid color-mix(in srgb, var(--border-color) 75%, transparent);
+    position: sticky;
+    top: 1rem;
+    align-self: start;
+    border-top-left-radius: 24px;
+    border-bottom-left-radius: 24px;
   }
 
   .preview-wrap img {
     width: 100%;
     max-width: min(100%, 760px);
-    max-height: 78vh;
+    max-height: calc(100vh - 4rem);
     height: auto;
     object-fit: contain;
     display: block;
@@ -1698,6 +1786,7 @@
     padding: 1.1rem;
     display: grid;
     gap: 0.95rem;
+    align-content: start;
   }
 
   .card-head {
@@ -1948,8 +2037,14 @@
 
     .preview-wrap {
       max-height: none;
+      min-height: auto;
       border-right: 0;
       border-bottom: 1px solid color-mix(in srgb, var(--border-color) 75%, transparent);
+      position: static;
+      top: auto;
+      border-top-left-radius: 24px;
+      border-top-right-radius: 24px;
+      border-bottom-left-radius: 0;
     }
 
     .preview-wrap img {

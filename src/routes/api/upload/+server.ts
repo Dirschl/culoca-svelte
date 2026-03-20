@@ -338,6 +338,12 @@ export const POST = async ({ request }) => {
         const formExternalUrl = form.get('external_url') as string;
         const formVideoUrl = form.get('video_url') as string;
         const formGroupSlug = form.get('group_slug') as string;
+        const formCountryName = form.get('country_name') as string;
+        const formStateName = form.get('state_name') as string;
+        const formRegionName = form.get('region_name') as string;
+        const formDistrictName = form.get('district_name') as string;
+        const formMunicipalityName = form.get('municipality_name') as string;
+        const formLocalityName = form.get('locality_name') as string;
 
         if (formTitle) title = formTitle;
         if (formCaption) caption = formCaption;
@@ -712,6 +718,12 @@ export const POST = async ({ request }) => {
           external_url: formExternalUrl?.trim() || null,
           video_url: formVideoUrl?.trim() || null,
           group_slug: formGroupSlug?.trim() || null,
+          country_name: formCountryName?.trim() || null,
+          state_name: formStateName?.trim() || null,
+          region_name: formRegionName?.trim() || null,
+          district_name: formDistrictName?.trim() || null,
+          municipality_name: formMunicipalityName?.trim() || null,
+          locality_name: formLocalityName?.trim() || null,
           ...(keywordsArray ? { keywords: keywordsArray } : {}),
           exif_data: Object.keys(exifToStore).length ? exifToStore : null,
           slug // <--- Slug speichern
@@ -728,6 +740,21 @@ export const POST = async ({ request }) => {
           console.warn('⚠️ Moderation check failed, continuing without moderation payload:', moderationError);
         }
 
+        const locationFields = await resolveLocationFieldsFromOriginalName(supabase, baseName);
+        if (locationFields) {
+          for (const [key, value] of Object.entries(locationFields)) {
+            if (dbRecord[key] == null || dbRecord[key] === '') {
+              dbRecord[key] = value;
+            }
+          }
+        } else {
+          dbRecord.location_needs_review = true;
+        }
+
+        if (hasCompleteGeoFields(dbRecord)) {
+          dbRecord.location_needs_review = false;
+        }
+
         if (keywordsArray) {
           keywordsArray = sanitizeKeywords(keywordsArray, {
             countryName: dbRecord.country_name,
@@ -738,17 +765,6 @@ export const POST = async ({ request }) => {
             localityName: dbRecord.locality_name
           });
           dbRecord.keywords = keywordsArray;
-        }
-
-        const locationFields = await resolveLocationFieldsFromOriginalName(supabase, baseName);
-        if (locationFields) {
-          Object.assign(dbRecord, locationFields);
-        } else {
-          dbRecord.location_needs_review = true;
-        }
-
-        if (hasCompleteGeoFields(dbRecord)) {
-          dbRecord.location_needs_review = false;
         }
 
         // Füge EXIF-Felder nur hinzu, wenn sie nicht null sind

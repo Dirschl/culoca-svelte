@@ -5,10 +5,14 @@ interface AIAnalysisRequest {
   imageBase64: string;
   userTitle: string;
   originalTitle?: string;
+  countryName?: string;
+  stateName?: string;
+  regionName?: string;
   motifName?: string;
   districtName?: string;
   municipalityName?: string;
   localityName?: string;
+  existingKeywords?: string;
   capturedAt?: string | null;
 }
 
@@ -167,10 +171,14 @@ class AIImageAnalyzer {
   private buildPrompt(request: AIAnalysisRequest): string {
     const context = [
       request.originalTitle ? `Originaldateiname: ${request.originalTitle}` : '',
+      request.countryName ? `Land: ${request.countryName}` : '',
+      request.stateName ? `Bundesland/Kanton: ${request.stateName}` : '',
+      request.regionName ? `Region/Bezirk: ${request.regionName}` : '',
       request.motifName ? `Motiv: ${request.motifName}` : '',
       request.localityName ? `Ortsteil/Stadtteil/Viertel: ${request.localityName}` : '',
       request.municipalityName ? `Gemeinde/Stadt: ${request.municipalityName}` : '',
       request.districtName ? `Landkreis/Bezirk: ${request.districtName}` : '',
+      request.existingKeywords ? `Bereits bekannte Keywords: ${request.existingKeywords}` : '',
       request.capturedAt ? `Aufnahmedatum: ${request.capturedAt}` : ''
     ]
       .filter(Boolean)
@@ -187,7 +195,7 @@ Anforderungen:
 1. Titel: 40-60 Zeichen, sachlich, suchmaschinenfreundlich, möglichst mit Ort oder Motiv. Kein Clickbait.
 2. Caption: 60-180 Zeichen, optionaler Bilduntertitel in einem Satz, sachlich.
 3. Beschreibung: 100-160 Zeichen, beschreibe sichtbare Elemente, Stimmung, Beleuchtung.
-4. Schlüsselwörter: GENAU 30 Begriffe sind zwingend erforderlich. Getrennt durch Kommas. Berücksichtige ALLE diese Kategorien:
+4. Schlüsselwörter: GENAU 30 Begriffe sind zwingend erforderlich. Getrennt durch Kommas. Nutze zuerst alle bereits bekannten Kontextdaten und ergänze sie mit sichtbaren Bildinhalten. Berücksichtige ALLE diese Kategorien:
    - Orte/Ortsnamen (Stadt, Landkreis, Region, Bundesland, Land)
    - Geografische Merkmale (Fluss, Berg, Tal, Wiese, Wald, etc.)
    - Visuelle Elemente (Farben, Objekte, Architektur, Natur)
@@ -200,6 +208,10 @@ Anforderungen:
 WICHTIG: 
 - Zähle die Keywords und stelle sicher, dass es exakt 30 sind
 - Liefere keine Wortfragmente, Präfixe oder abgestuften Vorsilben wie "S, St, Ste, Stein"
+- Liefere keine Teilwörter, Tippfragmente oder Buchstabenfolgen wie "Spor, Sportp, Steinhause"
+- Ortsbegriffe dürfen nur verwendet werden, wenn sie vollständig ausgeschrieben sind
+- Verwende bekannte Verwaltungsangaben bevorzugt: Land, Bundesland/Kanton, Region/Bezirk, Landkreis, Gemeinde/Stadt, optional Ortsteil
+- Wenn bereits bekannte Keywords vorhanden sind, übernimm die guten Begriffe daraus und ergänze fehlende sinnvolle Begriffe
 - Nutze sowohl spezifische als auch allgemeine Begriffe
 
 Format:
@@ -256,17 +268,34 @@ export async function POST({ request }) {
     console.log('🤖 AI Analysis API called');
     
     const body = await request.json();
-    const { imageBase64, userTitle, originalTitle, motifName, districtName, municipalityName, localityName, capturedAt } = body;
+    const {
+      imageBase64,
+      userTitle,
+      originalTitle,
+      countryName,
+      stateName,
+      regionName,
+      motifName,
+      districtName,
+      municipalityName,
+      localityName,
+      existingKeywords,
+      capturedAt
+    } = body;
 
     console.log('🤖 Request data:', {
       hasImageBase64: !!imageBase64,
       imageBase64Length: imageBase64?.length || 0,
       userTitle,
       originalTitle,
+      countryName,
+      stateName,
+      regionName,
       motifName,
       districtName,
       municipalityName,
       localityName,
+      existingKeywords,
       capturedAt
     });
 
@@ -286,10 +315,14 @@ export async function POST({ request }) {
         imageBase64,
         userTitle,
         originalTitle,
+        countryName,
+        stateName,
+        regionName,
         motifName,
         districtName,
         municipalityName,
         localityName,
+        existingKeywords,
         capturedAt
       });
 

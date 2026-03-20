@@ -28,6 +28,16 @@ function splitCompositeGeoValues(value: string | null | undefined): string[] {
     .filter(Boolean);
 }
 
+function appendUniqueKeyword(target: string[], value: string | null | undefined) {
+  const trimmed = value?.normalize('NFC').trim();
+  if (!trimmed) return;
+
+  const normalized = normalizeKeywordToken(trimmed);
+  if (!normalized) return;
+  if (target.some((entry) => normalizeKeywordToken(entry) === normalized)) return;
+  target.push(trimmed);
+}
+
 export function parseKeywords(value: string | string[] | null | undefined): string[] {
   const source = Array.isArray(value) ? value : (value || '').split(',');
   return source
@@ -88,15 +98,18 @@ export function sanitizeKeywords(
     cleaned.push(keyword);
   }
 
-  const result = cleaned.length >= KEYWORDS_MIN ? cleaned : fallbackCleaned;
+  const result = cleaned.length > 0 ? [...cleaned] : [...fallbackCleaned];
 
-  const locality = context.localityName?.normalize('NFC').trim();
-  if (locality) {
-    const normalizedLocality = normalizeKeywordToken(locality);
-    if (normalizedLocality && !result.some((entry) => normalizeKeywordToken(entry) === normalizedLocality)) {
-      result.push(locality);
-    }
-  }
+  [
+    context.countryName,
+    context.stateName,
+    context.regionName,
+    context.districtName,
+    context.municipalityName,
+    context.localityName
+  ]
+    .flatMap((entry) => splitCompositeGeoValues(entry))
+    .forEach((entry) => appendUniqueKeyword(result, entry));
 
   return result.slice(0, KEYWORDS_MAX);
 }

@@ -11,10 +11,14 @@ interface AIAnalysisRequest {
   imageBase64: string;
   userTitle: string;
   originalTitle?: string;
+  countryName?: string;
+  stateName?: string;
+  regionName?: string;
   motifName?: string;
   districtName?: string;
   municipalityName?: string;
   localityName?: string;
+  existingKeywords?: string;
   capturedAt?: string | null;
 }
 
