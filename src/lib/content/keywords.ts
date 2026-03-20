@@ -39,6 +39,12 @@ export function sanitizeKeywords(
   value: string | string[] | null | undefined,
   context: KeywordContext = {}
 ): string[] {
+  const parsedKeywords = parseKeywords(value);
+  const normalizedKeywords = parsedKeywords.map((keyword) => ({
+    original: keyword,
+    normalized: normalizeKeywordToken(keyword)
+  }));
+
   const geoTerms = new Set(
     [
       context.countryName,
@@ -55,13 +61,25 @@ export function sanitizeKeywords(
   const seen = new Set<string>();
   const cleaned: string[] = [];
 
-  for (const keyword of parseKeywords(value)) {
-    const normalized = normalizeKeywordToken(keyword);
+  for (const { original, normalized } of normalizedKeywords) {
     if (!normalized) continue;
+    if (/^[a-zäöüß]{1,3}$/iu.test(normalized)) continue;
+    if (
+      normalizedKeywords.some(
+        (candidate) =>
+          candidate.normalized !== normalized &&
+          candidate.normalized.length > normalized.length + 2 &&
+          /^[a-zäöüß]+$/iu.test(normalized) &&
+          /^[a-zäöüß]+$/iu.test(candidate.normalized) &&
+          candidate.normalized.startsWith(normalized)
+      )
+    ) {
+      continue;
+    }
     if (geoTerms.has(normalized)) continue;
     if (seen.has(normalized)) continue;
     seen.add(normalized);
-    cleaned.push(keyword);
+    cleaned.push(original);
   }
 
   const locality = context.localityName?.normalize('NFC').trim();

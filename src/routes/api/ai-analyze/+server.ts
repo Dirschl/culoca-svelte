@@ -187,7 +187,7 @@ Anforderungen:
 1. Titel: 40-60 Zeichen, sachlich, suchmaschinenfreundlich, möglichst mit Ort oder Motiv. Kein Clickbait.
 2. Caption: 60-180 Zeichen, optionaler Bilduntertitel in einem Satz, sachlich.
 3. Beschreibung: 100-160 Zeichen, beschreibe sichtbare Elemente, Stimmung, Beleuchtung.
-4. Schlüsselwörter: GENAU 30-50 Begriffe sind zwingend erforderlich. Getrennt durch Kommas. Berücksichtige ALLE diese Kategorien:
+4. Schlüsselwörter: GENAU 30 Begriffe sind zwingend erforderlich. Getrennt durch Kommas. Berücksichtige ALLE diese Kategorien:
    - Orte/Ortsnamen (Stadt, Landkreis, Region, Bundesland, Land)
    - Geografische Merkmale (Fluss, Berg, Tal, Wiese, Wald, etc.)
    - Visuelle Elemente (Farben, Objekte, Architektur, Natur)
@@ -198,15 +198,15 @@ Anforderungen:
    - Wetter/Merkmal (Schnee, Regen, Sonne, Nebel, etc.)
 
 WICHTIG: 
-- Zähle die Keywords und stelle sicher, dass es MINIMUM 30 sind
-- Je mehr relevante Keywords, desto besser
+- Zähle die Keywords und stelle sicher, dass es exakt 30 sind
+- Liefere keine Wortfragmente, Präfixe oder abgestuften Vorsilben wie "S, St, Ste, Stein"
 - Nutze sowohl spezifische als auch allgemeine Begriffe
 
 Format:
 TITLE: [Dein Titel hier]
 CAPTION: [Deine Caption hier]
 DESCRIPTION: [Deine Beschreibung hier]
-KEYWORDS: [schlüsselwort1, schlüsselwort2, schlüsselwort3, ..., schlüsselwort30, schlüsselwort31, ...]
+KEYWORDS: [schlüsselwort1, schlüsselwort2, schlüsselwort3, ..., schlüsselwort30]
 
 WICHTIG: Antworte nur auf Deutsch.`;
   }

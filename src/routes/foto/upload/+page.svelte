@@ -173,27 +173,13 @@
     }).format(parsed);
   }
 
-  function appendCapturedDateToMotif(motif: string, capturedAt: string | null): string {
-    const normalizedMotif = normalizeFieldValue(motif);
-    if (!normalizedMotif) return normalizedMotif;
-
-    const formattedDate = formatCapturedDate(capturedAt);
-    if (!formattedDate) return normalizedMotif;
-    if (/\bvom\s+\d{2}\.\d{2}\.\d{4}\b/u.test(normalizedMotif)) return normalizedMotif;
-
-    return `${normalizedMotif} vom ${formattedDate}`;
-  }
-
   function getRecommendedOriginalFilename(item: UploadItem): string | null {
     const countryCode = normalizeFieldValue(item.countryCode || '').toUpperCase();
     const districtToken = normalizeFieldValue(item.districtCode || getDistrictFilenameToken(item.districtName) || '');
     const municipalityName = normalizeFieldValue(item.municipalityName);
     const localityName = normalizeFieldValue(item.localityName);
     const authorLabel = normalizeFieldValue(currentProfileLabel);
-    const motifName = appendCapturedDateToMotif(
-      stripAuthorFromMotif(normalizeFieldValue(item.motifName), authorLabel),
-      item.capturedAt
-    );
+    const motifName = stripAuthorFromMotif(normalizeFieldValue(item.motifName), authorLabel);
 
     if (!countryCode || !districtToken || !municipalityName || !motifName) {
       return null;
@@ -210,6 +196,12 @@
 
   function getUploadOriginalFilename(item: UploadItem): string {
     return item.useStructuredFilename ? getRecommendedOriginalFilename(item) || item.originalFileName : item.originalFileName;
+  }
+
+  function getOriginalFilenameLabel(item: UploadItem): string {
+    const formattedDate = formatCapturedDate(item.capturedAt);
+    if (!formattedDate) return item.originalFileName;
+    return `${item.originalFileName} vom ${formattedDate}`;
   }
 
   function getAiUserTitle(item: UploadItem): string {
@@ -394,6 +386,9 @@
     if (browserLat == null || browserLon == null) return;
     item.lat = browserLat;
     item.lon = browserLon;
+    item.placeSearchQuery = '';
+    item.placeSearchResults = [];
+    item.placeSearchError = '';
     validateItem(item);
     files = [...files];
   }
@@ -971,12 +966,20 @@
         on:dragleave={() => (dragOver = false)}
         on:drop={onDrop}
         on:keydown={(event) => {
+          if (event.target !== event.currentTarget) {
+            return;
+          }
           if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault();
             fileInput?.click();
           }
         }}
-        on:click={() => fileInput?.click()}
+        on:click={(event) => {
+          if (event.target !== event.currentTarget) {
+            return;
+          }
+          fileInput?.click();
+        }}
       >
         <input bind:this={fileInput} type="file" accept="image/*" multiple hidden on:change={handleFileSelect} />
         <strong>Dateien hier ablegen</strong>
@@ -1224,7 +1227,7 @@
                   </div>
 
                   <div class="filename-preview">
-                    <span class="filename-preview__label">{item.originalFileName}</span>
+                    <span class="filename-preview__label">{getOriginalFilenameLabel(item)}</span>
                     <span class="filename-preview__label">Empfohlener Originaldateiname</span>
                     <code>{getRecommendedOriginalFilename(item) || 'Landkreis, Gemeinde / Stadt und Motiv eintragen, um die Vorlage zu sehen.'}</code>
                   </div>
