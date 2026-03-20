@@ -60,6 +60,7 @@
     aiError: string;
     showAdvancedFields: boolean;
     placeSearchQuery: string;
+    selectedPlaceLabel: string;
     placeSearchResults: SearchGeocodeResult[];
     placeSearchLoading: boolean;
     placeSearchError: string;
@@ -465,6 +466,7 @@
     item.municipalityName = result.municipalityName || item.municipalityName;
     setSuggestedLocality(item, result.localityName);
     item.placeSearchQuery = result.displayName || item.placeSearchQuery;
+    item.selectedPlaceLabel = result.displayName || item.selectedPlaceLabel;
     item.placeSearchResults = [];
     item.placeSearchError = '';
     validateItem(item);
@@ -502,10 +504,29 @@
   function handlePlaceSearchInput(item: UploadItem) {
     item.placeSearchError = '';
     if (item.placeSearchTimeout) clearTimeout(item.placeSearchTimeout);
-    item.placeSearchTimeout = setTimeout(() => {
+  }
+
+  function handlePlaceSearchKeydown(event: KeyboardEvent, item: UploadItem) {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      if (item.placeSearchTimeout) {
+        clearTimeout(item.placeSearchTimeout);
+        item.placeSearchTimeout = null;
+      }
       void runPlaceSearch(item);
-    }, 300);
-    files = [...files];
+      return;
+    }
+
+    if (event.key === 'Escape') {
+      if (item.placeSearchTimeout) {
+        clearTimeout(item.placeSearchTimeout);
+        item.placeSearchTimeout = null;
+      }
+      item.placeSearchResults = [];
+      item.placeSearchError = '';
+      item.placeSearchLoading = false;
+      files = [...files];
+    }
   }
 
   function selectPlaceSearchResult(item: UploadItem, result: SearchGeocodeResult) {
@@ -581,6 +602,7 @@
         aiError: '',
         showAdvancedFields: false,
         placeSearchQuery: '',
+        selectedPlaceLabel: '',
         placeSearchResults: [],
         placeSearchLoading: false,
         placeSearchError: '',
@@ -697,7 +719,9 @@
     item.lat = event.detail.lat;
     item.lon = event.detail.lon;
     if (event.detail.label?.trim()) {
-      item.placeSearchQuery = event.detail.label.trim();
+      const nextLabel = event.detail.label.trim();
+      item.placeSearchQuery = nextLabel;
+      item.selectedPlaceLabel = nextLabel;
     }
     validateItem(item);
     files = [...files];
@@ -904,6 +928,83 @@
     }
   }
 
+  function desktopStickyPreview(node: HTMLElement) {
+    const stickyInner = node.querySelector<HTMLElement>('.preview-wrap__sticky');
+    const card = node.closest<HTMLElement>('.upload-card');
+    if (!stickyInner || !card) {
+      return { destroy() {} };
+    }
+
+    const desktopBreakpoint = 860;
+    const stickyTop = 120;
+    const bottomGap = 16;
+
+    function resetStyles() {
+      stickyInner.style.position = '';
+      stickyInner.style.top = '';
+      stickyInner.style.left = '';
+      stickyInner.style.width = '';
+      stickyInner.style.bottom = '';
+    }
+
+    function updateSticky() {
+      if (window.innerWidth <= desktopBreakpoint) {
+        resetStyles();
+        return;
+      }
+
+      const cardRect = card.getBoundingClientRect();
+      const nodeRect = node.getBoundingClientRect();
+      const stickyHeight = stickyInner.offsetHeight;
+      const maxStickyTop = cardRect.bottom - stickyHeight - bottomGap;
+
+      if (cardRect.top > stickyTop) {
+        stickyInner.style.position = 'sticky';
+        stickyInner.style.top = `${stickyTop}px`;
+        stickyInner.style.left = '';
+        stickyInner.style.width = '';
+        stickyInner.style.bottom = '';
+        return;
+      }
+
+      if (maxStickyTop <= stickyTop) {
+        stickyInner.style.position = 'absolute';
+        stickyInner.style.top = 'auto';
+        stickyInner.style.left = '1rem';
+        stickyInner.style.width = 'calc(100% - 2rem)';
+        stickyInner.style.bottom = `${bottomGap}px`;
+        return;
+      }
+
+      stickyInner.style.position = 'fixed';
+      stickyInner.style.top = `${stickyTop}px`;
+      stickyInner.style.left = `${nodeRect.left + 16}px`;
+      stickyInner.style.width = `${Math.max(node.clientWidth - 32, 0)}px`;
+      stickyInner.style.bottom = '';
+    }
+
+    const onScrollOrResize = () => {
+      window.requestAnimationFrame(updateSticky);
+    };
+
+    const resizeObserver = new ResizeObserver(onScrollOrResize);
+    resizeObserver.observe(node);
+    resizeObserver.observe(stickyInner);
+    window.addEventListener('scroll', onScrollOrResize, { passive: true });
+    window.addEventListener('resize', onScrollOrResize);
+    onScrollOrResize();
+
+    return {
+      update: onScrollOrResize,
+      destroy() {
+        resizeObserver.disconnect();
+        window.removeEventListener('scroll', onScrollOrResize);
+        window.removeEventListener('resize', onScrollOrResize);
+        resetStyles();
+      }
+    };
+  }
+
   onMount(async () => {
     const session = await ensureAuth();
     if (!session) return;
@@ -1097,7 +1198,7 @@
         <div class="card-grid">
           {#each files as item (item.id)}
             <article class="upload-card" class:upload-card--invalid={!item.isValid}>
-              <div class="preview-wrap">
+              <div class="preview-wrap" use:desktopStickyPreview>
                 <div class="preview-wrap__sticky">
                   <img src={item.preview} alt={item.originalFileName} />
                 </div>
@@ -1129,8 +1230,9 @@
                         bind:value={item.placeSearchQuery}
                         placeholder="z. B. Brandenburger Tor, Wurmannsquick oder Friesing"
                         on:input={() => handlePlaceSearchInput(item)}
+                        on:keydown={(event) => handlePlaceSearchKeydown(event, item)}
                       />
-                      <small>Treffer übernehmen Koordinaten sowie Land, Landkreis, Gemeinde / Stadt und optional Ortsteil / Stadtteil / Viertel.</small>
+                      <small>`Enter` startet die Suche. Treffer übernehmen Koordinaten sowie Land, Landkreis, Gemeinde / Stadt und optional Ortsteil / Stadtteil / Viertel.</small>
                     </label>
                     <button
                       class="secondary-btn place-search-row__button"
@@ -1169,7 +1271,7 @@
                 <LocationPickerCard
                   initialLat={item.lat}
                   initialLon={item.lon}
-                  initialLabel={item.placeSearchQuery}
+                  initialLabel={item.selectedPlaceLabel}
                   liveUpdate={true}
                   showSearchTools={false}
                   showSelectionFooter={false}
@@ -1239,19 +1341,19 @@
                       />
                       {#if localityNeedsConfirmation(item)}
                         <small class="locality-review-note">
-                          Automatisch erkannt. Bitte kurz pruefen und bestaetigen oder leer lassen, wenn es keinen passenden Ortsteil gibt.
+                          Automatisch erkannt. Bitte kurz prüfen und bestätigen oder leer lassen, wenn es keinen passenden Ortsteil gibt.
                         </small>
                       {:else if item.localityName}
                         <small>Optional. Wenn gesetzt, sollte der Ortsteil genau stimmen.</small>
                       {:else}
-                        <small>Optional. In vielen Staedten oder Gemeinden gibt es keinen Ortsteil.</small>
+                        <small>Optional. In vielen Städten oder Gemeinden gibt es keinen Ortsteil.</small>
                       {/if}
                     </label>
 
                     {#if localityNeedsConfirmation(item)}
                       <div class="locality-review-actions">
                         <button class="secondary-btn" type="button" on:click={() => confirmLocality(item)}>
-                          Ortsteil bestaetigen
+                          Ortsteil bestätigen
                         </button>
                         <button class="secondary-btn" type="button" on:click={() => clearLocality(item)}>
                           Kein Ortsteil
@@ -1712,8 +1814,7 @@
   }
 
   .upload-card {
-    display: grid;
-    grid-template-columns: minmax(360px, 0.82fr) minmax(0, 1.18fr);
+    display: flex;
     align-items: stretch;
     overflow: visible;
   }
@@ -1724,9 +1825,12 @@
 
   .preview-wrap {
     display: block;
+    position: relative;
+    flex: 0 0 min(42%, 540px);
+    width: min(42%, 540px);
     align-self: stretch;
-    background: var(--bg-tertiary);
     min-height: clamp(420px, calc(100vh - 2rem), 920px);
+    background: var(--bg-tertiary);
     padding: 1rem;
     border-right: 1px solid color-mix(in srgb, var(--border-color) 75%, transparent);
     border-top-left-radius: 24px;
@@ -1734,13 +1838,13 @@
   }
 
   .preview-wrap__sticky {
+    position: -webkit-sticky;
     position: sticky;
-    top: 1rem;
+    top: 120px;
     width: 100%;
     display: flex;
     justify-content: center;
     align-items: flex-start;
-    height: fit-content;
   }
 
   .preview-wrap img {
@@ -1750,12 +1854,15 @@
     height: auto;
     object-fit: contain;
     display: block;
+    margin: 0 auto;
     border-radius: 18px;
     background: color-mix(in srgb, var(--bg-primary) 88%, transparent);
     box-shadow: 0 18px 36px rgba(0, 0, 0, 0.12);
   }
 
   .card-body {
+    flex: 1 1 0;
+    min-width: 0;
     padding: 1.1rem;
     display: grid;
     gap: 0.95rem;
@@ -1888,6 +1995,7 @@
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.75rem;
+    align-items: start;
   }
 
   .structured-grid__motif {
@@ -2005,10 +2113,15 @@
     }
 
     .upload-card {
+      display: grid;
       grid-template-columns: 1fr;
+      align-items: stretch;
     }
 
     .preview-wrap {
+      position: relative;
+      flex: none;
+      width: auto;
       max-height: none;
       min-height: auto;
       border-right: 0;
