@@ -1714,7 +1714,7 @@
   .upload-card {
     display: grid;
     grid-template-columns: minmax(360px, 0.82fr) minmax(0, 1.18fr);
-    align-items: start;
+    align-items: stretch;
     overflow: visible;
   }
 
@@ -1723,8 +1723,8 @@
   }
 
   .preview-wrap {
-    display: grid;
-    place-items: center;
+    display: block;
+    align-self: stretch;
     background: var(--bg-tertiary);
     min-height: clamp(420px, calc(100vh - 2rem), 920px);
     padding: 1rem;
@@ -1737,9 +1737,10 @@
     position: sticky;
     top: 1rem;
     width: 100%;
-    display: grid;
-    place-items: center;
-    align-self: start;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    height: fit-content;
   }
 
   .preview-wrap img {
