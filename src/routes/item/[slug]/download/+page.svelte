@@ -13,7 +13,18 @@
 
   export let data: any;
 
-  type AspectRatioPreset = 'original' | 'free' | '1:1' | '3:2' | '4:5' | '16:9' | 'open_graph';
+  type AspectRatioPreset =
+    | 'original'
+    | 'free'
+    | '1:1'
+    | '2:1'
+    | '3:2'
+    | '2:3'
+    | '5:4'
+    | '4:5'
+    | '16:9'
+    | '9:16'
+    | 'open_graph';
 
   type ExportSettings = {
     sizeMode: 'full' | 'custom';
@@ -97,9 +108,13 @@
 
   const aspectRatioMap: Record<Exclude<AspectRatioPreset, 'free' | 'original'>, number> = {
     '1:1': 1,
+    '2:1': 2 / 1,
     '3:2': 3 / 2,
+    '2:3': 2 / 3,
+    '5:4': 5 / 4,
     '4:5': 4 / 5,
     '16:9': 16 / 9,
+    '9:16': 9 / 16,
     open_graph: 1200 / 630
   };
 
@@ -994,9 +1009,13 @@
                 <option value="original">Original</option>
                 <option value="free">Frei</option>
                 <option value="1:1">1:1</option>
+                <option value="2:1">2:1</option>
                 <option value="3:2">3:2</option>
+                <option value="2:3">2:3</option>
+                <option value="5:4">5:4</option>
                 <option value="4:5">4:5</option>
                 <option value="16:9">16:9</option>
+                <option value="9:16">9:16</option>
                 <option value="open_graph">OpenGraph 1200px × 630px</option>
               </select>
             </label>
