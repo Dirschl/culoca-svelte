@@ -168,6 +168,38 @@ function getLegacyContentType(filename: string) {
   return 'image/jpeg';
 }
 
+function estimateOutputDimensions(item: DownloadItemRecord, options: DownloadExportOptions) {
+  const baseWidth = item.width || 0;
+  const baseHeight = item.height || 0;
+
+  if (!baseWidth || !baseHeight) {
+    return {
+      width: options.width || null,
+      height: options.height || null
+    };
+  }
+
+  if (options.sizeMode !== 'custom') {
+    return { width: baseWidth, height: baseHeight };
+  }
+
+  const requestedWidth = options.width || baseWidth;
+  const requestedHeight = options.height || baseHeight;
+
+  if (options.cropEnabled && options.crop) {
+    return {
+      width: requestedWidth,
+      height: requestedHeight
+    };
+  }
+
+  const ratio = Math.min(requestedWidth / baseWidth, requestedHeight / baseHeight);
+  return {
+    width: Math.max(1, Math.round(baseWidth * ratio)),
+    height: Math.max(1, Math.round(baseHeight * ratio))
+  };
+}
+
 export const GET: RequestHandler = async ({ params, request }) => {
   const itemId = params.id;
   if (!itemId) {
@@ -255,15 +287,29 @@ export const POST: RequestHandler = async ({ params, request }) => {
     }
 
     if (mode === 'estimate') {
-      const rendered = await renderDownloadExport(originalBuffer, item, options);
-      return json({
-        ok: true,
-        sizeBytes: rendered.info.size,
-        width: rendered.outputWidth,
-        height: rendered.outputHeight,
-        filename: buildDownloadFilename(item, options),
-        contentType: rendered.contentType
-      });
+      try {
+        const rendered = await renderDownloadExport(originalBuffer, item, options);
+        return json({
+          ok: true,
+          sizeBytes: rendered.info.size,
+          width: rendered.outputWidth,
+          height: rendered.outputHeight,
+          filename: buildDownloadFilename(item, options),
+          contentType: rendered.contentType
+        });
+      } catch (estimateError) {
+        console.warn('Download estimate failed, returning degraded fallback estimate:', estimateError);
+        const fallbackDimensions = estimateOutputDimensions(item, options);
+        return json({
+          ok: true,
+          sizeBytes: originalBuffer.byteLength,
+          width: fallbackDimensions.width,
+          height: fallbackDimensions.height,
+          filename: buildDownloadFilename(item, options),
+          contentType: options.format === 'webp' ? 'image/webp' : 'image/jpeg',
+          degradedEstimate: true
+        });
+      }
     }
 
     const rendered = await renderDownloadExport(originalBuffer, item, options);
