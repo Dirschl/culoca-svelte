@@ -327,33 +327,49 @@ function buildOriginalExif(item: DownloadableItem, width: number, height: number
 
 function buildCulocaExif(item: DownloadableItem, width: number, height: number) {
   const original = buildOriginalExif(item, width, height);
-  const originalArtist = firstString(original.IFD0.Artist, original.IFD0.XPAuthor);
-  const originalCopyright = firstString(original.IFD0.Copyright);
-  const artist = firstString(item.profile?.full_name, item.profile?.accountname, originalArtist, 'Unbekannt');
-  const copyright = originalCopyright
-    ? `${originalCopyright} | culoca.com`
-    : `${artist} | culoca.com`;
-  const title = firstString(item.title, original.IFD0.XPTitle);
-  const caption = firstString(item.caption, original.IFD0.XPComment, original.IFD0.ImageDescription);
-  const description = firstString(item.description, original.IFD0.ImageDescription, caption, 'Culoca Export');
-  const keywords = asJoinedKeywords(item.keywords) || firstString(original.IFD0.XPKeywords);
+  // Temporary field probe for Adobe Bridge: write numbered markers into
+  // as many practical EXIF string fields as sharp/libvips will accept.
+  const probe = {
+    ifd0ImageDescription: '01 ImageDescription',
+    ifd0Artist: '02 Artist',
+    ifd0Copyright: '03 Copyright',
+    ifd0Software: '04 Software',
+    ifd0XPTitle: '05 XPTitle',
+    ifd0XPComment: '06 XPComment',
+    ifd0XPAuthor: '07 XPAuthor',
+    ifd0XPKeywords: '08 XPKeywords',
+    ifd0XPSubject: '09 XPSubject',
+    ifd0Make: '10 Make',
+    ifd0Model: '11 Model',
+    exifDateTimeOriginal: '12 DateTimeOriginal',
+    exifCreateDate: '13 CreateDate',
+    exifLensModel: '14 LensModel',
+    exifUserComment: '15 UserComment',
+    exifFlash: '16 Flash'
+  };
 
   return {
     IFD0: stringifyExifValues({
       ...original.IFD0,
-      Software: 'Culoca Download Export',
-      Artist: artist,
-      Copyright: copyright,
-      ImageDescription: description,
-      XPTitle: title,
-      XPComment: description,
-      XPAuthor: artist,
-      XPKeywords: keywords,
-      XPSubject: caption || firstString(title, description)
+      Make: probe.ifd0Make,
+      Model: probe.ifd0Model,
+      Software: probe.ifd0Software,
+      Artist: probe.ifd0Artist,
+      Copyright: probe.ifd0Copyright,
+      ImageDescription: probe.ifd0ImageDescription,
+      XPTitle: probe.ifd0XPTitle,
+      XPComment: probe.ifd0XPComment,
+      XPAuthor: probe.ifd0XPAuthor,
+      XPKeywords: probe.ifd0XPKeywords,
+      XPSubject: probe.ifd0XPSubject
     }),
     ExifIFD: stringifyExifValues({
       ...original.ExifIFD,
-      UserComment: caption,
+      DateTimeOriginal: probe.exifDateTimeOriginal,
+      CreateDate: probe.exifCreateDate,
+      LensModel: probe.exifLensModel,
+      UserComment: probe.exifUserComment,
+      Flash: probe.exifFlash,
       PixelXDimension: String(width),
       PixelYDimension: String(height)
     }),
