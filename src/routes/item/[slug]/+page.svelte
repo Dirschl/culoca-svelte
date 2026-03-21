@@ -101,7 +101,8 @@ let showRightsManager = false;
   }
 
   function relatedThumbUrl(item: { slug: string; path_512?: string | null }) {
-    return item.path_512 ? getSeoImageUrl(item.slug, item.path_512, '512') : '';
+    const baseUrl = item.path_512 ? getSeoImageUrl(item.slug, item.path_512, '512') : '';
+    return baseUrl ? `${baseUrl}?context=similar` : '';
   }
 
   export let data: any;
@@ -3197,7 +3198,7 @@ let showRightsManager = false;
       }}
     />
     {#if similarMotifItems.length}
-      <section class="similar-motifs-panel">
+      <section class="similar-motifs-panel" data-nosnippet>
         <div class="similar-motifs-head">
           <div>
             <h2>Ähnliche Motive aus Vektoranalyse</h2>

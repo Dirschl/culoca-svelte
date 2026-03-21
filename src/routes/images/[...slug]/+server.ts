@@ -10,6 +10,7 @@ const SUPABASE_STORAGE_URL = 'https://caskhmcbvtevdwsolvwk.supabase.co/storage/v
  */
 export const GET: RequestHandler = async ({ params, url, request }) => {
   const { slug } = params;
+  const isSimilarContext = url.searchParams.get('context') === 'similar';
   
   if (!slug) {
     return new Response('Missing slug', { 
@@ -197,8 +198,10 @@ export const GET: RequestHandler = async ({ params, url, request }) => {
       'Access-Control-Allow-Origin': '*',
       'ETag': etag,
       'Last-Modified': lastModifiedDate.toUTCString(),
-      // Explicitly allow Google to index images for Google Image Search
-      'X-Robots-Tag': 'index, follow, max-image-preview:large',
+      // Keep main item images indexable, but block similarity thumbnails from Google Images.
+      'X-Robots-Tag': isSimilarContext
+        ? 'noimageindex, noarchive, nosnippet'
+        : 'index, follow, max-image-preview:large',
       // Add SEO-friendly headers
       'X-Content-Type-Options': 'nosniff'
     });
