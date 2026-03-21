@@ -434,6 +434,7 @@ async function applyCulocaMetadataUpdate(
   const description = firstString(item.description, item.caption);
   const creator = firstString(item.profile?.full_name, item.profile?.accountname);
   const copyright = creator ? `${creator} | Culoca` : 'Culoca';
+  const gpsInfo = buildGpsInfo(item.lat, item.lon);
 
   const args = ['-overwrite_original', '-P', '-m'];
 
@@ -462,6 +463,13 @@ async function applyCulocaMetadataUpdate(
   args.push(`-XMP-dc:Rights=${copyright}`);
   args.push(`-IPTC:CopyrightNotice=${copyright}`);
   args.push(`-EXIF:Copyright=${copyright}`);
+
+  if (gpsInfo.GPSLatitude && gpsInfo.GPSLatitudeRef && gpsInfo.GPSLongitude && gpsInfo.GPSLongitudeRef) {
+    args.push(`-EXIF:GPSLatitude=${gpsInfo.GPSLatitude}`);
+    args.push(`-EXIF:GPSLatitudeRef=${gpsInfo.GPSLatitudeRef}`);
+    args.push(`-EXIF:GPSLongitude=${gpsInfo.GPSLongitude}`);
+    args.push(`-EXIF:GPSLongitudeRef=${gpsInfo.GPSLongitudeRef}`);
+  }
 
   const tempDir = await mkdtemp(join(tmpdir(), 'culoca-export-'));
   const tempFile = join(tempDir, 'export.jpg');
