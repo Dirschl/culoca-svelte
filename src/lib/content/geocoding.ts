@@ -22,14 +22,47 @@ function firstNonEmpty(...values: Array<string | null | undefined>): string | nu
   return null;
 }
 
+function normalizePlaceValue(value: string | null | undefined): string {
+  return (value || '')
+    .normalize('NFC')
+    .trim()
+    .toLocaleLowerCase('de-DE');
+}
+
+function samePlaceValue(a: string | null | undefined, b: string | null | undefined): boolean {
+  const left = normalizePlaceValue(a);
+  const right = normalizePlaceValue(b);
+  return !!left && !!right && left === right;
+}
+
+function sanitizeLocalityCandidate(
+  localityName: string | null,
+  municipalityName: string | null,
+  districtName: string | null
+): string | null {
+  const trimmed = localityName?.trim() || null;
+  if (!trimmed) return null;
+
+  if (samePlaceValue(trimmed, municipalityName) || samePlaceValue(trimmed, districtName)) {
+    return null;
+  }
+
+  // Avoid treating roads, route numbers, house-style tokens or postal codes as locality names.
+  if (/^\d{4,6}$/.test(trimmed)) return null;
+  if (/^[A-ZÄÖÜ]{1,3}\s?\d+[a-z]?$/u.test(trimmed)) return null;
+  if (/\b(?:straße|strasse|weg|gasse|chaussee|allee|platz)\b/iu.test(trimmed)) return null;
+
+  return trimmed;
+}
+
 export function extractReverseGeocodeFields(address: NominatimAddress, displayName?: string | null): ReverseGeocodeFields {
   const countryName = firstNonEmpty(address.country);
   const stateName = firstNonEmpty(address.state);
   const municipalityName = firstNonEmpty(
+    address.municipality,
     address.city,
     address.town,
     address.village,
-    address.municipality,
     address.city_district
   );
   const districtName = firstNonEmpty(
@@ -39,13 +72,13 @@ export function extractReverseGeocodeFields(address: NominatimAddress, displayNa
     municipalityName,
     stateName,
   );
-  const localityName = firstNonEmpty(
+  const localityCandidate = firstNonEmpty(
     address.suburb,
     address.neighbourhood,
     address.quarter,
-    address.city_district,
-    address.hamlet
+    address.city_district
   );
+  const localityName = sanitizeLocalityCandidate(localityCandidate, municipalityName, districtName);
 
   return {
     countryName,

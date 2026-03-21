@@ -2834,7 +2834,7 @@ let showRightsManager = false;
               autocapitalize="sentences"
               placeholder="Keywords durch Kommas getrennt eingeben..."
             ></textarea>
-            <span class="char-count" class:limit-reached={keywordsEditValue.split(',').filter(k => k.trim().length > 0).length >= 30}>{keywordsEditValue.split(',').filter(k => k.trim().length > 0).length}/30</span>
+            <span class="char-count" class:limit-reached={keywordsEditValue.split(',').filter(k => k.trim().length > 0).length >= KEYWORDS_MAX}>{keywordsEditValue.split(',').filter(k => k.trim().length > 0).length}/{KEYWORDS_MAX}</span>
           </div>
         {:else}
           {#if image.keywords && image.keywords.length}

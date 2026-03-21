@@ -1,6 +1,6 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import * as exifr from 'exifr';
   import { AIImageAnalyzer } from '$lib/aiImageAnalyzer';
   import LocationPickerCard from '$lib/LocationPickerCard.svelte';
@@ -15,7 +15,12 @@
     normalizeAdminDisplayLabel,
     parseOriginalFilenameLocation
   } from '$lib/content/locationTaxonomy';
-  import { reverseGeocodeCoordinates, searchLocationHierarchy, type SearchGeocodeResult } from '$lib/content/geocoding';
+  import {
+    reverseGeocodeCoordinates,
+    searchLocationHierarchy,
+    type ReverseGeocodeFields,
+    type SearchGeocodeResult
+  } from '$lib/content/geocoding';
   import {
     DESCRIPTIVE_KEYWORDS_MIN,
     KEYWORDS_MAX,
@@ -67,6 +72,7 @@
     placeSearchLoading: boolean;
     placeSearchError: string;
     placeSearchTimeout: ReturnType<typeof setTimeout> | null;
+    geoNeedsRefresh: boolean;
   };
 
   const TITLE_MIN_LENGTH = 40;
@@ -85,6 +91,7 @@
   let isGettingLocation = false;
   let currentUserId: string | null = null;
   let currentProfileLabel = '';
+  let newUploadAnchorId: string | null = null;
   const aiImageAnalyzer = new AIImageAnalyzer();
 
   $: validCount = files.filter((item) => item.isValid).length;
@@ -107,6 +114,37 @@
 
   function normalizeFieldValue(value: string): string {
     return value.normalize('NFC').replace(/\s+/g, ' ').trim();
+  }
+
+  function hasFieldValue(value: string | null | undefined): boolean {
+    return !!normalizeFieldValue(value || '');
+  }
+
+  function isFiniteCoordinate(value: number | null | undefined): boolean {
+    return typeof value === 'number' && Number.isFinite(value);
+  }
+
+  function hasCoordinatePair(item: UploadItem): boolean {
+    return isFiniteCoordinate(item.lat) && isFiniteCoordinate(item.lon);
+  }
+
+  function coordinatesDiffer(
+    currentLat: number | null,
+    currentLon: number | null,
+    nextLat: number | null,
+    nextLon: number | null
+  ): boolean {
+    if (!isFiniteCoordinate(currentLat) || !isFiniteCoordinate(currentLon)) {
+      return isFiniteCoordinate(nextLat) || isFiniteCoordinate(nextLon);
+    }
+    if (!isFiniteCoordinate(nextLat) || !isFiniteCoordinate(nextLon)) {
+      return true;
+    }
+    return Math.abs(currentLat - nextLat) > 0.000001 || Math.abs(currentLon - nextLon) > 0.000001;
+  }
+
+  function shouldHighlightOptionalLocality(item: UploadItem): boolean {
+    return hasFieldValue(item.localityName) && !localityNeedsConfirmation(item);
   }
 
   function splitFilename(fileName: string): { stem: string; ext: string } {
@@ -286,6 +324,53 @@
     files = [...files];
   }
 
+  function setPlaceDisplay(item: UploadItem, label: string | null | undefined) {
+    const normalizedLabel = normalizeFieldValue(label || '');
+    if (!normalizedLabel) return;
+    item.placeSearchQuery = normalizedLabel;
+    item.selectedPlaceLabel = normalizedLabel;
+  }
+
+  function applyReverseGeocodeToItem(
+    item: UploadItem,
+    geocoded: SearchGeocodeResult | ReverseGeocodeFields,
+    options: { overwriteExisting?: boolean } = {}
+  ) {
+    const overwriteExisting = options.overwriteExisting ?? false;
+
+    item.countryCode =
+      geocoded.countryName === 'Österreich'
+        ? 'A'
+        : geocoded.countryName === 'Schweiz'
+          ? 'CH'
+          : 'D';
+
+    if (overwriteExisting || !normalizeFieldValue(item.countryName)) {
+      item.countryName = geocoded.countryName || item.countryName;
+    }
+    if (overwriteExisting || !normalizeFieldValue(item.stateName)) {
+      item.stateName = geocoded.stateName || item.stateName;
+    }
+    if (overwriteExisting || !normalizeFieldValue(item.regionName)) {
+      item.regionName = geocoded.districtName || item.regionName;
+    }
+    if (overwriteExisting || !normalizeFieldValue(item.districtName)) {
+      item.districtName = geocoded.districtName || item.districtName;
+    }
+    if (overwriteExisting || !normalizeFieldValue(item.municipalityName)) {
+      item.municipalityName = geocoded.municipalityName || item.municipalityName;
+    }
+
+    if (overwriteExisting) {
+      setSuggestedLocality(item, geocoded.localityName);
+    } else if (!normalizeFieldValue(item.localityName)) {
+      setSuggestedLocality(item, geocoded.localityName);
+    }
+
+    setPlaceDisplay(item, geocoded.displayName);
+    item.geoNeedsRefresh = false;
+  }
+
   function validateItem(item: UploadItem): boolean {
     const errors: string[] = [];
 
@@ -430,11 +515,14 @@
 
   function useCurrentLocation(item: UploadItem) {
     if (browserLat == null || browserLon == null) return;
+    const changed = coordinatesDiffer(item.lat, item.lon, browserLat, browserLon);
     item.lat = browserLat;
     item.lon = browserLon;
     item.placeSearchQuery = '';
+    item.selectedPlaceLabel = '';
     item.placeSearchResults = [];
     item.placeSearchError = '';
+    item.geoNeedsRefresh = changed || item.geoNeedsRefresh;
     validateItem(item);
     files = [...files];
   }
@@ -452,18 +540,7 @@
         return;
       }
 
-      item.countryCode =
-        geocoded.countryName === 'Österreich'
-          ? 'A'
-          : geocoded.countryName === 'Schweiz'
-            ? 'CH'
-            : 'D';
-      item.countryName = geocoded.countryName || item.countryName;
-      item.stateName = geocoded.stateName || item.stateName;
-      item.regionName = geocoded.districtName || item.regionName;
-      item.districtName = geocoded.districtName || item.districtName;
-      item.municipalityName = geocoded.municipalityName || item.municipalityName;
-      setSuggestedLocality(item, geocoded.localityName);
+      applyReverseGeocodeToItem(item, geocoded, { overwriteExisting: true });
 
       validateItem(item);
       files = [...files];
@@ -477,20 +554,7 @@
   function applySearchResultToItem(item: UploadItem, result: SearchGeocodeResult) {
     item.lat = result.lat;
     item.lon = result.lon;
-    item.countryCode =
-      result.countryName === 'Österreich'
-        ? 'A'
-        : result.countryName === 'Schweiz'
-          ? 'CH'
-          : 'D';
-    item.countryName = result.countryName || item.countryName;
-    item.stateName = result.stateName || item.stateName;
-    item.regionName = result.districtName || item.regionName;
-    item.districtName = result.districtName || item.districtName;
-    item.municipalityName = result.municipalityName || item.municipalityName;
-    setSuggestedLocality(item, result.localityName);
-    item.placeSearchQuery = result.displayName || item.placeSearchQuery;
-    item.selectedPlaceLabel = result.displayName || item.selectedPlaceLabel;
+    applyReverseGeocodeToItem(item, result, { overwriteExisting: true });
     item.placeSearchResults = [];
     item.placeSearchError = '';
     validateItem(item);
@@ -583,7 +647,16 @@
     }
   }
 
-  async function processFiles(fileList: File[]) {
+  async function scrollToNewUploadAnchor() {
+    await tick();
+
+    if (!newUploadAnchorId) return;
+
+    const anchor = document.getElementById(newUploadAnchorId);
+    anchor?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  async function processFiles(fileList: File[], options: { scrollToNewItems?: boolean } = {}) {
     const newItems: UploadItem[] = [];
 
     for (const file of fileList) {
@@ -630,7 +703,8 @@
         placeSearchResults: [],
         placeSearchLoading: false,
         placeSearchError: '',
-        placeSearchTimeout: null
+        placeSearchTimeout: null,
+        geoNeedsRefresh: false
       };
 
       try {
@@ -715,11 +789,27 @@
         }
       }
 
+      if (item.lat != null && item.lon != null) {
+        try {
+          const geocoded = await reverseGeocodeCoordinates(item.lat, item.lon);
+          if (geocoded) {
+            applyReverseGeocodeToItem(item, geocoded);
+          }
+        } catch (error) {
+          console.error('Failed to prefill upload geo data from existing GPS:', error);
+        }
+      }
+
       validateItem(item);
       newItems.push(item);
     }
 
     files = [...files, ...newItems];
+
+    if (options.scrollToNewItems && newItems.length > 0) {
+      newUploadAnchorId = `new-upload-anchor-${newItems[0].id}`;
+      await scrollToNewUploadAnchor();
+    }
   }
 
   function handleFileSelect(event: Event) {
@@ -740,6 +830,7 @@
   }
 
   function applyMapSelection(item: UploadItem, event: CustomEvent<{ lat: number; lon: number; label: string | null }>) {
+    const changed = coordinatesDiffer(item.lat, item.lon, event.detail.lat, event.detail.lon);
     item.lat = event.detail.lat;
     item.lon = event.detail.lon;
     if (event.detail.label?.trim()) {
@@ -747,6 +838,15 @@
       item.placeSearchQuery = nextLabel;
       item.selectedPlaceLabel = nextLabel;
     }
+    if (changed) {
+      item.geoNeedsRefresh = true;
+    }
+    validateItem(item);
+    files = [...files];
+  }
+
+  function handleCoordinateInput(item: UploadItem) {
+    item.geoNeedsRefresh = hasCoordinatePair(item);
     validateItem(item);
     files = [...files];
   }
@@ -948,7 +1048,7 @@
     dragOver = false;
     const dropped = Array.from(event.dataTransfer?.files || []);
     if (dropped.length) {
-      processFiles(dropped);
+      void processFiles(dropped, { scrollToNewItems: true });
     }
   }
 
@@ -1151,6 +1251,14 @@
         }}
       >
         <input bind:this={fileInput} type="file" accept="image/*" multiple hidden on:change={handleFileSelect} />
+        <div class="dropzone-icon" aria-hidden="true">
+          <svg viewBox="0 0 64 64" role="presentation" focusable="false">
+            <path
+              d="M32 12 20 24h8v14h8V24h8L32 12Zm-18 30h36a6 6 0 0 1 6 6v2a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2v-2a6 6 0 0 1 6-6Z"
+              fill="currentColor"
+            />
+          </svg>
+        </div>
         <strong>Dateien hier ablegen</strong>
         <span>oder klicken, um Bilder manuell auszuwählen</span>
         <small>Vorhandene EXIF-, IPTC- und GPS-Daten werden automatisch übernommen.</small>
@@ -1221,7 +1329,12 @@
 
         <div class="card-grid">
           {#each files as item (item.id)}
-            <article class="upload-card" class:upload-card--invalid={!item.isValid}>
+            <article
+              id={newUploadAnchorId === `new-upload-anchor-${item.id}` ? newUploadAnchorId : undefined}
+              class="upload-card"
+              class:upload-card--invalid={!item.isValid}
+              tabindex={newUploadAnchorId === `new-upload-anchor-${item.id}` ? -1 : undefined}
+            >
               <div class="preview-wrap" use:desktopStickyPreview>
                 <div class="preview-wrap__sticky">
                   <img src={item.preview} alt={item.originalFileName} />
@@ -1248,7 +1361,7 @@
 
                 <div class="place-search-box">
                   <div class="place-search-row">
-                    <label class="field">
+                    <label class="field" class:form-field--valid={hasCoordinatePair(item)} class:form-field--invalid={!hasCoordinatePair(item)}>
                       <span>Ort oder Landmarke suchen</span>
                       <input
                         bind:value={item.placeSearchQuery}
@@ -1257,6 +1370,9 @@
                         on:keydown={(event) => handlePlaceSearchKeydown(event, item)}
                       />
                       <small>`Enter` startet die Suche. Treffer übernehmen Koordinaten sowie Land, Landkreis, Gemeinde / Stadt und optional Ortsteil / Stadtteil / Viertel.</small>
+                      {#if item.lat != null && item.lon != null}
+                        <small>GPS-Daten erkannt: {item.lat.toFixed(6)}, {item.lon.toFixed(6)}. Karte und Ortsfelder wurden vorausgefüllt.</small>
+                      {/if}
                     </label>
                     <button
                       class="secondary-btn place-search-row__button"
@@ -1304,18 +1420,23 @@
                 />
 
                 <div class="geo-grid">
-                  <label class="field">
+                  <label class="field" class:form-field--valid={isFiniteCoordinate(item.lat)} class:form-field--invalid={!isFiniteCoordinate(item.lat)}>
                     <span>Breitengrad</span>
-                    <input type="number" step="any" bind:value={item.lat} on:input={() => validateItem(item)} />
+                    <input type="number" step="any" bind:value={item.lat} on:input={() => handleCoordinateInput(item)} />
                   </label>
-                  <label class="field">
+                  <label class="field" class:form-field--valid={isFiniteCoordinate(item.lon)} class:form-field--invalid={!isFiniteCoordinate(item.lon)}>
                     <span>Längengrad</span>
-                    <input type="number" step="any" bind:value={item.lon} on:input={() => validateItem(item)} />
+                    <input type="number" step="any" bind:value={item.lon} on:input={() => handleCoordinateInput(item)} />
                   </label>
                 </div>
 
                 <div class="inline-actions">
-                  <button class="secondary-btn" disabled={item.lat == null || item.lon == null} on:click={() => autofillGeoFromCoordinates(item)}>
+                  <button
+                    class="secondary-btn"
+                    class:attention-pulse-glow={item.geoNeedsRefresh}
+                    disabled={item.lat == null || item.lon == null}
+                    on:click={() => autofillGeoFromCoordinates(item)}
+                  >
                     Ortsdaten aus GPS-Position ermitteln
                   </button>
                 </div>
@@ -1329,7 +1450,7 @@
                   </div>
 
                   <div class="structured-grid">
-                    <label class="field">
+                    <label class="field" class:form-field--valid={hasFieldValue(item.countryCode)} class:form-field--invalid={!hasFieldValue(item.countryCode)}>
                       <span>Land</span>
                       <select bind:value={item.countryCode} on:change={() => validateItem(item)}>
                         <option value="D">Deutschland (D)</option>
@@ -1338,7 +1459,7 @@
                       </select>
                     </label>
 
-                    <label class="field">
+                    <label class="field" class:form-field--valid={hasFieldValue(item.districtName)} class:form-field--invalid={!hasFieldValue(item.districtName)}>
                       <span>Landkreis / Bezirk</span>
                       <input
                         bind:value={item.districtName}
@@ -1347,7 +1468,7 @@
                       />
                     </label>
 
-                    <label class="field">
+                    <label class="field" class:form-field--valid={hasFieldValue(item.municipalityName)} class:form-field--invalid={!hasFieldValue(item.municipalityName)}>
                       <span>Gemeinde / Stadt</span>
                       <input
                         bind:value={item.municipalityName}
@@ -1356,7 +1477,11 @@
                       />
                     </label>
 
-                    <label class="field">
+                    <label
+                      class="field"
+                      class:form-field--valid={shouldHighlightOptionalLocality(item)}
+                      class:form-field--invalid={localityNeedsConfirmation(item)}
+                    >
                       <span>Ortsteil / Stadtteil / Viertel</span>
                       <input
                         bind:value={item.localityName}
@@ -1385,7 +1510,7 @@
                       </div>
                     {/if}
 
-                    <label class="field structured-grid__motif">
+                    <label class="field structured-grid__motif" class:form-field--valid={hasFieldValue(item.motifName)} class:form-field--invalid={!hasFieldValue(item.motifName)}>
                       <span>Motiv</span>
                       <input
                         bind:value={item.motifName}
@@ -1426,7 +1551,7 @@
                   {/if}
                 </div>
 
-                <label class="field">
+                <label class="field" class:form-field--valid={item.title.length >= TITLE_MIN_LENGTH && item.title.length <= TITLE_MAX_LENGTH} class:form-field--invalid={!item.title.trim() || item.title.length < TITLE_MIN_LENGTH || item.title.length > TITLE_MAX_LENGTH}>
                   <span>Titel</span>
                   <input bind:value={item.title} maxlength={TITLE_MAX_LENGTH} on:input={() => validateItem(item)} />
                   <small>{item.title.length}/{TITLE_MAX_LENGTH} Zeichen, Zielbereich {TITLE_MIN_LENGTH}-{TITLE_MAX_LENGTH}</small>
@@ -1438,13 +1563,13 @@
                   <small>Optionaler Bilduntertitel oder ergänzender Kurztext.</small>
                 </label>
 
-                <label class="field">
+                <label class="field" class:form-field--valid={item.description.length >= DESCRIPTION_MIN_LENGTH && item.description.length <= DESCRIPTION_MAX_LENGTH} class:form-field--invalid={!item.description.trim() || item.description.length < DESCRIPTION_MIN_LENGTH || item.description.length > DESCRIPTION_MAX_LENGTH}>
                   <span>Beschreibung</span>
                   <textarea bind:value={item.description} rows="4" maxlength={DESCRIPTION_MAX_LENGTH} on:input={() => validateItem(item)} />
                   <small>{item.description.length}/{DESCRIPTION_MAX_LENGTH} Zeichen, Zielbereich {DESCRIPTION_MIN_LENGTH}-{DESCRIPTION_MAX_LENGTH}</small>
                 </label>
 
-                <label class="field">
+                <label class="field" class:form-field--valid={hasUsableKeywordSet(item)} class:form-field--invalid={!item.keywords.trim() || !hasUsableKeywordSet(item)}>
                   <span>Keywords</span>
                   <textarea bind:value={item.keywords} rows="3" on:input={() => validateItem(item)} />
                   <small>{sanitizeKeywords(item.keywords, {
@@ -1750,7 +1875,7 @@
   .dropzone {
     display: grid;
     place-items: center;
-    gap: 0.35rem;
+    gap: 0.45rem;
     text-align: center;
     min-height: 190px;
     margin-bottom: 1rem;
@@ -1761,6 +1886,24 @@
       linear-gradient(135deg, rgba(238, 114, 33, 0.06), transparent 48%),
       var(--bg-secondary);
     cursor: pointer;
+  }
+
+  .dropzone-icon {
+    display: grid;
+    place-items: center;
+    width: 4.75rem;
+    height: 4.75rem;
+    border-radius: 1.5rem;
+    margin-bottom: 0.2rem;
+    background: linear-gradient(180deg, rgba(18, 24, 38, 0.72), rgba(18, 24, 38, 0.48));
+    box-shadow: 0 18px 34px rgba(15, 23, 42, 0.18);
+    color: #fff;
+  }
+
+  .dropzone-icon svg {
+    width: 2.5rem;
+    height: 2.5rem;
+    display: block;
   }
 
   .dropzone--active {
@@ -1841,6 +1984,7 @@
     display: flex;
     align-items: stretch;
     overflow: visible;
+    flex-wrap: wrap;
   }
 
   .upload-card--invalid {

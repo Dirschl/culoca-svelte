@@ -8,7 +8,7 @@ type KeywordContext = {
 };
 
 export const KEYWORDS_MIN = 10;
-export const KEYWORDS_MAX = 30;
+export const KEYWORDS_MAX = 50;
 export const DESCRIPTIVE_KEYWORDS_MIN = 6;
 
 function normalizeKeywordToken(value: string): string {

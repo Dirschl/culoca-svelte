@@ -313,6 +313,54 @@ textarea::placeholder {
 .status-success { color: var(--success-color); }
 .status-warning { color: var(--warning-color); }
 
+.attention-pulse-glow {
+  animation: attention-pulse-glow 1.6s ease-in-out infinite;
+  border-color: color-mix(in srgb, var(--culoca-orange) 82%, white 18%) !important;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--culoca-orange) 35%, transparent),
+    0 0 0 8px color-mix(in srgb, var(--culoca-orange) 12%, transparent),
+    0 10px 28px color-mix(in srgb, var(--culoca-orange) 24%, transparent);
+}
+
+.form-field--valid input,
+.form-field--valid select,
+.form-field--valid textarea {
+  border-color: color-mix(in srgb, var(--success-color) 72%, var(--border-color));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--success-color) 16%, transparent);
+}
+
+.form-field--invalid input,
+.form-field--invalid select,
+.form-field--invalid textarea {
+  border-color: color-mix(in srgb, var(--error-color) 72%, var(--border-color));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--error-color) 16%, transparent);
+}
+
+.form-field--valid span {
+  color: color-mix(in srgb, var(--success-color) 78%, var(--text-primary));
+}
+
+.form-field--invalid span {
+  color: color-mix(in srgb, var(--error-color) 82%, var(--text-primary));
+}
+
+@keyframes attention-pulse-glow {
+  0%, 100% {
+    transform: translateY(0);
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--culoca-orange) 32%, transparent),
+      0 0 0 0 color-mix(in srgb, var(--culoca-orange) 0%, transparent),
+      0 10px 24px color-mix(in srgb, var(--culoca-orange) 16%, transparent);
+  }
+  50% {
+    transform: translateY(-1px);
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--culoca-orange) 44%, transparent),
+      0 0 0 10px color-mix(in srgb, var(--culoca-orange) 10%, transparent),
+      0 16px 34px color-mix(in srgb, var(--culoca-orange) 26%, transparent);
+  }
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
   .card {

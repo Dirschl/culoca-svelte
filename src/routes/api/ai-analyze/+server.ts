@@ -195,7 +195,7 @@ Anforderungen:
 1. Titel: 40-60 Zeichen, sachlich, suchmaschinenfreundlich, möglichst mit Ort oder Motiv. Kein Clickbait.
 2. Caption: 60-180 Zeichen, optionaler Bilduntertitel in einem Satz, sachlich.
 3. Beschreibung: 100-160 Zeichen, beschreibe sichtbare Elemente, Stimmung, Beleuchtung.
-4. Schlüsselwörter: GENAU 30 Begriffe sind zwingend erforderlich. Getrennt durch Kommas. Priorisiere sichtbare Bildinhalte deutlich stärker als Verwaltungsdaten. Berücksichtige ALLE diese Kategorien:
+4. Schlüsselwörter: Liefere 30 bis 50 Begriffe, getrennt durch Kommas. Priorisiere sichtbare Bildinhalte deutlich stärker als Verwaltungsdaten. Berücksichtige ALLE diese Kategorien:
    - Visuelle Elemente (Farben, Objekte, Architektur, Material, Natur, Formen)
    - Geografische Merkmale (Fluss, Berg, Tal, Wiese, Wald, Ufer, Hang, etc.)
    - Fotografie-Stil/Technik (Landschaftsfotografie, Tele, Weitwinkel, Detailaufnahme, Panorama, etc.)
@@ -205,8 +205,8 @@ Anforderungen:
    - Orte/Ortsnamen (Stadt, Landkreis, Region, Bundesland, Land) nur ergänzend
 
 WICHTIG: 
-- Zähle die Keywords und stelle sicher, dass es exakt 30 sind
-- Mindestens 20 der 30 Keywords müssen sichtbare oder fotografische Bildinhalte beschreiben
+- Zähle die Keywords und stelle sicher, dass es mindestens 30 und höchstens 50 sind
+- Mindestens 20 Keywords müssen sichtbare oder fotografische Bildinhalte beschreiben
 - Höchstens 6 Keywords dürfen reine Verwaltungs- oder Ortsangaben sein
 - Liefere keine Wortfragmente, Präfixe oder abgestuften Vorsilben wie "S, St, Ste, Stein"
 - Liefere keine Teilwörter, Tippfragmente oder Buchstabenfolgen wie "Spor, Sportp, Steinhause"
@@ -220,7 +220,7 @@ Format:
 TITLE: [Dein Titel hier]
 CAPTION: [Deine Caption hier]
 DESCRIPTION: [Deine Beschreibung hier]
-KEYWORDS: [schlüsselwort1, schlüsselwort2, schlüsselwort3, ..., schlüsselwort30]
+KEYWORDS: [schlüsselwort1, schlüsselwort2, schlüsselwort3, ..., schlüsselwort50]
 
 WICHTIG: Antworte nur auf Deutsch.`;
   }

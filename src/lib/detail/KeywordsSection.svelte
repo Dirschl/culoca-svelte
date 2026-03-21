@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { KEYWORDS_MAX } from '$lib/content/keywords';
   export let image: any;
   $: keywords = image?.keywords ?? [];
   export let isCreator: boolean;
@@ -34,7 +35,7 @@
       autocapitalize="sentences"
     ></textarea>
     <span class="char-count" class:valid={keywordsValid} class:too-many={keywordsTooMany}>
-      {keywordsCount}/30
+      {keywordsCount}/{KEYWORDS_MAX}
     </span>
   </div>
 {:else}
