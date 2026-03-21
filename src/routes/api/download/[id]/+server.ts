@@ -77,6 +77,27 @@ async function getAuthenticatedUser(supabase: ReturnType<typeof createAuthedSupa
   return user;
 }
 
+async function fetchDownloadSourceBuffer(
+  item: Pick<DownloadItemRecord, 'id' | 'original_url' | 'path_2048' | 'path_512'>,
+  options: DownloadExportOptions,
+  mode: 'estimate' | 'download'
+) {
+  const strictOriginalSource = mode === 'download' && options.metadataMode === 'original' && options.format === 'jpg';
+
+  try {
+    return await fetchOriginalItemBuffer(item, {
+      allowPublicFallback: !strictOriginalSource
+    });
+  } catch (sourceError) {
+    if (!strictOriginalSource) {
+      throw sourceError;
+    }
+
+    console.warn('Strict original download source unavailable, retrying with public variant fallback:', sourceError);
+    return fetchOriginalItemBuffer(item, { allowPublicFallback: true });
+  }
+}
+
 async function loadDownloadItem(supabase: ReturnType<typeof createAuthedSupabase>, itemId: string) {
   const { data: item, error: itemError } = await supabase
     .from('items')
@@ -211,7 +232,12 @@ export const GET: RequestHandler = async ({ params, request }) => {
   const unifiedRights = await assertDownloadRights(supabase, itemId, user.id);
 
   try {
-    const buffer = await fetchOriginalItemBuffer(item, { allowPublicFallback: false });
+    const buffer = await fetchDownloadSourceBuffer(item, {
+      sizeMode: 'full',
+      format: 'jpg',
+      metadataMode: 'original',
+      filenameMode: 'original'
+    }, 'download');
     const filename = getLegacyFilename(item);
     const contentType = getLegacyContentType(filename);
 
@@ -251,9 +277,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
     const body = await request.json().catch(() => ({}));
     const mode = body?.mode === 'estimate' ? 'estimate' : 'download';
     const options = normalizeDownloadExportOptions(body?.options as DownloadExportOptions);
-    const originalBuffer = await fetchOriginalItemBuffer(item, {
-      allowPublicFallback: !(mode === 'download' && options.metadataMode === 'original' && options.format === 'jpg')
-    });
+    const originalBuffer = await fetchDownloadSourceBuffer(item, options, mode);
 
     if (canBypassImageProcessing(options)) {
       const filename = buildDownloadFilename(item, options);
