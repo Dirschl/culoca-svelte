@@ -346,10 +346,10 @@ function buildCulocaExif(item: DownloadableItem, width: number, height: number) 
       Copyright: copyright,
       ImageDescription: description,
       XPTitle: title,
-      XPComment: description,
+      XPComment: caption || description,
       XPAuthor: artist,
       XPKeywords: keywords,
-      XPSubject: caption || firstString(title, description)
+      XPSubject: firstString(title, description)
     }),
     ExifIFD: stringifyExifValues({
       ...original.ExifIFD,
