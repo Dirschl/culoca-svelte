@@ -3,8 +3,10 @@ import { createClient as createWebDavClient } from 'webdav';
 import { extractPhotoMetadataFields } from '$lib/metadata/photoMetadata';
 import { exiftoolPath as vendoredExiftoolPath } from 'exiftool-vendored';
 import { execFile } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { promisify } from 'node:util';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -57,6 +59,36 @@ const DEFAULT_OPTIONS: Required<Pick<DownloadExportOptions, 'sizeMode' | 'format
   filenameMode: 'original'
 };
 const execFileAsync = promisify(execFile);
+const require = createRequire(import.meta.url);
+
+function resolveConfiguredExiftoolPath() {
+  const configuredPath = process.env.EXIFTOOL_PATH?.trim();
+  return configuredPath ? configuredPath : null;
+}
+
+function resolveBundledExiftoolPath() {
+  try {
+    const resolved = require('exiftool-vendored.pl');
+    return typeof resolved === 'string' && resolved.trim() ? resolved : null;
+  } catch (error) {
+    console.warn('Failed to resolve exiftool-vendored.pl directly:', error);
+    return null;
+  }
+}
+
+async function resolveExiftoolCommand() {
+  const configuredPath = resolveConfiguredExiftoolPath();
+  if (configuredPath) {
+    return configuredPath;
+  }
+
+  const bundledPath = resolveBundledExiftoolPath();
+  if (bundledPath && existsSync(bundledPath)) {
+    return bundledPath;
+  }
+
+  return vendoredExiftoolPath();
+}
 
 function clampNumber(value: unknown, min: number, max: number, fallback: number) {
   const num = typeof value === 'number' ? value : Number(value);
@@ -436,7 +468,7 @@ async function applyCulocaMetadataUpdate(
 
   try {
     await writeFile(tempFile, buffer);
-    const exiftoolCommand = process.env.EXIFTOOL_PATH || (await vendoredExiftoolPath());
+    const exiftoolCommand = await resolveExiftoolCommand();
     try {
       await execFileAsync(exiftoolCommand, [...args, tempFile], {
         maxBuffer: 10 * 1024 * 1024

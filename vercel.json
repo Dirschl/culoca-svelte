@@ -1,4 +1,9 @@
 {
+  "functions": {
+    "src/routes/api/download/[id]/+server.ts": {
+      "includeFiles": "node_modules/exiftool-vendored.pl/**"
+    }
+  },
   "redirects": [
     {
       "source": "/:path*",
