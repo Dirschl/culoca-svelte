@@ -282,6 +282,32 @@ function stringifyExifValues(input: Record<string, unknown>) {
   );
 }
 
+function escapeXml(value: string) {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&apos;');
+}
+
+function buildLangAlt(tagName: string, value: string | null) {
+  if (!value) return '';
+  return `<${tagName}><rdf:Alt><rdf:li xml:lang="x-default">${escapeXml(value)}</rdf:li></rdf:Alt></${tagName}>`;
+}
+
+function buildSeq(tagName: string, values: string[]) {
+  if (!values.length) return '';
+  const items = values.map((value) => `<rdf:li>${escapeXml(value)}</rdf:li>`).join('');
+  return `<${tagName}><rdf:Seq>${items}</rdf:Seq></${tagName}>`;
+}
+
+function buildBag(tagName: string, values: string[]) {
+  if (!values.length) return '';
+  const items = values.map((value) => `<rdf:li>${escapeXml(value)}</rdf:li>`).join('');
+  return `<${tagName}><rdf:Bag>${items}</rdf:Bag></${tagName}>`;
+}
+
 function buildOriginalExif(item: DownloadableItem, width: number, height: number) {
   const exif = item.exif_data || {};
   const extracted = extractPhotoMetadataFields(exif);
@@ -358,6 +384,36 @@ function buildCulocaExif(item: DownloadableItem, width: number, height: number) 
     }),
     IFD3: stringifyExifValues(buildGpsInfo(item.lat, item.lon))
   };
+}
+
+function buildCulocaXmp(item: DownloadableItem) {
+  const creator = firstString(item.profile?.full_name, item.profile?.accountname, 'Unbekannt');
+  const title = firstString(item.title);
+  const caption = firstString(item.caption);
+  const description = firstString(item.description, caption, 'Culoca Export');
+  const copyright = `${creator} | culoca.com`;
+  const keywords = Array.isArray(item.keywords)
+    ? item.keywords.filter((keyword): keyword is string => typeof keyword === 'string' && keyword.trim().length > 0)
+    : [];
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<x:xmpmeta xmlns:x="adobe:ns:meta/">
+  <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+    <rdf:Description
+      rdf:about=""
+      xmlns:dc="http://purl.org/dc/elements/1.1/"
+      xmlns:photoshop="http://ns.adobe.com/photoshop/1.0/"
+      xmlns:xmpRights="http://ns.adobe.com/xap/1.0/rights/">
+      ${buildLangAlt('dc:title', title)}
+      ${buildLangAlt('dc:description', description)}
+      ${buildSeq('dc:creator', [creator])}
+      ${buildBag('dc:subject', keywords)}
+      ${buildLangAlt('dc:rights', copyright)}
+      ${buildLangAlt('photoshop:Headline', caption)}
+      ${buildLangAlt('xmpRights:UsageTerms', copyright)}
+    </rdf:Description>
+  </rdf:RDF>
+</x:xmpmeta>`;
 }
 
 function applyFormat(pipeline: sharp.Sharp, format: DownloadExportFormat, compression: number | null | undefined) {
@@ -481,9 +537,11 @@ export async function renderDownloadExport(
     // like ISO, aperture, shutter speed, lens, timestamps and GPS are not lost.
     pipeline = pipeline.withMetadata();
   } else if (options.metadataMode === 'culoca' && options.format === 'jpg') {
-    pipeline = pipeline.withMetadata({
-      exif: buildCulocaExif(item, outputWidth, outputHeight)
-    });
+    pipeline = pipeline
+      .withMetadata({
+        exif: buildCulocaExif(item, outputWidth, outputHeight)
+      })
+      .withXmp(buildCulocaXmp(item));
   }
 
   const transformed = applyFormat(pipeline, options.format, options.compression);
