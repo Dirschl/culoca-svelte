@@ -1,4 +1,4 @@
-import sharp from 'sharp';
+import type { Gravity, Metadata, Sharp, Strategy } from 'sharp';
 import { createClient as createWebDavClient } from 'webdav';
 import { extractPhotoMetadataFields } from '$lib/metadata/photoMetadata';
 
@@ -416,7 +416,16 @@ function buildCulocaXmp(item: DownloadableItem) {
 </x:xmpmeta>`;
 }
 
-function applyFormat(pipeline: sharp.Sharp, format: DownloadExportFormat, compression: number | null | undefined) {
+let sharpFactoryPromise: Promise<(typeof import('sharp'))['default']> | null = null;
+
+async function getSharp() {
+  if (!sharpFactoryPromise) {
+    sharpFactoryPromise = import('sharp').then((module) => module.default);
+  }
+  return sharpFactoryPromise;
+}
+
+function applyFormat(pipeline: Sharp, format: DownloadExportFormat, compression: number | null | undefined) {
   if (format === 'webp') {
     if (compression == null) {
       return pipeline.webp({ lossless: true, effort: 6 });
@@ -443,7 +452,7 @@ function applyFormat(pipeline: sharp.Sharp, format: DownloadExportFormat, compre
 }
 
 function canReturnOriginalBufferUnchanged(
-  metadata: sharp.Metadata,
+  metadata: Metadata,
   options: DownloadExportOptions
 ) {
   return (
@@ -463,6 +472,7 @@ export async function renderDownloadExport(
   item: DownloadableItem,
   rawOptions: DownloadExportOptions
 ) {
+  const sharp = await getSharp();
   const options = normalizeDownloadExportOptions(rawOptions);
   const baseImage = sharp(originalBuffer).rotate();
   const metadata = await baseImage.metadata();
@@ -498,7 +508,7 @@ export async function renderDownloadExport(
         width: number;
         height: number;
         fit: 'cover' | 'inside';
-        position?: sharp.Gravity | sharp.Strategy;
+        position?: Gravity | Strategy;
         withoutEnlargement?: boolean;
       }
     | null = null;
