@@ -83,6 +83,10 @@
 		"ssh2-sftp-client": "^12.0.1",
 		"webdav": "^5.8.0"
 	},
+	"optionalDependencies": {
+		"@img/sharp-libvips-linux-x64": "1.2.0",
+		"@img/sharp-linux-x64": "0.34.3"
+	},
 	"engines": {
 		"node": "20.x"
 	}
