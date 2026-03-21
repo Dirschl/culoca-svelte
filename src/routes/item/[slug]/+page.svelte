@@ -2018,86 +2018,11 @@ let showRightsManager = false;
     }
   }
 
-  async function downloadOriginal(imageId: string, originalName: string) {
-    try {
-      // Show loading state
-      const downloadBtn = document.querySelector(`[data-download-id="${imageId}"]`) as HTMLButtonElement;
-      if (downloadBtn) {
-        downloadBtn.disabled = true;
-        downloadBtn.innerHTML = `
-          <svg width="35" height="35" viewBox="0 0 24 24" fill="none" class="animate-spin">
-            <path d="M12 6v7m0 0l-3-3m3 3l3-3M6 18h12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        `;
-      }
-
-      // Get current session token
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        alert('Bitte zuerst einloggen');
-        return;
-      }
-
-      const response = await authFetch(`/api/download/${imageId}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`
-        }
-      });
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          alert('Nicht angemeldet. Bitte zuerst einloggen.');
-        } else if (response.status === 403) {
-          alert('Kein Zugriff auf diese Datei.');
-        } else {
-          alert('Download fehlgeschlagen.');
-        }
-        return;
-      }
-
-      // Create blob and download
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = originalName || `image-${imageId}.jpg`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-
-      // Show success feedback
-      if (downloadBtn) {
-        downloadBtn.innerHTML = `
-          <svg width="35" height="35" viewBox="0 0 24 24" fill="none">
-            <path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        `;
-        setTimeout(() => {
-          downloadBtn.disabled = false;
-          downloadBtn.innerHTML = `
-            <svg width="35" height="35" viewBox="0 0 24 24" fill="none">
-              <path d="M12 6v7m0 0l-3-3m3 3l3-3M6 18h12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          `;
-        }, 2000);
-      }
-    } catch (error) {
-      console.error('Download error:', error);
-      alert('Download fehlgeschlagen.');
-      
-      // Reset button on error
-      const downloadBtn = document.querySelector(`[data-download-id="${imageId}"]`) as HTMLButtonElement;
-      if (downloadBtn) {
-        downloadBtn.disabled = false;
-        downloadBtn.innerHTML = `
-          <svg width="35" height="35" viewBox="0 0 24 24" fill="none">
-            <path d="M12 6v7m0 0l-3-3m3 3l3-3M6 18h12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        `;
-      }
-    }
+  async function downloadOriginal(_imageId: string, _originalName: string) {
+    const slug = image?.slug || itemSlug;
+    if (!slug) return;
+    const returnTo = browser ? `${window.location.pathname}${window.location.search}` : canonicalPath || `/item/${slug}`;
+    await goto(`/item/${slug}/download?returnTo=${encodeURIComponent(returnTo)}`);
   }
 
   function toggleGallery() {

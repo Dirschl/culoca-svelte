@@ -29,6 +29,7 @@
     sanitizeKeywords,
     sanitizeKeywordsText
   } from '$lib/content/keywords';
+  import { extractPhotoMetadataFields } from '$lib/metadata/photoMetadata';
 
   type UploadItem = {
     id: string;
@@ -233,7 +234,7 @@
     const { ext } = splitFilename(item.originalFileName);
     const detailLabel = [localityName, motifName].filter(Boolean).join(' ');
     const photographerSegment = authorLabel ? ` (${authorLabel})` : '';
-    const technicalSegment = technicalSuffix ? ` ${technicalSuffix}` : '';
+    const technicalSegment = technicalSuffix || '';
 
     return `${countryCode}_${districtToken}_${municipalityName}_${detailLabel}${photographerSegment}${technicalSegment}${ext}`;
   }
@@ -709,25 +710,7 @@
 
       try {
         const exifData = await exifr.parse(file, { iptc: true });
-        const headline =
-          fixEncoding(exifData?.['IPTC:Headline']) ||
-          fixEncoding(exifData?.iptc?.Headline) ||
-          fixEncoding(exifData?.iptc?.ObjectName) ||
-          '';
-        const caption =
-          fixEncoding(exifData?.['IPTC:CaptionAbstract']) ||
-          fixEncoding(exifData?.iptc?.CaptionAbstract) ||
-          '';
-        const description =
-          fixEncoding(exifData?.['IPTC:Description']) ||
-          fixEncoding(exifData?.iptc?.Description) ||
-          fixEncoding(exifData?.iptc?.CaptionAbstract) ||
-          fixEncoding(exifData?.ImageDescription) ||
-          '';
-        const keywords =
-          Array.isArray(exifData?.Keywords)
-            ? fixEncoding(exifData.Keywords.join(', '))
-            : fixEncoding(exifData?.Keywords || exifData?.['IPTC:Keywords'] || '') || '';
+        const extracted = extractPhotoMetadataFields(exifData || {});
         const createdAt =
           exifData?.DateTimeOriginal ||
           exifData?.CreateDate ||
@@ -735,22 +718,10 @@
           exifData?.ModifyDate ||
           null;
 
-        item.title = headline?.trim() || '';
-        if (!item.title) {
-          for (const [key, value] of Object.entries(exifData || {})) {
-            const keyLower = key.toLowerCase();
-            if (
-              typeof value === 'string' &&
-              (keyLower.endsWith('title') || keyLower.endsWith('headline') || keyLower.endsWith('objectname'))
-            ) {
-              item.title = fixEncoding(value)?.trim() || '';
-              if (item.title) break;
-            }
-          }
-        }
-        item.caption = caption?.trim() || '';
-        item.description = description?.trim() || '';
-        item.keywords = keywords?.trim() || '';
+        item.title = extracted.title?.trim() || '';
+        item.caption = extracted.caption?.trim() || '';
+        item.description = extracted.description?.trim() || '';
+        item.keywords = extracted.keywords?.trim() || '';
         if (createdAt instanceof Date && !Number.isNaN(createdAt.getTime())) {
           item.capturedAt = createdAt.toISOString();
         } else if (typeof createdAt === 'string' && createdAt.trim()) {
@@ -1463,7 +1434,6 @@
                       <span>Landkreis / Bezirk</span>
                       <input
                         bind:value={item.districtName}
-                        placeholder="Altötting"
                         on:input={() => validateItem(item)}
                       />
                     </label>
@@ -1472,7 +1442,6 @@
                       <span>Gemeinde / Stadt</span>
                       <input
                         bind:value={item.municipalityName}
-                        placeholder="Töging am Inn"
                         on:input={() => validateItem(item)}
                       />
                     </label>
@@ -1485,7 +1454,6 @@
                       <span>Ortsteil / Stadtteil / Viertel</span>
                       <input
                         bind:value={item.localityName}
-                        placeholder="Engfurt"
                         on:input={() => handleLocalityInput(item)}
                       />
                       {#if localityNeedsConfirmation(item)}

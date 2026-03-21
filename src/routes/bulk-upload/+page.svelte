@@ -8,6 +8,7 @@
   import SiteNav from '$lib/SiteNav.svelte';
   import SiteFooter from '$lib/SiteFooter.svelte';
   import { ITEM_TYPES, ITEM_TYPE_LABELS, getAvailableTypes, getTypeDescription } from '$lib/constants/itemTypes';
+  import { extractPhotoMetadataFields } from '$lib/metadata/photoMetadata';
 
   // Map picker state
   let mapContainer: HTMLElement;
@@ -68,6 +69,7 @@
     preview: string;
     exifData: any;
     title: string;
+    caption: string;
     description: string;
     keywords: string;
     typeId: number; // Neue type_id für Item-Typ
@@ -109,6 +111,10 @@
       image.errors.push(`Titel muss mindestens ${TITLE_MIN_LENGTH} Zeichen haben`);
     } else if (image.title.length > TITLE_MAX_LENGTH) {
       image.errors.push(`Titel darf maximal ${TITLE_MAX_LENGTH} Zeichen haben`);
+    }
+
+    if (!image.caption.trim()) {
+      image.errors.push('Caption ist erforderlich');
     }
     
     // Description validation
@@ -206,7 +212,14 @@
     dragOver = false;
   }
 
-  let lastImageData: { title?: string; description?: string; keywords?: string; lat?: number | null; lon?: number | null } = {};
+  let lastImageData: {
+    title?: string;
+    caption?: string;
+    description?: string;
+    keywords?: string;
+    lat?: number | null;
+    lon?: number | null;
+  } = {};
   let currentUserId: string | null = null;
 
   async function processFiles(fileList: File[]) {
@@ -246,6 +259,7 @@
         preview: URL.createObjectURL(file),
         exifData: null,
         title: '',
+        caption: '',
         description: '',
         keywords: '',
         typeId: ITEM_TYPES.PHOTO, // Default: Foto
@@ -265,71 +279,11 @@
         
         if (exifData) {
           imageFile.exifData = exifData;
-          
-          // Title - IPTC Headline hat Priorität, dann andere Quellen (wie im Backend)
-          if (exifData['IPTC:Headline']) {
-            imageFile.title = (fixEncoding(exifData['IPTC:Headline']) || '').trim();
-          } else if (exifData.iptc && exifData.iptc.Headline) {
-            imageFile.title = (fixEncoding(exifData.iptc.Headline) || '').trim();
-          } else if (exifData.iptc && exifData.iptc.ObjectName) {
-            imageFile.title = (fixEncoding(exifData.iptc.ObjectName) || '').trim();
-          } else if (exifData['IPTC:ObjectName']) {
-            imageFile.title = (fixEncoding(exifData['IPTC:ObjectName']) || '').trim();
-          }
-          
-          // Heuristische Suche: jedes Feld, das auf 'title' oder 'headline' endet
-          if (!imageFile.title) {
-            for (const [k, v] of Object.entries(exifData)) {
-              const keyLower = k.toLowerCase();
-              if (keyLower.endsWith('title') || keyLower.endsWith('headline') || keyLower.endsWith('objectname')) {
-                imageFile.title = (fixEncoding(v as string) || '').trim();
-                break;
-              }
-            }
-          }
-          
-          // Description - IPTC Description hat Priorität, dann andere Quellen
-          if (exifData['IPTC:Description']) {
-            imageFile.description = (fixEncoding(exifData['IPTC:Description']) || '').trim();
-          } else if (exifData.iptc && exifData.iptc.Description) {
-            imageFile.description = (fixEncoding(exifData.iptc.Description) || '').trim();
-          } else if (exifData.iptc && exifData.iptc.CaptionAbstract) {
-            imageFile.description = (fixEncoding(exifData.iptc.CaptionAbstract) || '').trim();
-          } else if (exifData['IPTC:CaptionAbstract']) {
-            imageFile.description = (fixEncoding(exifData['IPTC:CaptionAbstract']) || '').trim();
-          } else if (exifData.ImageDescription) {
-            // ImageDescription ist eine Beschreibung, nicht ein Titel
-            imageFile.description = (fixEncoding(exifData.ImageDescription) || '').trim();
-          }
-          
-          // Keywords – unterstützen mehrere Quellen (EXIF, IPTC)
-          if (Array.isArray(exifData.Keywords)) {
-            imageFile.keywords = (fixEncoding(exifData.Keywords.join(', ')) || '').trim();
-          } else if (typeof exifData.Keywords === 'string') {
-            imageFile.keywords = (fixEncoding(exifData.Keywords) || '').trim();
-          }
-
-          if (!imageFile.keywords && exifData.iptc && Array.isArray(exifData.iptc.Keywords)) {
-            imageFile.keywords = (fixEncoding(exifData.iptc.Keywords.join(', ')) || '').trim();
-          }
-
-          if (!imageFile.keywords && typeof exifData['IPTC:Keywords'] === 'string') {
-            imageFile.keywords = (fixEncoding(exifData['IPTC:Keywords']) || '').trim();
-          }
-          
-          // Heuristische Suche: jedes Feld, das auf 'keywords' endet und ein Array/String ist
-          if (!imageFile.keywords) {
-            for (const [k, v] of Object.entries(exifData)) {
-              if (k.toLowerCase().endsWith('keywords')) {
-                if (Array.isArray(v)) {
-                  imageFile.keywords = (fixEncoding((v as any).join(', ')) || '').trim();
-                } else if (typeof v === 'string') {
-                  imageFile.keywords = (fixEncoding(v as string) || '').trim();
-                }
-                if (imageFile.keywords) break;
-              }
-            }
-          }
+          const extracted = extractPhotoMetadataFields(exifData);
+          imageFile.title = extracted.title?.trim() || '';
+          imageFile.caption = extracted.caption?.trim() || '';
+          imageFile.description = extracted.description?.trim() || '';
+          imageFile.keywords = extracted.keywords?.trim() || '';
           
           // Extract GPS coordinates
           if (exifData.latitude && exifData.longitude) {
@@ -404,7 +358,7 @@
 
   async function uploadImages() {
     if (!validateAllImages()) {
-      message = 'Titel, Beschreibung, Keywörter und GPS prüfen.';
+      message = 'Titel, Caption, Beschreibung, Keywörter und GPS prüfen.';
       messageType = 'error';
       return;
     }
@@ -425,7 +379,7 @@
 
     let successCount = 0;
     let errorCount = 0;
-    const successfulUploads: { title: string; description: string; keywords: string }[] = [];
+    const successfulUploads: { title: string; caption: string; description: string; keywords: string }[] = [];
 
     for (let i = 0; i < files.length; i++) {
       const image = files[i];
@@ -452,6 +406,7 @@
         formData.append('original_path', supabasePath);
         formData.append('original_filename', image.originalFileName); // Ursprünglicher Dateiname
         formData.append('title', image.title);
+        formData.append('caption', image.caption);
         formData.append('description', image.description);
         formData.append('keywords', image.keywords);
         formData.append('type_id', image.typeId.toString());
@@ -497,6 +452,7 @@
           image.uploadProgress = 100;
           successfulUploads.push({
             title: image.title,
+            caption: image.caption,
             description: image.description,
             keywords: image.keywords
           });
@@ -519,6 +475,7 @@
         const last = successfulUploads[successfulUploads.length - 1];
         lastImageData = {
           title: last.title,
+          caption: last.caption,
           description: last.description,
           keywords: last.keywords
         };
@@ -539,6 +496,7 @@
       const last = successfulUploads[successfulUploads.length - 1];
       lastImageData = {
         title: last.title,
+        caption: last.caption,
         description: last.description,
         keywords: last.keywords
       };
@@ -955,6 +913,7 @@
         // lastImageData nach Upload setzen
         lastImageData = {
           title: image.title,
+          caption: image.caption,
           description: image.description,
           keywords: image.keywords
         };
@@ -1009,6 +968,7 @@
         formData.append('original_path', supabasePath);
         formData.append('original_filename', image.originalFileName); // Ursprünglicher Dateiname
         formData.append('title', image.title);
+        formData.append('caption', image.caption);
         formData.append('description', image.description);
         formData.append('keywords', image.keywords);
         formData.append('type_id', image.typeId.toString());
@@ -1045,6 +1005,7 @@
           // lastImageData nach Upload setzen
           lastImageData = {
             title: image.title,
+            caption: image.caption,
             description: image.description,
             keywords: image.keywords
           };
@@ -1220,7 +1181,7 @@
         {:else if validateAllImages()}
           <div class="validation-success">✅ Alle Bilder sind bereit für den Upload</div>
         {:else}
-          <div class="validation-error">⚠️ Titel, Beschreibung, Keywörter und GPS prüfen.</div>
+          <div class="validation-error">⚠️ Titel, Caption, Beschreibung, Keywörter und GPS prüfen.</div>
         {/if}
       </div>
 
@@ -1284,6 +1245,26 @@
                 <div class="title-info">
                   {#if image.title && image.title.split(',')[0]}
                     <span class="audioguide-hint">Audio / Info: {image.title.split(',')[0]}</span>
+                  {/if}
+                </div>
+              </div>
+
+              <!-- Caption Input -->
+              <div class="input-group">
+                <button type="button" class="clear-field-btn" on:click={() => { image.caption = ''; document.getElementById(`caption-${image.id}`)?.focus(); }}>Caption *</button>
+                <div class="desc-row">
+                  <textarea
+                    id="caption-{image.id}"
+                    bind:value={image.caption}
+                    rows="3"
+                    maxlength="300"
+                    on:input={() => validateImage(image)}
+                    class:error={!image.caption.trim()}
+                  ></textarea>
+                  {#if lastImageData.caption && !image.caption.trim()}
+                    <button type="button" class="copy-field-btn" title="Letzte Caption übernehmen" on:click={() => { image.caption = lastImageData.caption ?? ''; validateImage(image); }}>
+                      ⎘
+                    </button>
                   {/if}
                 </div>
               </div>

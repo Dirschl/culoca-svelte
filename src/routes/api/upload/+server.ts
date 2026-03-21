@@ -13,6 +13,7 @@ import {
   resolveLocationFieldsFromOriginalName
 } from '$lib/server/itemProcessing';
 import { sanitizeKeywords } from '$lib/content/keywords';
+import { extractPhotoMetadataFields } from '$lib/metadata/photoMetadata';
 dotenv.config();
 
 // -- Helper: fix IPTC strings that were decoded as Latin-1 instead of UTF-8
@@ -362,53 +363,24 @@ export const POST = async ({ request }) => {
 
         try {
           if (exif) {
+            const extracted = extractPhotoMetadataFields(exif);
+
             // GPS coordinates
-            if (exif.latitude && exif.longitude) {
-              lat = exif.latitude;
-              lon = exif.longitude;
+            if (typeof extracted.gps.lat === 'number' && typeof extracted.gps.lon === 'number') {
+              lat = extracted.gps.lat;
+              lon = extracted.gps.lon;
             }
 
-            // Title - IPTC Headline hat Priorität, dann andere Quellen
             if (!title) {
-              // KORREKTUR: IPTC Headline hat höchste Priorität
-              if (exif['IPTC:Headline']) {
-                title = fixEncoding(exif['IPTC:Headline']);
-              } else if (exif.iptc && (exif.iptc as any).Headline) {
-                title = fixEncoding((exif.iptc as any).Headline);
-              } else if (exif.iptc && (exif.iptc as any).ObjectName) {
-                title = fixEncoding((exif.iptc as any).ObjectName);
-              } else if (exif['IPTC:ObjectName']) {
-                title = fixEncoding(exif['IPTC:ObjectName']);
-              }
-              // ENTFERNT: ImageDescription wird nicht mehr als title verwendet!
-              // ImageDescription ist eine Beschreibung, kein Titel
+              title = extracted.title;
             }
 
-            // Heuristische Suche: jedes Feld, das auf 'title' oder 'headline' endet
-            if (!title) {
-              for (const [k, v] of Object.entries(exif)) {
-                const keyLower = k.toLowerCase();
-                if (keyLower.endsWith('title') || keyLower.endsWith('headline') || keyLower.endsWith('objectname')) {
-                  title = fixEncoding(v as string);
-                  break;
-                }
-              }
+            if (!caption) {
+              caption = extracted.caption;
             }
 
-            // Description - IPTC Description hat Priorität, dann andere Quellen
             if (!description) {
-              if (exif['IPTC:Description']) {
-                description = fixEncoding(exif['IPTC:Description']);
-              } else if (exif.iptc && (exif.iptc as any).Description) {
-                description = fixEncoding((exif.iptc as any).Description);
-              } else if (exif.iptc && (exif.iptc as any).CaptionAbstract) {
-                description = fixEncoding((exif.iptc as any).CaptionAbstract);
-              } else if (exif['IPTC:CaptionAbstract']) {
-                description = fixEncoding(exif['IPTC:CaptionAbstract']);
-              } else if (exif.ImageDescription) {
-                // ImageDescription ist eine Beschreibung, nicht ein Titel
-                description = fixEncoding(exif.ImageDescription);
-              }
+              description = extracted.description;
             }
 
             // Camera info
@@ -423,32 +395,7 @@ export const POST = async ({ request }) => {
 
             // Keywords – unterstützen mehrere Quellen (EXIF, IPTC)
             if (!keywords) {
-              if (Array.isArray(exif.Keywords)) {
-                keywords = exif.Keywords.join(', ');
-              } else if (typeof exif.Keywords === 'string') {
-                keywords = exif.Keywords;
-              }
-            }
-
-            if (!keywords && exif.iptc && Array.isArray((exif.iptc as any).Keywords)) {
-              keywords = (exif.iptc as any).Keywords.join(', ');
-            }
-
-            if (!keywords && typeof exif['IPTC:Keywords'] === 'string') {
-              keywords = exif['IPTC:Keywords'];
-            }
-            // Heuristische Suche: jedes Feld, das auf 'keywords' endet und ein Array/String ist
-            if (!keywords) {
-              for (const [k, v] of Object.entries(exif)) {
-                if (k.toLowerCase().endsWith('keywords')) {
-                  if (Array.isArray(v)) {
-                    keywords = (v as any).join(', ');
-                  } else if (typeof v === 'string') {
-                    keywords = v as string;
-                  }
-                  if (keywords) break;
-                }
-              }
+              keywords = extracted.keywords;
             }
 
             keywords = fixEncoding(keywords);

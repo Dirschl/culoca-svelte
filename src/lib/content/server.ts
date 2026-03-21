@@ -21,6 +21,7 @@ import {
 type ItemRecord = ContentItemLike & {
   user_id?: string | null;
   profile_id?: string | null;
+  short_id?: string | null;
   original_name?: string | null;
   country_code?: string | null;
   country_name?: string | null;
@@ -180,6 +181,7 @@ async function getSemanticSimilarItems(
 const ITEM_SELECT = `
   id,
   user_id,
+  short_id,
   original_name,
   path_2048,
   path_512,
@@ -470,6 +472,7 @@ export async function loadContentPage(args: {
   requestedPath: string;
   typeSlugHint?: string;
   groupSlugHint?: string;
+  skipCanonicalRedirect?: boolean;
 }) {
   const supabase = createServerSupabase();
   const typeMap = await getTypeMap(supabase);
@@ -509,7 +512,7 @@ export async function loadContentPage(args: {
   }
 
   const canonicalPath = getStoredOrComputedCanonicalPath({ item, rootItem, type });
-  if (canonicalPath && normalizePath(canonicalPath) !== requestedPath) {
+  if (!args.skipCanonicalRedirect && canonicalPath && normalizePath(canonicalPath) !== requestedPath) {
     return {
       redirectTo: canonicalPath
     };

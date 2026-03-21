@@ -113,7 +113,7 @@
         {/if}
 
         {#if rights?.download || rights?.download_original || isCreator}
-          <button class="square-btn download-btn" data-download-id={image.id} on:click={() => onDownloadOriginal(image.id, image.original_name)} title="Original herunterladen" disabled={rotating || loading}>
+          <button class="square-btn download-btn" data-download-id={image.id} on:click={() => onDownloadOriginal(image.id, image.original_name)} title="Download öffnen" disabled={rotating || loading}>
             <svg width="35" height="35" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M12 6v7m0 0l-3-3m3 3l3-3M6 18h12"/>
             </svg>
