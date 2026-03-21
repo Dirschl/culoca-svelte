@@ -230,6 +230,16 @@ function canFallbackToOriginalDownload(options: DownloadExportOptions) {
   return options.sizeMode === 'full' && options.format === 'jpg';
 }
 
+function getUserFacingDownloadErrorMessage(err: unknown, mode: 'download' | 'estimate') {
+  if (isSharpRuntimeError(err)) {
+    return mode === 'estimate'
+      ? 'Die Dateivorschau ist gerade nicht verfuegbar.'
+      : 'Die gewaehlte Exportvariante ist gerade nicht verfuegbar. Bitte versuche JPG in voller Aufloesung oder Original-Metadaten.';
+  }
+
+  return err instanceof Error ? err.message : 'Download fehlgeschlagen';
+}
+
 export const GET: RequestHandler = async ({ params, request }) => {
   const itemId = params.id;
   if (!itemId) {
@@ -267,11 +277,13 @@ export const GET: RequestHandler = async ({ params, request }) => {
     });
   } catch (err) {
     console.error('Download GET failed:', err);
-    throw error(500, err instanceof Error ? err.message : 'Download fehlgeschlagen');
+    throw error(500, getUserFacingDownloadErrorMessage(err, 'download'));
   }
 };
 
 export const POST: RequestHandler = async ({ params, request }) => {
+  let requestMode: 'estimate' | 'download' = 'download';
+
   try {
     const itemId = params.id;
     if (!itemId) {
@@ -285,6 +297,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
 
     const body = await request.json().catch(() => ({}));
     const mode = body?.mode === 'estimate' ? 'estimate' : 'download';
+    requestMode = mode;
     const options = normalizeDownloadExportOptions(body?.options as DownloadExportOptions);
     const originalBuffer = await fetchDownloadSourceBuffer(item, options, mode);
 
@@ -393,7 +406,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
       err && typeof err === 'object' && 'status' in err && typeof (err as { status?: unknown }).status === 'number'
         ? ((err as { status: number }).status as number)
         : 500;
-    const message = err instanceof Error ? err.message : 'Download fehlgeschlagen';
+    const message = getUserFacingDownloadErrorMessage(err, requestMode);
     return json({ error: message }, { status });
   }
 };
