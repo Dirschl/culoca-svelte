@@ -2,11 +2,11 @@ import sharp from 'sharp';
 import { createClient as createWebDavClient } from 'webdav';
 import { extractPhotoMetadataFields } from '$lib/metadata/photoMetadata';
 import { exiftoolPath as vendoredExiftoolPath } from 'exiftool-vendored';
+import bundledExiftoolPath from 'exiftool-vendored.pl';
 import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { promisify } from 'node:util';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -59,7 +59,6 @@ const DEFAULT_OPTIONS: Required<Pick<DownloadExportOptions, 'sizeMode' | 'format
   filenameMode: 'original'
 };
 const execFileAsync = promisify(execFile);
-const require = createRequire(import.meta.url);
 
 function resolveConfiguredExiftoolPath() {
   const configuredPath = process.env.EXIFTOOL_PATH?.trim();
@@ -67,13 +66,7 @@ function resolveConfiguredExiftoolPath() {
 }
 
 function resolveBundledExiftoolPath() {
-  try {
-    const resolved = require('exiftool-vendored.pl');
-    return typeof resolved === 'string' && resolved.trim() ? resolved : null;
-  } catch (error) {
-    console.warn('Failed to resolve exiftool-vendored.pl directly:', error);
-    return null;
-  }
+  return typeof bundledExiftoolPath === 'string' && bundledExiftoolPath.trim() ? bundledExiftoolPath : null;
 }
 
 async function resolveExiftoolCommand() {
