@@ -221,6 +221,15 @@ function estimateOutputDimensions(item: DownloadItemRecord, options: DownloadExp
   };
 }
 
+function isSharpRuntimeError(err: unknown) {
+  const message = err instanceof Error ? err.message : String(err ?? '');
+  return message.toLowerCase().includes('sharp');
+}
+
+function canFallbackToOriginalDownload(options: DownloadExportOptions) {
+  return options.sizeMode === 'full' && options.format === 'jpg';
+}
+
 export const GET: RequestHandler = async ({ params, request }) => {
   const itemId = params.id;
   if (!itemId) {
@@ -336,22 +345,48 @@ export const POST: RequestHandler = async ({ params, request }) => {
       }
     }
 
-    const rendered = await renderDownloadExport(originalBuffer, item, options);
-    await logDownload(
-      supabase,
-      item,
-      user.id,
-      options.sizeMode === 'full' ? 'full_resolution_custom' : 'custom_export'
-    );
+    try {
+      const rendered = await renderDownloadExport(originalBuffer, item, options);
+      await logDownload(
+        supabase,
+        item,
+        user.id,
+        options.sizeMode === 'full' ? 'full_resolution_custom' : 'custom_export'
+      );
 
-    return new Response(rendered.buffer, {
-      status: 200,
-      headers: {
-        'Content-Type': rendered.contentType,
-        'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(rendered.filename)}`,
-        'Cache-Control': 'private, max-age=0, must-revalidate'
+      return new Response(rendered.buffer, {
+        status: 200,
+        headers: {
+          'Content-Type': rendered.contentType,
+          'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(rendered.filename)}`,
+          'Cache-Control': 'private, max-age=0, must-revalidate'
+        }
+      });
+    } catch (renderError) {
+      if (!isSharpRuntimeError(renderError) || !canFallbackToOriginalDownload(options)) {
+        throw renderError;
       }
-    });
+
+      console.warn('Download render failed due to sharp runtime issue, falling back to original JPG payload:', renderError);
+      const filename = buildDownloadFilename(item, options);
+
+      await logDownload(
+        supabase,
+        item,
+        user.id,
+        options.sizeMode === 'full' ? 'full_resolution_custom' : 'custom_export'
+      );
+
+      return new Response(originalBuffer, {
+        status: 200,
+        headers: {
+          'Content-Type': 'image/jpeg',
+          'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
+          'Cache-Control': 'private, max-age=0, must-revalidate',
+          'X-Culoca-Download-Fallback': 'sharp-runtime'
+        }
+      });
+    }
   } catch (err) {
     console.error('Download POST failed:', err);
     const status =
