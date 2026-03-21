@@ -489,9 +489,27 @@ export async function renderDownloadExport(
     };
   }
 
-  let pipeline = sharp(originalBuffer).rotate();
+  const createBasePipeline = () => sharp(originalBuffer).rotate();
+  let pipeline = createBasePipeline();
   let outputWidth = baseWidth;
   let outputHeight = baseHeight;
+  let resizeConfig:
+    | {
+        width: number;
+        height: number;
+        fit: 'cover' | 'inside';
+        position?: sharp.Gravity | sharp.Strategy;
+        withoutEnlargement?: boolean;
+      }
+    | null = null;
+  let extractConfig:
+    | {
+        left: number;
+        top: number;
+        width: number;
+        height: number;
+      }
+    | null = null;
 
   if (options.sizeMode === 'custom') {
     const requestedWidth = options.width || baseWidth;
@@ -505,13 +523,20 @@ export async function renderDownloadExport(
       const boundedWidth = Math.min(cropWidth, baseWidth - cropLeft);
       const boundedHeight = Math.min(cropHeight, baseHeight - cropTop);
 
-      pipeline = pipeline.extract({
+      extractConfig = {
         left: Math.max(0, cropLeft),
         top: Math.max(0, cropTop),
         width: Math.max(1, boundedWidth),
         height: Math.max(1, boundedHeight)
-      });
+      };
+      pipeline = pipeline.extract(extractConfig);
 
+      resizeConfig = {
+        width: requestedWidth,
+        height: requestedHeight,
+        fit: 'cover',
+        position: 'centre'
+      };
       pipeline = pipeline.resize(requestedWidth, requestedHeight, {
         fit: 'cover',
         position: 'centre'
@@ -520,6 +545,12 @@ export async function renderDownloadExport(
       outputWidth = requestedWidth;
       outputHeight = requestedHeight;
     } else {
+      resizeConfig = {
+        width: requestedWidth,
+        height: requestedHeight,
+        fit: 'inside',
+        withoutEnlargement: false
+      };
       pipeline = pipeline.resize(requestedWidth, requestedHeight, {
         fit: 'inside',
         withoutEnlargement: false
@@ -531,21 +562,55 @@ export async function renderDownloadExport(
     }
   }
 
+  const rebuildProcessedPipeline = () => {
+    let nextPipeline = createBasePipeline();
+    if (extractConfig) {
+      nextPipeline = nextPipeline.extract(extractConfig);
+    }
+    if (resizeConfig) {
+      nextPipeline = nextPipeline.resize(resizeConfig.width, resizeConfig.height, {
+        fit: resizeConfig.fit,
+        position: resizeConfig.position,
+        withoutEnlargement: resizeConfig.withoutEnlargement
+      });
+    }
+    return nextPipeline;
+  };
+
+  const renderTransformedBuffer = async (inputPipeline: sharp.Sharp) => {
+    const transformed = applyFormat(inputPipeline, options.format, options.compression);
+    return transformed.toBuffer({ resolveWithObject: true });
+  };
+
+  let result: Awaited<ReturnType<typeof renderTransformedBuffer>>;
+
   if (options.metadataMode === 'original' && options.format === 'jpg') {
     // Preserve the original embedded metadata as-is.
     // This is the safest path for now so camera-specific EXIF fields
     // like ISO, aperture, shutter speed, lens, timestamps and GPS are not lost.
-    pipeline = pipeline.withMetadata();
+    result = await renderTransformedBuffer(pipeline.withMetadata());
   } else if (options.metadataMode === 'culoca' && options.format === 'jpg') {
-    pipeline = pipeline
-      .withMetadata({
-        exif: buildCulocaExif(item, outputWidth, outputHeight)
-      })
-      .withXmp(buildCulocaXmp(item));
-  }
+    const culocaExif = buildCulocaExif(item, outputWidth, outputHeight);
+    const culocaXmp = buildCulocaXmp(item);
 
-  const transformed = applyFormat(pipeline, options.format, options.compression);
-  const result = await transformed.toBuffer({ resolveWithObject: true });
+    try {
+      result = await renderTransformedBuffer(
+        pipeline.withMetadata({
+          exif: culocaExif
+        }).withXmp(culocaXmp)
+      );
+    } catch (xmpError) {
+      console.warn('Culoca XMP export failed, retrying with EXIF-only metadata:', xmpError);
+      result = await renderTransformedBuffer(
+        rebuildProcessedPipeline()
+          .withMetadata({
+            exif: culocaExif
+          })
+      );
+    }
+  } else {
+    result = await renderTransformedBuffer(pipeline);
+  }
 
   return {
     buffer: result.data,
