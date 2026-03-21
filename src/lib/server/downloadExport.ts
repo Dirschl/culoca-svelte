@@ -1,6 +1,7 @@
 import sharp from 'sharp';
 import { createClient as createWebDavClient } from 'webdav';
 import { extractPhotoMetadataFields } from '$lib/metadata/photoMetadata';
+import { exiftoolPath as vendoredExiftoolPath } from 'exiftool-vendored';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
@@ -56,7 +57,6 @@ const DEFAULT_OPTIONS: Required<Pick<DownloadExportOptions, 'sizeMode' | 'format
   filenameMode: 'original'
 };
 const execFileAsync = promisify(execFile);
-const EXIFTOOL_COMMAND = process.env.EXIFTOOL_PATH || 'exiftool';
 
 function clampNumber(value: unknown, min: number, max: number, fallback: number) {
   const num = typeof value === 'number' ? value : Number(value);
@@ -436,8 +436,9 @@ async function applyCulocaMetadataUpdate(
 
   try {
     await writeFile(tempFile, buffer);
+    const exiftoolCommand = process.env.EXIFTOOL_PATH || (await vendoredExiftoolPath());
     try {
-      await execFileAsync(EXIFTOOL_COMMAND, [...args, tempFile], {
+      await execFileAsync(exiftoolCommand, [...args, tempFile], {
         maxBuffer: 10 * 1024 * 1024
       });
     } catch (error) {
