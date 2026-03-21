@@ -27,6 +27,8 @@ export type DownloadExportOptions = {
 export type DownloadableItem = {
   id: string;
   short_id?: string | null;
+  width?: number | null;
+  height?: number | null;
   original_url?: string | null;
   path_2048?: string | null;
   path_512?: string | null;
@@ -394,6 +396,10 @@ function canReturnOriginalBufferUnchanged(
     options.metadataMode === 'original' &&
     metadata.format === 'jpeg'
   );
+}
+
+export function canBypassImageProcessing(options: DownloadExportOptions) {
+  return options.sizeMode === 'full' && options.format === 'jpg' && options.metadataMode === 'original';
 }
 
 export async function renderDownloadExport(

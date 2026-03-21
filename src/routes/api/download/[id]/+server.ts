@@ -2,6 +2,7 @@ import { error, json, type RequestHandler } from '@sveltejs/kit';
 import { createClient } from '@supabase/supabase-js';
 import {
   buildDownloadFilename,
+  canBypassImageProcessing,
   fetchOriginalItemBuffer,
   normalizeDownloadExportOptions,
   renderDownloadExport,
@@ -13,6 +14,8 @@ type DownloadItemRecord = {
   profile_id: string | null;
   user_id: string | null;
   short_id: string | null;
+  width: number | null;
+  height: number | null;
   original_url: string | null;
   path_2048: string | null;
   path_512: string | null;
@@ -83,6 +86,8 @@ async function loadDownloadItem(supabase: ReturnType<typeof createAuthedSupabase
         profile_id,
         user_id,
         short_id,
+        width,
+        height,
         original_url,
         path_2048,
         path_512,
@@ -217,6 +222,37 @@ export const POST: RequestHandler = async ({ params, request }) => {
     const originalBuffer = await fetchOriginalItemBuffer(item, {
       allowPublicFallback: !(mode === 'download' && options.metadataMode === 'original' && options.format === 'jpg')
     });
+
+    if (canBypassImageProcessing(options)) {
+      const filename = buildDownloadFilename(item, options);
+
+      if (mode === 'estimate') {
+        return json({
+          ok: true,
+          sizeBytes: originalBuffer.byteLength,
+          width: item.width,
+          height: item.height,
+          filename,
+          contentType: 'image/jpeg'
+        });
+      }
+
+      await logDownload(
+        supabase,
+        item,
+        user.id,
+        options.sizeMode === 'full' ? 'full_resolution_custom' : 'custom_export'
+      );
+
+      return new Response(originalBuffer, {
+        status: 200,
+        headers: {
+          'Content-Type': 'image/jpeg',
+          'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
+          'Cache-Control': 'private, max-age=0, must-revalidate'
+        }
+      });
+    }
 
     if (mode === 'estimate') {
       const rendered = await renderDownloadExport(originalBuffer, item, options);
