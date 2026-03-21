@@ -331,11 +331,11 @@ function buildCulocaExif(item: DownloadableItem, width: number, height: number) 
   const originalCopyright = firstString(original.IFD0.Copyright);
   const artist = firstString(item.profile?.full_name, item.profile?.accountname, originalArtist, 'Unbekannt');
   const copyright = originalCopyright
-    ? `${originalCopyright} | Culoca | culoca.com`
-    : `${artist} | Culoca | culoca.com`;
+    ? `${originalCopyright} | culoca.com`
+    : `${artist} | culoca.com`;
   const title = firstString(item.title, original.IFD0.XPTitle);
   const caption = firstString(item.caption, original.IFD0.XPComment, original.IFD0.ImageDescription);
-  const description = firstString(item.description, caption, original.IFD0.ImageDescription, 'Culoca Export');
+  const description = firstString(item.description, original.IFD0.ImageDescription, caption, 'Culoca Export');
   const keywords = asJoinedKeywords(item.keywords) || firstString(original.IFD0.XPKeywords);
 
   return {
@@ -344,15 +344,16 @@ function buildCulocaExif(item: DownloadableItem, width: number, height: number) 
       Software: 'Culoca Download Export',
       Artist: artist,
       Copyright: copyright,
-      ImageDescription: caption || description,
+      ImageDescription: description,
       XPTitle: title,
-      XPComment: caption || description,
+      XPComment: description,
       XPAuthor: artist,
       XPKeywords: keywords,
-      XPSubject: firstString(title, caption, description)
+      XPSubject: caption || firstString(title, description)
     }),
     ExifIFD: stringifyExifValues({
       ...original.ExifIFD,
+      UserComment: caption,
       PixelXDimension: String(width),
       PixelYDimension: String(height)
     }),
