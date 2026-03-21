@@ -56,6 +56,7 @@ const DEFAULT_OPTIONS: Required<Pick<DownloadExportOptions, 'sizeMode' | 'format
   filenameMode: 'original'
 };
 const execFileAsync = promisify(execFile);
+const EXIFTOOL_COMMAND = process.env.EXIFTOOL_PATH || 'exiftool';
 
 function clampNumber(value: unknown, min: number, max: number, fallback: number) {
   const num = typeof value === 'number' ? value : Number(value);
@@ -435,9 +436,17 @@ async function applyCulocaMetadataUpdate(
 
   try {
     await writeFile(tempFile, buffer);
-    await execFileAsync('/usr/local/bin/exiftool', [...args, tempFile], {
-      maxBuffer: 10 * 1024 * 1024
-    });
+    try {
+      await execFileAsync(EXIFTOOL_COMMAND, [...args, tempFile], {
+        maxBuffer: 10 * 1024 * 1024
+      });
+    } catch (error) {
+      if (error && typeof error === 'object' && 'code' in error && (error as { code?: string }).code === 'ENOENT') {
+        console.warn('exiftool not available, preserving original metadata without Culoca field updates');
+        return buffer;
+      }
+      throw error;
+    }
     return await readFile(tempFile);
   } finally {
     await rm(tempDir, { recursive: true, force: true });
