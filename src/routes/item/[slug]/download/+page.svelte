@@ -1137,11 +1137,44 @@
 
 <style>
   .download-page {
+    --download-bg-top: rgba(255, 249, 243, 0.9);
+    --download-bg-bottom: rgba(247, 243, 238, 1);
+    --download-accent-glow: rgba(238, 114, 33, 0.16);
+    --download-text: var(--text-primary, #221b16);
+    --download-text-soft: var(--text-secondary, #5f5349);
+    --download-border: rgba(116, 97, 79, 0.18);
+    --download-border-soft: rgba(116, 97, 79, 0.14);
+    --download-surface: rgba(255, 255, 255, 0.82);
+    --download-surface-soft: rgba(255, 255, 255, 0.72);
+    --download-input: rgba(255, 255, 255, 0.94);
+    --download-preview-top: rgba(237, 232, 227, 1);
+    --download-preview-bottom: rgba(222, 214, 207, 1);
+    --download-shadow: 0 28px 80px rgba(65, 39, 17, 0.08);
+    --download-secondary-btn: rgba(255, 255, 255, 0.9);
+    --download-error: #a2331a;
     min-height: 100vh;
     background:
-      radial-gradient(circle at top left, rgba(238, 114, 33, 0.16), transparent 34%),
-      linear-gradient(180deg, rgba(255, 249, 243, 0.9), rgba(247, 243, 238, 1));
-    color: var(--text-primary, #221b16);
+      radial-gradient(circle at top left, var(--download-accent-glow), transparent 34%),
+      linear-gradient(180deg, var(--download-bg-top), var(--download-bg-bottom));
+    color: var(--download-text);
+  }
+
+  :global(.dark) .download-page {
+    --download-bg-top: rgba(24, 24, 27, 0.96);
+    --download-bg-bottom: rgba(10, 10, 12, 1);
+    --download-accent-glow: rgba(238, 114, 33, 0.22);
+    --download-text: #f4eee8;
+    --download-text-soft: #c7b8ab;
+    --download-border: rgba(255, 255, 255, 0.14);
+    --download-border-soft: rgba(255, 255, 255, 0.1);
+    --download-surface: rgba(30, 24, 20, 0.86);
+    --download-surface-soft: rgba(42, 34, 29, 0.8);
+    --download-input: rgba(27, 22, 19, 0.95);
+    --download-preview-top: rgba(40, 34, 31, 1);
+    --download-preview-bottom: rgba(24, 20, 18, 1);
+    --download-shadow: 0 28px 80px rgba(0, 0, 0, 0.35);
+    --download-secondary-btn: rgba(35, 29, 25, 0.94);
+    --download-error: #ff8e72;
   }
 
   .download-shell {
@@ -1163,7 +1196,7 @@
 
   .download-header p {
     margin: 0;
-    color: var(--text-secondary, #5f5349);
+    color: var(--download-text-soft);
     font-size: 1.03rem;
     line-height: 1.6;
   }
@@ -1187,10 +1220,10 @@
   .preview-card,
   .settings-card {
     border-radius: 24px;
-    border: 1px solid rgba(116, 97, 79, 0.18);
-    background: rgba(255, 255, 255, 0.82);
+    border: 1px solid var(--download-border);
+    background: var(--download-surface);
     backdrop-filter: blur(14px);
-    box-shadow: 0 28px 80px rgba(65, 39, 17, 0.08);
+    box-shadow: var(--download-shadow);
   }
 
   .preview-card {
@@ -1201,7 +1234,7 @@
     position: relative;
     overflow: hidden;
     border-radius: 0;
-    background: linear-gradient(180deg, rgba(237, 232, 227, 1), rgba(222, 214, 207, 1));
+    background: linear-gradient(180deg, var(--download-preview-top), var(--download-preview-bottom));
     aspect-ratio: 4 / 3;
     user-select: none;
   }
@@ -1263,7 +1296,7 @@
   }
 
   .preview-meta span {
-    color: var(--text-secondary, #5f5349);
+    color: var(--download-text-soft);
   }
 
   .settings-card {
@@ -1273,7 +1306,7 @@
   .group + .group {
     margin-top: 1.25rem;
     padding-top: 1.1rem;
-    border-top: 1px solid rgba(116, 97, 79, 0.14);
+    border-top: 1px solid var(--download-border-soft);
   }
 
   .group h2 {
@@ -1284,10 +1317,10 @@
   .metadata-section {
     margin-top: 1.5rem;
     border-radius: 24px;
-    border: 1px solid rgba(116, 97, 79, 0.18);
-    background: rgba(255, 255, 255, 0.82);
+    border: 1px solid var(--download-border);
+    background: var(--download-surface);
     backdrop-filter: blur(14px);
-    box-shadow: 0 28px 80px rgba(65, 39, 17, 0.08);
+    box-shadow: var(--download-shadow);
     padding: 1.2rem;
   }
 
@@ -1298,8 +1331,8 @@
 
   .storage-preview-card {
     border-radius: 14px;
-    border: 1px solid rgba(116, 97, 79, 0.18);
-    background: rgba(255, 255, 255, 0.72);
+    border: 1px solid var(--download-border);
+    background: var(--download-surface-soft);
     padding: 0.9rem;
     margin-bottom: 1rem;
   }
@@ -1309,7 +1342,7 @@
   }
 
   .storage-preview-mode {
-    color: var(--text-secondary, #5f5349);
+    color: var(--download-text-soft);
     font-size: 0.9rem;
     margin-bottom: 0.45rem;
   }
@@ -1370,8 +1403,8 @@
   input[type='number'],
   select {
     border-radius: 12px;
-    border: 1px solid rgba(116, 97, 79, 0.24);
-    background: rgba(255, 255, 255, 0.94);
+    border: 1px solid var(--download-border);
+    background: var(--download-input);
     padding: 0.75rem 0.9rem;
     font: inherit;
     color: inherit;
@@ -1384,15 +1417,15 @@
   .remember-box {
     margin-top: 1.4rem;
     padding-top: 1rem;
-    border-top: 1px solid rgba(116, 97, 79, 0.14);
+    border-top: 1px solid var(--download-border-soft);
   }
 
   .metadata-preview-card {
     display: grid;
     gap: 0.6rem;
     border-radius: 14px;
-    border: 1px solid rgba(116, 97, 79, 0.18);
-    background: rgba(255, 255, 255, 0.72);
+    border: 1px solid var(--download-border);
+    background: var(--download-surface-soft);
     padding: 0.9rem;
   }
 
@@ -1404,7 +1437,7 @@
   }
 
   .metadata-label {
-    color: var(--text-secondary, #5f5349);
+    color: var(--download-text-soft);
     font-size: 0.84rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -1417,7 +1450,7 @@
 
   .metadata-note {
     margin: 0.8rem 0 0;
-    color: var(--text-secondary, #5f5349);
+    color: var(--download-text-soft);
     font-size: 0.92rem;
     line-height: 1.5;
   }
@@ -1445,8 +1478,8 @@
   }
 
   .secondary-btn {
-    background: rgba(255, 255, 255, 0.9);
-    border-color: rgba(116, 97, 79, 0.22);
+    background: var(--download-secondary-btn);
+    border-color: var(--download-border);
     color: inherit;
   }
 
@@ -1464,7 +1497,7 @@
   }
 
   .error-text {
-    color: #a2331a !important;
+    color: var(--download-error) !important;
   }
 
   @media (max-width: 900px) {
