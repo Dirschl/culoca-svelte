@@ -1159,7 +1159,8 @@
     color: var(--download-text);
   }
 
-  :global(.dark) .download-page {
+  :global(html[data-theme='dark']) .download-page,
+  :global(body[data-theme='dark']) .download-page {
     --download-bg-top: rgba(24, 24, 27, 0.96);
     --download-bg-bottom: rgba(10, 10, 12, 1);
     --download-accent-glow: rgba(238, 114, 33, 0.22);
