@@ -1,14 +1,6 @@
 import sharp from 'sharp';
 import { createClient as createWebDavClient } from 'webdav';
 import { extractPhotoMetadataFields } from '$lib/metadata/photoMetadata';
-import { exiftoolPath as vendoredExiftoolPath } from 'exiftool-vendored';
-import bundledExiftoolPath from 'exiftool-vendored.pl';
-import { execFile } from 'node:child_process';
-import { existsSync } from 'node:fs';
-import { promisify } from 'node:util';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 
 export type DownloadExportMetadataMode = 'original' | 'culoca' | 'none';
 export type DownloadExportFormat = 'jpg' | 'webp';
@@ -58,30 +50,6 @@ const DEFAULT_OPTIONS: Required<Pick<DownloadExportOptions, 'sizeMode' | 'format
   metadataMode: 'original',
   filenameMode: 'original'
 };
-const execFileAsync = promisify(execFile);
-
-function resolveConfiguredExiftoolPath() {
-  const configuredPath = process.env.EXIFTOOL_PATH?.trim();
-  return configuredPath ? configuredPath : null;
-}
-
-function resolveBundledExiftoolPath() {
-  return typeof bundledExiftoolPath === 'string' && bundledExiftoolPath.trim() ? bundledExiftoolPath : null;
-}
-
-async function resolveExiftoolCommand() {
-  const configuredPath = resolveConfiguredExiftoolPath();
-  if (configuredPath) {
-    return configuredPath;
-  }
-
-  const bundledPath = resolveBundledExiftoolPath();
-  if (bundledPath && existsSync(bundledPath)) {
-    return bundledPath;
-  }
-
-  return vendoredExiftoolPath();
-}
 
 function clampNumber(value: unknown, min: number, max: number, fallback: number) {
   const num = typeof value === 'number' ? value : Number(value);
@@ -280,11 +248,21 @@ function buildGpsInfo(lat: unknown, lon: unknown) {
     return {};
   }
 
+  const toExifCoordinate = (value: number) => {
+    const absolute = Math.abs(value);
+    const degrees = Math.floor(absolute);
+    const minutesFloat = (absolute - degrees) * 60;
+    const minutes = Math.floor(minutesFloat);
+    const seconds = (minutesFloat - minutes) * 60;
+    const secondsNumerator = Math.round(seconds * 10000);
+    return `${degrees}/1 ${minutes}/1 ${secondsNumerator}/10000`;
+  };
+
   return {
     GPSLatitudeRef: latitude >= 0 ? 'N' : 'S',
-    GPSLatitude: Math.abs(latitude).toFixed(6),
+    GPSLatitude: toExifCoordinate(latitude),
     GPSLongitudeRef: longitude >= 0 ? 'E' : 'W',
-    GPSLongitude: Math.abs(longitude).toFixed(6)
+    GPSLongitude: toExifCoordinate(longitude)
   };
 }
 
@@ -339,7 +317,7 @@ function buildOriginalExif(item: DownloadableItem, width: number, height: number
       PixelXDimension: String(width),
       PixelYDimension: String(height)
     }),
-    GPSInfo: stringifyExifValues(
+    IFD3: stringifyExifValues(
       buildGpsInfo(exif.latitude ?? exif.Latitude ?? item.lat, exif.longitude ?? exif.Longitude ?? item.lon)
     )
   };
@@ -376,7 +354,7 @@ function buildCulocaExif(item: DownloadableItem, width: number, height: number) 
       PixelXDimension: String(width),
       PixelYDimension: String(height)
     }),
-    GPSInfo: stringifyExifValues(buildGpsInfo(item.lat, item.lon))
+    IFD3: stringifyExifValues(buildGpsInfo(item.lat, item.lon))
   };
 }
 
@@ -416,75 +394,6 @@ function canReturnOriginalBufferUnchanged(
     options.metadataMode === 'original' &&
     metadata.format === 'jpeg'
   );
-}
-
-async function applyCulocaMetadataUpdate(
-  buffer: Buffer,
-  item: DownloadableItem
-) {
-  const title = firstString(item.title);
-  const caption = firstString(item.caption);
-  const description = firstString(item.description, item.caption);
-  const creator = firstString(item.profile?.full_name, item.profile?.accountname);
-  const copyright = creator ? `${creator} | Culoca` : 'Culoca';
-  const gpsInfo = buildGpsInfo(item.lat, item.lon);
-
-  const args = ['-overwrite_original', '-P', '-m'];
-
-  if (title) {
-    args.push(`-XMP-dc:Title=${title}`);
-    args.push(`-IPTC:ObjectName=${title}`);
-  }
-
-  if (caption) {
-    args.push(`-XMP-photoshop:Headline=${caption}`);
-    args.push(`-IPTC:Headline=${caption}`);
-  }
-
-  if (description) {
-    args.push(`-XMP-dc:Description=${description}`);
-    args.push(`-IPTC:Caption-Abstract=${description}`);
-    args.push(`-EXIF:ImageDescription=${description}`);
-  }
-
-  if (creator) {
-    args.push(`-XMP-dc:Creator=${creator}`);
-    args.push(`-IPTC:By-line=${creator}`);
-    args.push(`-EXIF:Artist=${creator}`);
-  }
-
-  args.push(`-XMP-dc:Rights=${copyright}`);
-  args.push(`-IPTC:CopyrightNotice=${copyright}`);
-  args.push(`-EXIF:Copyright=${copyright}`);
-
-  if (gpsInfo.GPSLatitude && gpsInfo.GPSLatitudeRef && gpsInfo.GPSLongitude && gpsInfo.GPSLongitudeRef) {
-    args.push(`-EXIF:GPSLatitude=${gpsInfo.GPSLatitude}`);
-    args.push(`-EXIF:GPSLatitudeRef=${gpsInfo.GPSLatitudeRef}`);
-    args.push(`-EXIF:GPSLongitude=${gpsInfo.GPSLongitude}`);
-    args.push(`-EXIF:GPSLongitudeRef=${gpsInfo.GPSLongitudeRef}`);
-  }
-
-  const tempDir = await mkdtemp(join(tmpdir(), 'culoca-export-'));
-  const tempFile = join(tempDir, 'export.jpg');
-
-  try {
-    await writeFile(tempFile, buffer);
-    const exiftoolCommand = await resolveExiftoolCommand();
-    try {
-      await execFileAsync(exiftoolCommand, [...args, tempFile], {
-        maxBuffer: 10 * 1024 * 1024
-      });
-    } catch (error) {
-      if (error && typeof error === 'object' && 'code' in error && (error as { code?: string }).code === 'ENOENT') {
-        console.warn('exiftool not available, preserving original metadata without Culoca field updates');
-        return buffer;
-      }
-      throw error;
-    }
-    return await readFile(tempFile);
-  } finally {
-    await rm(tempDir, { recursive: true, force: true });
-  }
 }
 
 export async function renderDownloadExport(
@@ -566,18 +475,16 @@ export async function renderDownloadExport(
     // like ISO, aperture, shutter speed, lens, timestamps and GPS are not lost.
     pipeline = pipeline.withMetadata();
   } else if (options.metadataMode === 'culoca' && options.format === 'jpg') {
-    pipeline = pipeline.withMetadata();
+    pipeline = pipeline.withMetadata({
+      exif: buildCulocaExif(item, outputWidth, outputHeight)
+    });
   }
 
   const transformed = applyFormat(pipeline, options.format, options.compression);
   const result = await transformed.toBuffer({ resolveWithObject: true });
-  const finalBuffer =
-    options.metadataMode === 'culoca' && options.format === 'jpg'
-      ? await applyCulocaMetadataUpdate(result.data, item)
-      : result.data;
 
   return {
-    buffer: finalBuffer,
+    buffer: result.data,
     info: result.info,
     contentType: options.format === 'webp' ? 'image/webp' : 'image/jpeg',
     filename: buildDownloadFilename(item, options),
