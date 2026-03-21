@@ -331,8 +331,8 @@ function buildCulocaExif(item: DownloadableItem, width: number, height: number) 
   const originalCopyright = firstString(original.IFD0.Copyright);
   const artist = firstString(item.profile?.full_name, item.profile?.accountname, originalArtist, 'Unbekannt');
   const copyright = originalCopyright
-    ? `${originalCopyright} | Culoca`
-    : `${artist} | Culoca`;
+    ? `${originalCopyright} | Culoca | culoca.com`
+    : `${artist} | Culoca | culoca.com`;
   const title = firstString(item.title, original.IFD0.XPTitle);
   const caption = firstString(item.caption, original.IFD0.XPComment, original.IFD0.ImageDescription);
   const description = firstString(item.description, caption, original.IFD0.ImageDescription, 'Culoca Export');
@@ -344,12 +344,12 @@ function buildCulocaExif(item: DownloadableItem, width: number, height: number) 
       Software: 'Culoca Download Export',
       Artist: artist,
       Copyright: copyright,
-      ImageDescription: description,
+      ImageDescription: caption || description,
       XPTitle: title,
       XPComment: caption || description,
       XPAuthor: artist,
       XPKeywords: keywords,
-      XPSubject: firstString(title, description)
+      XPSubject: firstString(title, caption, description)
     }),
     ExifIFD: stringifyExifValues({
       ...original.ExifIFD,
