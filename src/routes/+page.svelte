@@ -26,7 +26,8 @@
   let dashboardNotifications: any[] = [];
   let dashboardFollowedProfiles: any[] = [];
   let dashboardFollowedItems: any[] = [];
-  let dashboardCreatorInteractions: any[] = [];
+  let dashboardLatestDownloads: any[] = [];
+  let dashboardRecentItems: any[] = [];
   let dashboardPriorityFeed: any[] = [];
   let dashboardUnreadCount = 0;
   let dashboardChannels: any[] = [];
@@ -231,29 +232,12 @@
     return entry?.item?.title || entry?.item?.original_name || '';
   }
 
-  function getCreatorInteractionLabel(entry: any) {
-    switch (entry?.event_type) {
-      case 'download':
-        return 'Download';
-      case 'favorite_add':
-        return 'Gemerkt';
-      case 'like_add':
-        return 'Like';
-      case 'comment_create':
-        return 'Kommentar';
-      case 'chat_message':
-        return 'Nachricht';
-      default:
-        return 'Interaktion';
-    }
-  }
-
   function buildPriorityFeed(args: {
     conversations: any[];
     notifications: any[];
     followedItems: any[];
     followedProfiles: any[];
-    creatorInteractions: any[];
+    latestDownloads: any[];
   }) {
     const feed = [
       ...args.conversations.map((entry: any) => ({
@@ -282,15 +266,15 @@
         thumbUrl: entry.item ? getItemPreviewUrl(entry.item) : getAvatarUrl(entry.actor),
         fallback: (entry.actor?.full_name || entry.actor?.accountname || '?').slice(0, 1).toUpperCase()
       })),
-      ...args.creatorInteractions.map((entry: any) => ({
-        id: `creator-${entry.id}`,
-        type: 'creator_interaction',
+      ...args.latestDownloads.map((entry: any) => ({
+        id: `download-${entry.id}`,
+        type: 'download',
         category: 'creator',
-        score: entry.event_type === 'chat_message' ? 110 : 100,
+        score: 100,
         timestamp: toTimestamp(entry.created_at),
         title: entry.actor?.full_name || entry.actor?.accountname || 'Jemand',
-        subtitle: getCreatorInteractionLabel(entry),
-        preview: truncate(entry.item?.title || entry.item?.original_name || 'Dein Inhalt hat eine neue Reaktion', 120),
+        subtitle: 'Download',
+        preview: truncate(entry.item?.title || entry.item?.original_name || 'Jemand hat einen deiner Inhalte heruntergeladen', 120),
         href: entry.item ? getPublicItemHref(entry.item) : '/profile',
         thumbUrl: entry.item ? getItemPreviewUrl(entry.item) : getAvatarUrl(entry.actor),
         fallback: (entry.actor?.full_name || entry.actor?.accountname || '?').slice(0, 1).toUpperCase()
@@ -340,7 +324,8 @@
       dashboardNotifications = [];
       dashboardFollowedProfiles = [];
       dashboardFollowedItems = [];
-      dashboardCreatorInteractions = [];
+      dashboardLatestDownloads = [];
+      dashboardRecentItems = [];
       dashboardUnreadCount = 0;
       dashboardPriorityFeed = [];
       dashboardLoadedForUser = '';
@@ -354,7 +339,8 @@
       const [
         { data: conversationData, error: conversationError },
         { data: notificationData, error: notificationError },
-        { data: creatorInteractionData, error: creatorInteractionError },
+        { data: latestDownloadData, error: latestDownloadError },
+        { data: recentItemData, error: recentItemError },
         { data: followsData, error: followsError }
       ] =
         await Promise.all([
@@ -450,9 +436,30 @@
               )
             `)
             .eq('owner_user_id', user.id)
-            .in('event_type', ['download', 'favorite_add', 'like_add', 'comment_create', 'chat_message'])
+            .eq('event_type', 'download')
             .order('created_at', { ascending: false })
             .limit(5),
+          supabase
+            .from('item_events')
+            .select(`
+              item_id,
+              created_at,
+              items!inner(
+                id,
+                slug,
+                title,
+                original_name,
+                canonical_path,
+                country_slug,
+                district_slug,
+                municipality_slug,
+                path_512
+              )
+            `)
+            .eq('actor_user_id', user.id)
+            .eq('event_type', 'item_view')
+            .order('created_at', { ascending: false })
+            .limit(24),
           supabase
             .from('user_follows')
             .select('followed_user_id, created_at')
@@ -463,7 +470,8 @@
 
       if (conversationError) throw conversationError;
       if (notificationError) throw notificationError;
-      if (creatorInteractionError) throw creatorInteractionError;
+      if (latestDownloadError) throw latestDownloadError;
+      if (recentItemError) throw recentItemError;
       if (followsError) throw followsError;
 
       dashboardConversations = (conversationData || []).map((entry: any) => ({
@@ -475,11 +483,24 @@
         item: entry.items || null,
         actor: entry.profiles || null
       }));
-      dashboardCreatorInteractions = (creatorInteractionData || []).map((entry: any) => ({
+      dashboardLatestDownloads = (latestDownloadData || []).map((entry: any) => ({
         ...entry,
         item: entry.items || null,
         actor: entry.profiles || null
       }));
+      const seenRecentItems = new Set<string>();
+      dashboardRecentItems = (recentItemData || [])
+        .filter((entry: any) => {
+          const itemId = entry?.item_id;
+          if (!itemId || seenRecentItems.has(itemId)) return false;
+          seenRecentItems.add(itemId);
+          return true;
+        })
+        .map((entry: any) => ({
+          viewedAt: entry.created_at,
+          ...(entry.items || {})
+        }))
+        .slice(0, 5);
       dashboardUnreadCount = dashboardNotifications.filter((entry: any) => !entry.read_at).length;
 
       const followedIds = [...new Set((followsData || []).map((entry: any) => entry.followed_user_id).filter(Boolean))];
@@ -526,7 +547,7 @@
         notifications: dashboardNotifications,
         followedItems: dashboardFollowedItems,
         followedProfiles: dashboardFollowedProfiles,
-        creatorInteractions: dashboardCreatorInteractions
+        latestDownloads: dashboardLatestDownloads
       });
 
       dashboardLoadedForUser = user.id;
@@ -536,7 +557,8 @@
       dashboardNotifications = [];
       dashboardFollowedProfiles = [];
       dashboardFollowedItems = [];
-      dashboardCreatorInteractions = [];
+      dashboardLatestDownloads = [];
+      dashboardRecentItems = [];
       dashboardPriorityFeed = [];
       dashboardUnreadCount = 0;
     } finally {
@@ -1017,7 +1039,8 @@
     dashboardNotifications = [];
     dashboardFollowedProfiles = [];
     dashboardFollowedItems = [];
-    dashboardCreatorInteractions = [];
+    dashboardLatestDownloads = [];
+    dashboardRecentItems = [];
     dashboardPriorityFeed = [];
     dashboardUnreadCount = 0;
     dashboardLoadedForUser = '';
@@ -1488,16 +1511,16 @@
               <div class="dashboard-panel__head">
                 <div>
                   <span class="dashboard-kicker">Creator</span>
-                  <h2>Deine Inhalte</h2>
+                  <h2>Letzte Downloads</h2>
                 </div>
                 <a href="/profile">Mehr</a>
               </div>
 
-              {#if dashboardLoading && dashboardCreatorInteractions.length === 0}
-                <p class="dashboard-empty">Reaktionen auf deine Inhalte werden geladen...</p>
-              {:else if dashboardCreatorInteractions.length > 0}
+              {#if dashboardLoading && dashboardLatestDownloads.length === 0}
+                <p class="dashboard-empty">Downloads werden geladen...</p>
+              {:else if dashboardLatestDownloads.length > 0}
                 <div class="dashboard-list">
-                  {#each dashboardCreatorInteractions as entry (entry.id)}
+                  {#each dashboardLatestDownloads as entry (entry.id)}
                     <a class="dashboard-entry dashboard-entry--link" href={entry.item ? getPublicItemHref(entry.item) : '/profile'}>
                       {#if entry.item && getItemPreviewUrl(entry.item)}
                         <img
@@ -1528,14 +1551,60 @@
                           <strong>{entry.actor?.full_name || entry.actor?.accountname || 'Jemand'}</strong>
                           <time>{formatDateTime(entry.created_at)}</time>
                         </div>
-                        <span class="dashboard-entry__context">{getCreatorInteractionLabel(entry)}</span>
-                        <p>{truncate(entry.item?.title || entry.item?.original_name || 'Dein Inhalt hat eine neue Reaktion', 120)}</p>
+                        <span class="dashboard-entry__context">Download</span>
+                        <p>{truncate(entry.item?.title || entry.item?.original_name || 'Einer deiner Inhalte wurde heruntergeladen', 120)}</p>
                       </div>
                     </a>
                   {/each}
                 </div>
               {:else}
-                <p class="dashboard-empty">Sobald es Reaktionen auf deine Inhalte gibt, erscheinen sie hier.</p>
+                <p class="dashboard-empty">Sobald jemand etwas von dir herunterlädt, erscheint es hier.</p>
+              {/if}
+            </section>
+
+            <section class="dashboard-panel">
+              <div class="dashboard-panel__head">
+                <div>
+                  <span class="dashboard-kicker">Verlauf</span>
+                  <h2>Zuletzt besucht</h2>
+                </div>
+                <a href="/galerie">Galerie</a>
+              </div>
+
+              {#if dashboardLoading && dashboardRecentItems.length === 0}
+                <p class="dashboard-empty">Zuletzt besuchte Einträge werden geladen...</p>
+              {:else if dashboardRecentItems.length > 0}
+                <div class="dashboard-list">
+                  {#each dashboardRecentItems as item (item.id)}
+                    <a class="dashboard-entry dashboard-entry--link" href={getPublicItemHref(item)}>
+                      {#if getItemPreviewUrl(item)}
+                        <img
+                          class="dashboard-entry__thumb"
+                          src={getItemPreviewUrl(item)}
+                          alt={item.title || item.original_name || 'Item'}
+                          width="64"
+                          height="64"
+                          loading="lazy"
+                        />
+                      {:else}
+                        <div class="dashboard-entry__thumb dashboard-entry__thumb--fallback">
+                          {(item.title || item.original_name || '?').slice(0, 1).toUpperCase()}
+                        </div>
+                      {/if}
+
+                      <div class="dashboard-entry__body">
+                        <div class="dashboard-entry__meta">
+                          <strong>{item.title || item.original_name || 'Ohne Titel'}</strong>
+                          <time>{formatDateTime(item.viewedAt)}</time>
+                        </div>
+                        <span class="dashboard-entry__context">Zuletzt besucht</span>
+                        <p>Eintrag erneut öffnen.</p>
+                      </div>
+                    </a>
+                  {/each}
+                </div>
+              {:else}
+                <p class="dashboard-empty">Deine zuletzt geöffneten Einträge erscheinen hier.</p>
               {/if}
             </section>
             {/if}
