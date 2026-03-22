@@ -60,7 +60,7 @@
     { href: '/profile/freigaben', label: 'Freigaben' },
   ];
 
-  $: currentPath = $page.url.pathname;
+  $: currentPath = $page.url?.pathname || '/';
   $: isChatRoute = isActive('/chat');
   $: displayName = $customerBranding?.fullName || $customerBranding?.accountName || '';
   $: userMenuLabel = $isAuthenticated && displayName ? displayName : ($isAuthenticated ? 'Konto' : 'Login');
@@ -213,10 +213,13 @@
   }
 
   function getUserLinkHref(href: string): string {
-    return `${href}?returnTo=${encodeURIComponent(inheritedReturnTo)}`;
+    if (!href) return '/';
+    const separator = href.includes('?') ? '&' : '?';
+    return `${href}${separator}returnTo=${encodeURIComponent(inheritedReturnTo || '/')}`;
   }
 
   function isActive(href: string): boolean {
+    if (!href || !currentPath) return false;
     if (href === '/') return currentPath === '/';
     return currentPath === href || currentPath.startsWith(href + '/');
   }
