@@ -679,6 +679,9 @@ let showRightsManager = false;
   let commentLoading = false;
   let commentStatus = '';
   let lastCommentItemId = '';
+  let activeReplyCommentId: string | null = null;
+  let replyDrafts: Record<string, string> = {};
+  let replyLoadingCommentId: string | null = null;
   let interactionInsightsLoading = false;
   let interactionInsightsLoaded = false;
   let lastInsightsKey = '';
@@ -978,7 +981,11 @@ let showRightsManager = false;
     }
   }
 
-  async function logCommentEvent(eventType: 'comment_create' | 'comment_delete', commentId: string) {
+  async function logCommentEvent(
+    eventType: 'comment_create' | 'comment_delete',
+    commentId: string,
+    parentCommentId: string | null = null
+  ) {
     if (!currentUser?.id || !image?.id) return;
 
     try {
@@ -990,6 +997,7 @@ let showRightsManager = false;
         source: 'item_detail',
         metadata: {
           comment_id: commentId,
+          parent_comment_id: parentCommentId,
           canonical_path: canonicalPath || image.canonical_path || null
         }
       });
@@ -1036,6 +1044,7 @@ let showRightsManager = false;
         .from('item_comments')
         .select(`
           id,
+          parent_comment_id,
           body,
           status,
           created_at,
@@ -1047,7 +1056,7 @@ let showRightsManager = false;
           )
         `)
         .eq('item_id', image.id)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: true });
 
       if (error) throw error;
       comments = isCreator ? data || [] : (data || []).filter((entry: any) => entry.status === 'visible');
@@ -1164,6 +1173,18 @@ let showRightsManager = false;
     return comment?.profiles?.full_name || comment?.profiles?.accountname || 'Unbekannt';
   }
 
+  function getRootComments() {
+    return comments
+      .filter((comment) => !comment.parent_comment_id)
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  }
+
+  function getReplies(parentCommentId: string) {
+    return comments
+      .filter((comment) => comment.parent_comment_id === parentCommentId)
+      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  }
+
   function getCommentAvatarUrl(comment: any) {
     const avatarUrl = comment?.profiles?.avatar_url;
     if (!avatarUrl) return '';
@@ -1208,10 +1229,12 @@ let showRightsManager = false;
           item_id: image.id,
           user_id: currentUser.id,
           body,
-          status: 'visible'
+          status: 'visible',
+          parent_comment_id: null
         })
         .select(`
           id,
+          parent_comment_id,
           body,
           status,
           created_at,
@@ -1229,7 +1252,7 @@ let showRightsManager = false;
       comments = [data, ...comments];
       commentDraft = '';
       commentStatus = 'Kommentar gespeichert.';
-      await logCommentEvent('comment_create', data.id);
+      await logCommentEvent('comment_create', data.id, null);
     } catch (error) {
       console.error('Failed to save comment:', error);
       commentStatus = 'Kommentar konnte nicht gespeichert werden.';
@@ -1252,10 +1275,78 @@ let showRightsManager = false;
 
       comments = comments.filter((comment) => comment.id !== commentId);
       commentStatus = 'Kommentar gelöscht.';
-      await logCommentEvent('comment_delete', commentId);
+      await logCommentEvent('comment_delete', commentId, null);
     } catch (error) {
       console.error('Failed to delete comment:', error);
       commentStatus = 'Kommentar konnte nicht gelöscht werden.';
+    }
+  }
+
+  function openReply(comment: any) {
+    const rootCommentId = comment?.parent_comment_id || comment?.id || null;
+    activeReplyCommentId = rootCommentId;
+    commentStatus = '';
+  }
+
+  async function submitReply(parentCommentId: string) {
+    const body = (replyDrafts[parentCommentId] || '').trim();
+
+    if (!image?.id) return;
+
+    if (!currentUser?.id) {
+      const returnTo = browser ? `${window.location.pathname}${window.location.search}` : canonicalPath || '/';
+      await goto(`/login?returnTo=${encodeURIComponent(returnTo)}`);
+      return;
+    }
+
+    if (!body) {
+      commentStatus = 'Bitte zuerst eine Antwort eingeben.';
+      return;
+    }
+
+    replyLoadingCommentId = parentCommentId;
+    commentStatus = '';
+
+    try {
+      const { data, error } = await supabase
+        .from('item_comments')
+        .insert({
+          item_id: image.id,
+          user_id: currentUser.id,
+          body,
+          status: 'visible',
+          parent_comment_id: parentCommentId
+        })
+        .select(`
+          id,
+          parent_comment_id,
+          body,
+          status,
+          created_at,
+          user_id,
+          profiles!inner(
+            full_name,
+            accountname,
+            avatar_url
+          )
+        `)
+        .single();
+
+      if (error) throw error;
+
+      comments = [...comments, data];
+      replyDrafts = {
+        ...replyDrafts,
+        [parentCommentId]: ''
+      };
+      activeReplyCommentId = null;
+      commentStatus = 'Antwort gespeichert.';
+      await logCommentEvent('comment_create', data.id, parentCommentId);
+    } catch (error) {
+      console.error('Failed to save reply:', error);
+      commentStatus = 'Antwort konnte nicht gespeichert werden.';
+    } finally {
+      replyLoadingCommentId = null;
     }
   }
 
@@ -3359,7 +3450,7 @@ let showRightsManager = false;
         <p class="comment-empty">Kommentare werden geladen...</p>
       {:else if comments.length > 0}
         <div class="comment-list">
-          {#each comments as comment}
+          {#each getRootComments() as comment}
             <article class="comment-item" class:is-hidden={comment.status === 'hidden'}>
               <div class="comment-avatar">
                 {#if getCommentAvatarUrl(comment)}
@@ -3379,6 +3470,9 @@ let showRightsManager = false;
                 <p>{comment.body}</p>
               </div>
               <div class="comment-actions">
+                <button type="button" class="comment-delete-btn" on:click={() => openReply(comment)}>
+                  Antworten
+                </button>
                 {#if isCreator}
                   <button type="button" class="comment-delete-btn" on:click={() => toggleCommentVisibility(comment)}>
                     {comment.status === 'hidden' ? 'Einblenden' : 'Ausblenden'}
@@ -3391,6 +3485,72 @@ let showRightsManager = false;
                 {/if}
               </div>
             </article>
+
+            {#if activeReplyCommentId === comment.id}
+              <div class="comment-reply-form">
+                <textarea
+                  bind:value={replyDrafts[comment.id]}
+                  rows="2"
+                  maxlength="1000"
+                  placeholder={currentUser ? 'Antwort schreiben...' : 'Zum Antworten bitte einloggen.'}
+                  disabled={replyLoadingCommentId === comment.id}
+                ></textarea>
+                <div class="comment-form-footer">
+                  <span>{(replyDrafts[comment.id] || '').trim().length}/1000</span>
+                  <div class="comment-inline-actions">
+                    <button type="button" class="comment-delete-btn" on:click={() => (activeReplyCommentId = null)}>
+                      Abbrechen
+                    </button>
+                    <button
+                      type="button"
+                      class="comment-submit-btn"
+                      on:click={() => submitReply(comment.id)}
+                      disabled={replyLoadingCommentId === comment.id}
+                    >
+                      {replyLoadingCommentId === comment.id ? 'Speichert...' : 'Antworten'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            {/if}
+
+            {#if getReplies(comment.id).length > 0}
+              <div class="comment-replies">
+                {#each getReplies(comment.id) as reply}
+                  <article class="comment-item comment-item--reply" class:is-hidden={reply.status === 'hidden'}>
+                    <div class="comment-avatar">
+                      {#if getCommentAvatarUrl(reply)}
+                        <img src={getCommentAvatarUrl(reply)} alt={getCommentAuthor(reply)} loading="lazy" />
+                      {:else}
+                        <span>{getCommentAuthor(reply).slice(0, 1)}</span>
+                      {/if}
+                    </div>
+                    <div class="comment-body">
+                      <div class="comment-meta">
+                        <strong>{getCommentAuthor(reply)}</strong>
+                        <span>{formatCommentDate(reply.created_at)}</span>
+                        {#if reply.status === 'hidden'}
+                          <span>Ausgeblendet</span>
+                        {/if}
+                      </div>
+                      <p>{reply.body}</p>
+                    </div>
+                    <div class="comment-actions">
+                      {#if isCreator}
+                        <button type="button" class="comment-delete-btn" on:click={() => toggleCommentVisibility(reply)}>
+                          {reply.status === 'hidden' ? 'Einblenden' : 'Ausblenden'}
+                        </button>
+                      {/if}
+                      {#if currentUser?.id === reply.user_id}
+                        <button type="button" class="comment-delete-btn" on:click={() => deleteComment(reply.id)}>
+                          Löschen
+                        </button>
+                      {/if}
+                    </div>
+                  </article>
+                {/each}
+              </div>
+            {/if}
           {/each}
         </div>
       {:else}
@@ -5551,6 +5711,35 @@ let showRightsManager = false;
     gap: 0.9rem;
   }
 
+  .comment-replies {
+    display: grid;
+    gap: 0.7rem;
+    margin-left: 3.2rem;
+  }
+
+  .comment-reply-form {
+    display: grid;
+    gap: 0.7rem;
+    margin-left: 3.2rem;
+    padding: 0.85rem 0.95rem;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-primary);
+  }
+
+  .comment-reply-form textarea {
+    width: 100%;
+    min-height: 4.5rem;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    padding: 0.75rem 0.85rem;
+    font: inherit;
+    resize: vertical;
+    box-sizing: border-box;
+  }
+
   .comment-item {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
@@ -5565,6 +5754,11 @@ let showRightsManager = false;
   .comment-item.is-hidden {
     opacity: 0.76;
     border-style: dashed;
+  }
+
+  .comment-item--reply {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    background: var(--bg-secondary);
   }
 
   .comment-avatar {
@@ -5597,6 +5791,12 @@ let showRightsManager = false;
     gap: 0.45rem;
     align-content: start;
     justify-items: end;
+  }
+
+  .comment-inline-actions {
+    display: flex;
+    gap: 0.55rem;
+    align-items: center;
   }
 
   .comment-meta {
