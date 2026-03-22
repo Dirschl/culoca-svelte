@@ -1,5 +1,7 @@
 <script lang="ts">
-  import { onDestroy, onMount, tick } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
+  import { get } from 'svelte/store';
+  import { browser } from '$app/environment';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import type { PageData } from './$types';
@@ -32,15 +34,6 @@
   let dashboardUnreadCount = 0;
   let dashboardChannels: any[] = [];
   let activeDashboardView: DashboardView = 'all';
-  let selectedConversationId = '';
-  let conversationMessages: any[] = [];
-  let messagesLoading = false;
-  let messageDraft = '';
-  let messageSendLoading = false;
-  let messageStatus = '';
-  let messageListElement: HTMLDivElement | null = null;
-  let activeMessageChannel: any = null;
-  let handledConversationIntentKey = '';
   let dashboardUserSearchQuery = '';
   let dashboardUserSearchResults: any[] = [];
   let dashboardUserSearchLoading = false;
@@ -172,10 +165,6 @@
     if (!value) return 0;
     const time = new Date(value).getTime();
     return Number.isFinite(time) ? time : 0;
-  }
-
-  function buildParticipantKey(firstUserId: string, secondUserId: string) {
-    return [firstUserId, secondUserId].sort().join(':');
   }
 
   function getConversationUnread(entry: any) {
@@ -572,10 +561,6 @@
     }
     dashboardChannels = [];
 
-    if (activeMessageChannel) {
-      supabase.removeChannel(activeMessageChannel);
-      activeMessageChannel = null;
-    }
   }
 
   function setupDashboardChannels(userId: string) {
@@ -623,342 +608,6 @@
       .subscribe();
 
     dashboardChannels = [notificationsChannel, conversationsChannel, followsChannel];
-  }
-
-  async function loadConversationMessages(conversationId: string) {
-    if (!currentUserId || !conversationId) return;
-
-    messagesLoading = true;
-
-    try {
-      const { data, error } = await supabase
-        .from('user_messages')
-        .select(`
-          id,
-          sender_user_id,
-          item_id,
-          body,
-          created_at,
-          items:item_id(
-            id,
-            slug,
-            title,
-            original_name,
-            canonical_path,
-            country_slug,
-            district_slug,
-            municipality_slug,
-            path_512
-          )
-        `)
-        .eq('conversation_id', conversationId)
-        .order('created_at', { ascending: true });
-
-      if (error) throw error;
-
-      conversationMessages = (data || []).map((entry: any) => ({
-        ...entry,
-        item: entry.items || null
-      }));
-      await scrollMessagesToBottom();
-    } catch (error) {
-      console.error('Failed to load conversation messages:', error);
-      conversationMessages = [];
-    } finally {
-      messagesLoading = false;
-    }
-  }
-
-  async function markConversationRead(conversation: any) {
-    if (!currentUserId || !conversation?.id) return;
-
-    const readColumn = conversation.user_a_id === currentUserId ? 'user_a_last_read_at' : 'user_b_last_read_at';
-    const now = new Date().toISOString();
-
-    try {
-      const { error } = await supabase
-        .from('user_conversations')
-        .update({ [readColumn]: now, updated_at: now })
-        .eq('id', conversation.id);
-
-      if (error) throw error;
-
-      dashboardConversations = dashboardConversations.map((entry: any) =>
-        entry.id === conversation.id ? { ...entry, [readColumn]: now } : entry
-      );
-    } catch (error) {
-      console.error('Failed to mark conversation as read:', error);
-    }
-  }
-
-  function setupActiveMessageChannel(conversationId: string) {
-    if (activeMessageChannel) {
-      supabase.removeChannel(activeMessageChannel);
-      activeMessageChannel = null;
-    }
-
-    if (!conversationId) return;
-
-    activeMessageChannel = supabase
-      .channel(`home-messages-${conversationId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'user_messages', filter: `conversation_id=eq.${conversationId}` },
-        async () => {
-          await loadConversationMessages(conversationId);
-          await loadDashboardData();
-        }
-      )
-      .subscribe();
-  }
-
-  async function selectConversation(conversation: any, updateUrl = true) {
-    if (!conversation?.id) return;
-
-    selectedConversationId = conversation.id;
-    messageStatus = '';
-    setupActiveMessageChannel(conversation.id);
-    await loadConversationMessages(conversation.id);
-    await markConversationRead(conversation);
-
-    if (updateUrl) {
-      await goto(`/chat?conversation=${encodeURIComponent(conversation.id)}`, {
-        replaceState: true,
-        noScroll: true,
-        keepFocus: true
-      });
-    }
-  }
-
-  async function ensureConversation(targetUserId: string, itemId: string | null = null) {
-    if (!currentUserId || !targetUserId || targetUserId === currentUserId) return null;
-
-    const participantKey = buildParticipantKey(currentUserId, targetUserId);
-    const existingConversation = dashboardConversations.find((entry: any) => entry.participant_key === participantKey);
-    if (existingConversation) return existingConversation;
-
-    try {
-      const sortedUsers = [currentUserId, targetUserId].sort();
-      const { data, error } = await supabase
-        .from('user_conversations')
-        .insert({
-          participant_key: participantKey,
-          user_a_id: sortedUsers[0],
-          user_b_id: sortedUsers[1],
-          starter_item_id: itemId,
-          created_by_user_id: currentUserId
-        })
-        .select(`
-          id,
-          participant_key,
-          user_a_id,
-          user_b_id,
-          starter_item_id,
-          last_message_at,
-          last_message_preview,
-          last_message_sender_id,
-          user_a_last_read_at,
-          user_b_last_read_at,
-          created_at,
-          user_a:user_a_id(
-            id,
-            full_name,
-            accountname,
-            avatar_url
-          ),
-          user_b:user_b_id(
-            id,
-            full_name,
-            accountname,
-            avatar_url
-          ),
-          starter_item:starter_item_id(
-            id,
-            profile_id,
-            slug,
-            title,
-            original_name,
-            canonical_path,
-            country_slug,
-            district_slug,
-            municipality_slug,
-            path_512
-          )
-        `)
-        .single();
-
-      if (error) throw error;
-
-      const conversation = {
-        ...data,
-        otherUser: data.user_a_id === currentUserId ? data.user_b : data.user_a
-      };
-      dashboardConversations = [conversation, ...dashboardConversations];
-      return conversation;
-    } catch (error: any) {
-      if (error?.code === '23505') {
-        await loadDashboardData();
-        return dashboardConversations.find((entry: any) => entry.participant_key === participantKey) || null;
-      }
-
-      console.error('Failed to ensure conversation:', error);
-      return null;
-    }
-  }
-
-  async function handleInitialConversationIntent() {
-    if (!currentUserId) return;
-
-    const chatWith = ($page.url.searchParams.get('chatWith') || '').trim();
-    const conversationId = ($page.url.searchParams.get('conversation') || '').trim();
-    const itemId = ($page.url.searchParams.get('item') || '').trim() || null;
-    const intentKey = `${currentUserId}:${chatWith}:${conversationId}:${itemId}:${dashboardConversations.length}`;
-
-    if (intentKey === handledConversationIntentKey) return;
-    handledConversationIntentKey = intentKey;
-
-    if (chatWith && chatWith !== currentUserId) {
-      const conversation = await ensureConversation(chatWith, itemId);
-      if (conversation) {
-        await selectConversation(conversation, false);
-      }
-      return;
-    }
-
-    if (conversationId) {
-      const conversation = dashboardConversations.find((entry: any) => entry.id === conversationId);
-      if (conversation) {
-        await selectConversation(conversation, false);
-      }
-      return;
-    }
-
-    if (dashboardConversations.length > 0 && !selectedConversationId) {
-      await selectConversation(dashboardConversations[0], false);
-    }
-  }
-
-  async function openConversation(conversationId: string) {
-    const conversation = dashboardConversations.find((entry: any) => entry.id === conversationId);
-    if (conversation) {
-      await selectConversation(conversation);
-    }
-  }
-
-  async function scrollMessagesToBottom() {
-    await tick();
-    if (messageListElement) {
-      messageListElement.scrollTop = messageListElement.scrollHeight;
-    }
-  }
-
-  async function sendMessage() {
-    const body = messageDraft.trim();
-    const conversation = dashboardConversations.find((entry: any) => entry.id === selectedConversationId);
-
-    if (!currentUserId || !conversation?.id) return;
-    if (!body) {
-      messageStatus = 'Bitte zuerst eine Nachricht eingeben.';
-      return;
-    }
-
-    messageSendLoading = true;
-    messageStatus = '';
-
-    try {
-      const now = new Date().toISOString();
-      const { data, error } = await supabase
-        .from('user_messages')
-        .insert({
-          conversation_id: conversation.id,
-          sender_user_id: currentUserId,
-          item_id: conversation.starter_item_id || null,
-          body
-        })
-        .select(`
-          id,
-          sender_user_id,
-          item_id,
-          body,
-          created_at,
-          items:item_id(
-            id,
-            slug,
-            title,
-            original_name,
-            canonical_path,
-            country_slug,
-            district_slug,
-            municipality_slug,
-            path_512
-          )
-        `)
-        .single();
-
-      if (error) throw error;
-
-      const readColumn = conversation.user_a_id === currentUserId ? 'user_a_last_read_at' : 'user_b_last_read_at';
-      const { error: updateError } = await supabase
-        .from('user_conversations')
-        .update({
-          last_message_at: now,
-          last_message_preview: body.slice(0, 180),
-          last_message_sender_id: currentUserId,
-          [readColumn]: now,
-          updated_at: now
-        })
-        .eq('id', conversation.id);
-
-      if (updateError) throw updateError;
-
-      conversationMessages = [...conversationMessages, { ...data, item: data.items || null }];
-      messageDraft = '';
-      await scrollMessagesToBottom();
-
-      const recipientUserId = conversation.user_a_id === currentUserId ? conversation.user_b_id : conversation.user_a_id;
-      if (recipientUserId && recipientUserId !== currentUserId) {
-        await supabase.from('user_notifications').insert({
-          recipient_user_id: recipientUserId,
-          actor_user_id: currentUserId,
-          item_id: conversation.starter_item_id || null,
-          event_type: 'chat_message',
-          payload: {
-            conversation_id: conversation.id,
-            message_excerpt: body.slice(0, 180),
-            starter_item_id: conversation.starter_item_id || null
-          }
-        });
-      }
-
-      if (conversation.starter_item_id) {
-        await supabase.from('item_events').insert({
-          item_id: conversation.starter_item_id,
-          actor_user_id: currentUserId,
-          owner_user_id: conversation.starter_item?.profile_id || null,
-          event_type: 'chat_message',
-          source: 'home_chat',
-          metadata: {
-            conversation_id: conversation.id,
-            message_id: data.id,
-            message_excerpt: body.slice(0, 180),
-            starter_item_id: conversation.starter_item_id
-          }
-        });
-      }
-
-      await loadDashboardData();
-    } catch (error) {
-      console.error('Error sending message:', error);
-      messageStatus = 'Nachricht konnte gerade nicht gesendet werden.';
-    } finally {
-      messageSendLoading = false;
-    }
-  }
-
-  async function handleMessageKeydown(event: KeyboardEvent) {
-    if (event.key !== 'Enter' || event.shiftKey) return;
-    event.preventDefault();
-    await sendMessage();
   }
 
   function showDashboardPanel(panel: 'inbox' | 'creator' | 'network') {
@@ -1030,9 +679,6 @@
     loadDashboardData();
     setupDashboardChannels(currentUserId);
   }
-  $: if ($isAuthenticated && currentUserId && dashboardLoadedForUser === currentUserId && dashboardConversations) {
-    handleInitialConversationIntent();
-  }
   $: if (!$isAuthenticated) {
     teardownDashboardChannels();
     dashboardConversations = [];
@@ -1044,11 +690,6 @@
     dashboardPriorityFeed = [];
     dashboardUnreadCount = 0;
     dashboardLoadedForUser = '';
-    selectedConversationId = '';
-    conversationMessages = [];
-    messageDraft = '';
-    messageStatus = '';
-    handledConversationIntentKey = '';
     clearDashboardUserSearch();
   }
   $: homeJsonLd = {
@@ -1071,6 +712,14 @@
 
   onMount(() => {
     savedLocation = readRememberedLocation();
+    if (browser) {
+      const p = get(page).url.searchParams;
+      if (p.get('chatWith') || p.get('conversation')) {
+        const qs = p.toString();
+        void goto(qs ? `/chat?${qs}` : '/chat', { replaceState: true });
+        return;
+      }
+    }
     if ($isAuthenticated) {
       loadCurrentUserFullName();
       loadDashboardData();
@@ -1117,129 +766,14 @@
                 <p class="hero-greeting">Hallo, {currentUserFullName}</p>
               {/if}
               <h1>Dein Dashboard</h1>
-              <p class="dashboard-copy">Nachrichten zuerst. Danach folgen Reaktionen, Netzwerk und deine wichtigsten Sprünge.</p>
+              <p class="dashboard-copy">Reaktionen, Netzwerk und priorisierte Sprünge – Chats laufen zentral unter „Chat“ in der Navigation.</p>
             </div>
             <div class="dashboard-actions">
-              <a href="/chat" class="btn-primary">Nachrichten</a>
-              <a href="/galerie" class="btn-secondary">Galerie</a>
+              <a href="/chat" class="btn-secondary">Nachrichten</a>
+              <a href="/galerie" class="btn-primary">Galerie</a>
               <a href={publicProfileHref} class="btn-secondary">Öffentliches Profil</a>
             </div>
           </header>
-
-          <section class="dashboard-chat-hero" id="startseite-inbox">
-            <div class="dashboard-panel__head">
-              <div>
-                <span class="dashboard-kicker">Inbox</span>
-                <h2>Nachrichten zuerst</h2>
-              </div>
-              <a href="#menschen-finden">Neues Gespräch starten</a>
-            </div>
-
-            <div class="dashboard-chat-layout">
-              <div class="conversation-list">
-                {#if dashboardLoading && dashboardConversations.length === 0}
-                  <p class="dashboard-empty">Gespräche werden geladen...</p>
-                {:else if dashboardConversations.length > 0}
-                  {#each dashboardConversations as entry (entry.id)}
-                    <button
-                      type="button"
-                      class="conversation-card"
-                      class:is-active={entry.id === selectedConversationId}
-                      class:is-unread={getConversationUnread(entry)}
-                      on:click={() => selectConversation(entry)}
-                    >
-                      <div class="conversation-card__header">
-                        <div class="conversation-card__user">
-                          {#if getAvatarUrl(entry.otherUser)}
-                            <img
-                              src={getAvatarUrl(entry.otherUser)}
-                              alt={entry.otherUser?.full_name || entry.otherUser?.accountname || 'Profil'}
-                            />
-                          {:else}
-                            <span class="conversation-card__avatar-fallback">
-                              {(entry.otherUser?.full_name || entry.otherUser?.accountname || '?').slice(0, 1).toUpperCase()}
-                            </span>
-                          {/if}
-                          <strong>{entry.otherUser?.full_name || entry.otherUser?.accountname || 'Unbekannt'}</strong>
-                        </div>
-                        <time>{formatDateTime(entry.last_message_at || entry.created_at)}</time>
-                      </div>
-                      {#if entry.starter_item}
-                        <span class="conversation-card__item">
-                          Bezug: {entry.starter_item.title || entry.starter_item.original_name || 'Item'}
-                        </span>
-                      {/if}
-                      <span class="conversation-card__preview">
-                        {entry.last_message_preview || 'Noch keine Nachricht gesendet.'}
-                      </span>
-                    </button>
-                  {/each}
-                {:else}
-                  <p class="dashboard-empty">Deine Gespräche erscheinen hier ganz oben, sobald echte Nachrichten vorliegen.</p>
-                {/if}
-              </div>
-
-              <div class="chat-thread">
-                {#if selectedConversationId}
-                  {@const activeConversation = dashboardConversations.find((entry) => entry.id === selectedConversationId)}
-                  {#if activeConversation}
-                    <div class="chat-thread__header">
-                      <div>
-                        <strong>{activeConversation.otherUser?.full_name || activeConversation.otherUser?.accountname || 'Unbekannt'}</strong>
-                        {#if activeConversation.starter_item}
-                          <span>
-                            zu
-                            <a href={getPublicItemHref(activeConversation.starter_item)}>
-                              {activeConversation.starter_item.title || activeConversation.starter_item.original_name || 'Item'}
-                            </a>
-                          </span>
-                        {/if}
-                      </div>
-                    </div>
-
-                    {#if messagesLoading}
-                      <p class="dashboard-empty">Nachrichten werden geladen...</p>
-                    {:else if conversationMessages.length > 0}
-                      <div class="message-list" bind:this={messageListElement}>
-                        {#each conversationMessages as entry}
-                          <div class="message-bubble" class:is-own={entry.sender_user_id === currentUserId}>
-                            <p>{entry.body}</p>
-                            {#if entry.item}
-                              <a class="message-bubble__item" href={getPublicItemHref(entry.item)}>
-                                {entry.item.title || entry.item.original_name || 'Item'}
-                              </a>
-                            {/if}
-                            <time>{formatDateTime(entry.created_at)}</time>
-                          </div>
-                        {/each}
-                      </div>
-                    {:else}
-                      <p class="dashboard-empty">Noch keine Nachrichten in diesem Gespräch.</p>
-                    {/if}
-
-                    <div class="chat-compose">
-                      <textarea
-                        bind:value={messageDraft}
-                        rows="4"
-                        placeholder="Nachricht schreiben..."
-                        on:keydown={handleMessageKeydown}
-                      />
-                      <div class="chat-compose__actions">
-                        {#if messageStatus}
-                          <span class="dashboard-empty">{messageStatus}</span>
-                        {/if}
-                        <button type="button" class="dashboard-inline-action dashboard-inline-action--primary" on:click={sendMessage} disabled={messageSendLoading}>
-                          {messageSendLoading ? 'Senden...' : 'Nachricht senden'}
-                        </button>
-                      </div>
-                    </div>
-                  {/if}
-                {:else}
-                  <p class="dashboard-empty">Wähle ein Gespräch aus oder starte unten über die Personensuche einen neuen Chat.</p>
-                {/if}
-              </div>
-            </div>
-          </section>
 
           <div class="dashboard-tabs" role="tablist" aria-label="Dashboard-Fokus">
             <button type="button" class="dashboard-tab" class:is-active={activeDashboardView === 'all'} on:click={() => (activeDashboardView = 'all')}>
@@ -1267,7 +801,7 @@
                   <span class="dashboard-kicker">Netzwerk</span>
                   <h2>Menschen finden</h2>
                 </div>
-                <a href="/chat">Inbox</a>
+                <a href="/chat">Zum Chat</a>
               </div>
 
               <div class="dashboard-search__bar">
@@ -1351,7 +885,7 @@
                 <span class="dashboard-kicker">Jetzt wichtig</span>
                 <h2>Priorisierte Übersicht</h2>
               </div>
-                <a href="/chat">Inbox</a>
+                <a href="/chat">Zum Chat</a>
             </div>
 
             {#if dashboardLoading && filteredDashboardPriorityFeed.length === 0}
@@ -1398,65 +932,10 @@
             <section class="dashboard-panel">
               <div class="dashboard-panel__head">
                 <div>
-                  <span class="dashboard-kicker">Nachrichten</span>
-                  <h2>Letzte Gespräche</h2>
-                </div>
-                <a href="/chat">Alle ansehen</a>
-              </div>
-
-              {#if dashboardLoading && dashboardConversations.length === 0}
-                <p class="dashboard-empty">Gespräche werden geladen...</p>
-              {:else if dashboardConversations.length > 0}
-                <div class="dashboard-list">
-                  {#each dashboardConversations as entry (entry.id)}
-                    <button
-                      type="button"
-                      class="dashboard-entry"
-                      class:is-unread={getConversationUnread(entry)}
-                      on:click={() => openConversation(entry.id)}
-                    >
-                      {#if entry.starter_item && getItemPreviewUrl(entry.starter_item)}
-                        <img
-                          class="dashboard-entry__thumb"
-                          src={getItemPreviewUrl(entry.starter_item)}
-                          alt={entry.starter_item.title || entry.starter_item.original_name || 'Item'}
-                          width="64"
-                          height="64"
-                          loading="lazy"
-                        />
-                      {:else}
-                        <div class="dashboard-entry__thumb dashboard-entry__thumb--fallback">
-                          {(entry.otherUser?.full_name || entry.otherUser?.accountname || '?').slice(0, 1).toUpperCase()}
-                        </div>
-                      {/if}
-
-                      <div class="dashboard-entry__body">
-                        <div class="dashboard-entry__meta">
-                          <strong>{entry.otherUser?.full_name || entry.otherUser?.accountname || 'Unbekannt'}</strong>
-                          <time>{formatDateTime(entry.last_message_at)}</time>
-                        </div>
-                        {#if entry.starter_item}
-                          <span class="dashboard-entry__context">
-                            {entry.starter_item.title || entry.starter_item.original_name || 'Item'}
-                          </span>
-                        {/if}
-                        <p>{truncate(entry.last_message_preview, 120) || 'Noch keine Nachricht.'}</p>
-                      </div>
-                    </button>
-                  {/each}
-                </div>
-              {:else}
-                <p class="dashboard-empty">Sobald echte Nachrichten vorliegen, erscheinen deine Gespräche hier.</p>
-              {/if}
-            </section>
-
-            <section class="dashboard-panel">
-              <div class="dashboard-panel__head">
-                <div>
                   <span class="dashboard-kicker">Aktivität</span>
                   <h2>Neue Reaktionen</h2>
                 </div>
-                <a href="/chat">{dashboardUnreadCount > 0 ? `${dashboardUnreadCount} neu` : 'Inbox'}</a>
+                <a href="/chat">{dashboardUnreadCount > 0 ? `${dashboardUnreadCount} neu` : 'Zum Chat'}</a>
               </div>
 
               {#if dashboardLoading && dashboardNotifications.length === 0}
@@ -1616,7 +1095,7 @@
                   <span class="dashboard-kicker">Netzwerk</span>
                   <h2>Gefolgte Profile</h2>
                 </div>
-                <a href="/#menschen-finden">Chats starten</a>
+                <a href="/#menschen-finden">Profile finden</a>
               </div>
 
               {#if dashboardLoading && dashboardFollowedProfiles.length === 0}
@@ -1708,8 +1187,8 @@
 
           <section class="dashboard-shortcuts">
             <a class="dashboard-shortcut" href="/chat">
-              <strong>Inbox</strong>
-              <span>Gespräche direkt oben auf der Startseite öffnen und beantworten.</span>
+              <strong>Chat</strong>
+              <span>Direktnachrichten und Gespräche – zentral unter /chat.</span>
             </a>
             <a class="dashboard-shortcut" href="/galerie">
               <strong>Eigene Galerie</strong>
@@ -1954,23 +1433,6 @@
     color: var(--text-primary);
   }
 
-  .dashboard-chat-hero {
-    display: grid;
-    gap: 1rem;
-    padding: 1rem;
-    border-radius: 24px;
-    background:
-      radial-gradient(circle at top left, rgba(238, 114, 33, 0.16), transparent 38%),
-      color-mix(in srgb, var(--bg-secondary) 90%, white 10%);
-    border: 1px solid color-mix(in srgb, var(--culoca-orange) 20%, var(--border-color) 80%);
-  }
-
-  .dashboard-chat-layout {
-    display: grid;
-    grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
-    gap: 1rem;
-  }
-
   .dashboard-search {
     display: grid;
     gap: 1rem;
@@ -2099,21 +1561,12 @@
     text-decoration: none;
   }
 
-  button.dashboard-entry {
-    cursor: pointer;
-  }
-
   .dashboard-entry--static {
     cursor: default;
   }
 
   .dashboard-entry--search {
     grid-template-columns: 64px minmax(0, 1fr) auto;
-  }
-
-  .dashboard-entry.is-unread {
-    border-color: color-mix(in srgb, var(--culoca-orange) 38%, var(--border-color) 62%);
-    box-shadow: 0 0 0 1px rgba(238, 114, 33, 0.12);
   }
 
   .dashboard-entry__thumb {
@@ -2189,185 +1642,9 @@
     border-color: color-mix(in srgb, var(--culoca-orange) 38%, var(--border-color) 62%);
   }
 
-  .dashboard-inline-action--primary {
-    background: var(--culoca-orange);
-    color: #fff;
-    border-color: var(--culoca-orange);
-  }
-
   .dashboard-empty {
     margin: 0;
     color: var(--text-secondary);
-  }
-
-  .conversation-list {
-    display: grid;
-    gap: 0.75rem;
-    align-content: start;
-  }
-
-  .conversation-card {
-    display: grid;
-    gap: 0.4rem;
-    width: 100%;
-    text-align: left;
-    padding: 0.9rem 1rem;
-    border-radius: 16px;
-    border: 1px solid var(--border-color);
-    background: var(--bg-primary);
-    color: inherit;
-    cursor: pointer;
-  }
-
-  .conversation-card:hover,
-  .conversation-card.is-active {
-    border-color: color-mix(in srgb, var(--culoca-orange) 46%, var(--border-color) 54%);
-  }
-
-  .conversation-card.is-unread {
-    box-shadow: inset 3px 0 0 var(--culoca-orange);
-  }
-
-  .conversation-card__header {
-    display: flex;
-    justify-content: space-between;
-    gap: 0.75rem;
-    align-items: center;
-  }
-
-  .conversation-card__user {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    min-width: 0;
-  }
-
-  .conversation-card__user img,
-  .conversation-card__avatar-fallback {
-    width: 40px;
-    height: 40px;
-    border-radius: 999px;
-    flex-shrink: 0;
-  }
-
-  .conversation-card__user img {
-    object-fit: cover;
-  }
-
-  .conversation-card__avatar-fallback {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background: color-mix(in srgb, var(--culoca-orange) 14%, var(--bg-secondary) 86%);
-    color: var(--text-primary);
-    font-weight: 700;
-  }
-
-  .conversation-card__user strong,
-  .conversation-card__preview,
-  .conversation-card__item {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .conversation-card__item,
-  .conversation-card__preview,
-  .conversation-card time {
-    color: var(--text-secondary);
-    font-size: 0.9rem;
-  }
-
-  .chat-thread {
-    display: grid;
-    gap: 1rem;
-    min-width: 0;
-  }
-
-  .chat-thread__header {
-    padding: 0.95rem 1rem;
-    border-radius: 16px;
-    border: 1px solid var(--border-color);
-    background: var(--bg-primary);
-  }
-
-  .chat-thread__header div {
-    display: grid;
-    gap: 0.2rem;
-  }
-
-  .chat-thread__header span,
-  .chat-thread__header a {
-    color: var(--text-secondary);
-    font-size: 0.95rem;
-  }
-
-  .message-list {
-    display: grid;
-    gap: 0.75rem;
-    max-height: 560px;
-    overflow-y: auto;
-    padding-right: 0.25rem;
-  }
-
-  .message-bubble {
-    display: grid;
-    gap: 0.35rem;
-    padding: 0.9rem 1rem;
-    border-radius: 16px 16px 16px 6px;
-    background: var(--bg-primary);
-    border: 1px solid var(--border-color);
-    max-width: min(100%, 42rem);
-  }
-
-  .message-bubble.is-own {
-    margin-left: auto;
-    border-radius: 16px 16px 6px 16px;
-    background: color-mix(in srgb, var(--culoca-orange) 12%, var(--bg-primary) 88%);
-    border-color: color-mix(in srgb, var(--culoca-orange) 28%, var(--border-color) 72%);
-  }
-
-  .message-bubble p {
-    margin: 0;
-    white-space: pre-wrap;
-    line-height: 1.5;
-  }
-
-  .message-bubble__item,
-  .message-bubble time {
-    color: var(--text-secondary);
-    font-size: 0.85rem;
-  }
-
-  .chat-compose {
-    display: grid;
-    gap: 0.75rem;
-  }
-
-  .chat-compose textarea {
-    width: 100%;
-    padding: 0.9rem 1rem;
-    border: 1px solid var(--border-color);
-    border-radius: 16px;
-    background: var(--bg-primary);
-    color: var(--text-primary);
-    font: inherit;
-    resize: vertical;
-    box-sizing: border-box;
-  }
-
-  .chat-compose textarea:focus {
-    outline: none;
-    border-color: color-mix(in srgb, var(--culoca-orange) 46%, var(--border-color) 54%);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--culoca-orange) 14%, transparent 86%);
-  }
-
-  .chat-compose__actions {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 1rem;
-    flex-wrap: wrap;
   }
 
   .dashboard-shortcuts {
@@ -2718,7 +1995,6 @@
 
   /* ---- Responsive ---- */
   @media (max-width: 960px) {
-    .dashboard-chat-layout,
     .dashboard-priority-list,
     .dashboard-grid,
     .dashboard-shortcuts {
