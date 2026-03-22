@@ -60,6 +60,7 @@
   let recentItems: any[] = [];
   let favoriteItems: any[] = [];
   let likedItems: any[] = [];
+  let creatorInteractions: any[] = [];
   let interactionLoading = true;
 
   $: nameValid = name.length >= 2 && name.length <= 60;
@@ -166,7 +167,8 @@
       const [
         { data: recentData, error: recentError },
         { data: favoriteData, error: favoriteError },
-        { data: likedData, error: likedError }
+        { data: likedData, error: likedError },
+        { data: creatorData, error: creatorError }
       ] = await Promise.all([
         supabase
           .from('item_events')
@@ -228,12 +230,41 @@
           `)
           .eq('user_id', user.id)
           .order('created_at', { ascending: false })
-          .limit(24)
+          .limit(24),
+        supabase
+          .from('item_events')
+          .select(`
+            id,
+            event_type,
+            created_at,
+            actor_user_id,
+            metadata,
+            items!inner(
+              id,
+              slug,
+              title,
+              original_name,
+              canonical_path,
+              country_slug,
+              district_slug,
+              municipality_slug,
+              path_512
+            ),
+            profiles:actor_user_id(
+              full_name,
+              accountname
+            )
+          `)
+          .eq('owner_user_id', user.id)
+          .in('event_type', ['download', 'favorite_add', 'like_add', 'comment_create', 'comment_hide', 'comment_restore'])
+          .order('created_at', { ascending: false })
+          .limit(20)
       ]);
 
       if (recentError) throw recentError;
       if (favoriteError) throw favoriteError;
       if (likedError) throw likedError;
+      if (creatorError) throw creatorError;
 
       const seenRecent = new Set<string>();
       recentItems = (recentData || [])
@@ -257,11 +288,17 @@
         likedAt: entry.created_at,
         ...(entry.items || {})
       }));
+      creatorInteractions = (creatorData || []).map((entry: any) => ({
+        ...entry,
+        item: entry.items || null,
+        actor: entry.profiles || null
+      }));
     } catch (error) {
       console.error('Error loading interactions:', error);
       recentItems = [];
       favoriteItems = [];
       likedItems = [];
+      creatorInteractions = [];
     } finally {
       interactionLoading = false;
     }
@@ -278,6 +315,29 @@
       month: '2-digit',
       year: 'numeric'
     });
+  }
+
+  function getCreatorInteractionActor(entry: any) {
+    return entry?.actor?.full_name || entry?.actor?.accountname || (entry?.actor_user_id ? 'Nutzer' : 'Anonym');
+  }
+
+  function getCreatorInteractionLabel(entry: any) {
+    switch (entry?.event_type) {
+      case 'download':
+        return 'hat dein Bild heruntergeladen';
+      case 'favorite_add':
+        return 'hat dein Bild gemerkt';
+      case 'like_add':
+        return 'findet dein Bild gut';
+      case 'comment_create':
+        return 'hat kommentiert';
+      case 'comment_hide':
+        return 'wurde ausgeblendet';
+      case 'comment_restore':
+        return 'wurde wieder eingeblendet';
+      default:
+        return entry?.event_type || 'hat interagiert';
+    }
   }
 
   function handleAvatarChange(event: Event) {
@@ -684,6 +744,37 @@
               </div>
             {:else}
               <p class="help-text">Noch keine Likes vorhanden.</p>
+            {/if}
+          </div>
+
+          <div class="card">
+            <h3 class="section-title">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M3 12h18" />
+                <path d="M3 6h18" />
+                <path d="M3 18h12" />
+              </svg>
+              Interaktionen auf deinen Items
+            </h3>
+            {#if interactionLoading}
+              <p class="help-text">Interaktionen werden geladen...</p>
+            {:else if creatorInteractions.length > 0}
+              <div class="activity-list">
+                {#each creatorInteractions as entry}
+                  <a class="activity-item" href={entry.item ? getPublicItemHref(entry.item) : '#'}>
+                    <div class="activity-copy">
+                      <strong>{getCreatorInteractionActor(entry)}</strong>
+                      <span>{getCreatorInteractionLabel(entry)}</span>
+                      {#if entry.item}
+                        <em>{entry.item.title || entry.item.original_name || 'Ohne Titel'}</em>
+                      {/if}
+                    </div>
+                    <time>{formatInteractionDate(entry.created_at)}</time>
+                  </a>
+                {/each}
+              </div>
+            {:else}
+              <p class="help-text">Noch keine Interaktionen auf deinen Items vorhanden.</p>
             {/if}
           </div>
 
@@ -1314,6 +1405,47 @@
   .interaction-card span {
     font-size: 0.85rem;
     color: var(--text-secondary);
+  }
+
+  .activity-list {
+    display: grid;
+    gap: 0.7rem;
+  }
+
+  .activity-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 1rem;
+    align-items: center;
+    text-decoration: none;
+    color: inherit;
+    padding: 0.9rem 1rem;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-tertiary);
+    transition: border-color 0.2s ease, transform 0.2s ease;
+  }
+
+  .activity-item:hover {
+    border-color: var(--accent-color);
+    transform: translateY(-1px);
+  }
+
+  .activity-copy {
+    display: grid;
+    gap: 0.2rem;
+    min-width: 0;
+  }
+
+  .activity-copy span,
+  .activity-copy em,
+  .activity-item time {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+  }
+
+  .activity-copy em {
+    font-style: normal;
   }
 
   .section-title {
