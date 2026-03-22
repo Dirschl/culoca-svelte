@@ -135,9 +135,18 @@
             title={isLiked ? 'Like entfernen' : 'Gefällt mir'}
             disabled={likeLoading}
           >
-            <svg width="30" height="30" viewBox="0 0 24 24" fill={isLiked ? 'currentColor' : 'none'} stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M7 11V21" />
-              <path d="M14 5.88L13 10H18.76A2 2 0 0 1 20.72 12.39L19.77 18.39A2 2 0 0 1 17.79 20H7V10L10.59 3.82A1 1 0 0 1 12.4 4.22V5.88Z" />
+            <svg
+              width="30"
+              height="30"
+              viewBox="0 0 24 24"
+              fill={isLiked ? 'currentColor' : 'none'}
+              stroke="currentColor"
+              stroke-width="2.2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M12 20.5l-1.45-1.32C5.4 14.5 2 11.42 2 7.72 2 4.9 4.24 2.75 7.05 2.75c1.6 0 3.14.74 4.15 1.9 1.01-1.16 2.55-1.9 4.15-1.9C18.16 2.75 20.4 4.9 20.4 7.72c0 3.7-3.4 6.78-8.55 11.46L12 20.5z" />
             </svg>
           </button>
         {/if}

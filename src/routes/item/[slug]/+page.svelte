@@ -651,7 +651,7 @@ let showRightsManager = false;
       name: image.title || 'Standort',
       fromItem: true
     });
-    goto('/');
+    goto(imageBackHref || '/');
   }
   
   // Funktion zum Zurücksetzen auf aktuelle GPS-Koordinaten
