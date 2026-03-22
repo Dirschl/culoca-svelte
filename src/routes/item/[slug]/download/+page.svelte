@@ -92,6 +92,11 @@
   let estimateTimer: ReturnType<typeof setTimeout> | null = null;
   let estimateKey = '';
   let upscaleWarning = '';
+  let originalEstimateKey = '';
+  let lastOriginalEstimateKey = '';
+  let originalEstimateLoaded = false;
+  let originalEstimateLoading = false;
+  let originalEstimateLabel = '';
   let previewMetrics: PreviewMetrics = { left: 0, top: 0, width: 1, height: 1 };
   let handleWindowResize: (() => void) | null = null;
   let previewResizeObserver: ResizeObserver | null = null;
@@ -157,6 +162,23 @@
   }
 
   $: upscaleWarning = getUpscaleWarning();
+  $: originalEstimateKey = JSON.stringify({
+    userId: currentUser?.id || null,
+    imageId: image?.id || null,
+    canDownload
+  });
+  $: if (originalEstimateKey !== lastOriginalEstimateKey) {
+    lastOriginalEstimateKey = originalEstimateKey;
+    originalEstimateLoaded = false;
+    originalEstimateLoading = false;
+  }
+  $: originalEstimateLabel =
+    image?.width && image?.height
+      ? `Original: ${image.width} × ${image.height}`
+      : 'Original: Maße unbekannt';
+  $: if (browser && image?.id && currentUser?.id && canDownload && originalEstimateKey && !originalEstimateLoaded && !originalEstimateLoading) {
+    fetchOriginalEstimate();
+  }
 
   $: metadataPreviewKey = JSON.stringify({
     format: settings.format,
@@ -642,6 +664,44 @@
     }
   }
 
+  async function fetchOriginalEstimate() {
+    if (!browser || !image?.id || !currentUser || !canDownload || originalEstimateLoading || originalEstimateLoaded) {
+      return;
+    }
+
+    originalEstimateLoading = true;
+
+    try {
+      const response = await authFetch(`/api/download/${image.id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          mode: 'estimate',
+          options: {
+            sizeMode: 'full',
+            format: 'jpg',
+            metadataMode: 'original',
+            filenameMode: 'original'
+          }
+        })
+      });
+
+      if (!response.ok) {
+        return;
+      }
+
+      const result = await response.json();
+      originalEstimateLabel = `Original: ${formatBytes(result.sizeBytes)} · ${result.width} × ${result.height}`;
+      originalEstimateLoaded = true;
+    } catch {
+      // Keep the original dimensions visible even if the size lookup fails.
+    } finally {
+      originalEstimateLoading = false;
+    }
+  }
+
   function queueEstimate() {
     if (!browser) return;
     if (estimateTimer) clearTimeout(estimateTimer);
@@ -999,6 +1059,7 @@
 
         <div class="preview-meta">
           <strong>{image?.title || image?.original_name || 'Bild'}</strong>
+          <span>{originalEstimateLabel}</span>
           <span>{estimateLabel}</span>
           {#if upscaleWarning}
             <span class="warning-text">{upscaleWarning}</span>
