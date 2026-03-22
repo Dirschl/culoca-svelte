@@ -23,6 +23,7 @@
   let messageSendLoading = false;
   let messageStatus = '';
   let messageListElement: HTMLDivElement | null = null;
+  let composeTextarea: HTMLTextAreaElement | null = null;
   let liveChannels: any[] = [];
   let activeMessageChannel: any = null;
   let handledConversationIntentKey = '';
@@ -432,7 +433,8 @@
     const chatWith = ($page.url.searchParams.get('chatWith') || '').trim();
     const conversationId = ($page.url.searchParams.get('conversation') || '').trim();
     const itemId = ($page.url.searchParams.get('item') || '').trim() || null;
-    const intentKey = `${currentUserId}:${chatWith}:${conversationId}:${itemId}:${conversations.length}`;
+    // Kein conversations.length: sonst mehrfache Läufe nach loadChatData / neue Conversation
+    const intentKey = `${currentUserId}:${chatWith}:${conversationId}:${itemId}`;
 
     if (intentKey === handledConversationIntentKey) return;
     handledConversationIntentKey = intentKey;
@@ -442,6 +444,10 @@
       const conversation = await ensureConversation(chatWith, itemId);
       if (conversation) {
         await selectConversation(conversation, false);
+        await tick();
+        requestAnimationFrame(() => {
+          composeTextarea?.focus();
+        });
       }
       return;
     }
@@ -871,6 +877,7 @@
 
               <div class="chat-compose">
                 <textarea
+                  bind:this={composeTextarea}
                   bind:value={messageDraft}
                   rows="4"
                   placeholder="Nachricht schreiben..."

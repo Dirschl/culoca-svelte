@@ -599,7 +599,7 @@
     </div>
     <iframe
       class="chat-drawer__frame"
-      src="/chat?embed=1"
+      src={chatDrawerSrc}
       title="Culoca Chat"
       loading="lazy"
     ></iframe>
