@@ -147,17 +147,32 @@
     return item?.slug && item?.path_512 ? getSeoImageUrl(item.slug, item.path_512, '512') : '';
   }
 
-  function formatDateTime(value: string | null | undefined): string {
-    if (!value) return '';
+  /** Kompakt für Dashboard-Zeilen: Datum und Uhrzeit getrennt (weniger Breite neben dem Titel). */
+  function formatMetaDateLines(value: string | number | Date | null | undefined): {
+    date: string;
+    time: string;
+    iso: string;
+  } {
+    if (value === null || value === undefined || value === '') {
+      return { date: '', time: '', iso: '' };
+    }
     try {
-      return new Intl.DateTimeFormat('de-DE', {
-        day: '2-digit',
-        month: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit'
-      }).format(new Date(value));
+      const d = value instanceof Date ? value : new Date(value);
+      if (!Number.isFinite(d.getTime())) return { date: '', time: '', iso: '' };
+      return {
+        date: new Intl.DateTimeFormat('de-DE', {
+          day: '2-digit',
+          month: '2-digit',
+          year: '2-digit'
+        }).format(d),
+        time: new Intl.DateTimeFormat('de-DE', {
+          hour: '2-digit',
+          minute: '2-digit'
+        }).format(d),
+        iso: d.toISOString()
+      };
     } catch {
-      return '';
+      return { date: '', time: '', iso: '' };
     }
   }
 
@@ -846,7 +861,7 @@
                         <div class="dashboard-entry__meta">
                           <strong>{profile.full_name || profile.accountname || 'Profil'}</strong>
                           {#if profile.accountname}
-                            <time>@{profile.accountname}</time>
+                            <span class="dashboard-entry__handle">@{profile.accountname}</span>
                           {/if}
                         </div>
                         <span class="dashboard-entry__context">Profil finden, folgen oder direkt schreiben</span>
@@ -913,7 +928,13 @@
                       <div class="dashboard-entry__meta">
                         <strong>{entry.title}</strong>
                         {#if entry.timestamp > 0}
-                          <time>{formatDateTime(new Date(entry.timestamp).toISOString())}</time>
+                          {@const meta = formatMetaDateLines(entry.timestamp)}
+                          {#if meta.date || meta.time}
+                            <time class="dashboard-entry__datetime" datetime={meta.iso}>
+                              {#if meta.date}<span class="dashboard-entry__date-line">{meta.date}</span>{/if}
+                              {#if meta.time}<span class="dashboard-entry__time-line">{meta.time}</span>{/if}
+                            </time>
+                          {/if}
                         {/if}
                       </div>
                       <span class="dashboard-entry__context">{entry.subtitle}</span>
@@ -971,7 +992,15 @@
                       <div class="dashboard-entry__body">
                         <div class="dashboard-entry__meta">
                           <strong>{entry.actor?.full_name || entry.actor?.accountname || 'Jemand'}</strong>
-                          <time>{formatDateTime(entry.created_at)}</time>
+                          {#if entry.created_at}
+                            {@const meta = formatMetaDateLines(entry.created_at)}
+                            {#if meta.date || meta.time}
+                              <time class="dashboard-entry__datetime" datetime={meta.iso}>
+                                {#if meta.date}<span class="dashboard-entry__date-line">{meta.date}</span>{/if}
+                                {#if meta.time}<span class="dashboard-entry__time-line">{meta.time}</span>{/if}
+                              </time>
+                            {/if}
+                          {/if}
                         </div>
                         <span class="dashboard-entry__context">{getNotificationLabel(entry)}</span>
                         <p>{truncate(getNotificationPreview(entry), 120)}</p>
@@ -1028,7 +1057,15 @@
                       <div class="dashboard-entry__body">
                         <div class="dashboard-entry__meta">
                           <strong>{entry.actor?.full_name || entry.actor?.accountname || 'Jemand'}</strong>
-                          <time>{formatDateTime(entry.created_at)}</time>
+                          {#if entry.created_at}
+                            {@const meta = formatMetaDateLines(entry.created_at)}
+                            {#if meta.date || meta.time}
+                              <time class="dashboard-entry__datetime" datetime={meta.iso}>
+                                {#if meta.date}<span class="dashboard-entry__date-line">{meta.date}</span>{/if}
+                                {#if meta.time}<span class="dashboard-entry__time-line">{meta.time}</span>{/if}
+                              </time>
+                            {/if}
+                          {/if}
                         </div>
                         <span class="dashboard-entry__context">Download</span>
                         <p>{truncate(entry.item?.title || entry.item?.original_name || 'Einer deiner Inhalte wurde heruntergeladen', 120)}</p>
@@ -1074,7 +1111,15 @@
                       <div class="dashboard-entry__body">
                         <div class="dashboard-entry__meta">
                           <strong>{item.title || item.original_name || 'Ohne Titel'}</strong>
-                          <time>{formatDateTime(item.viewedAt)}</time>
+                          {#if item.viewedAt}
+                            {@const meta = formatMetaDateLines(item.viewedAt)}
+                            {#if meta.date || meta.time}
+                              <time class="dashboard-entry__datetime" datetime={meta.iso}>
+                                {#if meta.date}<span class="dashboard-entry__date-line">{meta.date}</span>{/if}
+                                {#if meta.time}<span class="dashboard-entry__time-line">{meta.time}</span>{/if}
+                              </time>
+                            {/if}
+                          {/if}
                         </div>
                         <span class="dashboard-entry__context">Zuletzt besucht</span>
                         <p>Eintrag erneut öffnen.</p>
@@ -1122,7 +1167,7 @@
                       <div class="dashboard-entry__body">
                         <div class="dashboard-entry__meta">
                           <strong>{profile.full_name || profile.accountname || 'Profil'}</strong>
-                          <time>@{profile.accountname || 'profil'}</time>
+                          <span class="dashboard-entry__handle">@{profile.accountname || 'profil'}</span>
                         </div>
                         <span class="dashboard-entry__context">Direktnachricht</span>
                         <p>Chat mit diesem Profil öffnen.</p>
@@ -1168,7 +1213,15 @@
                       <div class="dashboard-entry__body">
                         <div class="dashboard-entry__meta">
                           <strong>{item.title || item.original_name || 'Neuer Inhalt'}</strong>
-                          <time>{formatDateTime(item.created_at)}</time>
+                          {#if item.created_at}
+                            {@const meta = formatMetaDateLines(item.created_at)}
+                            {#if meta.date || meta.time}
+                              <time class="dashboard-entry__datetime" datetime={meta.iso}>
+                                {#if meta.date}<span class="dashboard-entry__date-line">{meta.date}</span>{/if}
+                                {#if meta.time}<span class="dashboard-entry__time-line">{meta.time}</span>{/if}
+                              </time>
+                            {/if}
+                          {/if}
                         </div>
                         <span class="dashboard-entry__context">
                           {item.profile?.full_name || item.profile?.accountname || 'Profil'}
@@ -1603,12 +1656,51 @@
   .dashboard-entry__meta {
     display: flex;
     justify-content: space-between;
-    gap: 0.75rem;
-    align-items: center;
+    align-items: flex-start;
+    gap: 0.5rem 0.75rem;
+    min-width: 0;
   }
 
-  .dashboard-entry__meta strong,
-  .dashboard-entry__meta time,
+  .dashboard-entry__meta strong {
+    flex: 1 1 0%;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Datum + Uhrzeit gestapelt: schmale rechte Spalte, Titel darf Ellipsis nutzen */
+  .dashboard-entry__datetime {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.08rem;
+    line-height: 1.15;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .dashboard-entry__date-line,
+  .dashboard-entry__time-line {
+    display: block;
+  }
+
+  /* @accountname neben dem Namen */
+  .dashboard-entry__handle {
+    flex: 0 1 auto;
+    max-width: 40%;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    text-align: right;
+  }
+
   .dashboard-entry__body p,
   .dashboard-entry__context {
     min-width: 0;
@@ -1617,7 +1709,6 @@
     white-space: nowrap;
   }
 
-  .dashboard-entry__meta time,
   .dashboard-entry__context {
     color: var(--text-secondary);
     font-size: 0.85rem;
