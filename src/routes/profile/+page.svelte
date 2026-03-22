@@ -1,6 +1,6 @@
 <script lang="ts">
   import { supabase } from '$lib/supabaseClient';
-  import { onMount } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import SiteNav from '$lib/SiteNav.svelte';
@@ -72,6 +72,8 @@
   let messageDraft = '';
   let messageSendLoading = false;
   let messageStatus = '';
+  let liveChannels: any[] = [];
+  let activeMessageChannel: any = null;
 
   $: nameValid = name.length >= 2 && name.length <= 60;
   $: phoneValid = phone.length === 0 || /^\+?[0-9\- ]{7,20}$/.test(phone);
@@ -116,6 +118,13 @@
         if (urlData?.signedUrl) errorLogUrl = urlData.signedUrl;
       }
     }
+
+    setupLiveChannels(currentUser.id);
+  });
+
+  onDestroy(() => {
+    teardownLiveChannels();
+    teardownMessageChannel();
   });
 
   async function loadProfile() {
@@ -352,6 +361,98 @@
     }
   }
 
+  function teardownLiveChannels() {
+    for (const channel of liveChannels) {
+      supabase.removeChannel(channel);
+    }
+    liveChannels = [];
+  }
+
+  function teardownMessageChannel() {
+    if (activeMessageChannel) {
+      supabase.removeChannel(activeMessageChannel);
+      activeMessageChannel = null;
+    }
+  }
+
+  function setupLiveChannels(currentUserId: string) {
+    teardownLiveChannels();
+
+    if (!currentUserId) return;
+
+    const notificationsChannel = supabase
+      .channel(`profile-notifications-${currentUserId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_notifications',
+          filter: `recipient_user_id=eq.${currentUserId}`
+        },
+        async () => {
+          await loadInteractions();
+        }
+      )
+      .subscribe();
+
+    const conversationsChannel = supabase
+      .channel(`profile-conversations-${currentUserId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_conversations',
+          filter: `user_a_id=eq.${currentUserId}`
+        },
+        async () => {
+          await loadConversations(selectedConversationId || null);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_conversations',
+          filter: `user_b_id=eq.${currentUserId}`
+        },
+        async () => {
+          await loadConversations(selectedConversationId || null);
+        }
+      )
+      .subscribe();
+
+    liveChannels = [notificationsChannel, conversationsChannel];
+  }
+
+  function setupMessageChannel(conversationId: string) {
+    teardownMessageChannel();
+
+    if (!conversationId) return;
+
+    activeMessageChannel = supabase
+      .channel(`profile-messages-${conversationId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'user_messages',
+          filter: `conversation_id=eq.${conversationId}`
+        },
+        async () => {
+          await loadConversationMessages(conversationId);
+          const activeConversation = conversations.find((entry: any) => entry.id === conversationId);
+          if (activeConversation) {
+            await markConversationRead(activeConversation);
+          }
+        }
+      )
+      .subscribe();
+  }
+
   function getAvatarUrl(profileEntry: any) {
     const avatarUrl = profileEntry?.avatar_url;
     if (!avatarUrl) return '';
@@ -454,16 +555,19 @@
         } else {
           selectedConversationId = '';
           conversationMessages = [];
+          teardownMessageChannel();
         }
       } else {
         selectedConversationId = '';
         conversationMessages = [];
+        teardownMessageChannel();
       }
     } catch (error) {
       console.error('Error loading conversations:', error);
       conversations = [];
       selectedConversationId = '';
       conversationMessages = [];
+      teardownMessageChannel();
     } finally {
       conversationLoading = false;
     }
@@ -547,6 +651,7 @@
 
     selectedConversationId = conversation.id;
     messageStatus = '';
+    setupMessageChannel(conversation.id);
     await loadConversationMessages(conversation.id);
 
     if (shouldMarkRead && getConversationUnread(conversation)) {

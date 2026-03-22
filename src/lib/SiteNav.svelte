@@ -13,6 +13,8 @@
   let adminReviewCount = 0;
   let inboxCount = 0;
   let lastInboxRefreshKey = '';
+  let liveInboxChannels: any[] = [];
+  let liveInboxChannelKey = '';
 
   const navLinks = [
     { href: '/foto', label: 'Fotos' },
@@ -134,6 +136,65 @@
     }
   }
 
+  function teardownLiveInboxChannels() {
+    for (const channel of liveInboxChannels) {
+      supabase.removeChannel(channel);
+    }
+    liveInboxChannels = [];
+  }
+
+  function setupLiveInboxChannels() {
+    teardownLiveInboxChannels();
+
+    if (!$isAuthenticated || !$currentUserId) return;
+
+    const notificationsChannel = supabase
+      .channel(`nav-notifications-${$currentUserId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_notifications',
+          filter: `recipient_user_id=eq.${$currentUserId}`
+        },
+        () => {
+          void refreshInboxCount();
+        }
+      )
+      .subscribe();
+
+    const conversationsChannel = supabase
+      .channel(`nav-conversations-${$currentUserId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_conversations',
+          filter: `user_a_id=eq.${$currentUserId}`
+        },
+        () => {
+          void refreshInboxCount();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_conversations',
+          filter: `user_b_id=eq.${$currentUserId}`
+        },
+        () => {
+          void refreshInboxCount();
+        }
+      )
+      .subscribe();
+
+    liveInboxChannels = [notificationsChannel, conversationsChannel];
+  }
+
   function getUserLinkHref(href: string): string {
     return `${href}?returnTo=${encodeURIComponent(inheritedReturnTo)}`;
   }
@@ -191,14 +252,26 @@
   onMount(() => {
     refreshReviewCount();
     refreshInboxCount();
+    setupLiveInboxChannels();
     const handler = (e: MouseEvent) => {
       if (!(e.target as HTMLElement)?.closest('.dropdown')) {
         closeDropdowns();
       }
     };
     document.addEventListener('click', handler);
-    return () => document.removeEventListener('click', handler);
+    return () => {
+      document.removeEventListener('click', handler);
+      teardownLiveInboxChannels();
+    };
   });
+
+  $: {
+    const nextLiveInboxChannelKey = `${$isAuthenticated ? 'auth' : 'anon'}:${$currentUserId || 'none'}`;
+    if (nextLiveInboxChannelKey !== liveInboxChannelKey) {
+      liveInboxChannelKey = nextLiveInboxChannelKey;
+      setupLiveInboxChannels();
+    }
+  }
 </script>
 
 <nav class="site-nav" aria-label="Hauptnavigation">
