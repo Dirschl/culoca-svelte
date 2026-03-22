@@ -179,12 +179,50 @@ async function logDownload(
   }
 }
 
+async function logDownloadEvent(
+  supabase: ReturnType<typeof createAuthedSupabase>,
+  item: DownloadItemRecord,
+  userId: string,
+  source: string,
+  downloadType: string,
+  options: Pick<
+    DownloadExportOptions,
+    'sizeMode' | 'width' | 'height' | 'cropEnabled' | 'format' | 'metadataMode' | 'filenameMode'
+  >
+) {
+  try {
+    await supabase.from('item_events').insert({
+      item_id: item.id,
+      actor_user_id: userId,
+      owner_user_id: item.profile_id || item.user_id,
+      event_type: 'download',
+      source,
+      metadata: {
+        download_type: downloadType,
+        size_mode: options.sizeMode,
+        width: options.width ?? null,
+        height: options.height ?? null,
+        crop_enabled: options.cropEnabled,
+        format: options.format,
+        metadata_mode: options.metadataMode,
+        filename_mode: options.filenameMode
+      }
+    });
+  } catch (logError) {
+    console.warn('Failed to log item event for download:', logError);
+  }
+}
+
 function getLegacyDownloadTypeForRights(unifiedRights: { download?: boolean; download_original?: boolean } | null | undefined) {
   return unifiedRights?.download_original ? 'full_resolution' : 'preview';
 }
 
 function getLegacyDownloadTypeForExport(options: DownloadExportOptions) {
   return options.sizeMode === 'full' ? 'full_resolution' : 'preview';
+}
+
+function getDownloadEventSource(item: DownloadItemRecord, userId: string) {
+  return userId === item.profile_id || userId === item.user_id ? 'owner' : 'rights';
 }
 
 function getLegacyFilename(item: DownloadItemRecord) {
@@ -272,6 +310,22 @@ export const GET: RequestHandler = async ({ params, request }) => {
       user.id,
       getLegacyDownloadTypeForRights(unifiedRights)
     );
+    await logDownloadEvent(
+      supabase,
+      item,
+      user.id,
+      getDownloadEventSource(item, user.id),
+      getLegacyDownloadTypeForRights(unifiedRights),
+      {
+        sizeMode: 'full',
+        width: item.width,
+        height: item.height,
+        cropEnabled: false,
+        format: 'jpg',
+        metadataMode: 'original',
+        filenameMode: 'original'
+      }
+    );
 
     return new Response(buffer, {
       status: 200,
@@ -327,6 +381,14 @@ export const POST: RequestHandler = async ({ params, request }) => {
         user.id,
         getLegacyDownloadTypeForExport(options)
       );
+      await logDownloadEvent(
+        supabase,
+        item,
+        user.id,
+        getDownloadEventSource(item, user.id),
+        getLegacyDownloadTypeForExport(options),
+        options
+      );
 
       return new Response(originalBuffer, {
         status: 200,
@@ -372,6 +434,14 @@ export const POST: RequestHandler = async ({ params, request }) => {
         user.id,
         getLegacyDownloadTypeForExport(options)
       );
+      await logDownloadEvent(
+        supabase,
+        item,
+        user.id,
+        getDownloadEventSource(item, user.id),
+        getLegacyDownloadTypeForExport(options),
+        options
+      );
 
       return new Response(rendered.buffer, {
         status: 200,
@@ -396,6 +466,14 @@ export const POST: RequestHandler = async ({ params, request }) => {
             item,
             user.id,
             getLegacyDownloadTypeForExport(options)
+          );
+          await logDownloadEvent(
+            supabase,
+            item,
+            user.id,
+            getDownloadEventSource(item, user.id),
+            getLegacyDownloadTypeForExport(options),
+            options
           );
 
           return new Response(rewritten.buffer, {
@@ -424,6 +502,14 @@ export const POST: RequestHandler = async ({ params, request }) => {
         item,
         user.id,
         getLegacyDownloadTypeForExport(options)
+      );
+      await logDownloadEvent(
+        supabase,
+        item,
+        user.id,
+        getDownloadEventSource(item, user.id),
+        getLegacyDownloadTypeForExport(options),
+        options
       );
 
       return new Response(originalBuffer, {

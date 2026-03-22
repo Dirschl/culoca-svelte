@@ -4,8 +4,16 @@ import type { RequestHandler } from './$types';
 
 export const POST: RequestHandler = async ({ request, getClientAddress }) => {
   // Create Supabase client directly
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  const supabaseUrl =
+    process.env.PUBLIC_SUPABASE_URL ||
+    process.env.VITE_SUPABASE_URL ||
+    import.meta.env.PUBLIC_SUPABASE_URL ||
+    import.meta.env.VITE_SUPABASE_URL;
+  const supabaseKey =
+    process.env.PUBLIC_SUPABASE_ANON_KEY ||
+    process.env.VITE_SUPABASE_ANON_KEY ||
+    import.meta.env.PUBLIC_SUPABASE_ANON_KEY ||
+    import.meta.env.VITE_SUPABASE_ANON_KEY;
   
   if (!supabaseUrl || !supabaseKey) {
     console.error('[Log Item View] Missing Supabase environment variables');
@@ -28,6 +36,12 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 
     // Determine visitor type based on visitorId
     const visitorType = visitorId ? 'authenticated' : 'anonymous';
+
+    const { data: itemOwner } = await supabase
+      .from('items')
+      .select('profile_id, user_id')
+      .eq('id', itemId)
+      .maybeSingle();
     
     console.log('[Log Item View] Debug info:', {
       itemId,
@@ -146,6 +160,25 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 
     console.log(`[Log Item View] Successfully logged view for item ${itemId} as ${visitorType}`);
     console.log('[Log Item View] Database response:', data);
+
+    try {
+      await supabase.from('item_events').insert({
+        item_id: itemId,
+        actor_user_id: visitorId || null,
+        owner_user_id: itemOwner?.profile_id || itemOwner?.user_id || null,
+        event_type: 'item_view',
+        source: visitorType,
+        metadata: {
+          referer: refererUrl,
+          user_agent: userAgentString,
+          has_gps: !!(validLat && validLon),
+          visitor_lat: validLat,
+          visitor_lon: validLon
+        }
+      });
+    } catch (eventError) {
+      console.warn('[Log Item View] Failed to log item event:', eventError);
+    }
     
     return json({ 
       success: true, 

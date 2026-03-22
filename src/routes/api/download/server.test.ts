@@ -49,6 +49,40 @@ describe('/api/download/[id] POST', () => {
   };
 
   function createSupabaseMock() {
+    const itemEventsInsertMock = vi.fn().mockResolvedValue({
+      data: null,
+      error: null
+    });
+
+    const fromMock = vi.fn((tableName: string) => {
+      if (tableName === 'items') {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: vi.fn().mockResolvedValue({
+                data: itemRecord,
+                error: null
+              })
+            }))
+          }))
+        };
+      }
+
+      if (tableName === 'item_events') {
+        return {
+          insert: itemEventsInsertMock
+        };
+      }
+
+      return {
+        select: vi.fn(),
+        insert: vi.fn().mockResolvedValue({
+          data: null,
+          error: null
+        })
+      };
+    });
+
     return {
       auth: {
         getUser: vi.fn().mockResolvedValue({
@@ -56,16 +90,7 @@ describe('/api/download/[id] POST', () => {
           error: null
         })
       },
-      from: vi.fn(() => ({
-        select: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            maybeSingle: vi.fn().mockResolvedValue({
-              data: itemRecord,
-              error: null
-            })
-          }))
-        }))
-      })),
+      from: fromMock,
       rpc: vi.fn((fnName: string) => {
         if (fnName === 'get_unified_item_rights') {
           return Promise.resolve({
@@ -79,7 +104,8 @@ describe('/api/download/[id] POST', () => {
         }
 
         return Promise.resolve({ data: null, error: null });
-      })
+      }),
+      __itemEventsInsertMock: itemEventsInsertMock
     };
   }
 
@@ -229,6 +255,7 @@ describe('/api/download/[id] POST', () => {
   it('logs custom exports with legacy download types so statistics keep working', async () => {
     const supabaseMock = createSupabaseMock();
     createClientMock.mockReturnValue(supabaseMock);
+    const itemEventsInsertMock = supabaseMock.__itemEventsInsertMock;
 
     const options = {
       sizeMode: 'custom',
@@ -275,5 +302,24 @@ describe('/api/download/[id] POST', () => {
       p_download_type: 'preview',
       p_download_source: 'owner'
     });
+    expect(itemEventsInsertMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        item_id: itemRecord.id,
+        actor_user_id: 'owner-1',
+        owner_user_id: 'owner-1',
+        event_type: 'download',
+        source: 'owner',
+        metadata: expect.objectContaining({
+          download_type: 'preview',
+          size_mode: 'custom',
+          width: 1200,
+          height: 630,
+          crop_enabled: true,
+          format: 'jpg',
+          metadata_mode: 'culoca',
+          filename_mode: 'web'
+        })
+      })
+    );
   });
 });
