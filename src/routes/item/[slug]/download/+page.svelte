@@ -79,11 +79,11 @@
   let currentUser: { id: string } | null = null;
   let isCreator = false;
   let canDownload = false;
-  let estimateLabel = 'Dateigröße auf Anfrage berechnen';
+  let estimateLabel = 'Dateigröße wird berechnet...';
   let estimatedFilename = '';
   let estimateError = '';
   let isEstimating = false;
-  let estimateEnabled = false;
+  let estimateEnabled = true;
   let isDownloading = false;
   let previewImageUrl = '';
   let dragState: DragState = null;
@@ -627,12 +627,6 @@
     }, 350);
   }
 
-  function requestEstimate() {
-    estimateEnabled = true;
-    estimateLabel = 'Dateigröße wird berechnet...';
-    queueEstimate();
-  }
-
   function readRememberedSettings() {
     if (!browser) return;
     const raw = localStorage.getItem(SETTINGS_KEY);
@@ -983,11 +977,6 @@
         <div class="preview-meta">
           <strong>{image?.title || image?.original_name || 'Bild'}</strong>
           <span>{estimateLabel}</span>
-          {#if !estimateEnabled}
-            <button class="estimate-button" type="button" on:click={requestEstimate}>
-              Dateigröße berechnen
-            </button>
-          {/if}
           {#if isEstimating}
             <span>Vorschau wird aktualisiert...</span>
           {/if}
@@ -1323,23 +1312,6 @@
     flex-direction: column;
     gap: 0.35rem;
     padding: 1rem 0.25rem 0.15rem;
-  }
-
-  .estimate-button {
-    align-self: flex-start;
-    margin-top: 0.25rem;
-    border: 1px solid var(--border-color, #d6d3d1);
-    background: var(--bg-secondary, #f6f3ef);
-    color: var(--text-primary, #2c241d);
-    border-radius: 999px;
-    padding: 0.45rem 0.9rem;
-    font: inherit;
-    font-weight: 600;
-    cursor: pointer;
-  }
-
-  .estimate-button:hover {
-    background: var(--bg-tertiary, #ebe5de);
   }
 
   .preview-meta strong {
