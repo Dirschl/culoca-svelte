@@ -516,12 +516,12 @@
   function getCulocaMetadataPreview(): MetadataPreview {
     const original = getOriginalMetadataPreview();
     const creator = firstText(image?.profile?.full_name, image?.profile?.accountname, original.creator, 'Unbekannt');
-    const copyright = original.copyright ? `${original.copyright} | Culoca` : `${creator} | Culoca`;
+    const copyright = original.copyright ? `${original.copyright} | culoca.com` : `${creator} | culoca.com`;
 
     return {
       title: firstText(image?.title),
-      caption: firstText(image?.caption),
-      description: firstText(image?.description),
+      caption: firstText(image?.caption, original.caption),
+      description: firstText(image?.description, image?.caption, original.description),
       keywords: firstText(Array.isArray(image?.keywords) ? image.keywords.join(', ') : image?.keywords),
       creator,
       copyright,
@@ -927,9 +927,11 @@
 
   onDestroy(() => {
     unifiedRightsStore.reset();
-    window.removeEventListener('pointermove', handlePointerMove);
-    window.removeEventListener('pointerup', handlePointerUp);
-    if (handleWindowResize) window.removeEventListener('resize', handleWindowResize);
+    if (browser) {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+      if (handleWindowResize) window.removeEventListener('resize', handleWindowResize);
+    }
     previewResizeObserver?.disconnect();
     if (estimateTimer) clearTimeout(estimateTimer);
   });

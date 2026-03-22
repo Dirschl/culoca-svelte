@@ -268,6 +268,25 @@ function buildGpsInfo(lat: unknown, lon: unknown) {
   };
 }
 
+function getAutoOrientedDimensions(metadata: Metadata) {
+  const width = metadata.width || 0;
+  const height = metadata.height || 0;
+
+  if (!width || !height) {
+    return { width, height };
+  }
+
+  const orientation = metadata.orientation || 1;
+  if ([5, 6, 7, 8].includes(orientation)) {
+    return {
+      width: height,
+      height: width
+    };
+  }
+
+  return { width, height };
+}
+
 function compactObject<T extends Record<string, unknown>>(input: T) {
   return Object.fromEntries(
     Object.entries(input).filter(([, value]) => value !== null && value !== undefined && value !== '')
@@ -375,7 +394,7 @@ function buildCulocaExif(item: DownloadableItem, width: number, height: number) 
       XPComment: caption || description,
       XPAuthor: artist,
       XPKeywords: keywords,
-      XPSubject: firstString(title, description)
+      XPSubject: firstString(caption, title, description)
     }),
     ExifIFD: stringifyExifValues({
       ...original.ExifIFD,
@@ -388,10 +407,13 @@ function buildCulocaExif(item: DownloadableItem, width: number, height: number) 
 
 function buildCulocaXmp(item: DownloadableItem) {
   const creator = firstString(item.profile?.full_name, item.profile?.accountname, 'Unbekannt');
+  const original = buildOriginalExif(item, item.width || 0, item.height || 0);
   const title = firstString(item.title);
-  const caption = firstString(item.caption);
+  const caption = firstString(item.caption, original.IFD0.XPSubject, original.IFD0.XPComment);
   const description = firstString(item.description, caption, 'Culoca Export');
-  const copyright = `${creator} | culoca.com`;
+  const copyright = firstString(original.IFD0.Copyright)
+    ? `${firstString(original.IFD0.Copyright)} | culoca.com`
+    : `${creator} | culoca.com`;
   const keywords = Array.isArray(item.keywords)
     ? item.keywords.filter((keyword): keyword is string => typeof keyword === 'string' && keyword.trim().length > 0)
     : [];
@@ -476,8 +498,9 @@ export async function renderDownloadExport(
   const options = normalizeDownloadExportOptions(rawOptions);
   const baseImage = sharp(originalBuffer).rotate();
   const metadata = await baseImage.metadata();
-  const baseWidth = metadata.width || 0;
-  const baseHeight = metadata.height || 0;
+  const orientedDimensions = getAutoOrientedDimensions(metadata);
+  const baseWidth = orientedDimensions.width || 0;
+  const baseHeight = orientedDimensions.height || 0;
 
   if (!baseWidth || !baseHeight) {
     throw new Error('Bilddimensionen konnten nicht gelesen werden');
