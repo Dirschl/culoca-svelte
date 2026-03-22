@@ -125,7 +125,10 @@ describe('downloadExport', () => {
       const tags = await exiftool.read(tempFile);
 
       expect(tags.Copyright).toBe('Johann Dirschl | culoca.com');
-      expect(tags.Headline).toBe('Ein stiller Moment im Abendlicht.');
+      expect(tags.Headline).toBe('Abendlicht am Weiher');
+      expect(tags.Title).toBe('Ein stiller Moment im Abendlicht.');
+      expect(tags.UsageTerms).toBe('culoca.com');
+      expect(tags.Marked).toBe(true);
       expect(tags.ImageDescription).toBe('Ein stiller Moment im Abendlicht.');
     } finally {
       await fs.unlink(tempFile).catch(() => undefined);

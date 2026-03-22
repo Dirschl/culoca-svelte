@@ -428,6 +428,7 @@ function buildCulocaXmp(item: DownloadableItem) {
   const copyright = firstString(original.IFD0.Copyright)
     ? `${firstString(original.IFD0.Copyright)} | culoca.com`
     : `${creator} | culoca.com`;
+  const usageTerms = 'culoca.com';
   const keywords = Array.isArray(item.keywords)
     ? item.keywords.filter((keyword): keyword is string => typeof keyword === 'string' && keyword.trim().length > 0)
     : [];
@@ -440,13 +441,14 @@ function buildCulocaXmp(item: DownloadableItem) {
       xmlns:dc="http://purl.org/dc/elements/1.1/"
       xmlns:photoshop="http://ns.adobe.com/photoshop/1.0/"
       xmlns:xmpRights="http://ns.adobe.com/xap/1.0/rights/">
-      ${buildLangAlt('dc:title', title)}
+      ${buildLangAlt('dc:title', caption)}
       ${buildLangAlt('dc:description', description)}
       ${buildSeq('dc:creator', [creator])}
       ${buildBag('dc:subject', keywords)}
       ${buildLangAlt('dc:rights', copyright)}
-      ${buildLangAlt('photoshop:Headline', caption)}
-      ${buildLangAlt('xmpRights:UsageTerms', copyright)}
+      ${buildLangAlt('photoshop:Headline', title)}
+      <xmpRights:Marked>True</xmpRights:Marked>
+      ${buildLangAlt('xmpRights:UsageTerms', usageTerms)}
     </rdf:Description>
   </rdf:RDF>
 </x:xmpmeta>`;
@@ -460,6 +462,7 @@ function buildCulocaExiftoolTags(item: DownloadableItem) {
   const creator = firstString(item.profile?.full_name, item.profile?.accountname, extracted.creator, 'Unbekannt');
   const originalCopyright = firstString(item.exif_data?.Copyright, extracted.copyright);
   const copyright = originalCopyright ? `${originalCopyright} | culoca.com` : `${creator} | culoca.com`;
+  const usageTerms = 'culoca.com';
   const keywords = Array.isArray(item.keywords)
     ? item.keywords.filter((keyword): keyword is string => typeof keyword === 'string' && keyword.trim().length > 0)
     : [];
@@ -472,16 +475,18 @@ function buildCulocaExiftoolTags(item: DownloadableItem) {
     Copyright: copyright,
     'IPTC:CopyrightNotice': copyright,
     'XMP-dc:Rights': copyright,
-    Headline: caption,
-    'IPTC:Headline': caption,
-    'XMP-photoshop:Headline': caption,
-    Title: title,
-    'XMP-dc:Title': title,
+    Headline: title,
+    'IPTC:Headline': title,
+    'XMP-photoshop:Headline': title,
+    Title: caption,
+    'XMP-dc:Title': caption,
     ImageDescription: description,
     Description: description,
     'IPTC:Caption-Abstract': description,
     'XMP-dc:Description': description,
-    XPTitle: title,
+    'XMP-xmpRights:UsageTerms': usageTerms,
+    'XMP-xmpRights:Marked': true,
+    XPTitle: caption,
     XPComment: caption || description,
     XPAuthor: creator,
     XPKeywords: keywords.length ? keywords.join('; ') : null,
