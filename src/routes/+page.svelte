@@ -965,7 +965,11 @@
           </div>
 
           {#if showDashboardUserSearch()}
-            <DashboardLocationPanel {savedLocation} />
+            <div class="dashboard-location-row">
+              <div class="dashboard-location-row__cell">
+                <DashboardLocationPanel {savedLocation} />
+              </div>
+            </div>
           {/if}
 
           <div class="dashboard-grid">
@@ -1565,6 +1569,18 @@
     align-items: start;
   }
 
+  /* Standort nur linke Spalte (halbe Content-Breite), sonst wirkt die Karte wie ein Streifen */
+  .dashboard-location-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+    align-items: start;
+  }
+
+  .dashboard-location-row__cell {
+    min-width: 0;
+  }
+
   .dashboard-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2131,6 +2147,7 @@
   /* ---- Responsive ---- */
   @media (max-width: 960px) {
     .dashboard-top-row,
+    .dashboard-location-row,
     .dashboard-grid,
     .dashboard-shortcuts {
       grid-template-columns: 1fr;
