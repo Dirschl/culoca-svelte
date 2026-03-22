@@ -161,7 +161,7 @@
     queueEstimate();
   }
 
-  $: upscaleWarning = getUpscaleWarning();
+  $: upscaleWarning = getUpscaleWarning(settings, cropRect, image);
   $: originalEstimateKey = JSON.stringify({
     userId: currentUser?.id || null,
     imageId: image?.id || null,
@@ -378,15 +378,24 @@
     return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
   }
 
-  function getUpscaleWarning() {
-    if (settings.sizeMode !== 'custom' || !settings.cropEnabled || !image?.width || !image?.height) {
+  function getUpscaleWarning(
+    currentSettings: ExportSettings,
+    currentCropRect: CropRect,
+    currentImage: typeof image
+  ) {
+    if (
+      currentSettings.sizeMode !== 'custom' ||
+      !currentSettings.cropEnabled ||
+      !currentImage?.width ||
+      !currentImage?.height
+    ) {
       return '';
     }
 
-    const sourceCropWidth = Math.max(1, Math.round(image.width * cropRect.width));
-    const sourceCropHeight = Math.max(1, Math.round(image.height * cropRect.height));
-    const targetWidth = Math.max(1, settings.width || sourceCropWidth);
-    const targetHeight = Math.max(1, settings.height || sourceCropHeight);
+    const sourceCropWidth = Math.max(1, Math.round(currentImage.width * currentCropRect.width));
+    const sourceCropHeight = Math.max(1, Math.round(currentImage.height * currentCropRect.height));
+    const targetWidth = Math.max(1, currentSettings.width || sourceCropWidth);
+    const targetHeight = Math.max(1, currentSettings.height || sourceCropHeight);
     const scaleX = targetWidth / sourceCropWidth;
     const scaleY = targetHeight / sourceCropHeight;
     const upscaleFactor = Math.max(scaleX, scaleY);
