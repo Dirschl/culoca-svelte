@@ -75,26 +75,33 @@
           <div><strong>{data.followingCount}</strong><span>folgt</span></div>
         </div>
       </header>
-      <div class="items-grid">
-        {#each data.items as item (item.id)}
-          <article class="item-card">
-            <a href={itemHref(item)}>
-              {#if item.path_512}
-                <img
-                  src={getSeoImageUrl(item.slug, item.path_512, '512')}
-                  alt={item.title || creatorName}
-                  loading="lazy"
-                  decoding="async"
-                  width="320"
-                  height="213"
-                />
-              {/if}
-              <h2>{item.title || item.slug}</h2>
-              <p>{trimText(item.description || item.caption || `Mehr Inhalte von ${creatorName}.`, 110)}</p>
-            </a>
-          </article>
-        {/each}
-      </div>
+      {#if data.items.length}
+        <div class="items-grid">
+          {#each data.items as item (item.id)}
+            <article class="item-card">
+              <a href={itemHref(item)}>
+                {#if item.path_512}
+                  <img
+                    src={getSeoImageUrl(item.slug, item.path_512, '512')}
+                    alt={item.title || creatorName}
+                    loading="lazy"
+                    decoding="async"
+                    width="320"
+                    height="213"
+                  />
+                {/if}
+                <h2>{item.title || item.slug}</h2>
+                <p>{trimText(item.description || item.caption || `Mehr Inhalte von ${creatorName}.`, 110)}</p>
+              </a>
+            </article>
+          {/each}
+        </div>
+      {:else}
+        <section class="empty-gallery">
+          <h2>Noch keine öffentlichen Inhalte</h2>
+          <p>Dieses Profil ist schon erreichbar, aber aktuell sind noch keine öffentlichen Einträge in der Galerie sichtbar.</p>
+        </section>
+      {/if}
     </div>
   </main>
   <SiteFooter />
@@ -112,6 +119,14 @@
   .hub-stats div { display: grid; gap: 0.15rem; min-width: 120px; }
   .hub-stats strong { font-size: 1.2rem; }
   .hub-stats span { color: var(--text-secondary); font-size: 0.92rem; }
+  .empty-gallery {
+    padding: 1.5rem;
+    border-radius: 18px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+  }
+  .empty-gallery h2 { margin: 0 0 0.45rem; }
+  .empty-gallery p { margin: 0; color: var(--text-secondary); max-width: 60ch; }
   .items-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
   .item-card a { display: block; color: inherit; text-decoration: none; }
   .item-card img { width: 100%; height: auto; border-radius: 12px; margin-bottom: 0.75rem; background: var(--bg-secondary); }

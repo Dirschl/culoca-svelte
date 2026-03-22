@@ -4,10 +4,12 @@
   import type { PageData } from './$types';
   import SiteNav from '$lib/SiteNav.svelte';
   import SiteFooter from '$lib/SiteFooter.svelte';
+  import FollowButton from '$lib/FollowButton.svelte';
   import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
   import { isAuthenticated } from '$lib/sessionStore';
   import { readRememberedLocation, type RememberedLocation } from '$lib/locationPreferences';
   import { appendReturnTo, getPublicItemHref } from '$lib/content/routing';
+  import { authFetch } from '$lib/authFetch';
   import { supabase } from '$lib/supabaseClient';
   import { buildBreadcrumbJsonLd, DEFAULT_OG_IMAGE, trimText } from '$lib/seo/site';
 
@@ -28,6 +30,11 @@
   let dashboardUnreadCount = 0;
   let dashboardChannels: any[] = [];
   let activeDashboardView: DashboardView = 'all';
+  let dashboardUserSearchQuery = '';
+  let dashboardUserSearchResults: any[] = [];
+  let dashboardUserSearchLoading = false;
+  let dashboardUserSearchMessage = '';
+  let dashboardUserSearchTimeout: ReturnType<typeof setTimeout> | null = null;
 
   const TYPE_ICONS: Record<string, string> = {
     foto: '📷',
@@ -51,6 +58,10 @@
   function truncate(text: string | null | undefined, max: number): string {
     if (!text) return '';
     return text.length > max ? text.slice(0, max).trimEnd() + '...' : text;
+  }
+
+  function normalizeUserSearchQuery(value: string): string {
+    return value.trim().replace(/^@+/, '');
   }
 
   function formatDate(iso: string | null): string {
@@ -581,6 +592,64 @@
     return activeDashboardView === 'all' || activeDashboardView === panel;
   }
 
+  function showDashboardUserSearch() {
+    return activeDashboardView === 'all' || activeDashboardView === 'network';
+  }
+
+  async function searchDashboardUsers() {
+    const query = normalizeUserSearchQuery(dashboardUserSearchQuery);
+
+    if (!$isAuthenticated || !currentUserId || query.length < 2) {
+      dashboardUserSearchResults = [];
+      dashboardUserSearchMessage = query.length === 1 ? 'Bitte mindestens 2 Zeichen eingeben.' : '';
+      return;
+    }
+
+    dashboardUserSearchLoading = true;
+    dashboardUserSearchMessage = '';
+
+    try {
+      const response = await authFetch(`/api/search-users?q=${encodeURIComponent(query)}`);
+
+      if (!response.ok) {
+        dashboardUserSearchResults = [];
+        dashboardUserSearchMessage = 'Die Suche ist gerade nicht verfügbar.';
+        return;
+      }
+
+      const payload = await response.json();
+      dashboardUserSearchResults = payload.users || [];
+      dashboardUserSearchMessage = dashboardUserSearchResults.length === 0 ? 'Keine passenden Profile gefunden.' : '';
+    } catch (error) {
+      console.error('Dashboard user search failed:', error);
+      dashboardUserSearchResults = [];
+      dashboardUserSearchMessage = 'Die Suche ist gerade nicht verfügbar.';
+    } finally {
+      dashboardUserSearchLoading = false;
+    }
+  }
+
+  function handleDashboardUserSearchInput() {
+    if (dashboardUserSearchTimeout) {
+      clearTimeout(dashboardUserSearchTimeout);
+    }
+
+    dashboardUserSearchTimeout = setTimeout(() => {
+      searchDashboardUsers();
+    }, 250);
+  }
+
+  function clearDashboardUserSearch() {
+    dashboardUserSearchQuery = '';
+    dashboardUserSearchResults = [];
+    dashboardUserSearchMessage = '';
+    dashboardUserSearchLoading = false;
+    if (dashboardUserSearchTimeout) {
+      clearTimeout(dashboardUserSearchTimeout);
+      dashboardUserSearchTimeout = null;
+    }
+  }
+
   $: if ($isAuthenticated && !currentUserFullName) {
     loadCurrentUserFullName();
   }
@@ -598,6 +667,7 @@
     dashboardPriorityFeed = [];
     dashboardUnreadCount = 0;
     dashboardLoadedForUser = '';
+    clearDashboardUserSearch();
   }
   $: homeJsonLd = {
     '@context': 'https://schema.org',
@@ -627,6 +697,9 @@
 
   onDestroy(() => {
     teardownDashboardChannels();
+    if (dashboardUserSearchTimeout) {
+      clearTimeout(dashboardUserSearchTimeout);
+    }
   });
 </script>
 
@@ -689,6 +762,91 @@
               <strong>{dashboardTabCounts.network}</strong>
             </button>
           </div>
+
+          {#if showDashboardUserSearch()}
+            <section class="dashboard-search">
+              <div class="dashboard-panel__head">
+                <div>
+                  <span class="dashboard-kicker">Netzwerk</span>
+                  <h2>Menschen finden</h2>
+                </div>
+                <a href="/profile">Inbox</a>
+              </div>
+
+              <div class="dashboard-search__bar">
+                <input
+                  class="dashboard-search__input"
+                  type="search"
+                  bind:value={dashboardUserSearchQuery}
+                  on:input={handleDashboardUserSearchInput}
+                  placeholder="Namen oder @accountname suchen"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+                {#if dashboardUserSearchQuery}
+                  <button type="button" class="dashboard-search__clear" on:click={clearDashboardUserSearch}>
+                    Zurücksetzen
+                  </button>
+                {/if}
+              </div>
+
+              {#if dashboardUserSearchLoading}
+                <p class="dashboard-empty">Profile werden gesucht...</p>
+              {:else if dashboardUserSearchResults.length > 0}
+                <div class="dashboard-list">
+                  {#each dashboardUserSearchResults as profile (profile.id)}
+                    <div class="dashboard-entry dashboard-entry--static dashboard-entry--search">
+                      {#if getAvatarUrl(profile)}
+                        <img
+                          class="dashboard-entry__thumb"
+                          src={getAvatarUrl(profile)}
+                          alt={profile.full_name || profile.accountname || 'Profil'}
+                          width="64"
+                          height="64"
+                          loading="lazy"
+                        />
+                      {:else}
+                        <div class="dashboard-entry__thumb dashboard-entry__thumb--fallback">
+                          {(profile.full_name || profile.accountname || '?').slice(0, 1).toUpperCase()}
+                        </div>
+                      {/if}
+
+                      <div class="dashboard-entry__body">
+                        <div class="dashboard-entry__meta">
+                          <strong>{profile.full_name || profile.accountname || 'Profil'}</strong>
+                          {#if profile.accountname}
+                            <time>@{profile.accountname}</time>
+                          {/if}
+                        </div>
+                        <span class="dashboard-entry__context">Profil finden, folgen oder direkt schreiben</span>
+                        <p>{profile.email || 'Öffentliches Profil und Direktnachrichten sind von hier aus erreichbar.'}</p>
+                      </div>
+
+                      <div class="dashboard-entry__actions">
+                        <a class="dashboard-inline-action" href={`/profile?chatWith=${encodeURIComponent(profile.id)}`}>
+                          Chat
+                        </a>
+                        {#if profile.accountname}
+                          <a class="dashboard-inline-action" href={`/${encodeURIComponent(profile.accountname)}`}>
+                            Profil
+                          </a>
+                        {/if}
+                        <FollowButton
+                          targetUserId={profile.id}
+                          targetLabel={profile.full_name || profile.accountname || 'Profil'}
+                          compact={true}
+                        />
+                      </div>
+                    </div>
+                  {/each}
+                </div>
+              {:else if dashboardUserSearchMessage}
+                <p class="dashboard-empty">{dashboardUserSearchMessage}</p>
+              {:else}
+                <p class="dashboard-empty">Suche nach Namen oder `@accountname`, um direkt einen Chat zu starten oder Profile zu folgen.</p>
+              {/if}
+            </section>
+          {/if}
 
           <section class="dashboard-priority">
             <div class="dashboard-panel__head">
@@ -1175,7 +1333,8 @@
   }
 
   .dashboard-inner {
-    max-width: 1200px;
+    width: 100%;
+    max-width: 1680px;
     margin: 0 auto;
     display: grid;
     gap: 1.25rem;
@@ -1250,6 +1409,56 @@
     border-color: color-mix(in srgb, var(--culoca-orange) 45%, var(--border-color) 55%);
     background: color-mix(in srgb, var(--culoca-orange) 12%, var(--bg-secondary) 88%);
     color: var(--text-primary);
+  }
+
+  .dashboard-search {
+    display: grid;
+    gap: 1rem;
+    padding: 1.15rem;
+    border-radius: 22px;
+    border: 1px solid color-mix(in srgb, var(--culoca-orange) 16%, var(--border-color) 84%);
+    background:
+      radial-gradient(circle at top right, rgba(238, 114, 33, 0.1), transparent 34%),
+      color-mix(in srgb, var(--bg-secondary) 92%, white 8%);
+  }
+
+  .dashboard-search__bar {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .dashboard-search__input {
+    flex: 1 1 420px;
+    min-width: 240px;
+    border-radius: 16px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    padding: 0.9rem 1rem;
+    font: inherit;
+  }
+
+  .dashboard-search__input:focus {
+    outline: none;
+    border-color: color-mix(in srgb, var(--culoca-orange) 48%, var(--border-color) 52%);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--culoca-orange) 14%, transparent 86%);
+  }
+
+  .dashboard-search__clear {
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    background: var(--bg-primary);
+    color: var(--text-secondary);
+    font: inherit;
+    padding: 0.72rem 0.95rem;
+    cursor: pointer;
+  }
+
+  .dashboard-search__clear:hover {
+    color: var(--text-primary);
+    border-color: color-mix(in srgb, var(--culoca-orange) 38%, var(--border-color) 62%);
   }
 
   .dashboard-grid {
@@ -1334,6 +1543,14 @@
     cursor: pointer;
   }
 
+  .dashboard-entry--static {
+    cursor: default;
+  }
+
+  .dashboard-entry--search {
+    grid-template-columns: 64px minmax(0, 1fr) auto;
+  }
+
   .dashboard-entry.is-unread {
     border-color: color-mix(in srgb, var(--culoca-orange) 38%, var(--border-color) 62%);
     box-shadow: 0 0 0 1px rgba(238, 114, 33, 0.12);
@@ -1385,6 +1602,31 @@
 
   .dashboard-entry__body p {
     margin: 0;
+  }
+
+  .dashboard-entry__actions {
+    display: flex;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: center;
+  }
+
+  .dashboard-inline-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.62rem 0.92rem;
+    border-radius: 999px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    text-decoration: none;
+    font-weight: 600;
+  }
+
+  .dashboard-inline-action:hover {
+    border-color: color-mix(in srgb, var(--culoca-orange) 38%, var(--border-color) 62%);
   }
 
   .dashboard-empty {
@@ -1744,6 +1986,15 @@
     .dashboard-grid,
     .dashboard-shortcuts {
       grid-template-columns: 1fr;
+    }
+
+    .dashboard-entry--search {
+      grid-template-columns: 64px minmax(0, 1fr);
+    }
+
+    .dashboard-entry__actions {
+      grid-column: 1 / -1;
+      justify-content: flex-start;
     }
 
     .hero-layout {

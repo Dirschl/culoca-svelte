@@ -30,11 +30,21 @@ export async function loadAccountGalleryPage(accountnameParam: string, pageParam
   const currentPage = Math.max(1, Number.parseInt(pageParam || '1', 10));
   const accountname = accountnameParam.toLowerCase();
 
-  const { data: profile } = await supabase
+  let { data: profile } = await supabase
     .from('profiles')
     .select('id, full_name, accountname, bio, avatar_url, website')
     .eq('accountname', accountname)
     .maybeSingle();
+
+  if (!profile?.id) {
+    const { data: fallbackProfile } = await supabase
+      .from('profiles')
+      .select('id, full_name, accountname, bio, avatar_url, website')
+      .ilike('accountname', accountname)
+      .maybeSingle();
+
+    profile = fallbackProfile;
+  }
 
   if (!profile?.id) {
     throw error(404, 'Profil nicht gefunden');
@@ -50,9 +60,6 @@ export async function loadAccountGalleryPage(accountnameParam: string, pageParam
     .or('is_private.eq.false,is_private.is.null');
 
   const totalCount = count || 0;
-  if (!totalCount) {
-    throw error(404, 'Keine öffentlichen Inhalte gefunden');
-  }
 
   const [{ count: followerCount }, { count: followingCount }] = await Promise.all([
     supabase
@@ -67,28 +74,34 @@ export async function loadAccountGalleryPage(accountnameParam: string, pageParam
 
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
   const page = Math.min(currentPage, totalPages);
-  const { data: items, error: itemsError } = await supabase
-    .from('items')
-    .select(
-      'id, slug, title, description, caption, canonical_path, country_slug, district_slug, municipality_slug, path_512, width, height, created_at'
-    )
-    .eq('profile_id', profile.id)
-    .eq('admin_hidden', false)
-    .is('group_root_item_id', null)
-    .not('slug', 'is', null)
-    .or('is_private.eq.false,is_private.is.null')
-    .order('created_at', { ascending: false })
-    .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
+  let items: Array<Record<string, unknown>> = [];
 
-  if (itemsError) {
-    throw error(500, itemsError.message);
+  if (totalCount > 0) {
+    const { data: loadedItems, error: itemsError } = await supabase
+      .from('items')
+      .select(
+        'id, slug, title, description, caption, canonical_path, country_slug, district_slug, municipality_slug, path_512, width, height, created_at'
+      )
+      .eq('profile_id', profile.id)
+      .eq('admin_hidden', false)
+      .is('group_root_item_id', null)
+      .not('slug', 'is', null)
+      .or('is_private.eq.false,is_private.is.null')
+      .order('created_at', { ascending: false })
+      .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
+
+    if (itemsError) {
+      throw error(500, itemsError.message);
+    }
+
+    items = loadedItems || [];
   }
 
   const hubPath = `/${accountname}`;
 
   return {
     profile,
-    items: (items || []).map((item) => ({
+    items: items.map((item) => ({
       ...item,
       canonical_path: getPublicItemHref(item)
     })),
