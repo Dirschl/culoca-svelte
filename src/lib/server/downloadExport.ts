@@ -1,4 +1,4 @@
-import type { Gravity, Metadata, Sharp, Strategy } from 'sharp';
+import sharp, { type Gravity, type Metadata, type Sharp, type Strategy } from 'sharp';
 import { createClient as createWebDavClient } from 'webdav';
 import { extractPhotoMetadataFields } from '$lib/metadata/photoMetadata';
 
@@ -438,15 +438,6 @@ function buildCulocaXmp(item: DownloadableItem) {
 </x:xmpmeta>`;
 }
 
-let sharpFactoryPromise: Promise<(typeof import('sharp'))['default']> | null = null;
-
-async function getSharp() {
-  if (!sharpFactoryPromise) {
-    sharpFactoryPromise = import('sharp').then((module) => module.default);
-  }
-  return sharpFactoryPromise;
-}
-
 function applyFormat(pipeline: Sharp, format: DownloadExportFormat, compression: number | null | undefined) {
   if (format === 'webp') {
     if (compression == null) {
@@ -494,7 +485,6 @@ export async function renderDownloadExport(
   item: DownloadableItem,
   rawOptions: DownloadExportOptions
 ) {
-  const sharp = await getSharp();
   const options = normalizeDownloadExportOptions(rawOptions);
   const baseImage = sharp(originalBuffer).rotate();
   const metadata = await baseImage.metadata();
