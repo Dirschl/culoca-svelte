@@ -43,6 +43,9 @@
   let dashboardConversations: any[] = [];
   let dashboardNotifications: any[] = [];
   let dashboardFollowedProfiles: any[] = [];
+  let dashboardFollowerProfiles: any[] = [];
+  /** Netzwerk-Panel: gefolgte Profile vs. Follower-Liste */
+  let dashboardNetworkListMode: 'following' | 'followers' = 'following';
   let dashboardFollowedItems: any[] = [];
   let dashboardLatestDownloads: any[] = [];
   let dashboardRecentItems: any[] = [];
@@ -104,6 +107,9 @@
     creator: dashboardPriorityFeed.filter((entry: any) => entry.category === 'creator').length,
     network: dashboardPriorityFeed.filter((entry: any) => entry.category === 'network').length
   };
+
+  $: dashboardNetworkProfiles =
+    dashboardNetworkListMode === 'following' ? dashboardFollowedProfiles : dashboardFollowerProfiles;
 
   async function loadCurrentUserFullName() {
     const { data: authData } = await supabase.auth.getUser();
@@ -418,6 +424,7 @@
       dashboardConversations = [];
       dashboardNotifications = [];
       dashboardFollowedProfiles = [];
+      dashboardFollowerProfiles = [];
       dashboardFollowedItems = [];
       dashboardLatestDownloads = [];
       dashboardRecentItems = [];
@@ -440,7 +447,8 @@
         { data: recentItemData, error: recentItemError },
         { data: favoriteItemData, error: favoriteItemError },
         { data: likedItemData, error: likedItemError },
-        { data: followsData, error: followsError }
+        { data: followsOutData, error: followsOutError },
+        { data: followsInData, error: followsInError }
       ] =
         await Promise.all([
           supabase
@@ -604,7 +612,13 @@
             .select('followed_user_id, created_at')
             .eq('follower_user_id', user.id)
             .order('created_at', { ascending: false })
-            .limit(5)
+            .limit(24),
+          supabase
+            .from('user_follows')
+            .select('follower_user_id, created_at')
+            .eq('followed_user_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(24)
         ]);
 
       if (conversationError) throw conversationError;
@@ -613,7 +627,8 @@
       if (recentItemError) throw recentItemError;
       if (favoriteItemError) throw favoriteItemError;
       if (likedItemError) throw likedItemError;
-      if (followsError) throw followsError;
+      if (followsOutError) throw followsOutError;
+      if (followsInError) throw followsInError;
 
       dashboardConversations = (conversationData || []).map((entry: any) => ({
         ...entry,
@@ -652,34 +667,39 @@
       })).slice(0, 12);
       dashboardUnreadCount = dashboardNotifications.filter((entry: any) => !entry.read_at).length;
 
-      const followedIds = [...new Set((followsData || []).map((entry: any) => entry.followed_user_id).filter(Boolean))];
+      const followedIds = [
+        ...new Set((followsOutData || []).map((entry: any) => entry.followed_user_id).filter(Boolean))
+      ];
+      const followerIds = [
+        ...new Set((followsInData || []).map((entry: any) => entry.follower_user_id).filter(Boolean))
+      ];
 
       if (followedIds.length > 0) {
-        const [{ data: profilesData, error: profilesError }, { data: itemsData, error: itemsError }] = await Promise.all([
-          supabase
-            .from('profiles')
-            .select('id, full_name, accountname, avatar_url, website')
-            .in('id', followedIds),
-          supabase
-            .from('items')
-            .select('id, profile_id, slug, title, original_name, canonical_path, country_slug, district_slug, municipality_slug, path_512, created_at')
-            .in('profile_id', followedIds)
-            .eq('admin_hidden', false)
-            .is('group_root_item_id', null)
-            .not('slug', 'is', null)
-            .or('is_private.eq.false,is_private.is.null')
-            .order('created_at', { ascending: false })
-            .limit(12)
-        ]);
+        const [{ data: profilesData, error: profilesError }, { data: itemsData, error: itemsError }] =
+          await Promise.all([
+            supabase
+              .from('profiles')
+              .select('id, full_name, accountname, avatar_url, website')
+              .in('id', followedIds),
+            supabase
+              .from('items')
+              .select(
+                'id, profile_id, slug, title, original_name, canonical_path, country_slug, district_slug, municipality_slug, path_512, created_at'
+              )
+              .in('profile_id', followedIds)
+              .eq('admin_hidden', false)
+              .is('group_root_item_id', null)
+              .not('slug', 'is', null)
+              .or('is_private.eq.false,is_private.is.null')
+              .order('created_at', { ascending: false })
+              .limit(12)
+          ]);
 
         if (profilesError) throw profilesError;
         if (itemsError) throw itemsError;
 
         const profilesById = new Map((profilesData || []).map((entry: any) => [entry.id, entry]));
-        dashboardFollowedProfiles = followedIds
-          .map((id) => profilesById.get(id))
-          .filter(Boolean)
-          .slice(0, 5);
+        dashboardFollowedProfiles = followedIds.map((id) => profilesById.get(id)).filter(Boolean);
         dashboardFollowedItems = (itemsData || [])
           .map((entry: any) => ({
             ...entry,
@@ -691,11 +711,25 @@
         dashboardFollowedItems = [];
       }
 
+      if (followerIds.length > 0) {
+        const { data: followerProfilesData, error: followerProfilesError } = await supabase
+          .from('profiles')
+          .select('id, full_name, accountname, avatar_url, website')
+          .in('id', followerIds);
+
+        if (followerProfilesError) throw followerProfilesError;
+
+        const fpById = new Map((followerProfilesData || []).map((entry: any) => [entry.id, entry]));
+        dashboardFollowerProfiles = followerIds.map((id) => fpById.get(id)).filter(Boolean);
+      } else {
+        dashboardFollowerProfiles = [];
+      }
+
       dashboardPriorityFeed = buildPriorityFeed({
         conversations: dashboardConversations,
         notifications: dashboardNotifications,
         followedItems: dashboardFollowedItems,
-        followedProfiles: dashboardFollowedProfiles,
+        followedProfiles: dashboardFollowedProfiles.slice(0, 5),
         latestDownloads: dashboardLatestDownloads
       });
 
@@ -705,6 +739,7 @@
       dashboardConversations = [];
       dashboardNotifications = [];
       dashboardFollowedProfiles = [];
+      dashboardFollowerProfiles = [];
       dashboardFollowedItems = [];
       dashboardLatestDownloads = [];
       dashboardRecentItems = [];
@@ -763,6 +798,13 @@
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'user_follows', filter: `follower_user_id=eq.${userId}` },
+        async () => {
+          await loadDashboardData();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'user_follows', filter: `followed_user_id=eq.${userId}` },
         async () => {
           await loadDashboardData();
         }
@@ -874,6 +916,7 @@
     dashboardConversations = [];
     dashboardNotifications = [];
     dashboardFollowedProfiles = [];
+    dashboardFollowerProfiles = [];
     dashboardFollowedItems = [];
     dashboardLatestDownloads = [];
     dashboardRecentItems = [];
@@ -1341,15 +1384,34 @@
 
             <section class="dashboard-panel">
               <div class="dashboard-panel__head">
-                <div>
-                  <span class="dashboard-kicker">Verlauf</span>
-                  <h2>Zuletzt besucht</h2>
+                <div class="dashboard-panel__head-title">
+                  <svg
+                    class="dashboard-panel__head-icon dashboard-panel__head-icon--clock"
+                    width="22"
+                    height="22"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <circle cx="12" cy="12" r="9" fill="none" />
+                    <path d="M12 12.5V8" />
+                    <path d="M12 12.5l4 2.3" />
+                    <circle cx="12" cy="12" r="1.25" fill="currentColor" stroke="none" />
+                  </svg>
+                  <div>
+                    <span class="dashboard-kicker">Verlauf</span>
+                    <h2>Zuletzt angesehen</h2>
+                  </div>
                 </div>
                 <a href="/galerie">Galerie</a>
               </div>
 
               {#if dashboardLoading && dashboardRecentItems.length === 0}
-                <p class="dashboard-empty">Zuletzt besuchte Einträge werden geladen...</p>
+                <p class="dashboard-empty">Zuletzt angesehene Einträge werden geladen...</p>
               {:else if dashboardRecentItems.length > 0}
                 <div class="dashboard-list">
                   {#each dashboardRecentItems as item (item.id)}
@@ -1382,14 +1444,14 @@
                             {/if}
                           {/if}
                         </div>
-                        <span class="dashboard-entry__context">Zuletzt besucht</span>
+                        <span class="dashboard-entry__context">Zuletzt angesehen</span>
                         <p>Eintrag erneut öffnen.</p>
                       </div>
                     </a>
                   {/each}
                 </div>
               {:else}
-                <p class="dashboard-empty">Deine zuletzt geöffneten Einträge erscheinen hier.</p>
+                <p class="dashboard-empty">Inhalte, die du zuletzt angesehen hast, erscheinen hier.</p>
               {/if}
             </section>
 
@@ -1536,18 +1598,53 @@
             {#if showDashboardPanel('network')}
             <section class="dashboard-panel">
               <div class="dashboard-panel__head">
-                <div>
-                  <span class="dashboard-kicker">Netzwerk</span>
-                  <h2>Gefolgte Profile</h2>
+                <div class="dashboard-panel__head-title dashboard-panel__head-title--network">
+                  <svg
+                    class="dashboard-panel__head-icon"
+                    width="22"
+                    height="22"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3zM8 11c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zM8 13c-2.33 0-7 1.17-7 3.5V19h14v-2.5C15 14.17 10.33 13 8 13zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"
+                    />
+                  </svg>
+                  <div class="dashboard-panel__head-network-copy">
+                    <span class="dashboard-kicker">Netzwerk</span>
+                    <div class="dashboard-network-tabs" role="tablist" aria-label="Netzwerk">
+                      <button
+                        type="button"
+                        role="tab"
+                        aria-selected={dashboardNetworkListMode === 'following'}
+                        class="dashboard-network-tab"
+                        class:is-active={dashboardNetworkListMode === 'following'}
+                        on:click={() => (dashboardNetworkListMode = 'following')}
+                      >
+                        Du folgst <span class="dashboard-network-tab__count">({dashboardFollowedProfiles.length})</span>
+                      </button>
+                      <button
+                        type="button"
+                        role="tab"
+                        aria-selected={dashboardNetworkListMode === 'followers'}
+                        class="dashboard-network-tab"
+                        class:is-active={dashboardNetworkListMode === 'followers'}
+                        on:click={() => (dashboardNetworkListMode = 'followers')}
+                      >
+                        Follower <span class="dashboard-network-tab__count">({dashboardFollowerProfiles.length})</span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
                 <a href="/#profile-finden">Profile finden</a>
               </div>
 
-              {#if dashboardLoading && dashboardFollowedProfiles.length === 0}
-                <p class="dashboard-empty">Gefolgte Profile werden geladen...</p>
-              {:else if dashboardFollowedProfiles.length > 0}
+              {#if dashboardLoading && dashboardNetworkProfiles.length === 0}
+                <p class="dashboard-empty">Netzwerk wird geladen...</p>
+              {:else if dashboardNetworkProfiles.length > 0}
                 <div class="dashboard-list">
-                  {#each dashboardFollowedProfiles as profile (profile.id)}
+                  {#each dashboardNetworkProfiles as profile (profile.id)}
                     <a class="dashboard-entry dashboard-entry--link" href={`/chat?chatWith=${encodeURIComponent(profile.id)}`}>
                       {#if getAvatarUrl(profile)}
                         <img
@@ -1576,7 +1673,11 @@
                   {/each}
                 </div>
               {:else}
-                <p class="dashboard-empty">Sobald du Profilen folgst, erscheinen sie hier als Schnellstart.</p>
+                <p class="dashboard-empty">
+                  {dashboardNetworkListMode === 'following'
+                    ? 'Du folgst aktuell noch keinem Profil.'
+                    : 'Noch keine Follower.'}
+                </p>
               {/if}
             </section>
 
@@ -2109,6 +2210,53 @@
     height: 22px;
     margin-top: 0.12rem;
     color: var(--culoca-orange);
+  }
+
+  .dashboard-panel__head-title--network {
+    align-items: flex-start;
+  }
+
+  .dashboard-panel__head-network-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    min-width: 0;
+  }
+
+  .dashboard-network-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem 1.15rem;
+  }
+
+  .dashboard-network-tab {
+    margin: 0;
+    padding: 0 0 0.15rem;
+    border: none;
+    border-bottom: 2px solid transparent;
+    background: none;
+    font: inherit;
+    font-size: 1.05rem;
+    font-weight: 600;
+    line-height: 1.3;
+    cursor: pointer;
+    color: var(--text-secondary);
+  }
+
+  .dashboard-network-tab__count {
+    font-weight: 600;
+  }
+
+  .dashboard-network-tab:hover,
+  .dashboard-network-tab:hover .dashboard-network-tab__count {
+    color: var(--culoca-orange);
+  }
+
+  .dashboard-network-tab.is-active,
+  .dashboard-network-tab.is-active .dashboard-network-tab__count {
+    color: var(--culoca-orange);
+    border-bottom-color: var(--culoca-orange);
   }
 
   .dashboard-panel__head h2 {
