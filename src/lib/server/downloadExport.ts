@@ -57,7 +57,12 @@ const DEFAULT_OPTIONS: Required<Pick<DownloadExportOptions, 'sizeMode' | 'format
   filenameMode: 'original'
 };
 
+const SOURCE_CACHE_TTL_MS = 5 * 60 * 1000;
+const SOURCE_CACHE_MAX_ENTRIES = 24;
+
 let sharpFactoryPromise: Promise<(typeof import('sharp'))['default']> | null = null;
+const sourceBufferCache = new Map<string, { buffer: Buffer; expiresAt: number }>();
+const sourceBufferInflight = new Map<string, Promise<Buffer>>();
 
 async function getSharp() {
   if (!sharpFactoryPromise) {
@@ -105,6 +110,54 @@ function getFilePathFromOriginalUrl(originalUrl: string | null | undefined, item
   return filePath || `items/${itemId}.jpg`;
 }
 
+function getSourceCacheKey(item: Pick<DownloadableItem, 'id' | 'original_url' | 'path_2048' | 'path_512'>) {
+  return JSON.stringify({
+    id: item.id,
+    original_url: item.original_url || null,
+    path_2048: item.path_2048 || null,
+    path_512: item.path_512 || null
+  });
+}
+
+function pruneSourceBufferCache() {
+  const now = Date.now();
+
+  for (const [key, entry] of sourceBufferCache.entries()) {
+    if (entry.expiresAt <= now) {
+      sourceBufferCache.delete(key);
+    }
+  }
+
+  while (sourceBufferCache.size > SOURCE_CACHE_MAX_ENTRIES) {
+    const oldestKey = sourceBufferCache.keys().next().value;
+    if (!oldestKey) break;
+    sourceBufferCache.delete(oldestKey);
+  }
+}
+
+function getCachedSourceBuffer(cacheKey: string) {
+  const cached = sourceBufferCache.get(cacheKey);
+  if (!cached) return null;
+  if (cached.expiresAt <= Date.now()) {
+    sourceBufferCache.delete(cacheKey);
+    return null;
+  }
+  return Buffer.from(cached.buffer);
+}
+
+function setCachedSourceBuffer(cacheKey: string, buffer: Buffer) {
+  sourceBufferCache.set(cacheKey, {
+    buffer: Buffer.from(buffer),
+    expiresAt: Date.now() + SOURCE_CACHE_TTL_MS
+  });
+  pruneSourceBufferCache();
+}
+
+export function clearDownloadSourceCache() {
+  sourceBufferCache.clear();
+  sourceBufferInflight.clear();
+}
+
 export function normalizeDownloadExportOptions(input: unknown): DownloadExportOptions {
   const source = (input && typeof input === 'object' ? input : {}) as Record<string, unknown>;
   const sizeMode = source.sizeMode === 'custom' ? 'custom' : DEFAULT_OPTIONS.sizeMode;
@@ -150,59 +203,94 @@ export async function fetchOriginalItemBuffer(
 ) {
   const allowPublicFallback = options?.allowPublicFallback ?? true;
   const originalUrl = item.original_url?.trim() || null;
+  const cacheKey = getSourceCacheKey(item);
+  const cachedBuffer = getCachedSourceBuffer(cacheKey);
 
-  if (originalUrl) {
-    try {
-      const directResponse = await fetch(originalUrl);
-      if (directResponse.ok) {
-        return Buffer.from(await directResponse.arrayBuffer());
-      }
-    } catch (directError) {
-      console.warn('Direct original fetch failed, falling back to WebDAV:', directError);
-    }
+  if (cachedBuffer) {
+    return cachedBuffer;
+  }
 
-    if (process.env.HETZNER_WEBDAV_USER && process.env.HETZNER_WEBDAV_PASSWORD) {
+  const inflight = sourceBufferInflight.get(cacheKey);
+  if (inflight) {
+    return Buffer.from(await inflight);
+  }
+
+  const loader = (async () => {
+    let loadedBuffer: Buffer | null = null;
+
+    if (originalUrl) {
       try {
-        const auth = Buffer.from(
-          `${process.env.HETZNER_WEBDAV_USER}:${process.env.HETZNER_WEBDAV_PASSWORD}`
-        ).toString('base64');
-        const authResponse = await fetch(originalUrl, {
-          headers: {
-            Authorization: `Basic ${auth}`
-          }
-        });
-        if (authResponse.ok) {
-          return Buffer.from(await authResponse.arrayBuffer());
+        const directResponse = await fetch(originalUrl);
+        if (directResponse.ok) {
+          loadedBuffer = Buffer.from(await directResponse.arrayBuffer());
+          setCachedSourceBuffer(cacheKey, loadedBuffer);
+          return Buffer.from(loadedBuffer);
         }
-      } catch (authFetchError) {
-        console.warn('Authenticated original fetch failed, falling back to WebDAV:', authFetchError);
+      } catch (directError) {
+        console.warn('Direct original fetch failed, falling back to WebDAV:', directError);
+      }
+
+      if (process.env.HETZNER_WEBDAV_USER && process.env.HETZNER_WEBDAV_PASSWORD) {
+        try {
+          const auth = Buffer.from(
+            `${process.env.HETZNER_WEBDAV_USER}:${process.env.HETZNER_WEBDAV_PASSWORD}`
+          ).toString('base64');
+          const authResponse = await fetch(originalUrl, {
+            headers: {
+              Authorization: `Basic ${auth}`
+            }
+          });
+          if (authResponse.ok) {
+            loadedBuffer = Buffer.from(await authResponse.arrayBuffer());
+            setCachedSourceBuffer(cacheKey, loadedBuffer);
+            return Buffer.from(loadedBuffer);
+          }
+        } catch (authFetchError) {
+          console.warn('Authenticated original fetch failed, falling back to WebDAV:', authFetchError);
+        }
       }
     }
-  }
 
-  if (!process.env.HETZNER_WEBDAV_URL || !process.env.HETZNER_WEBDAV_USER || !process.env.HETZNER_WEBDAV_PASSWORD) {
-    const fallbackBuffer = allowPublicFallback ? await fetchPublicVariantBuffer(item) : null;
-    if (fallbackBuffer) return fallbackBuffer;
-    throw new Error(
-      originalUrl
-        ? 'Original konnte weder direkt noch per WebDAV geladen werden. Fuer Original-EXIF wird kein metadatenreduzierter Fallback verwendet.'
-        : 'Kein echtes Original verfuegbar. Fuer Original-EXIF wird kein metadatenreduzierter Fallback verwendet.'
-    );
-  }
+    if (!process.env.HETZNER_WEBDAV_URL || !process.env.HETZNER_WEBDAV_USER || !process.env.HETZNER_WEBDAV_PASSWORD) {
+      const fallbackBuffer = allowPublicFallback ? await fetchPublicVariantBuffer(item) : null;
+      if (fallbackBuffer) {
+        setCachedSourceBuffer(cacheKey, fallbackBuffer);
+        return Buffer.from(fallbackBuffer);
+      }
+      throw new Error(
+        originalUrl
+          ? 'Original konnte weder direkt noch per WebDAV geladen werden. Fuer Original-EXIF wird kein metadatenreduzierter Fallback verwendet.'
+          : 'Kein echtes Original verfuegbar. Fuer Original-EXIF wird kein metadatenreduzierter Fallback verwendet.'
+      );
+    }
 
-  const webdav = createWebDavClient(process.env.HETZNER_WEBDAV_URL, {
-    username: process.env.HETZNER_WEBDAV_USER,
-    password: process.env.HETZNER_WEBDAV_PASSWORD
-  });
+    const webdav = createWebDavClient(process.env.HETZNER_WEBDAV_URL, {
+      username: process.env.HETZNER_WEBDAV_USER,
+      password: process.env.HETZNER_WEBDAV_PASSWORD
+    });
 
-  const filePath = getFilePathFromOriginalUrl(originalUrl, item.id);
+    const filePath = getFilePathFromOriginalUrl(originalUrl, item.id);
+    try {
+      const fileBuffer = await webdav.getFileContents(filePath, { format: 'binary' });
+      loadedBuffer = Buffer.isBuffer(fileBuffer) ? fileBuffer : Buffer.from(fileBuffer as ArrayBuffer);
+      setCachedSourceBuffer(cacheKey, loadedBuffer);
+      return Buffer.from(loadedBuffer);
+    } catch (webdavError) {
+      const fallbackBuffer = allowPublicFallback ? await fetchPublicVariantBuffer(item) : null;
+      if (fallbackBuffer) {
+        setCachedSourceBuffer(cacheKey, fallbackBuffer);
+        return Buffer.from(fallbackBuffer);
+      }
+      throw webdavError;
+    }
+  })();
+
+  sourceBufferInflight.set(cacheKey, loader);
+
   try {
-    const fileBuffer = await webdav.getFileContents(filePath, { format: 'binary' });
-    return Buffer.isBuffer(fileBuffer) ? fileBuffer : Buffer.from(fileBuffer as ArrayBuffer);
-  } catch (webdavError) {
-    const fallbackBuffer = allowPublicFallback ? await fetchPublicVariantBuffer(item) : null;
-    if (fallbackBuffer) return fallbackBuffer;
-    throw webdavError;
+    return Buffer.from(await loader);
+  } finally {
+    sourceBufferInflight.delete(cacheKey);
   }
 }
 

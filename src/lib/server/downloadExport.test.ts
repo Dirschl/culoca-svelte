@@ -4,14 +4,24 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import sharp from 'sharp';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  clearDownloadSourceCache,
+  fetchOriginalItemBuffer,
   renderDownloadExport,
   buildDownloadFilename,
   rewriteJpegMetadataWithoutSharp
 } from './downloadExport';
 
 describe('downloadExport', () => {
+  afterEach(() => {
+    clearDownloadSourceCache();
+    vi.restoreAllMocks();
+    delete process.env.HETZNER_WEBDAV_URL;
+    delete process.env.HETZNER_WEBDAV_USER;
+    delete process.env.HETZNER_WEBDAV_PASSWORD;
+  });
+
   it('renders open graph exports from auto-oriented JPEGs without failing crop math', async () => {
     const source = await sharp({
       create: {
@@ -133,5 +143,24 @@ describe('downloadExport', () => {
     } finally {
       await fs.unlink(tempFile).catch(() => undefined);
     }
+  });
+
+  it('caches original source buffers to avoid repeated remote fetches', async () => {
+    const fetchMock = vi.fn(async () => new Response(Buffer.from('original-buffer'), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const item = {
+      id: '28fe6820-16af-4cda-90dc-a36243acea7d',
+      original_url: 'https://example.com/original.jpg',
+      path_2048: 'foo.jpg',
+      path_512: 'foo.jpg'
+    };
+
+    const first = await fetchOriginalItemBuffer(item);
+    const second = await fetchOriginalItemBuffer(item);
+
+    expect(first.toString()).toBe('original-buffer');
+    expect(second.toString()).toBe('original-buffer');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
