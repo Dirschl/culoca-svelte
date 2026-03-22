@@ -1680,7 +1680,7 @@
             <p class="help-text">Die Inbox liegt jetzt auf der Startseite und steht dort ganz oben.</p>
             <div class="review-actions">
               <a class="review-link" href="/chat">Inbox öffnen</a>
-              <a class="review-link review-link--secondary" href="/#menschen-finden">Neuen Chat starten</a>
+              <a class="review-link review-link--secondary" href="/#profile-finden">Neuen Chat starten</a>
             </div>
           </div>
 

@@ -795,11 +795,11 @@
           </div>
 
           {#if showDashboardUserSearch()}
-            <section class="dashboard-search" id="menschen-finden">
+            <section class="dashboard-search" id="profile-finden">
               <div class="dashboard-panel__head">
                 <div>
                   <span class="dashboard-kicker">Netzwerk</span>
-                  <h2>Menschen finden</h2>
+                  <h2>Profile finden</h2>
                 </div>
                 <a href="/chat">Zum Chat</a>
               </div>
@@ -810,7 +810,7 @@
                   type="search"
                   bind:value={dashboardUserSearchQuery}
                   on:input={handleDashboardUserSearchInput}
-                  placeholder="Namen oder @accountname suchen"
+                  placeholder="Name, @accountname oder Organisation suchen"
                   autocomplete="off"
                   spellcheck="false"
                 />
@@ -874,7 +874,7 @@
               {:else if dashboardUserSearchMessage}
                 <p class="dashboard-empty">{dashboardUserSearchMessage}</p>
               {:else}
-                <p class="dashboard-empty">Suche nach Namen oder `@accountname`, um direkt einen Chat zu starten oder Profile zu folgen.</p>
+                <p class="dashboard-empty">Suche nach Name, `@accountname` oder Organisation, um Chats zu starten oder Profile zu folgen.</p>
               {/if}
             </section>
           {/if}
@@ -1095,7 +1095,7 @@
                   <span class="dashboard-kicker">Netzwerk</span>
                   <h2>Gefolgte Profile</h2>
                 </div>
-                <a href="/#menschen-finden">Profile finden</a>
+                <a href="/#profile-finden">Profile finden</a>
               </div>
 
               {#if dashboardLoading && dashboardFollowedProfiles.length === 0}
@@ -1433,10 +1433,12 @@
     color: var(--text-primary);
   }
 
+  /* Einheitliches Innenpadding, damit Kicker/Titel aller Gruppen bündig starten */
   .dashboard-search {
     display: grid;
     gap: 1rem;
-    padding: 1.15rem;
+    align-content: start;
+    padding: 1rem;
     border-radius: 22px;
     border: 1px solid color-mix(in srgb, var(--culoca-orange) 16%, var(--border-color) 84%);
     background:
@@ -1487,11 +1489,13 @@
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 1rem;
+    align-items: start;
   }
 
   .dashboard-priority {
     display: grid;
     gap: 1rem;
+    align-content: start;
     padding: 1rem;
     border-radius: 22px;
     background:
@@ -1504,11 +1508,13 @@
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.75rem;
+    align-items: start;
   }
 
   .dashboard-panel {
     display: grid;
     gap: 1rem;
+    align-content: start;
     padding: 1rem;
     border-radius: 20px;
     background: color-mix(in srgb, var(--bg-secondary) 88%, white 12%);
@@ -1518,8 +1524,12 @@
   .dashboard-panel__head {
     display: flex;
     justify-content: space-between;
-    align-items: flex-end;
+    align-items: flex-start;
     gap: 1rem;
+  }
+
+  .dashboard-panel__head > div:first-child {
+    min-width: 0;
   }
 
   .dashboard-panel__head h2 {
@@ -1656,7 +1666,7 @@
   .dashboard-shortcut {
     display: grid;
     gap: 0.35rem;
-    padding: 1rem 1.1rem;
+    padding: 1rem;
     border-radius: 18px;
     background: linear-gradient(180deg, color-mix(in srgb, var(--bg-secondary) 88%, white 12%), var(--bg-secondary));
     border: 1px solid var(--border-color);
