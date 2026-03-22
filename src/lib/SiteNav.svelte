@@ -2,7 +2,7 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
-  import { hasAdminPermission, isAuthenticated, customerBranding } from '$lib/sessionStore';
+  import { hasAdminPermission, isAuthenticated, customerBranding, currentUserId } from '$lib/sessionStore';
   import { supabase } from '$lib/supabaseClient';
   import { currentPathWithSearch, sanitizeReturnTo } from '$lib/returnTo';
   import { fetchAllReviewItems, fetchProfileReviewItems } from '$lib/profile/review';
@@ -11,6 +11,8 @@
   let openDropdown: string | null = null;
   let reviewCount = 0;
   let adminReviewCount = 0;
+  let inboxCount = 0;
+  let lastInboxRefreshKey = '';
 
   const navLinks = [
     { href: '/foto', label: 'Fotos' },
@@ -55,6 +57,13 @@
   $: userMenuLabel = $isAuthenticated && displayName ? displayName : ($isAuthenticated ? 'Konto' : 'Login');
   $: userMenuActive = isActive('/settings') || isActive('/standort') || isActive('/profile') || isActive('/profile/freigaben') || isActive('/login') || ($hasAdminPermission && adminLinks.some(l => isActive(l.href)));
   $: inheritedReturnTo = sanitizeReturnTo($page.url.searchParams.get('returnTo'), currentPathWithSearch($page.url));
+  $: {
+    const nextInboxKey = `${$isAuthenticated ? 'auth' : 'anon'}:${$currentUserId || 'none'}:${currentPath}`;
+    if (nextInboxKey !== lastInboxRefreshKey) {
+      lastInboxRefreshKey = nextInboxKey;
+      void refreshInboxCount();
+    }
+  }
 
   async function refreshReviewCount() {
     if (!$isAuthenticated) {
@@ -84,6 +93,44 @@
       console.error('Failed to load review count:', error);
       reviewCount = 0;
       adminReviewCount = 0;
+    }
+  }
+
+  async function refreshInboxCount() {
+    if (!$isAuthenticated || !$currentUserId) {
+      inboxCount = 0;
+      return;
+    }
+
+    try {
+      const [
+        { count: notificationCount, error: notificationError },
+        { data: conversations, error: conversationError }
+      ] = await Promise.all([
+        supabase
+          .from('user_notifications')
+          .select('id', { count: 'exact', head: true })
+          .eq('recipient_user_id', $currentUserId)
+          .is('read_at', null),
+        supabase
+          .from('user_conversations')
+          .select('id, user_a_id, user_b_id, user_a_last_read_at, user_b_last_read_at, last_message_at, last_message_sender_id')
+          .or(`user_a_id.eq.${$currentUserId},user_b_id.eq.${$currentUserId}`)
+      ]);
+
+      if (notificationError) throw notificationError;
+      if (conversationError) throw conversationError;
+
+      const unreadConversations = (conversations || []).filter((entry: any) => {
+        if (!entry?.last_message_at || entry?.last_message_sender_id === $currentUserId) return false;
+        const ownReadAt = entry.user_a_id === $currentUserId ? entry.user_a_last_read_at : entry.user_b_last_read_at;
+        return !ownReadAt || new Date(entry.last_message_at).getTime() > new Date(ownReadAt).getTime();
+      }).length;
+
+      inboxCount = (notificationCount || 0) + unreadConversations;
+    } catch (error) {
+      console.error('Failed to load inbox count:', error);
+      inboxCount = 0;
     }
   }
 
@@ -143,6 +190,7 @@
 
   onMount(() => {
     refreshReviewCount();
+    refreshInboxCount();
     const handler = (e: MouseEvent) => {
       if (!(e.target as HTMLElement)?.closest('.dropdown')) {
         closeDropdowns();
@@ -243,6 +291,15 @@
               {reviewCount}
             </button>
           {/if}
+          {#if inboxCount > 0}
+            <span
+              class="inbox-badge"
+              aria-label={`${inboxCount} ungelesene Benachrichtigungen oder Nachrichten`}
+              title={`${inboxCount} ungelesene Benachrichtigungen oder Nachrichten`}
+            >
+              {inboxCount}
+            </span>
+          {/if}
           {#if $isAuthenticated}
             <svg class="dd-arrow" class:dd-open={openDropdown === 'user'} width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5l3 3 3-3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>
           {/if}
@@ -254,6 +311,9 @@
                 {link.label}
                 {#if link.href === '/profile/review' && reviewCount > 0}
                   <span class="review-badge review-badge--inline">{reviewCount}</span>
+                {/if}
+                {#if link.href === '/profile' && inboxCount > 0}
+                  <span class="inbox-badge inbox-badge--inline">{inboxCount}</span>
                 {/if}
               </a>
             {/each}
@@ -287,6 +347,9 @@
               {link.label}
               {#if link.href === '/profile/review' && reviewCount > 0}
                 <span class="review-badge review-badge--inline">{reviewCount}</span>
+              {/if}
+              {#if link.href === '/profile' && inboxCount > 0}
+                <span class="inbox-badge inbox-badge--inline">{inboxCount}</span>
               {/if}
             </a>
           {/each}
@@ -482,6 +545,23 @@
     font-family: inherit;
   }
   .review-badge--inline {
+    margin-left: auto;
+  }
+  .inbox-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.35rem;
+    height: 1.35rem;
+    padding: 0 0.35rem;
+    border-radius: 999px;
+    background: var(--accent-color);
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .inbox-badge--inline {
     margin-left: auto;
   }
 
