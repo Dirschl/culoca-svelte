@@ -1,5 +1,4 @@
 import sharp, { type Gravity, type Metadata, type Sharp, type Strategy } from 'sharp';
-import { exiftool } from 'exiftool-vendored';
 import { promises as fs } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -510,6 +509,8 @@ export async function rewriteJpegMetadataWithoutSharp(
   const tempOriginalFile = `${tempFile}_original`;
 
   try {
+    const { exiftool } = await import('exiftool-vendored');
+
     await fs.writeFile(tempFile, originalBuffer);
 
     if (options.metadataMode === 'none') {

@@ -380,25 +380,28 @@ export const POST: RequestHandler = async ({ params, request }) => {
 
       if (canRewriteMetadataWithoutSharp(originalBuffer, options)) {
         console.warn('Download render failed due to sharp runtime issue, retrying with exiftool metadata rewrite:', renderError);
+        try {
+          const rewritten = await rewriteJpegMetadataWithoutSharp(originalBuffer, item, options);
 
-        const rewritten = await rewriteJpegMetadataWithoutSharp(originalBuffer, item, options);
+          await logDownload(
+            supabase,
+            item,
+            user.id,
+            options.sizeMode === 'full' ? 'full_resolution_custom' : 'custom_export'
+          );
 
-        await logDownload(
-          supabase,
-          item,
-          user.id,
-          options.sizeMode === 'full' ? 'full_resolution_custom' : 'custom_export'
-        );
-
-        return new Response(rewritten.buffer, {
-          status: 200,
-          headers: {
-            'Content-Type': rewritten.contentType,
-            'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(rewritten.filename)}`,
-            'Cache-Control': 'private, max-age=0, must-revalidate',
-            'X-Culoca-Download-Fallback': 'exiftool-rewrite'
-          }
-        });
+          return new Response(rewritten.buffer, {
+            status: 200,
+            headers: {
+              'Content-Type': rewritten.contentType,
+              'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(rewritten.filename)}`,
+              'Cache-Control': 'private, max-age=0, must-revalidate',
+              'X-Culoca-Download-Fallback': 'exiftool-rewrite'
+            }
+          });
+        } catch (rewriteError) {
+          console.warn('Exiftool metadata rewrite failed, falling back to original JPG payload:', rewriteError);
+        }
       }
 
       if (options.sizeMode !== 'full' || options.format !== 'jpg') {
