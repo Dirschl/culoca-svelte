@@ -58,8 +58,6 @@
   let returnTo = '/';
   let reviewCount = 0;
   let recentItems: any[] = [];
-  let favoriteItems: any[] = [];
-  let likedItems: any[] = [];
   let creatorInteractions: any[] = [];
   let notifications: any[] = [];
   let unreadNotifications = 0;
@@ -212,8 +210,6 @@
     try {
       const [
         { data: recentData, error: recentError },
-        { data: favoriteData, error: favoriteError },
-        { data: likedData, error: likedError },
         { data: creatorData, error: creatorError },
         { data: notificationData, error: notificationError }
       ] = await Promise.all([
@@ -238,46 +234,6 @@
           .eq('event_type', 'item_view')
           .order('created_at', { ascending: false })
           .limit(36),
-        supabase
-          .from('item_favorites')
-          .select(`
-            item_id,
-            created_at,
-            items!inner(
-              id,
-              slug,
-              title,
-              original_name,
-              canonical_path,
-              country_slug,
-              district_slug,
-              municipality_slug,
-              path_512
-            )
-          `)
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(24),
-        supabase
-          .from('item_likes')
-          .select(`
-            item_id,
-            created_at,
-            items!inner(
-              id,
-              slug,
-              title,
-              original_name,
-              canonical_path,
-              country_slug,
-              district_slug,
-              municipality_slug,
-              path_512
-            )
-          `)
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(24),
         supabase
           .from('item_events')
           .select(`
@@ -336,8 +292,6 @@
       ]);
 
       if (recentError) throw recentError;
-      if (favoriteError) throw favoriteError;
-      if (likedError) throw likedError;
       if (creatorError) throw creatorError;
       if (notificationError) throw notificationError;
 
@@ -355,14 +309,6 @@
         }))
         .slice(0, 12);
 
-      favoriteItems = (favoriteData || []).map((entry: any) => ({
-        favoritedAt: entry.created_at,
-        ...(entry.items || {})
-      }));
-      likedItems = (likedData || []).map((entry: any) => ({
-        likedAt: entry.created_at,
-        ...(entry.items || {})
-      }));
       creatorInteractions = (creatorData || []).map((entry: any) => ({
         ...entry,
         item: entry.items || null,
@@ -428,8 +374,6 @@
     } catch (error) {
       console.error('Error loading interactions:', error);
       recentItems = [];
-      favoriteItems = [];
-      likedItems = [];
       creatorInteractions = [];
       notifications = [];
       unreadNotifications = 0;
@@ -1708,59 +1652,6 @@
               </div>
             {:else}
               <p class="help-text">Noch keine zuletzt angesehenen Items vorhanden.</p>
-            {/if}
-          </div>
-
-          <div class="card">
-            <h3 class="section-title">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
-              </svg>
-              Merkliste
-            </h3>
-            {#if interactionLoading}
-              <p class="help-text">Merkliste wird geladen...</p>
-            {:else if favoriteItems.length > 0}
-              <div class="interaction-grid">
-                {#each favoriteItems as item}
-                  <a class="interaction-card" href={getPublicItemHref(item)}>
-                    {#if getItemPreviewUrl(item)}
-                      <img src={getItemPreviewUrl(item)} alt={item.title || item.original_name || 'Item'} loading="lazy" />
-                    {/if}
-                    <strong>{item.title || item.original_name || 'Ohne Titel'}</strong>
-                    <span>Gemerkt am {formatInteractionDate(item.favoritedAt)}</span>
-                  </a>
-                {/each}
-              </div>
-            {:else}
-              <p class="help-text">Noch keine gemerkten Items vorhanden.</p>
-            {/if}
-          </div>
-
-          <div class="card">
-            <h3 class="section-title">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M7 11V21" />
-                <path d="M14 5.88L13 10H18.76A2 2 0 0 1 20.72 12.39L19.77 18.39A2 2 0 0 1 17.79 20H7V10L10.59 3.82A1 1 0 0 1 12.4 4.22V5.88Z" />
-              </svg>
-              Gefällt mir
-            </h3>
-            {#if interactionLoading}
-              <p class="help-text">Likes werden geladen...</p>
-            {:else if likedItems.length > 0}
-              <div class="interaction-grid">
-                {#each likedItems as item}
-                  <a class="interaction-card" href={getPublicItemHref(item)}>
-                    {#if getItemPreviewUrl(item)}
-                      <img src={getItemPreviewUrl(item)} alt={item.title || item.original_name || 'Item'} loading="lazy" />
-                    {/if}
-                    <strong>{item.title || item.original_name || 'Ohne Titel'}</strong>
-                    <span>Geliked am {formatInteractionDate(item.likedAt)}</span>
-                  </a>
-                {/each}
-              </div>
-            {:else}
-              <p class="help-text">Noch keine Likes vorhanden.</p>
             {/if}
           </div>
 

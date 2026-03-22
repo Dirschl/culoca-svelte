@@ -46,6 +46,8 @@
   let dashboardFollowedItems: any[] = [];
   let dashboardLatestDownloads: any[] = [];
   let dashboardRecentItems: any[] = [];
+  let dashboardFavoriteItems: any[] = [];
+  let dashboardLikedItems: any[] = [];
   let dashboardPriorityFeed: any[] = [];
   let dashboardUnreadCount = 0;
   let dashboardChannels: any[] = [];
@@ -419,6 +421,8 @@
       dashboardFollowedItems = [];
       dashboardLatestDownloads = [];
       dashboardRecentItems = [];
+      dashboardFavoriteItems = [];
+      dashboardLikedItems = [];
       dashboardUnreadCount = 0;
       dashboardPriorityFeed = [];
       dashboardLoadedForUser = '';
@@ -434,6 +438,8 @@
         { data: notificationData, error: notificationError },
         { data: latestDownloadData, error: latestDownloadError },
         { data: recentItemData, error: recentItemError },
+        { data: favoriteItemData, error: favoriteItemError },
+        { data: likedItemData, error: likedItemError },
         { data: followsData, error: followsError }
       ] =
         await Promise.all([
@@ -554,6 +560,46 @@
             .order('created_at', { ascending: false })
             .limit(24),
           supabase
+            .from('item_favorites')
+            .select(`
+              item_id,
+              created_at,
+              items!inner(
+                id,
+                slug,
+                title,
+                original_name,
+                canonical_path,
+                country_slug,
+                district_slug,
+                municipality_slug,
+                path_512
+              )
+            `)
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(24),
+          supabase
+            .from('item_likes')
+            .select(`
+              item_id,
+              created_at,
+              items!inner(
+                id,
+                slug,
+                title,
+                original_name,
+                canonical_path,
+                country_slug,
+                district_slug,
+                municipality_slug,
+                path_512
+              )
+            `)
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(24),
+          supabase
             .from('user_follows')
             .select('followed_user_id, created_at')
             .eq('follower_user_id', user.id)
@@ -565,6 +611,8 @@
       if (notificationError) throw notificationError;
       if (latestDownloadError) throw latestDownloadError;
       if (recentItemError) throw recentItemError;
+      if (favoriteItemError) throw favoriteItemError;
+      if (likedItemError) throw likedItemError;
       if (followsError) throw followsError;
 
       dashboardConversations = (conversationData || []).map((entry: any) => ({
@@ -594,6 +642,14 @@
           ...(entry.items || {})
         }))
         .slice(0, 5);
+      dashboardFavoriteItems = (favoriteItemData || []).map((entry: any) => ({
+        favoritedAt: entry.created_at,
+        ...(entry.items || {})
+      })).slice(0, 12);
+      dashboardLikedItems = (likedItemData || []).map((entry: any) => ({
+        likedAt: entry.created_at,
+        ...(entry.items || {})
+      })).slice(0, 12);
       dashboardUnreadCount = dashboardNotifications.filter((entry: any) => !entry.read_at).length;
 
       const followedIds = [...new Set((followsData || []).map((entry: any) => entry.followed_user_id).filter(Boolean))];
@@ -652,6 +708,8 @@
       dashboardFollowedItems = [];
       dashboardLatestDownloads = [];
       dashboardRecentItems = [];
+      dashboardFavoriteItems = [];
+      dashboardLikedItems = [];
       dashboardPriorityFeed = [];
       dashboardUnreadCount = 0;
     } finally {
@@ -711,7 +769,35 @@
       )
       .subscribe();
 
-    dashboardChannels = [notificationsChannel, conversationsChannel, followsChannel];
+    const favoritesChannel = supabase
+      .channel(`home-favorites-${userId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'item_favorites', filter: `user_id=eq.${userId}` },
+        async () => {
+          await loadDashboardData();
+        }
+      )
+      .subscribe();
+
+    const likesChannel = supabase
+      .channel(`home-likes-${userId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'item_likes', filter: `user_id=eq.${userId}` },
+        async () => {
+          await loadDashboardData();
+        }
+      )
+      .subscribe();
+
+    dashboardChannels = [
+      notificationsChannel,
+      conversationsChannel,
+      followsChannel,
+      favoritesChannel,
+      likesChannel
+    ];
   }
 
   function showDashboardPanel(panel: 'inbox' | 'creator' | 'network') {
@@ -791,6 +877,8 @@
     dashboardFollowedItems = [];
     dashboardLatestDownloads = [];
     dashboardRecentItems = [];
+    dashboardFavoriteItems = [];
+    dashboardLikedItems = [];
     dashboardPriorityFeed = [];
     dashboardUnreadCount = 0;
     dashboardLoadedForUser = '';
@@ -1304,6 +1392,145 @@
                 <p class="dashboard-empty">Deine zuletzt geöffneten Einträge erscheinen hier.</p>
               {/if}
             </section>
+
+            <section class="dashboard-panel">
+              <div class="dashboard-panel__head">
+                <div class="dashboard-panel__head-title">
+                  <svg
+                    class="dashboard-panel__head-icon"
+                    width="22"
+                    height="22"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+                  </svg>
+                  <div>
+                    <span class="dashboard-kicker">Gemerkt</span>
+                    <h2>Merkliste</h2>
+                  </div>
+                </div>
+                <a href="/galerie">Stöbern</a>
+              </div>
+
+              {#if dashboardLoading && dashboardFavoriteItems.length === 0}
+                <p class="dashboard-empty">Merkliste wird geladen...</p>
+              {:else if dashboardFavoriteItems.length > 0}
+                <div class="dashboard-list">
+                  {#each dashboardFavoriteItems as item (item.id)}
+                    <a class="dashboard-entry dashboard-entry--link" href={getPublicItemHref(item)}>
+                      {#if getItemPreviewUrl(item)}
+                        <img
+                          class="dashboard-entry__thumb"
+                          src={getItemPreviewUrl(item)}
+                          alt={item.title || item.original_name || 'Item'}
+                          width="64"
+                          height="64"
+                          loading="lazy"
+                        />
+                      {:else}
+                        <div class="dashboard-entry__thumb dashboard-entry__thumb--fallback">
+                          {(item.title || item.original_name || '?').slice(0, 1).toUpperCase()}
+                        </div>
+                      {/if}
+
+                      <div class="dashboard-entry__body">
+                        <div class="dashboard-entry__meta">
+                          <strong>{item.title || item.original_name || 'Ohne Titel'}</strong>
+                          {#if item.favoritedAt}
+                            {@const meta = formatMetaDateLines(item.favoritedAt)}
+                            {#if meta.date || meta.time}
+                              <time class="dashboard-entry__datetime" datetime={meta.iso}>
+                                {#if meta.date}<span class="dashboard-entry__date-line">{meta.date}</span>{/if}
+                                {#if meta.time}<span class="dashboard-entry__time-line">{meta.time}</span>{/if}
+                              </time>
+                            {/if}
+                          {/if}
+                        </div>
+                        <span class="dashboard-entry__context">Gemerkt</span>
+                        <p>Eintrag aus deiner Merkliste öffnen.</p>
+                      </div>
+                    </a>
+                  {/each}
+                </div>
+              {:else}
+                <p class="dashboard-empty">Noch keine gemerkten Einträge. Auf Item-Seiten mit „Merken“ vormerken.</p>
+              {/if}
+            </section>
+
+            <section class="dashboard-panel">
+              <div class="dashboard-panel__head">
+                <div class="dashboard-panel__head-title">
+                  <!-- Herz wie auf der Item-Seite (ImageControlsSection, Like aktiv) -->
+                  <svg
+                    class="dashboard-panel__head-icon dashboard-panel__head-icon--heart"
+                    width="22"
+                    height="22"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    stroke="currentColor"
+                    stroke-width="2.2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M12 20.5l-1.45-1.32C5.4 14.5 2 11.42 2 7.72 2 4.9 4.24 2.75 7.05 2.75c1.6 0 3.14.74 4.15 1.9 1.01-1.16 2.55-1.9 4.15-1.9C18.16 2.75 20.4 4.9 20.4 7.72c0 3.7-3.4 6.78-8.55 11.46L12 20.5z"
+                    />
+                  </svg>
+                  <div>
+                    <span class="dashboard-kicker">Likes</span>
+                    <h2>Gefällt mir</h2>
+                  </div>
+                </div>
+                <a href="/galerie">Stöbern</a>
+              </div>
+
+              {#if dashboardLoading && dashboardLikedItems.length === 0}
+                <p class="dashboard-empty">Likes werden geladen...</p>
+              {:else if dashboardLikedItems.length > 0}
+                <div class="dashboard-list">
+                  {#each dashboardLikedItems as item (item.id)}
+                    <a class="dashboard-entry dashboard-entry--link" href={getPublicItemHref(item)}>
+                      {#if getItemPreviewUrl(item)}
+                        <img
+                          class="dashboard-entry__thumb"
+                          src={getItemPreviewUrl(item)}
+                          alt={item.title || item.original_name || 'Item'}
+                          width="64"
+                          height="64"
+                          loading="lazy"
+                        />
+                      {:else}
+                        <div class="dashboard-entry__thumb dashboard-entry__thumb--fallback">
+                          {(item.title || item.original_name || '?').slice(0, 1).toUpperCase()}
+                        </div>
+                      {/if}
+
+                      <div class="dashboard-entry__body">
+                        <div class="dashboard-entry__meta">
+                          <strong>{item.title || item.original_name || 'Ohne Titel'}</strong>
+                          {#if item.likedAt}
+                            {@const meta = formatMetaDateLines(item.likedAt)}
+                            {#if meta.date || meta.time}
+                              <time class="dashboard-entry__datetime" datetime={meta.iso}>
+                                {#if meta.date}<span class="dashboard-entry__date-line">{meta.date}</span>{/if}
+                                {#if meta.time}<span class="dashboard-entry__time-line">{meta.time}</span>{/if}
+                              </time>
+                            {/if}
+                          {/if}
+                        </div>
+                        <span class="dashboard-entry__context">Gefällt mir</span>
+                        <p>Eintrag erneut öffnen.</p>
+                      </div>
+                    </a>
+                  {/each}
+                </div>
+              {:else}
+                <p class="dashboard-empty">Noch keine Likes. Auf Item-Seiten mit „Gefällt mir“ markieren.</p>
+              {/if}
+            </section>
             {/if}
 
             {#if showDashboardPanel('network')}
@@ -1429,14 +1656,7 @@
           </div>
 
           {#if data.dashboardDiscover}
-            <aside class="dashboard-page-layout__aside" aria-label="Entdecken">
-              <header class="dashboard-discover-head">
-                <span class="dashboard-kicker">Entdecken</span>
-                <h2 class="dashboard-discover-title">Neu auf Culoca</h2>
-                <p class="dashboard-discover-lede">
-                  Nächste Termine, 20 neueste Fotos und Firmen wie unter /foto – Varianten-Wechsel, Entfernung bei bekannter Position.
-                </p>
-              </header>
+            <aside class="dashboard-page-layout__aside" aria-label="Aktuelle Termine, Fotos und Firmen">
               <HomeDashboardDiscover
                 upcomingEvents={data.dashboardDiscover.upcomingEvents}
                 latestPhotos={data.dashboardDiscover.latestPhotos}
@@ -1693,23 +1913,6 @@
     word-break: break-all;
   }
 
-  .dashboard-discover-head {
-    margin-bottom: 0.35rem;
-  }
-
-  .dashboard-discover-title {
-    margin: 0.15rem 0 0.4rem;
-    font-size: 1.2rem;
-    line-height: 1.2;
-  }
-
-  .dashboard-discover-lede {
-    margin: 0;
-    font-size: 0.84rem;
-    line-height: 1.45;
-    color: var(--text-secondary);
-  }
-
   .dashboard-inner {
     width: 100%;
     display: grid;
@@ -1891,6 +2094,21 @@
 
   .dashboard-panel__head > div:first-child {
     min-width: 0;
+  }
+
+  .dashboard-panel__head-title {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.65rem;
+    min-width: 0;
+  }
+
+  .dashboard-panel__head-icon {
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    margin-top: 0.12rem;
+    color: var(--culoca-orange);
   }
 
   .dashboard-panel__head h2 {

@@ -1,9 +1,112 @@
 import { createClient } from '@supabase/supabase-js';
 import { error } from '@sveltejs/kit';
 import { getHubSeoPolicy } from '$lib/seo/policy';
-import { getPublicItemHref } from '$lib/content/routing';
+import { getPublicItemHref, slugifySegment } from '$lib/content/routing';
 
 const PAGE_SIZE = 24;
+
+type ProfileRow = {
+  id: string;
+  full_name: string | null;
+  accountname: string | null;
+  bio: string | null;
+  avatar_url: string | null;
+  website: string | null;
+};
+
+function normalizePermalinkSegment(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return '';
+  try {
+    return decodeURIComponent(trimmed).trim().toLowerCase();
+  } catch {
+    return trimmed.toLowerCase();
+  }
+}
+
+/** Escape `%` and `_` for PostgREST `.ilike()` patterns. */
+function escapeIlike(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+}
+
+/** Pick a substring for bounded `ilike` prefilter (longest segment, min length 3). */
+function pickFullNameSearchNeedle(slug: string): string | null {
+  const parts = slug.split('-').filter(Boolean);
+  const candidates = parts.length ? parts : [slug];
+  const ok = candidates.filter((p) => p.length >= 3);
+  if (!ok.length) return null;
+  return ok.reduce((a, b) => (b.length > a.length ? b : a));
+}
+
+async function resolveProfileForPermalink(
+  supabase: ReturnType<typeof createClient>,
+  segment: string
+): Promise<ProfileRow | null> {
+  const accountname = normalizePermalinkSegment(segment);
+  if (!accountname || !/^[a-z0-9_-]+$/.test(accountname)) {
+    return null;
+  }
+
+  const select =
+    'id, full_name, accountname, bio, avatar_url, website' as const;
+
+  let { data: profile, error: err1 } = await supabase
+    .from('profiles')
+    .select(select)
+    .eq('accountname', accountname)
+    .maybeSingle();
+
+  if (err1 && err1.code !== 'PGRST116') {
+    throw error(500, err1.message);
+  }
+
+  if (profile?.id) {
+    return profile as ProfileRow;
+  }
+
+  const { data: fallbackProfile, error: err2 } = await supabase
+    .from('profiles')
+    .select(select)
+    .ilike('accountname', accountname)
+    .maybeSingle();
+
+  if (err2 && err2.code !== 'PGRST116') {
+    throw error(500, err2.message);
+  }
+
+  if (fallbackProfile?.id) {
+    return fallbackProfile as ProfileRow;
+  }
+
+  // Fallback: URL segment equals slugified display name (accountname unset / legacy / typo in marketing links)
+  const needle = pickFullNameSearchNeedle(accountname);
+  if (!needle) {
+    return null;
+  }
+
+  const { data: candidates, error: err3 } = await supabase
+    .from('profiles')
+    .select(select)
+    .not('full_name', 'is', null)
+    .neq('full_name', '')
+    .ilike('full_name', `%${escapeIlike(needle)}%`)
+    .limit(200);
+
+  if (err3) {
+    throw error(500, err3.message);
+  }
+
+  const rows = (candidates || []) as ProfileRow[];
+  const matches = rows.filter(
+    (p) => p.full_name && slugifySegment(p.full_name) === accountname
+  );
+
+  if (matches.length === 1) {
+    return matches[0];
+  }
+
+  return null;
+}
 
 function createServerSupabase() {
   const supabaseUrl = (
@@ -28,23 +131,13 @@ function createServerSupabase() {
 export async function loadAccountGalleryPage(accountnameParam: string, pageParam: string | null) {
   const supabase = createServerSupabase();
   const currentPage = Math.max(1, Number.parseInt(pageParam || '1', 10));
-  const accountname = accountnameParam.toLowerCase();
+  const accountname = normalizePermalinkSegment(accountnameParam);
 
-  let { data: profile } = await supabase
-    .from('profiles')
-    .select('id, full_name, accountname, bio, avatar_url, website')
-    .eq('accountname', accountname)
-    .maybeSingle();
-
-  if (!profile?.id) {
-    const { data: fallbackProfile } = await supabase
-      .from('profiles')
-      .select('id, full_name, accountname, bio, avatar_url, website')
-      .ilike('accountname', accountname)
-      .maybeSingle();
-
-    profile = fallbackProfile;
+  if (!accountname) {
+    throw error(404, 'Profil nicht gefunden');
   }
+
+  const profile = await resolveProfileForPermalink(supabase, accountname);
 
   if (!profile?.id) {
     throw error(404, 'Profil nicht gefunden');
