@@ -24,9 +24,12 @@
   export let canFavorite = false;
   export let isFavorited = false;
   export let favoriteLoading = false;
+  export let isLocationFiltered = false;
   export let canLike = false;
   export let isLiked = false;
   export let likeLoading = false;
+  export let canChat = false;
+  export let onStartChat: () => void;
 
   type HtmlSnippet = {
     label: string;
@@ -54,7 +57,7 @@
   $: loading = $unifiedRightsStore.loading;
   $: hasMapLocation = !!(image?.lat && image?.lon);
   $: canDownload = !!(rights?.download || rights?.download_original || isCreator);
-  $: showControls = hasMapLocation || canFavorite || canLike || canDownload || (isCreator && editMode);
+  $: showControls = hasMapLocation || canFavorite || canLike || canChat || canDownload || (isCreator && editMode);
 
   function insertHtmlSnippet(tool: HtmlSnippet) {
     if (!contentTextarea) {
@@ -83,7 +86,7 @@
 
 <div class="controls-section" class:dark={darkMode}>
   {#if showControls}
-    {#if hasMapLocation || canFavorite || canLike || canDownload}
+    {#if hasMapLocation || canFavorite || canLike || canChat || canDownload}
       <div class="action-buttons">
         {#if externalUrl?.trim()}
           <a class="square-btn website-btn" href={externalUrl} target="_blank" rel="noopener noreferrer" title="Webseite öffnen">
@@ -102,7 +105,7 @@
             <path class="google-red" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="currentColor"/>
           </svg>
         </a>
-        <button class="square-btn location-filter-btn" on:click={onSetLocationFilter} title="Als Location-Filter setzen">
+        <button class="square-btn location-filter-btn" class:is-active={isLocationFiltered} on:click={onSetLocationFilter} title="Als Location-Filter setzen">
           <svg width="35" height="35" viewBox="0 0 83.86 100.88" fill="currentColor">
             <path d="M0,41.35c0-5.67,1.1-11.03,3.29-16.07,2.19-5.04,5.19-9.43,8.98-13.17,3.79-3.74,8.25-6.69,13.36-8.86,5.11-2.17,10.54-3.25,16.29-3.25s11.18,1.08,16.29,3.25c5.11,2.17,9.56,5.12,13.36,8.86,3.79,3.74,6.79,8.13,8.98,13.17,2.19,5.04,3.29,10.4,3.29,16.07s-1.1,11.03-3.29,16.07c-2.2,5.04-5.19,9.43-8.98,13.17-3.8,3.74-8.25,6.7-13.36,8.86-5.11,2.17-9.49,21.42-15.25,21.42s-12.23-19.25-17.34-21.42c-5.11-2.17-9.56-5.12-13.36-8.86-3.79-3.74-6.79-8.13-8.98-13.17-2.2-5.04-3.29-10.4-3.29-16.07ZM25.16,41.35c0,2.29.44,4.43,1.32,6.44.88,2.01,2.07,3.76,3.59,5.26,1.52,1.5,3.29,2.68,5.33,3.55,2.04.87,4.21,1.3,6.53,1.3s4.49-.43,6.53-1.3c2.04-.87,3.81-2.05,5.33-3.55,1.52-1.5,2.71-3.25,3.59-5.26.88-2.01,1.32-4.15,1.32-6.44s-.44-4.43-1.32-6.44c-.88-2.01-2.08-3.76-3.59-5.26-1.52-1.5-3.29-2.68-5.33-3.55-2.03-.87-4.21-1.3-6.53-1.3s-4.49.43-6.53,1.3c-2.04.87-3.81,2.05-5.33,3.55-1.52,1.5-2.72,3.25-3.59,5.26-.88,2.01-1.32,4.16-1.32,6.44Z"/>
           </svg>
@@ -147,6 +150,30 @@
               aria-hidden="true"
             >
               <path d="M12 20.5l-1.45-1.32C5.4 14.5 2 11.42 2 7.72 2 4.9 4.24 2.75 7.05 2.75c1.6 0 3.14.74 4.15 1.9 1.01-1.16 2.55-1.9 4.15-1.9C18.16 2.75 20.4 4.9 20.4 7.72c0 3.7-3.4 6.78-8.55 11.46L12 20.5z" />
+            </svg>
+          </button>
+        {/if}
+
+        {#if canChat}
+          <button
+            class="square-btn chat-btn"
+            on:click={onStartChat}
+            title="Nachricht zum Item schreiben"
+          >
+            <svg
+              width="30"
+              height="30"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M6.5 18.5L3.5 20l1.2-3.7A7.8 7.8 0 0 1 4 13c0-4.4 4-8 9-8s9 3.6 9 8-4 8-9 8c-1.5 0-2.9-.3-4.1-.9H6.5z" />
+              <path d="M8.5 11.5h9" />
+              <path d="M8.5 15.5h6" />
             </svg>
           </button>
         {/if}
@@ -399,10 +426,13 @@
   }
   .location-filter-btn {
     background: var(--bg-secondary);
-    color: var(--text-primary);
+    color: #fff;
   }
-  .location-filter-btn:hover svg {
-    fill: #ee7221;
+  .location-filter-btn:hover,
+  .location-filter-btn.is-active {
+    background: rgba(238, 114, 33, 0.12);
+    color: #ee7221;
+    border-color: rgba(238, 114, 33, 0.4);
   }
   .delete-btn {
     background: var(--bg-secondary);
@@ -410,7 +440,7 @@
   }
   .favorite-btn {
     background: var(--bg-secondary);
-    color: var(--text-primary);
+    color: #fff;
   }
   .favorite-btn:hover,
   .favorite-btn.is-active {
@@ -420,13 +450,22 @@
   }
   .like-btn {
     background: var(--bg-secondary);
-    color: var(--text-primary);
+    color: #fff;
   }
   .like-btn:hover,
   .like-btn.is-active {
-    background: rgba(37, 99, 235, 0.12);
-    color: #2563eb;
-    border-color: rgba(37, 99, 235, 0.36);
+    background: rgba(238, 114, 33, 0.12);
+    color: #ee7221;
+    border-color: rgba(238, 114, 33, 0.4);
+  }
+  .chat-btn {
+    background: var(--bg-secondary);
+    color: #fff;
+  }
+  .chat-btn:hover {
+    background: rgba(238, 114, 33, 0.12);
+    color: #ee7221;
+    border-color: rgba(238, 114, 33, 0.4);
   }
   .delete-btn:hover {
     background: #dc3545;

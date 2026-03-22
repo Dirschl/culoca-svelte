@@ -695,6 +695,15 @@ let showRightsManager = false;
     messages: 0
   };
   let recentInteractions: any[] = [];
+  let recentInteractionsExpanded = false;
+  $: creatorUserId = image?.profile_id || image?.user_id || null;
+  $: canChatWithCreator = !!creatorUserId && creatorUserId !== currentUser?.id;
+  $: isLocationFiltered =
+    !!image?.lat &&
+    !!image?.lon &&
+    !!$filterStore.locationFilter &&
+    Math.abs(($filterStore.locationFilter?.lat || 0) - image.lat) < 0.000001 &&
+    Math.abs(($filterStore.locationFilter?.lon || 0) - image.lon) < 0.000001;
   
   // Function to initialize GPS if not available
   async function initializeGpsIfNeeded() {
@@ -860,6 +869,7 @@ let showRightsManager = false;
     if (nextInsightsKey !== lastInsightsKey) {
       lastInsightsKey = nextInsightsKey;
       interactionInsightsLoaded = false;
+      recentInteractionsExpanded = false;
       interactionCounts = {
         views: 0,
         downloads: 0,
@@ -1724,7 +1734,6 @@ let showRightsManager = false;
     goto('/');
   }
   async function startCreatorChat() {
-    const creatorUserId = image?.profile_id || image?.user_id || null;
     if (!creatorUserId) return;
 
     if (!currentUser?.id) {
@@ -3410,8 +3419,10 @@ let showRightsManager = false;
       editMode={canEditItem && editMode}
       canFavorite={!!image?.id}
       canLike={!!image?.id}
+      canChat={canChatWithCreator}
       {isFavorited}
       {favoriteLoading}
+      {isLocationFiltered}
       {isLiked}
       {likeLoading}
       bind:externalUrl={managementForm.external_url}
@@ -3428,6 +3439,7 @@ let showRightsManager = false;
       onDownloadOriginal={downloadOriginal}
       onToggleFavorite={toggleFavorite}
       onToggleLike={toggleLike}
+      onStartChat={startCreatorChat}
       onToggleGallery={toggleGallery}
     />
     {#if favoriteStatus}
@@ -3492,14 +3504,29 @@ let showRightsManager = false;
 
           {#if recentInteractions.length > 0}
             <div class="insight-feed">
-              <h3>Letzte Interaktionen</h3>
-              {#each recentInteractions as entry}
-                <div class="insight-feed-item">
-                  <strong>{getInteractionActorLabel(entry)}</strong>
-                  <span>{getInteractionEventLabel(entry)}</span>
-                  <time>{formatCommentDate(entry.created_at)}</time>
+              <button
+                type="button"
+                class="insight-feed-toggle"
+                class:is-open={recentInteractionsExpanded}
+                on:click={() => (recentInteractionsExpanded = !recentInteractionsExpanded)}
+                aria-expanded={recentInteractionsExpanded}
+              >
+                <span>Letzte Interaktionen</span>
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </button>
+              {#if recentInteractionsExpanded}
+                <div class="insight-feed-list">
+                  {#each recentInteractions as entry}
+                    <div class="insight-feed-item">
+                      <strong>{getInteractionActorLabel(entry)}</strong>
+                      <span>{getInteractionEventLabel(entry)}</span>
+                      <time>{formatCommentDate(entry.created_at)}</time>
+                    </div>
+                  {/each}
                 </div>
-              {/each}
+              {/if}
             </div>
           {/if}
         {/if}
@@ -5761,9 +5788,48 @@ let showRightsManager = false;
     gap: 0.65rem;
   }
 
-  .insight-feed h3 {
+  .insight-feed-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     margin: 0;
+    width: 100%;
+    padding: 0.9rem 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font: inherit;
     font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+  }
+
+  .insight-feed-toggle:hover,
+  .insight-feed-toggle.is-open {
+    border-color: color-mix(in srgb, var(--culoca-orange) 45%, var(--border-color));
+    color: var(--culoca-orange);
+  }
+
+  .insight-feed-toggle svg {
+    width: 18px;
+    height: 18px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: transform 0.2s ease;
+  }
+
+  .insight-feed-toggle.is-open svg {
+    transform: rotate(180deg);
+  }
+
+  .insight-feed-list {
+    display: grid;
+    gap: 0.65rem;
   }
 
   .insight-feed-item {
