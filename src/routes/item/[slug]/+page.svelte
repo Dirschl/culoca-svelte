@@ -690,7 +690,8 @@ let showRightsManager = false;
     downloads: 0,
     favorites: 0,
     likes: 0,
-    comments: 0
+    comments: 0,
+    messages: 0
   };
   let recentInteractions: any[] = [];
   
@@ -863,7 +864,8 @@ let showRightsManager = false;
         downloads: 0,
         favorites: 0,
         likes: 0,
-        comments: 0
+        comments: 0,
+        messages: 0
       };
       recentInteractions = [];
 
@@ -1103,6 +1105,7 @@ let showRightsManager = false;
         { count: favoritesCount, error: favoritesError },
         { count: likesCount, error: likesError },
         { count: commentsCount, error: commentsError },
+        { count: messagesCount, error: messagesError },
         { data: recentData, error: recentError }
       ] = await Promise.all([
         supabase
@@ -1130,6 +1133,11 @@ let showRightsManager = false;
           .eq('status', 'visible'),
         supabase
           .from('item_events')
+          .select('id', { count: 'exact', head: true })
+          .eq('item_id', image.id)
+          .eq('event_type', 'chat_message'),
+        supabase
+          .from('item_events')
           .select(`
             id,
             event_type,
@@ -1143,7 +1151,7 @@ let showRightsManager = false;
             )
           `)
           .eq('item_id', image.id)
-          .in('event_type', ['download', 'favorite_add', 'like_add', 'comment_create'])
+          .in('event_type', ['download', 'favorite_add', 'like_add', 'comment_create', 'chat_message'])
           .order('created_at', { ascending: false })
           .limit(8)
       ]);
@@ -1153,6 +1161,7 @@ let showRightsManager = false;
       if (favoritesError) throw favoritesError;
       if (likesError) throw likesError;
       if (commentsError) throw commentsError;
+      if (messagesError) throw messagesError;
       if (recentError) throw recentError;
 
       interactionCounts = {
@@ -1160,7 +1169,8 @@ let showRightsManager = false;
         downloads: downloadsCount || 0,
         favorites: favoritesCount || 0,
         likes: likesCount || 0,
-        comments: commentsCount || 0
+        comments: commentsCount || 0,
+        messages: messagesCount || 0
       };
       recentInteractions = recentData || [];
       interactionInsightsLoaded = true;
@@ -1185,6 +1195,8 @@ let showRightsManager = false;
         return 'Gefällt mir';
       case 'comment_create':
         return 'Kommentar';
+      case 'chat_message':
+        return 'Nachricht';
       default:
         return entry?.event_type || 'Interaktion';
     }
@@ -3470,6 +3482,10 @@ let showRightsManager = false;
             <div class="insight-card">
               <strong>{interactionCounts.comments}</strong>
               <span>Kommentare</span>
+            </div>
+            <div class="insight-card">
+              <strong>{interactionCounts.messages}</strong>
+              <span>Nachrichten</span>
             </div>
           </div>
 

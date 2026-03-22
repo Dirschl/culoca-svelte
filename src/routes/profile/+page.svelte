@@ -268,7 +268,7 @@
             )
           `)
           .eq('owner_user_id', user.id)
-          .in('event_type', ['download', 'favorite_add', 'like_add', 'comment_create', 'comment_hide', 'comment_restore'])
+          .in('event_type', ['download', 'favorite_add', 'like_add', 'comment_create', 'comment_hide', 'comment_restore', 'chat_message'])
           .order('created_at', { ascending: false })
           .limit(20),
         supabase
@@ -419,6 +419,7 @@
           ),
           starter_item:starter_item_id(
             id,
+            profile_id,
             slug,
             title,
             original_name,
@@ -610,6 +611,7 @@
           ),
           starter_item:starter_item_id(
             id,
+            profile_id,
             slug,
             title,
             original_name,
@@ -763,6 +765,22 @@
           }
         });
       }
+
+      if (conversation.starter_item_id) {
+        await supabase.from('item_events').insert({
+          item_id: conversation.starter_item_id,
+          actor_user_id: user.id,
+          owner_user_id: conversation.starter_item?.profile_id || null,
+          event_type: 'chat_message',
+          source: 'profile_chat',
+          metadata: {
+            conversation_id: conversation.id,
+            message_id: data.id,
+            message_excerpt: body.slice(0, 180),
+            starter_item_id: conversation.starter_item_id
+          }
+        });
+      }
     } catch (error) {
       console.error('Error sending message:', error);
       messageStatus = 'Nachricht konnte gerade nicht gesendet werden.';
@@ -802,6 +820,8 @@
         return 'wurde ausgeblendet';
       case 'comment_restore':
         return 'wurde wieder eingeblendet';
+      case 'chat_message':
+        return 'hat dir zu einem Bild geschrieben';
       default:
         return entry?.event_type || 'hat interagiert';
     }
@@ -834,6 +854,18 @@
     }
 
     return entry.item ? getPublicItemHref(entry.item) : '#';
+  }
+
+  function getNotificationPreview(entry: any) {
+    if (entry?.event_type === 'chat_message' && entry?.payload?.message_excerpt) {
+      return entry.payload.message_excerpt;
+    }
+
+    if (entry?.event_type === 'comment_create' && entry?.payload?.comment_excerpt) {
+      return entry.payload.comment_excerpt;
+    }
+
+    return '';
   }
 
   async function markNotificationRead(notificationId: string) {
@@ -1243,6 +1275,9 @@
                       <span>{getNotificationLabel(entry)}</span>
                       {#if entry.item}
                         <em>{entry.item.title || entry.item.original_name || 'Ohne Titel'}</em>
+                      {/if}
+                      {#if getNotificationPreview(entry)}
+                        <em>{getNotificationPreview(entry)}</em>
                       {/if}
                     </div>
                     <time>{formatInteractionDate(entry.created_at)}</time>
