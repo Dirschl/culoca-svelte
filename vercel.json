@@ -10,6 +10,15 @@
       "permanent": true
     }
   ],
+  "functions": {
+    "src/routes/api/**/*": {
+      "includeFiles": [
+        "node_modules/sharp/**/*",
+        "node_modules/@img/sharp-linux-x64/**/*",
+        "node_modules/@img/sharp-libvips-linux-x64/**/*"
+      ]
+    }
+  },
   "buildCommand": "npm run build",
   "installCommand": "npm install --include=optional",
   "framework": "sveltekit"
