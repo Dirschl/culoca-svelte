@@ -998,6 +998,31 @@ let showRightsManager = false;
     }
   }
 
+  async function logCommentModerationEvent(
+    eventType: 'comment_hide' | 'comment_restore',
+    commentId: string,
+    targetUserId: string | null | undefined
+  ) {
+    if (!currentUser?.id || !image?.id) return;
+
+    try {
+      await supabase.from('item_events').insert({
+        item_id: image.id,
+        actor_user_id: currentUser.id,
+        owner_user_id: image.profile_id || image.user_id || null,
+        event_type: eventType,
+        source: 'item_detail',
+        metadata: {
+          comment_id: commentId,
+          target_user_id: targetUserId || null,
+          canonical_path: canonicalPath || image.canonical_path || null
+        }
+      });
+    } catch (error) {
+      console.warn('Failed to log comment moderation event:', error);
+    }
+  }
+
   async function loadComments() {
     if (!image?.id) {
       comments = [];
@@ -1022,11 +1047,10 @@ let showRightsManager = false;
           )
         `)
         .eq('item_id', image.id)
-        .eq('status', 'visible')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      comments = data || [];
+      comments = isCreator ? data || [] : (data || []).filter((entry: any) => entry.status === 'visible');
     } catch (error) {
       console.error('Failed to load comments:', error);
       comments = [];
@@ -1232,6 +1256,43 @@ let showRightsManager = false;
     } catch (error) {
       console.error('Failed to delete comment:', error);
       commentStatus = 'Kommentar konnte nicht gelöscht werden.';
+    }
+  }
+
+  async function toggleCommentVisibility(comment: any) {
+    if (!currentUser?.id || !isCreator || !comment?.id) return;
+
+    const nextStatus = comment.status === 'hidden' ? 'visible' : 'hidden';
+
+    try {
+      const { error } = await supabase
+        .from('item_comments')
+        .update({
+          status: nextStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', comment.id);
+
+      if (error) throw error;
+
+      comments = comments.map((entry) =>
+        entry.id === comment.id
+          ? {
+              ...entry,
+              status: nextStatus
+            }
+          : entry
+      );
+
+      commentStatus = nextStatus === 'hidden' ? 'Kommentar ausgeblendet.' : 'Kommentar wieder sichtbar.';
+      await logCommentModerationEvent(
+        nextStatus === 'hidden' ? 'comment_hide' : 'comment_restore',
+        comment.id,
+        comment.user_id
+      );
+    } catch (error) {
+      console.error('Failed to moderate comment:', error);
+      commentStatus = 'Kommentar konnte nicht moderiert werden.';
     }
   }
 
@@ -3299,7 +3360,7 @@ let showRightsManager = false;
       {:else if comments.length > 0}
         <div class="comment-list">
           {#each comments as comment}
-            <article class="comment-item">
+            <article class="comment-item" class:is-hidden={comment.status === 'hidden'}>
               <div class="comment-avatar">
                 {#if getCommentAvatarUrl(comment)}
                   <img src={getCommentAvatarUrl(comment)} alt={getCommentAuthor(comment)} loading="lazy" />
@@ -3311,14 +3372,24 @@ let showRightsManager = false;
                 <div class="comment-meta">
                   <strong>{getCommentAuthor(comment)}</strong>
                   <span>{formatCommentDate(comment.created_at)}</span>
+                  {#if comment.status === 'hidden'}
+                    <span>Ausgeblendet</span>
+                  {/if}
                 </div>
                 <p>{comment.body}</p>
               </div>
-              {#if currentUser?.id === comment.user_id}
-                <button type="button" class="comment-delete-btn" on:click={() => deleteComment(comment.id)}>
-                  Löschen
-                </button>
-              {/if}
+              <div class="comment-actions">
+                {#if isCreator}
+                  <button type="button" class="comment-delete-btn" on:click={() => toggleCommentVisibility(comment)}>
+                    {comment.status === 'hidden' ? 'Einblenden' : 'Ausblenden'}
+                  </button>
+                {/if}
+                {#if currentUser?.id === comment.user_id}
+                  <button type="button" class="comment-delete-btn" on:click={() => deleteComment(comment.id)}>
+                    Löschen
+                  </button>
+                {/if}
+              </div>
             </article>
           {/each}
         </div>
@@ -5491,6 +5562,11 @@ let showRightsManager = false;
     border: 1px solid var(--border-color);
   }
 
+  .comment-item.is-hidden {
+    opacity: 0.76;
+    border-style: dashed;
+  }
+
   .comment-avatar {
     width: 2.4rem;
     height: 2.4rem;
@@ -5514,6 +5590,13 @@ let showRightsManager = false;
     min-width: 0;
     display: grid;
     gap: 0.35rem;
+  }
+
+  .comment-actions {
+    display: grid;
+    gap: 0.45rem;
+    align-content: start;
+    justify-items: end;
   }
 
   .comment-meta {
