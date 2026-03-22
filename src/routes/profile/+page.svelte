@@ -61,6 +61,8 @@
   let favoriteItems: any[] = [];
   let likedItems: any[] = [];
   let creatorInteractions: any[] = [];
+  let notifications: any[] = [];
+  let unreadNotifications = 0;
   let interactionLoading = true;
 
   $: nameValid = name.length >= 2 && name.length <= 60;
@@ -168,7 +170,8 @@
         { data: recentData, error: recentError },
         { data: favoriteData, error: favoriteError },
         { data: likedData, error: likedError },
-        { data: creatorData, error: creatorError }
+        { data: creatorData, error: creatorError },
+        { data: notificationData, error: notificationError }
       ] = await Promise.all([
         supabase
           .from('item_events')
@@ -258,6 +261,33 @@
           .eq('owner_user_id', user.id)
           .in('event_type', ['download', 'favorite_add', 'like_add', 'comment_create', 'comment_hide', 'comment_restore'])
           .order('created_at', { ascending: false })
+          .limit(20),
+        supabase
+          .from('user_notifications')
+          .select(`
+            id,
+            event_type,
+            payload,
+            read_at,
+            created_at,
+            items:item_id(
+              id,
+              slug,
+              title,
+              original_name,
+              canonical_path,
+              country_slug,
+              district_slug,
+              municipality_slug,
+              path_512
+            ),
+            profiles:actor_user_id(
+              full_name,
+              accountname
+            )
+          `)
+          .eq('recipient_user_id', user.id)
+          .order('created_at', { ascending: false })
           .limit(20)
       ]);
 
@@ -265,6 +295,7 @@
       if (favoriteError) throw favoriteError;
       if (likedError) throw likedError;
       if (creatorError) throw creatorError;
+      if (notificationError) throw notificationError;
 
       const seenRecent = new Set<string>();
       recentItems = (recentData || [])
@@ -293,12 +324,20 @@
         item: entry.items || null,
         actor: entry.profiles || null
       }));
+      notifications = (notificationData || []).map((entry: any) => ({
+        ...entry,
+        item: entry.items || null,
+        actor: entry.profiles || null
+      }));
+      unreadNotifications = notifications.filter((entry: any) => !entry.read_at).length;
     } catch (error) {
       console.error('Error loading interactions:', error);
       recentItems = [];
       favoriteItems = [];
       likedItems = [];
       creatorInteractions = [];
+      notifications = [];
+      unreadNotifications = 0;
     } finally {
       interactionLoading = false;
     }
@@ -337,6 +376,74 @@
         return 'wurde wieder eingeblendet';
       default:
         return entry?.event_type || 'hat interagiert';
+    }
+  }
+
+  function getNotificationActor(entry: any) {
+    return entry?.actor?.full_name || entry?.actor?.accountname || 'Jemand';
+  }
+
+  function getNotificationLabel(entry: any) {
+    switch (entry?.event_type) {
+      case 'download':
+        return 'hat dein Bild heruntergeladen';
+      case 'favorite_add':
+        return 'hat dein Bild gemerkt';
+      case 'like_add':
+        return 'findet dein Bild gut';
+      case 'comment_create':
+        return 'hat kommentiert';
+      default:
+        return 'hat interagiert';
+    }
+  }
+
+  async function markNotificationRead(notificationId: string) {
+    if (!notificationId) return;
+
+    try {
+      const { error } = await supabase
+        .from('user_notifications')
+        .update({ read_at: new Date().toISOString() })
+        .eq('id', notificationId)
+        .is('read_at', null);
+
+      if (error) throw error;
+
+      notifications = notifications.map((entry) =>
+        entry.id === notificationId
+          ? {
+              ...entry,
+              read_at: entry.read_at || new Date().toISOString()
+            }
+          : entry
+      );
+      unreadNotifications = notifications.filter((entry: any) => !entry.read_at).length;
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
+  }
+
+  async function markAllNotificationsRead() {
+    if (!user?.id || unreadNotifications === 0) return;
+
+    try {
+      const { error } = await supabase
+        .from('user_notifications')
+        .update({ read_at: new Date().toISOString() })
+        .eq('recipient_user_id', user.id)
+        .is('read_at', null);
+
+      if (error) throw error;
+
+      const now = new Date().toISOString();
+      notifications = notifications.map((entry) => ({
+        ...entry,
+        read_at: entry.read_at || now
+      }));
+      unreadNotifications = 0;
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
     }
   }
 
@@ -664,6 +771,48 @@
               <div class="review-ok">
                 Keine offenen Daten. Dein Bestand ist aktuell sauber gepflegt.
               </div>
+            {/if}
+          </div>
+
+          <div class="card">
+            <div class="notification-header">
+              <h3 class="section-title">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5" />
+                  <path d="M10 17a2 2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                Benachrichtigungen
+              </h3>
+              {#if unreadNotifications > 0}
+                <button type="button" class="mark-read-btn" on:click={markAllNotificationsRead}>
+                  Alle als gelesen
+                </button>
+              {/if}
+            </div>
+            {#if interactionLoading}
+              <p class="help-text">Benachrichtigungen werden geladen...</p>
+            {:else if notifications.length > 0}
+              <div class="activity-list">
+                {#each notifications as entry}
+                  <a
+                    class="activity-item"
+                    class:is-unread={!entry.read_at}
+                    href={entry.item ? getPublicItemHref(entry.item) : '#'}
+                    on:click={() => markNotificationRead(entry.id)}
+                  >
+                    <div class="activity-copy">
+                      <strong>{getNotificationActor(entry)}</strong>
+                      <span>{getNotificationLabel(entry)}</span>
+                      {#if entry.item}
+                        <em>{entry.item.title || entry.item.original_name || 'Ohne Titel'}</em>
+                      {/if}
+                    </div>
+                    <time>{formatInteractionDate(entry.created_at)}</time>
+                  </a>
+                {/each}
+              </div>
+            {:else}
+              <p class="help-text">Noch keine Benachrichtigungen vorhanden.</p>
             {/if}
           </div>
 
@@ -1412,6 +1561,35 @@
     gap: 0.7rem;
   }
 
+  .notification-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .notification-header .section-title {
+    margin-bottom: 0;
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  .mark-read-btn {
+    border: 1px solid var(--border-color);
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border-radius: 999px;
+    padding: 0.5rem 0.9rem;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .mark-read-btn:hover {
+    border-color: var(--accent-color);
+    color: var(--accent-color);
+  }
+
   .activity-item {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
@@ -1429,6 +1607,11 @@
   .activity-item:hover {
     border-color: var(--accent-color);
     transform: translateY(-1px);
+  }
+
+  .activity-item.is-unread {
+    border-color: color-mix(in srgb, var(--accent-color) 38%, var(--border-color));
+    box-shadow: inset 3px 0 0 var(--accent-color);
   }
 
   .activity-copy {

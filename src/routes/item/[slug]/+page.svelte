@@ -981,6 +981,27 @@ let showRightsManager = false;
     }
   }
 
+  async function createOwnerNotification(
+    eventType: 'favorite_add' | 'like_add' | 'comment_create',
+    payload: Record<string, unknown>
+  ) {
+    const ownerUserId = image?.profile_id || image?.user_id || null;
+
+    if (!currentUser?.id || !image?.id || !ownerUserId || ownerUserId === currentUser.id) return;
+
+    try {
+      await supabase.from('user_notifications').insert({
+        recipient_user_id: ownerUserId,
+        actor_user_id: currentUser.id,
+        item_id: image.id,
+        event_type: eventType,
+        payload
+      });
+    } catch (error) {
+      console.warn('Failed to create owner notification:', error);
+    }
+  }
+
   async function logCommentEvent(
     eventType: 'comment_create' | 'comment_delete',
     commentId: string,
@@ -1253,6 +1274,12 @@ let showRightsManager = false;
       commentDraft = '';
       commentStatus = 'Kommentar gespeichert.';
       await logCommentEvent('comment_create', data.id, null);
+      await createOwnerNotification('comment_create', {
+        comment_id: data.id,
+        parent_comment_id: null,
+        comment_excerpt: body.slice(0, 180),
+        canonical_path: canonicalPath || image.canonical_path || null
+      });
     } catch (error) {
       console.error('Failed to save comment:', error);
       commentStatus = 'Kommentar konnte nicht gespeichert werden.';
@@ -1342,6 +1369,12 @@ let showRightsManager = false;
       activeReplyCommentId = null;
       commentStatus = 'Antwort gespeichert.';
       await logCommentEvent('comment_create', data.id, parentCommentId);
+      await createOwnerNotification('comment_create', {
+        comment_id: data.id,
+        parent_comment_id: parentCommentId,
+        comment_excerpt: body.slice(0, 180),
+        canonical_path: canonicalPath || image.canonical_path || null
+      });
     } catch (error) {
       console.error('Failed to save reply:', error);
       commentStatus = 'Antwort konnte nicht gespeichert werden.';
@@ -1427,6 +1460,9 @@ let showRightsManager = false;
         isFavorited = true;
         favoriteStatus = 'Zur Merkliste hinzugefügt.';
         await logFavoriteEvent('favorite_add');
+        await createOwnerNotification('favorite_add', {
+          canonical_path: canonicalPath || image.canonical_path || null
+        });
       }
     } catch (error) {
       console.error('Failed to toggle favorite:', error);
@@ -1476,6 +1512,9 @@ let showRightsManager = false;
         isLiked = true;
         likeStatus = 'Gefällt mir gespeichert.';
         await logLikeEvent('like_add');
+        await createOwnerNotification('like_add', {
+          canonical_path: canonicalPath || image.canonical_path || null
+        });
       }
     } catch (error) {
       console.error('Failed to toggle like:', error);
