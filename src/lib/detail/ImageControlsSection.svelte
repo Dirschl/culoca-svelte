@@ -7,6 +7,7 @@
   export let onCopyLink: () => void;
   export let onDeleteImage: () => void;
   export let onDownloadOriginal: (id: string, name: string) => void;
+  export let onToggleFavorite: () => void;
   export let onToggleGallery: () => void;
   export let calendarUrl: string | null = null;
   export let editMode = false;
@@ -19,6 +20,9 @@
   export let highlightCalendar = false;
   export let darkMode = false;
   export let rotating = false;
+  export let canFavorite = false;
+  export let isFavorited = false;
+  export let favoriteLoading = false;
 
   type HtmlSnippet = {
     label: string;
@@ -45,7 +49,8 @@
   $: rights = $unifiedRightsStore.rights;
   $: loading = $unifiedRightsStore.loading;
   $: hasMapLocation = !!(image?.lat && image?.lon);
-  $: showControls = hasMapLocation || (isCreator && editMode);
+  $: canDownload = !!(rights?.download || rights?.download_original || isCreator);
+  $: showControls = hasMapLocation || canFavorite || canDownload || (isCreator && editMode);
 
   function insertHtmlSnippet(tool: HtmlSnippet) {
     if (!contentTextarea) {
@@ -74,7 +79,7 @@
 
 <div class="controls-section" class:dark={darkMode}>
   {#if showControls}
-    {#if hasMapLocation}
+    {#if hasMapLocation || canFavorite || canDownload}
       <div class="action-buttons">
         {#if externalUrl?.trim()}
           <a class="square-btn website-btn" href={externalUrl} target="_blank" rel="noopener noreferrer" title="Webseite öffnen">
@@ -104,6 +109,20 @@
           </svg>
         </button>
 
+        {#if canFavorite}
+          <button
+            class="square-btn favorite-btn"
+            class:is-active={isFavorited}
+            on:click={onToggleFavorite}
+            title={isFavorited ? 'Aus Merkliste entfernen' : 'Merken'}
+            disabled={favoriteLoading}
+          >
+            <svg width="30" height="30" viewBox="0 0 24 24" fill={isFavorited ? 'currentColor' : 'none'} stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+            </svg>
+          </button>
+        {/if}
+
         {#if rights?.delete || isCreator}
           <button class="square-btn delete-btn" on:click={onDeleteImage} title="Bild löschen" disabled={loading}>
             <svg width="35" height="35" viewBox="0 0 24 24" fill="currentColor">
@@ -112,7 +131,7 @@
           </button>
         {/if}
 
-        {#if rights?.download || rights?.download_original || isCreator}
+        {#if canDownload}
           <button class="square-btn download-btn" data-download-id={image.id} on:click={() => onDownloadOriginal(image.id, image.original_name)} title="Download öffnen" disabled={rotating || loading}>
             <svg width="35" height="35" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M12 6v7m0 0l-3-3m3 3l3-3M6 18h12"/>
@@ -360,6 +379,16 @@
   .delete-btn {
     background: var(--bg-secondary);
     color: var(--text-primary);
+  }
+  .favorite-btn {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+  }
+  .favorite-btn:hover,
+  .favorite-btn.is-active {
+    background: rgba(238, 114, 33, 0.12);
+    color: #ee7221;
+    border-color: rgba(238, 114, 33, 0.4);
   }
   .delete-btn:hover {
     background: #dc3545;

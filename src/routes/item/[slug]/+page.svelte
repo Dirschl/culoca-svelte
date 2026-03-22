@@ -665,6 +665,10 @@ let showRightsManager = false;
   
   // Item view logging
   let viewLogged = false;
+  let isFavorited = false;
+  let favoriteLoading = false;
+  let favoriteStatus = '';
+  let lastFavoriteKey = '';
   
   // Function to initialize GPS if not available
   async function initializeGpsIfNeeded() {
@@ -729,6 +733,10 @@ let showRightsManager = false;
       // Log item view when page loads
       if (image?.id && !viewLogged) {
         logItemView();
+      }
+
+      if (image?.id) {
+        await loadFavoriteState();
       }
 
       // Initialize slider progress
@@ -807,6 +815,109 @@ let showRightsManager = false;
       }
     } catch (error) {
       console.error('[Item Detail] Error logging item view:', error);
+    }
+  }
+
+  $: {
+    const nextFavoriteKey = `${currentUser?.id || 'anon'}:${image?.id || 'no-item'}`;
+    if (nextFavoriteKey !== lastFavoriteKey) {
+      lastFavoriteKey = nextFavoriteKey;
+      favoriteStatus = '';
+      if (!currentUser?.id || !image?.id) {
+        isFavorited = false;
+      } else if (browser) {
+        void loadFavoriteState();
+      }
+    }
+  }
+
+  async function loadFavoriteState() {
+    if (!browser || !image?.id || !currentUser?.id) {
+      isFavorited = false;
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('item_favorites')
+        .select('item_id')
+        .eq('user_id', currentUser.id)
+        .eq('item_id', image.id)
+        .maybeSingle();
+
+      if (error) throw error;
+      isFavorited = !!data;
+    } catch (error) {
+      console.error('Failed to load favorite state:', error);
+      isFavorited = false;
+    }
+  }
+
+  async function logFavoriteEvent(eventType: 'favorite_add' | 'favorite_remove') {
+    if (!currentUser?.id || !image?.id) return;
+
+    try {
+      await supabase.from('item_events').insert({
+        item_id: image.id,
+        actor_user_id: currentUser.id,
+        owner_user_id: image.profile_id || image.user_id || null,
+        event_type: eventType,
+        source: 'item_detail',
+        metadata: {
+          canonical_path: canonicalPath || image.canonical_path || null
+        }
+      });
+    } catch (error) {
+      console.warn('Failed to log favorite event:', error);
+    }
+  }
+
+  async function toggleFavorite() {
+    if (!image?.id) return;
+
+    if (!currentUser?.id) {
+      const returnTo = browser ? `${window.location.pathname}${window.location.search}` : canonicalPath || '/';
+      await goto(`/login?returnTo=${encodeURIComponent(returnTo)}`);
+      return;
+    }
+
+    favoriteLoading = true;
+    favoriteStatus = '';
+
+    try {
+      if (isFavorited) {
+        const { error } = await supabase
+          .from('item_favorites')
+          .delete()
+          .eq('user_id', currentUser.id)
+          .eq('item_id', image.id);
+
+        if (error) throw error;
+        isFavorited = false;
+        favoriteStatus = 'Aus Merkliste entfernt.';
+        await logFavoriteEvent('favorite_remove');
+      } else {
+        const { error } = await supabase
+          .from('item_favorites')
+          .upsert(
+            {
+              user_id: currentUser.id,
+              item_id: image.id,
+              created_at: new Date().toISOString()
+            },
+            { onConflict: 'user_id,item_id' }
+          );
+
+        if (error) throw error;
+        isFavorited = true;
+        favoriteStatus = 'Zur Merkliste hinzugefügt.';
+        await logFavoriteEvent('favorite_add');
+      }
+    } catch (error) {
+      console.error('Failed to toggle favorite:', error);
+      favoriteStatus = 'Merken ist gerade nicht verfügbar.';
+    } finally {
+      favoriteLoading = false;
     }
   }
   
@@ -2656,6 +2767,9 @@ let showRightsManager = false;
       {image}
       isCreator={isCreator}
       editMode={canEditItem && editMode}
+      canFavorite={!!image?.id}
+      {isFavorited}
+      {favoriteLoading}
       bind:externalUrl={managementForm.external_url}
       bind:videoUrl={managementForm.video_url}
       bind:contentHtml={managementForm.content}
@@ -2668,8 +2782,12 @@ let showRightsManager = false;
       onCopyLink={copyCurrentLink}
       onDeleteImage={deleteImage}
       onDownloadOriginal={downloadOriginal}
+      onToggleFavorite={toggleFavorite}
       onToggleGallery={toggleGallery}
     />
+    {#if favoriteStatus}
+      <p class="favorite-status">{favoriteStatus}</p>
+    {/if}
     {#if hasVideoEmbed && !(canEditItem && editMode)}
       <section class="content-panel">
         <h2>Video</h2>
@@ -4691,6 +4809,14 @@ let showRightsManager = false;
 
   .content-panel h2 {
     margin: 0 0 0.75rem 0;
+  }
+
+  .favorite-status {
+    max-width: 1400px;
+    margin: 0.65rem auto 0;
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    text-align: center;
   }
 
   .event-detail-list {

@@ -4,6 +4,8 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import SiteNav from '$lib/SiteNav.svelte';
+  import { getPublicItemHref } from '$lib/content/routing';
+  import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
   import { sanitizeReturnTo } from '$lib/returnTo';
   import { fetchProfileReviewItems } from '$lib/profile/review';
 
@@ -55,6 +57,9 @@
   let errorLogFiles: string[] = [];
   let returnTo = '/';
   let reviewCount = 0;
+  let recentItems: any[] = [];
+  let favoriteItems: any[] = [];
+  let interactionLoading = true;
 
   $: nameValid = name.length >= 2 && name.length <= 60;
   $: phoneValid = phone.length === 0 || /^\+?[0-9\- ]{7,20}$/.test(phone);
@@ -86,8 +91,7 @@
       return;
     }
     user = currentUser;
-    await loadProfile();
-    await loadReviewCount();
+    await Promise.all([loadProfile(), loadReviewCount(), loadInteractions()]);
     loading = false;
     userId = user.id;
     const { data, error } = await supabase.storage.from('errorlogs').list('');
@@ -150,6 +154,99 @@
       console.error('Error loading review count:', error);
       reviewCount = 0;
     }
+  }
+
+  async function loadInteractions() {
+    if (!user?.id) return;
+
+    interactionLoading = true;
+
+    try {
+      const [{ data: recentData, error: recentError }, { data: favoriteData, error: favoriteError }] = await Promise.all([
+        supabase
+          .from('item_events')
+          .select(`
+            item_id,
+            created_at,
+            items!inner(
+              id,
+              slug,
+              title,
+              original_name,
+              canonical_path,
+              country_slug,
+              district_slug,
+              municipality_slug,
+              path_512
+            )
+          `)
+          .eq('actor_user_id', user.id)
+          .eq('event_type', 'item_view')
+          .order('created_at', { ascending: false })
+          .limit(36),
+        supabase
+          .from('item_favorites')
+          .select(`
+            item_id,
+            created_at,
+            items!inner(
+              id,
+              slug,
+              title,
+              original_name,
+              canonical_path,
+              country_slug,
+              district_slug,
+              municipality_slug,
+              path_512
+            )
+          `)
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(24)
+      ]);
+
+      if (recentError) throw recentError;
+      if (favoriteError) throw favoriteError;
+
+      const seenRecent = new Set<string>();
+      recentItems = (recentData || [])
+        .filter((entry: any) => {
+          const itemId = entry?.item_id;
+          if (!itemId || seenRecent.has(itemId)) return false;
+          seenRecent.add(itemId);
+          return true;
+        })
+        .map((entry: any) => ({
+          viewedAt: entry.created_at,
+          ...(entry.items || {})
+        }))
+        .slice(0, 12);
+
+      favoriteItems = (favoriteData || []).map((entry: any) => ({
+        favoritedAt: entry.created_at,
+        ...(entry.items || {})
+      }));
+    } catch (error) {
+      console.error('Error loading interactions:', error);
+      recentItems = [];
+      favoriteItems = [];
+    } finally {
+      interactionLoading = false;
+    }
+  }
+
+  function getItemPreviewUrl(item: any) {
+    return item?.slug && item?.path_512 ? getSeoImageUrl(item.slug, item.path_512, '512') : '';
+  }
+
+  function formatInteractionDate(value: string | null | undefined) {
+    if (!value) return '';
+    return new Date(value).toLocaleDateString('de-DE', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
   }
 
   function handleAvatarChange(event: Event) {
@@ -476,6 +573,59 @@
               <div class="review-ok">
                 Keine offenen Daten. Dein Bestand ist aktuell sauber gepflegt.
               </div>
+            {/if}
+          </div>
+
+          <div class="card">
+            <h3 class="section-title">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 8v5l4 2" />
+                <path d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              Zuletzt angesehen
+            </h3>
+            {#if interactionLoading}
+              <p class="help-text">Persönliche Listen werden geladen...</p>
+            {:else if recentItems.length > 0}
+              <div class="interaction-grid">
+                {#each recentItems as item}
+                  <a class="interaction-card" href={getPublicItemHref(item)}>
+                    {#if getItemPreviewUrl(item)}
+                      <img src={getItemPreviewUrl(item)} alt={item.title || item.original_name || 'Item'} loading="lazy" />
+                    {/if}
+                    <strong>{item.title || item.original_name || 'Ohne Titel'}</strong>
+                    <span>Angesehen am {formatInteractionDate(item.viewedAt)}</span>
+                  </a>
+                {/each}
+              </div>
+            {:else}
+              <p class="help-text">Noch keine zuletzt angesehenen Items vorhanden.</p>
+            {/if}
+          </div>
+
+          <div class="card">
+            <h3 class="section-title">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+              </svg>
+              Merkliste
+            </h3>
+            {#if interactionLoading}
+              <p class="help-text">Merkliste wird geladen...</p>
+            {:else if favoriteItems.length > 0}
+              <div class="interaction-grid">
+                {#each favoriteItems as item}
+                  <a class="interaction-card" href={getPublicItemHref(item)}>
+                    {#if getItemPreviewUrl(item)}
+                      <img src={getItemPreviewUrl(item)} alt={item.title || item.original_name || 'Item'} loading="lazy" />
+                    {/if}
+                    <strong>{item.title || item.original_name || 'Ohne Titel'}</strong>
+                    <span>Gemerkt am {formatInteractionDate(item.favoritedAt)}</span>
+                  </a>
+                {/each}
+              </div>
+            {:else}
+              <p class="help-text">Noch keine gemerkten Items vorhanden.</p>
             {/if}
           </div>
 
@@ -1064,6 +1214,48 @@
     border-radius: 12px;
     padding: 2rem;
     box-shadow: 0 2px 8px var(--shadow);
+  }
+
+  .interaction-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+  }
+
+  .interaction-card {
+    display: grid;
+    gap: 0.55rem;
+    text-decoration: none;
+    color: inherit;
+    padding: 0.8rem;
+    border-radius: 12px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .interaction-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent-color);
+    box-shadow: 0 10px 24px var(--shadow);
+  }
+
+  .interaction-card img {
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+    border-radius: 10px;
+    background: var(--bg-primary);
+  }
+
+  .interaction-card strong {
+    font-size: 0.96rem;
+    line-height: 1.35;
+  }
+
+  .interaction-card span {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
   }
 
   .section-title {
