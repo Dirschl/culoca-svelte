@@ -18,6 +18,11 @@
   import HomeTypeSectionsFeed from '$lib/HomeTypeSectionsFeed.svelte';
   import HomeDashboardDiscover from '$lib/HomeDashboardDiscover.svelte';
   import { getStoredGpsPositionForHub } from '$lib/storedGpsReadout';
+  import {
+    readDashboardHeroVisit,
+    saveDashboardHeroVisitFromItem,
+    clearDashboardHeroVisit
+  } from '$lib/dashboardHeroVisit';
 
   export let data: PageData;
   type DashboardView = 'all' | 'inbox' | 'creator' | 'network';
@@ -55,6 +60,7 @@
     href: string;
     imageUrl: string;
     title: string | null;
+    source: 'visit' | 'upload';
   };
   let dashboardHeroBackdrop: DashboardHeroBackdrop | null = null;
 
@@ -130,12 +136,68 @@
     await loadDashboardHeroBackdrop();
   }
 
-  /** Zuletzt hochgeladenes Item mit Bild (2048 bevorzugt) für Dashboard-Hero-Hintergrund */
+  /**
+   * Hero-Hintergrund: zuletzt besuchtes Item (localStorage) mit frischen Pfaden aus DB,
+   * sonst zuletzt hochgeladenes eigenes Item mit Bild.
+   */
   async function loadDashboardHeroBackdrop() {
     dashboardHeroBackdrop = null;
     if (!browser || !currentUserId) return;
 
     try {
+      const stored = readDashboardHeroVisit();
+      const visitAllowed =
+        stored?.slug &&
+        (!stored.viewerUserId || stored.viewerUserId === currentUserId);
+
+      if (visitAllowed && stored) {
+        const { data: fresh, error: freshErr } = await supabase
+          .from('items')
+          .select(
+            'slug, path_2048, path_512, canonical_path, title, country_slug, district_slug, municipality_slug, updated_at'
+          )
+          .eq('slug', stored.slug)
+          .maybeSingle();
+
+        if (!freshErr && fresh?.slug && (fresh.path_2048 || fresh.path_512)) {
+          saveDashboardHeroVisitFromItem(fresh, { viewerUserId: currentUserId });
+          const path = fresh.path_2048 || fresh.path_512;
+          const size: '2048' | '512' = fresh.path_2048 ? '2048' : '512';
+          const imageUrl = getSeoImageUrl(fresh.slug, path, size);
+          const href = getPublicItemHref(fresh);
+          if (imageUrl) {
+            dashboardHeroBackdrop = {
+              href,
+              imageUrl,
+              title: fresh.title ?? null,
+              source: 'visit'
+            };
+            return;
+          }
+        }
+
+        // Fallback: Snapshot aus dem Besuch (z. B. RLS / offline), Eintrag ggf. veraltet
+        if (stored.path_2048 || stored.path_512) {
+          const path = stored.path_2048 || stored.path_512;
+          const size: '2048' | '512' = stored.path_2048 ? '2048' : '512';
+          const imageUrl = getSeoImageUrl(stored.slug, path, size);
+          const href = stored.href || getPublicItemHref(stored);
+          if (imageUrl) {
+            dashboardHeroBackdrop = {
+              href,
+              imageUrl,
+              title: stored.title ?? null,
+              source: 'visit'
+            };
+            return;
+          }
+        }
+
+        if (!freshErr && fresh === null) {
+          clearDashboardHeroVisit();
+        }
+      }
+
       const { data: rows, error } = await supabase
         .from('items')
         .select(
@@ -157,7 +219,7 @@
       if (!imageUrl) return;
 
       const href = getPublicItemHref(row);
-      dashboardHeroBackdrop = { href, imageUrl, title: row.title ?? null };
+      dashboardHeroBackdrop = { href, imageUrl, title: row.title ?? null, source: 'upload' };
     } catch (e) {
       console.warn('[home] dashboard hero backdrop failed', e);
     }
@@ -813,9 +875,14 @@
           <a
             href={dashboardHeroBackdrop.href}
             class="dashboard-hero-bg"
-            aria-label={dashboardHeroBackdrop.title
-              ? `Zuletzt hochgeladen: ${dashboardHeroBackdrop.title}`
-              : 'Zum zuletzt hochgeladenen Inhalt'}
+            data-sveltekit-preload-data="hover"
+            aria-label={dashboardHeroBackdrop.source === 'visit'
+              ? dashboardHeroBackdrop.title
+                ? `Zuletzt angesehen: ${dashboardHeroBackdrop.title}`
+                : 'Zum zuletzt angesehenen Inhalt'
+              : dashboardHeroBackdrop.title
+                ? `Zuletzt hochgeladen: ${dashboardHeroBackdrop.title}`
+                : 'Zum zuletzt hochgeladenen Inhalt'}
           >
             <img
               src={dashboardHeroBackdrop.imageUrl}
@@ -1558,6 +1625,19 @@
   .dashboard-hero-inner {
     position: relative;
     z-index: 2;
+  }
+
+  /* Klicks erreichen den Hintergrund-Link; interaktive Bereiche bleiben bedienbar */
+  .dashboard-hero--has-backdrop .dashboard-hero-inner {
+    pointer-events: none;
+  }
+
+  .dashboard-hero--has-backdrop .hero-dash-actions,
+  .dashboard-hero--has-backdrop .hero-dash-actions a,
+  .dashboard-hero--has-backdrop .dashboard-tabs,
+  .dashboard-hero--has-backdrop .dashboard-tabs button,
+  .dashboard-hero--has-backdrop .hero-side {
+    pointer-events: auto;
   }
 
   .dashboard-hero--has-backdrop {

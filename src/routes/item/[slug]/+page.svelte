@@ -31,6 +31,7 @@
   import { reverseGeocodeCoordinates, searchLocationHierarchy, type SearchGeocodeResult } from '$lib/content/geocoding';
   import { KEYWORDS_MAX, sanitizeKeywords } from '$lib/content/keywords';
   import { env as publicEnv } from '$env/dynamic/public';
+  import { saveDashboardHeroVisitFromItem } from '$lib/dashboardHeroVisit';
 
   /** Wenn PUBLIC_ADOBE_AFFILIATE_REDIRECT_BASE gesetzt ist (z. B. Partnerize), wird der Adobe-Link darüber geleitet. */
   function getAdobeAffiliateUrl(directUrl: string | null | undefined): string | null {
@@ -557,6 +558,30 @@ let showRightsManager = false;
   // Load unified rights when image is available
   $: if (image && browser && image.id) {
     unifiedRightsStore.loadRights(image.id);
+  }
+
+  /** Dashboard-Startseite: zuletzt angesehenes Item als Hero-Hintergrund (nur eingeloggt) */
+  $: if (
+    browser &&
+    $sessionStore.isAuthenticated &&
+    $sessionStore.userId &&
+    image?.slug &&
+    (image.path_2048 || image.path_512)
+  ) {
+    saveDashboardHeroVisitFromItem(
+      {
+        slug: image.slug,
+        path_2048: image.path_2048,
+        path_512: image.path_512,
+        title: image.title,
+        canonical_path: image.canonical_path,
+        country_slug: image.country_slug,
+        district_slug: image.district_slug,
+        municipality_slug: image.municipality_slug,
+        updated_at: image.updated_at
+      },
+      { viewerUserId: $sessionStore.userId }
+    );
   }
 
   // Cleanup rights store when component is destroyed
