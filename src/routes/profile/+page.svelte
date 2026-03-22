@@ -907,6 +907,17 @@
     });
   }
 
+  function formatCommentDate(value: string | null | undefined) {
+    if (!value) return '';
+    return new Date(value).toLocaleString('de-DE', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  }
+
   function getCreatorInteractionActor(entry: any) {
     return entry?.actor?.full_name || entry?.actor?.accountname || (entry?.actor_user_id ? 'Nutzer' : 'Anonym');
   }
@@ -1194,7 +1205,7 @@
     }, 5000);
   }
 
-  function getAvatarUrl() {
+  function getProfileAvatarUrl() {
     if (avatarPreview) return avatarPreview;
     if (profile?.avatar_url) {
       if (profile.avatar_url.startsWith('http')) {
@@ -1284,8 +1295,8 @@
         <!-- Avatar-Sektion -->
         <div class="avatar-section">
           <div class="avatar-container">
-            {#if getAvatarUrl()}
-              <img src={getAvatarUrl()} alt="Profilbild" class="profile-avatar" />
+            {#if getProfileAvatarUrl()}
+              <img src={getProfileAvatarUrl()} alt="Profilbild" class="profile-avatar" />
             {:else}
               <div class="avatar-placeholder">
                 <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
@@ -1299,9 +1310,9 @@
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
                 </svg>
-                {getAvatarUrl() ? 'Ändern' : 'Hochladen'}
+                {getProfileAvatarUrl() ? 'Ändern' : 'Hochladen'}
               </label>
-              {#if getAvatarUrl()}
+              {#if getProfileAvatarUrl()}
                 <button type="button" class="avatar-btn secondary" on:click={() => {
                   avatarFile = null;
                   avatarPreview = null;
