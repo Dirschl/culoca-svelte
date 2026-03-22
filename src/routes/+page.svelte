@@ -51,6 +51,13 @@
   let dashboardUserSearchMessage = '';
   let dashboardUserSearchTimeout: ReturnType<typeof setTimeout> | null = null;
 
+  type DashboardHeroBackdrop = {
+    href: string;
+    imageUrl: string;
+    title: string | null;
+  };
+  let dashboardHeroBackdrop: DashboardHeroBackdrop | null = null;
+
   function truncate(text: string | null | undefined, max: number): string {
     if (!text) return '';
     return text.length > max ? text.slice(0, max).trimEnd() + '...' : text;
@@ -119,6 +126,41 @@
 
     currentUserAccountname = profile?.accountname || '';
     currentUserFullName = currentUserFullName || profile?.full_name || profile?.accountname || '';
+
+    await loadDashboardHeroBackdrop();
+  }
+
+  /** Zuletzt hochgeladenes Item mit Bild (2048 bevorzugt) für Dashboard-Hero-Hintergrund */
+  async function loadDashboardHeroBackdrop() {
+    dashboardHeroBackdrop = null;
+    if (!browser || !currentUserId) return;
+
+    try {
+      const { data: rows, error } = await supabase
+        .from('items')
+        .select(
+          'slug, path_2048, path_512, canonical_path, title, country_slug, district_slug, municipality_slug'
+        )
+        .eq('profile_id', currentUserId)
+        .not('slug', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(40);
+
+      if (error || !rows?.length) return;
+
+      const row = rows.find((r) => r.path_2048 || r.path_512);
+      if (!row?.slug) return;
+
+      const path = row.path_2048 || row.path_512;
+      const size: '2048' | '512' = row.path_2048 ? '2048' : '512';
+      const imageUrl = getSeoImageUrl(row.slug, path, size);
+      if (!imageUrl) return;
+
+      const href = getPublicItemHref(row);
+      dashboardHeroBackdrop = { href, imageUrl, title: row.title ?? null };
+    } catch (e) {
+      console.warn('[home] dashboard hero backdrop failed', e);
+    }
   }
 
   function getAvatarUrl(profileEntry: any) {
@@ -690,6 +732,7 @@
     dashboardPriorityFeed = [];
     dashboardUnreadCount = 0;
     dashboardLoadedForUser = '';
+    dashboardHeroBackdrop = null;
     clearDashboardUserSearch();
   }
   $: homeJsonLd = {
@@ -762,17 +805,37 @@
 
   <main>
     {#if $isAuthenticated}
-      <section class="hero dashboard-hero">
-        <div class="hero-inner">
+      <section
+        class="hero dashboard-hero"
+        class:dashboard-hero--has-backdrop={!!dashboardHeroBackdrop}
+      >
+        {#if dashboardHeroBackdrop}
+          <a
+            href={dashboardHeroBackdrop.href}
+            class="dashboard-hero-bg"
+            aria-label={dashboardHeroBackdrop.title
+              ? `Zuletzt hochgeladen: ${dashboardHeroBackdrop.title}`
+              : 'Zum zuletzt hochgeladenen Inhalt'}
+          >
+            <img
+              src={dashboardHeroBackdrop.imageUrl}
+              alt=""
+              width="2048"
+              height="1152"
+              decoding="async"
+              fetchpriority="high"
+            />
+          </a>
+          <div class="dashboard-hero-scrim" aria-hidden="true"></div>
+        {/if}
+        <div class="hero-inner dashboard-hero-inner">
           <div class="hero-layout hero-layout--dashboard">
             <div class="hero-copy">
+              <p class="hero-greeting-line">Hallo,</p>
               {#if currentUserFullName}
-                <p class="hero-greeting">Hallo, {currentUserFullName}</p>
+                <h1 class="hero-dashboard-name">{currentUserFullName}</h1>
               {/if}
-              <h1><span class="hero-line">Dein Dashboard</span></h1>
-              <p class="hero-sub">
-                Reaktionen, Netzwerk und priorisierte Sprünge – Chats laufen zentral unter „Chat“ in der Navigation.
-              </p>
+              <p class="hero-dashboard-lede">Dein Culoca Dashboard zeigt dir einen schnellen Überblick.</p>
               <div class="hero-dash-actions">
                 <a href="/chat" class="btn-secondary">Nachrichten</a>
                 <a href="/galerie" class="btn-primary">Galerie</a>
@@ -1322,9 +1385,6 @@
         <div class="hero-inner">
           <div class="hero-layout">
             <div class="hero-copy">
-              {#if currentUserFullName}
-                <p class="hero-greeting">Hallo, {currentUserFullName}</p>
-              {/if}
               <h1>
                 <span class="hero-line">Entdecke deine Umgebung</span>
                 <span class="hero-line hero-accent">durch GPS-Inhalte</span>
@@ -1449,6 +1509,100 @@
 
   .dashboard-hero .dashboard-tabs {
     margin-top: 1.1rem;
+  }
+
+  /* Dashboard-Hero: letztes eigenes Upload-Bild, Vignette links-oben, volle Breite / zentriert / cover */
+  .dashboard-hero {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .dashboard-hero-bg {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    text-decoration: none;
+    color: inherit;
+  }
+
+  .dashboard-hero-bg:focus-visible {
+    outline: 3px solid var(--culoca-orange, #ee7221);
+    outline-offset: 2px;
+    z-index: 3;
+  }
+
+  .dashboard-hero-bg img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center center;
+    display: block;
+    max-width: none;
+  }
+
+  .dashboard-hero-scrim {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background: linear-gradient(
+      128deg,
+      rgba(6, 8, 14, 0.94) 0%,
+      rgba(6, 8, 14, 0.62) 32%,
+      rgba(6, 8, 14, 0.28) 58%,
+      rgba(6, 8, 14, 0.12) 82%,
+      rgba(6, 8, 14, 0.04) 100%
+    );
+  }
+
+  .dashboard-hero-inner {
+    position: relative;
+    z-index: 2;
+  }
+
+  .dashboard-hero--has-backdrop {
+    min-height: min(48vh, 480px);
+    background: var(--bg-primary);
+  }
+
+  .hero-greeting-line {
+    margin: 0 0 0.35rem;
+    font-size: 1.2rem;
+    font-weight: 500;
+    line-height: 1.35;
+    color: var(--text-secondary);
+  }
+
+  .dashboard-hero--has-backdrop .hero-greeting-line {
+    color: rgba(255, 255, 255, 0.92);
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+  }
+
+  .hero-dashboard-name {
+    margin: 0 0 0.65rem;
+    font-size: clamp(1.85rem, 4.5vw, 2.85rem);
+    font-weight: 800;
+    line-height: 1.12;
+    letter-spacing: -0.028em;
+    color: var(--text-primary);
+  }
+
+  .dashboard-hero--has-backdrop .hero-dashboard-name {
+    color: #fff;
+    text-shadow: 0 2px 14px rgba(0, 0, 0, 0.35);
+  }
+
+  .hero-dashboard-lede {
+    margin: 0 0 1.35rem;
+    font-size: 1.05rem;
+    line-height: 1.55;
+    max-width: 36ch;
+    color: var(--text-secondary);
+  }
+
+  .dashboard-hero--has-backdrop .hero-dashboard-lede {
+    color: rgba(255, 255, 255, 0.9);
+    text-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
   }
 
   .hero-coords {
