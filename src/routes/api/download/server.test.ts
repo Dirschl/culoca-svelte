@@ -225,4 +225,55 @@ describe('/api/download/[id] POST', () => {
     expect(rewriteJpegMetadataWithoutSharpMock).toHaveBeenCalledWith(Buffer.from('original-jpg'), itemRecord, options);
     expect(Buffer.from(await response.arrayBuffer()).toString()).toBe('rewritten-jpg');
   });
+
+  it('logs custom exports with legacy download types so statistics keep working', async () => {
+    const supabaseMock = createSupabaseMock();
+    createClientMock.mockReturnValue(supabaseMock);
+
+    const options = {
+      sizeMode: 'custom',
+      width: 1200,
+      height: 630,
+      cropEnabled: true,
+      crop: { x: 0, y: 0, width: 1, height: 1 },
+      format: 'jpg',
+      metadataMode: 'culoca',
+      filenameMode: 'web'
+    };
+
+    normalizeDownloadExportOptionsMock.mockReturnValue(options);
+    canBypassImageProcessingMock.mockReturnValue(false);
+    renderDownloadExportMock.mockResolvedValue({
+      info: { size: 123456 },
+      outputWidth: 1200,
+      outputHeight: 630,
+      contentType: 'image/jpeg',
+      filename: 'abendlicht-am-weiher-culoca-abc123def4.jpg',
+      buffer: Buffer.from('rendered')
+    });
+
+    const { POST } = await import('./[id]/+server');
+    const response = await POST({
+      params: { id: itemRecord.id },
+      request: new Request('http://localhost/api/download/' + itemRecord.id, {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer token',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          mode: 'download',
+          options
+        })
+      })
+    } as any);
+
+    expect(response.status).toBe(200);
+    expect(supabaseMock.rpc).toHaveBeenCalledWith('log_item_download', {
+      p_item_id: itemRecord.id,
+      p_user_id: 'owner-1',
+      p_download_type: 'preview',
+      p_download_source: 'owner'
+    });
+  });
 });

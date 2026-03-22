@@ -179,6 +179,14 @@ async function logDownload(
   }
 }
 
+function getLegacyDownloadTypeForRights(unifiedRights: { download?: boolean; download_original?: boolean } | null | undefined) {
+  return unifiedRights?.download_original ? 'full_resolution' : 'preview';
+}
+
+function getLegacyDownloadTypeForExport(options: DownloadExportOptions) {
+  return options.sizeMode === 'full' ? 'full_resolution' : 'preview';
+}
+
 function getLegacyFilename(item: DownloadItemRecord) {
   const originalName = item.original_name?.trim() || `image-${item.id}.jpg`;
   return originalName;
@@ -262,7 +270,7 @@ export const GET: RequestHandler = async ({ params, request }) => {
       supabase,
       item,
       user.id,
-      unifiedRights?.download_original ? 'full_resolution' : 'preview'
+      getLegacyDownloadTypeForRights(unifiedRights)
     );
 
     return new Response(buffer, {
@@ -291,7 +299,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
     const supabase = createAuthedSupabase(request);
     const user = await getAuthenticatedUser(supabase);
     const item = await loadDownloadItem(supabase, itemId);
-    await assertDownloadRights(supabase, itemId, user.id);
+    const unifiedRights = await assertDownloadRights(supabase, itemId, user.id);
 
     const body = await request.json().catch(() => ({}));
     const mode = body?.mode === 'estimate' ? 'estimate' : 'download';
@@ -317,7 +325,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
         supabase,
         item,
         user.id,
-        options.sizeMode === 'full' ? 'full_resolution_custom' : 'custom_export'
+        getLegacyDownloadTypeForExport(options)
       );
 
       return new Response(originalBuffer, {
@@ -362,7 +370,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
         supabase,
         item,
         user.id,
-        options.sizeMode === 'full' ? 'full_resolution_custom' : 'custom_export'
+        getLegacyDownloadTypeForExport(options)
       );
 
       return new Response(rendered.buffer, {
@@ -387,7 +395,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
             supabase,
             item,
             user.id,
-            options.sizeMode === 'full' ? 'full_resolution_custom' : 'custom_export'
+            getLegacyDownloadTypeForExport(options)
           );
 
           return new Response(rewritten.buffer, {
@@ -415,7 +423,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
         supabase,
         item,
         user.id,
-        options.sizeMode === 'full' ? 'full_resolution_custom' : 'custom_export'
+        getLegacyDownloadTypeForExport(options)
       );
 
       return new Response(originalBuffer, {
