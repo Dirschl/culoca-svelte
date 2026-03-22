@@ -679,6 +679,17 @@ let showRightsManager = false;
   let commentLoading = false;
   let commentStatus = '';
   let lastCommentItemId = '';
+  let interactionInsightsLoading = false;
+  let interactionInsightsLoaded = false;
+  let lastInsightsKey = '';
+  let interactionCounts = {
+    views: 0,
+    downloads: 0,
+    favorites: 0,
+    likes: 0,
+    comments: 0
+  };
+  let recentInteractions: any[] = [];
   
   // Function to initialize GPS if not available
   async function initializeGpsIfNeeded() {
@@ -836,6 +847,26 @@ let showRightsManager = false;
     commentStatus = '';
     if (browser) {
       void loadComments();
+    }
+  }
+
+  $: {
+    const nextInsightsKey = `${currentUser?.id || 'anon'}:${image?.id || 'no-item'}:${isCreator ? 'creator' : 'viewer'}`;
+    if (nextInsightsKey !== lastInsightsKey) {
+      lastInsightsKey = nextInsightsKey;
+      interactionInsightsLoaded = false;
+      interactionCounts = {
+        views: 0,
+        downloads: 0,
+        favorites: 0,
+        likes: 0,
+        comments: 0
+      };
+      recentInteractions = [];
+
+      if (browser && image?.id && isCreator && currentUser?.id) {
+        void loadInteractionInsights();
+      }
     }
   }
 
@@ -1001,6 +1032,107 @@ let showRightsManager = false;
       comments = [];
     } finally {
       commentsLoading = false;
+    }
+  }
+
+  async function loadInteractionInsights() {
+    if (!browser || !image?.id || !currentUser?.id || !isCreator) {
+      return;
+    }
+
+    interactionInsightsLoading = true;
+
+    try {
+      const [
+        { count: viewsCount, error: viewsError },
+        { count: downloadsCount, error: downloadsError },
+        { count: favoritesCount, error: favoritesError },
+        { count: likesCount, error: likesError },
+        { count: commentsCount, error: commentsError },
+        { data: recentData, error: recentError }
+      ] = await Promise.all([
+        supabase
+          .from('item_events')
+          .select('id', { count: 'exact', head: true })
+          .eq('item_id', image.id)
+          .eq('event_type', 'item_view'),
+        supabase
+          .from('item_events')
+          .select('id', { count: 'exact', head: true })
+          .eq('item_id', image.id)
+          .eq('event_type', 'download'),
+        supabase
+          .from('item_favorites')
+          .select('item_id', { count: 'exact', head: true })
+          .eq('item_id', image.id),
+        supabase
+          .from('item_likes')
+          .select('item_id', { count: 'exact', head: true })
+          .eq('item_id', image.id),
+        supabase
+          .from('item_comments')
+          .select('id', { count: 'exact', head: true })
+          .eq('item_id', image.id)
+          .eq('status', 'visible'),
+        supabase
+          .from('item_events')
+          .select(`
+            id,
+            event_type,
+            source,
+            created_at,
+            actor_user_id,
+            metadata,
+            profiles:actor_user_id (
+              full_name,
+              accountname
+            )
+          `)
+          .eq('item_id', image.id)
+          .in('event_type', ['download', 'favorite_add', 'like_add', 'comment_create'])
+          .order('created_at', { ascending: false })
+          .limit(8)
+      ]);
+
+      if (viewsError) throw viewsError;
+      if (downloadsError) throw downloadsError;
+      if (favoritesError) throw favoritesError;
+      if (likesError) throw likesError;
+      if (commentsError) throw commentsError;
+      if (recentError) throw recentError;
+
+      interactionCounts = {
+        views: viewsCount || 0,
+        downloads: downloadsCount || 0,
+        favorites: favoritesCount || 0,
+        likes: likesCount || 0,
+        comments: commentsCount || 0
+      };
+      recentInteractions = recentData || [];
+      interactionInsightsLoaded = true;
+    } catch (error) {
+      console.error('Failed to load interaction insights:', error);
+    } finally {
+      interactionInsightsLoading = false;
+    }
+  }
+
+  function getInteractionActorLabel(entry: any) {
+    return entry?.profiles?.full_name || entry?.profiles?.accountname || (entry?.actor_user_id ? 'Nutzer' : 'Anonym');
+  }
+
+  function getInteractionEventLabel(entry: any) {
+    switch (entry?.event_type) {
+      case 'download':
+        return 'Download';
+      case 'favorite_add':
+        return 'Gemerkte Datei';
+      case 'like_add':
+        return 'Gefällt mir';
+      case 'comment_create':
+        return 'Kommentar';
+      default:
+        return entry?.event_type || 'Interaktion';
     }
   }
 
@@ -3094,6 +3226,50 @@ let showRightsManager = false;
         <div class="rich-content">
           {@html effectiveContentHtml}
         </div>
+      </section>
+    {/if}
+    {#if isCreator}
+      <section class="content-panel insights-panel">
+        <h2>Interaktionen</h2>
+        {#if interactionInsightsLoading && !interactionInsightsLoaded}
+          <p class="comment-empty">Interaktionen werden geladen...</p>
+        {:else}
+          <div class="insight-grid">
+            <div class="insight-card">
+              <strong>{interactionCounts.views}</strong>
+              <span>Aufrufe</span>
+            </div>
+            <div class="insight-card">
+              <strong>{interactionCounts.downloads}</strong>
+              <span>Downloads</span>
+            </div>
+            <div class="insight-card">
+              <strong>{interactionCounts.favorites}</strong>
+              <span>Gemerkt</span>
+            </div>
+            <div class="insight-card">
+              <strong>{interactionCounts.likes}</strong>
+              <span>Likes</span>
+            </div>
+            <div class="insight-card">
+              <strong>{interactionCounts.comments}</strong>
+              <span>Kommentare</span>
+            </div>
+          </div>
+
+          {#if recentInteractions.length > 0}
+            <div class="insight-feed">
+              <h3>Letzte Interaktionen</h3>
+              {#each recentInteractions as entry}
+                <div class="insight-feed-item">
+                  <strong>{getInteractionActorLabel(entry)}</strong>
+                  <span>{getInteractionEventLabel(entry)}</span>
+                  <time>{formatCommentDate(entry.created_at)}</time>
+                </div>
+              {/each}
+            </div>
+          {/if}
+        {/if}
       </section>
     {/if}
     <section class="content-panel comments-panel">
@@ -5195,6 +5371,64 @@ let showRightsManager = false;
   .comments-panel {
     display: grid;
     gap: 1rem;
+  }
+
+  .insights-panel {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .insight-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 0.75rem;
+  }
+
+  .insight-card {
+    display: grid;
+    gap: 0.3rem;
+    padding: 0.9rem;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-primary);
+    text-align: center;
+  }
+
+  .insight-card strong {
+    font-size: 1.45rem;
+    line-height: 1;
+  }
+
+  .insight-card span {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+  }
+
+  .insight-feed {
+    display: grid;
+    gap: 0.65rem;
+  }
+
+  .insight-feed h3 {
+    margin: 0;
+    font-size: 1rem;
+  }
+
+  .insight-feed-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 0.75rem;
+    align-items: center;
+    padding: 0.8rem 0.9rem;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-primary);
+  }
+
+  .insight-feed-item span,
+  .insight-feed-item time {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
   }
 
   .comment-form {
