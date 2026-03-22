@@ -12,9 +12,9 @@
   const pageTitle =
     data.page > 1
       ? `${creatorName}: Seite ${data.page} | Culoca`
-      : `${creatorName}: Fotograf und Motive | Culoca`;
+      : `${creatorName} auf Culoca`;
   const metaDescription = trimText(
-    data.profile.bio || `${creatorName} zeigt ${data.totalCount} öffentliche Inhalte auf Culoca. Fotografen-Hub mit Bildern, Themen und Detailseiten.`
+    data.profile.bio || `${creatorName} zeigt ${data.totalCount} öffentliche Inhalte auf Culoca. Galerie mit Bildern, Themen und Detailseiten.`
   );
 
   function itemHref(item: { canonical_path: string | null; slug: string }) {
@@ -38,7 +38,6 @@
     "@graph": [
       buildBreadcrumbJsonLd([
         { name: 'Culoca', path: '/' },
-        { name: 'Fotografen', path: '/foto' },
         { name: creatorName, path: data.seoPolicy.canonicalPath }
       ]),
       {
@@ -58,12 +57,10 @@
       <nav class="breadcrumb" aria-label="Breadcrumb">
         <a href="/">Culoca</a>
         <span>/</span>
-        <a href="/foto">Fotos</a>
-        <span>/</span>
         <span>{creatorName}</span>
       </nav>
       <header class="hub-header">
-        <p class="hub-kicker">Fotografen-Hub</p>
+        <p class="hub-kicker">Profil</p>
         <h1>{creatorName}</h1>
         <p class="hub-copy">
           {metaDescription}
@@ -84,7 +81,7 @@
                 />
               {/if}
               <h2>{item.title || item.slug}</h2>
-              <p>{trimText(item.description || item.caption || `Mehr Bilder von ${creatorName}.`, 110)}</p>
+              <p>{trimText(item.description || item.caption || `Mehr Inhalte von ${creatorName}.`, 110)}</p>
             </a>
           </article>
         {/each}

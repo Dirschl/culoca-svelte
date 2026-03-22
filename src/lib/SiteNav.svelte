@@ -12,6 +12,9 @@
   let reviewCount = 0;
   let adminReviewCount = 0;
   let inboxCount = 0;
+  let inboxMessageCount = 0;
+  let inboxActivityCount = 0;
+  let followerAlertCount = 0;
   let lastInboxRefreshKey = '';
   let liveInboxChannels: any[] = [];
   let liveInboxChannelKey = '';
@@ -101,17 +104,20 @@
   async function refreshInboxCount() {
     if (!$isAuthenticated || !$currentUserId) {
       inboxCount = 0;
+      inboxMessageCount = 0;
+      inboxActivityCount = 0;
+      followerAlertCount = 0;
       return;
     }
 
     try {
       const [
-        { count: notificationCount, error: notificationError },
+        { data: notificationData, error: notificationError },
         { data: conversations, error: conversationError }
       ] = await Promise.all([
         supabase
           .from('user_notifications')
-          .select('id', { count: 'exact', head: true })
+          .select('id, event_type')
           .eq('recipient_user_id', $currentUserId)
           .is('read_at', null),
         supabase
@@ -129,10 +135,17 @@
         return !ownReadAt || new Date(entry.last_message_at).getTime() > new Date(ownReadAt).getTime();
       }).length;
 
-      inboxCount = (notificationCount || 0) + unreadConversations;
+      const unreadNotifications = notificationData || [];
+      followerAlertCount = unreadNotifications.filter((entry: any) => entry.event_type === 'follow_create').length;
+      inboxActivityCount = unreadNotifications.filter((entry: any) => entry.event_type !== 'follow_create').length;
+      inboxMessageCount = unreadConversations;
+      inboxCount = inboxActivityCount + inboxMessageCount + followerAlertCount;
     } catch (error) {
       console.error('Failed to load inbox count:', error);
       inboxCount = 0;
+      inboxMessageCount = 0;
+      inboxActivityCount = 0;
+      followerAlertCount = 0;
     }
   }
 
@@ -379,6 +392,19 @@
         </button>
         {#if $isAuthenticated && openDropdown === 'user'}
           <div class="dropdown-menu dropdown-menu--user">
+            {#if inboxCount > 0}
+              <div class="dropdown-status-row">
+                {#if inboxMessageCount > 0}
+                  <span class="mini-status-chip">Nachrichten {inboxMessageCount}</span>
+                {/if}
+                {#if inboxActivityCount > 0}
+                  <span class="mini-status-chip">Aktivität {inboxActivityCount}</span>
+                {/if}
+                {#if followerAlertCount > 0}
+                  <span class="mini-status-chip mini-status-chip--accent">Follower {followerAlertCount}</span>
+                {/if}
+              </div>
+            {/if}
             {#each userLinks as link}
               <a href={getUserLinkHref(link.href)} class="dropdown-item" class:active={isActive(link.href)} on:click={closeDropdowns}>
                 {link.label}
@@ -387,6 +413,9 @@
                 {/if}
                 {#if link.href === '/profile' && inboxCount > 0}
                   <span class="inbox-badge inbox-badge--inline">{inboxCount}</span>
+                {/if}
+                {#if link.href === '/profile' && followerAlertCount > 0}
+                  <span class="mini-status-chip mini-status-chip--inline mini-status-chip--accent">+{followerAlertCount} Follower</span>
                 {/if}
               </a>
             {/each}
@@ -423,6 +452,9 @@
               {/if}
               {#if link.href === '/profile' && inboxCount > 0}
                 <span class="inbox-badge inbox-badge--inline">{inboxCount}</span>
+              {/if}
+              {#if link.href === '/profile' && followerAlertCount > 0}
+                <span class="mini-status-chip mini-status-chip--inline mini-status-chip--accent">+{followerAlertCount} Follower</span>
               {/if}
             </a>
           {/each}
@@ -563,6 +595,13 @@
 
   .dropdown-menu--user { min-width: 190px; right: 0; left: auto; }
 
+  .dropdown-status-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    padding: 0.75rem 1rem 0.35rem;
+  }
+
   .dropdown-divider {
     height: 1px;
     margin: 0.35rem 0;
@@ -636,6 +675,30 @@
   }
   .inbox-badge--inline {
     margin-left: auto;
+  }
+
+  .mini-status-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 1.5rem;
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    font-size: 0.72rem;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .mini-status-chip--accent {
+    background: color-mix(in srgb, var(--accent-color) 18%, var(--bg-tertiary) 82%);
+    color: var(--text-primary);
+  }
+
+  .mini-status-chip--inline {
+    margin-left: 0.45rem;
   }
 
   /* Mobile helpers */

@@ -63,6 +63,14 @@
   let creatorInteractions: any[] = [];
   let notifications: any[] = [];
   let unreadNotifications = 0;
+  let followingProfiles: any[] = [];
+  let followerProfiles: any[] = [];
+  let followingCount = 0;
+  let followerCount = 0;
+  let followingSearch = '';
+  let followerSearch = '';
+  let followingVisibleCount = 8;
+  let followerVisibleCount = 8;
   let interactionLoading = true;
   let conversations: any[] = [];
   let conversationLoading = true;
@@ -97,6 +105,24 @@
   ];
   
   $: isReservedAccountname = reservedAccountnames.includes(accountname.toLowerCase());
+  $: normalizedFollowingSearch = followingSearch.trim().toLowerCase();
+  $: normalizedFollowerSearch = followerSearch.trim().toLowerCase();
+  $: filteredFollowingProfiles = followingProfiles.filter((entry: any) => {
+    const haystack = `${entry?.full_name || ''} ${entry?.accountname || ''}`.toLowerCase();
+    return !normalizedFollowingSearch || haystack.includes(normalizedFollowingSearch);
+  });
+  $: filteredFollowerProfiles = followerProfiles.filter((entry: any) => {
+    const haystack = `${entry?.full_name || ''} ${entry?.accountname || ''}`.toLowerCase();
+    return !normalizedFollowerSearch || haystack.includes(normalizedFollowerSearch);
+  });
+  $: visibleFollowingProfiles = filteredFollowingProfiles.slice(0, followingVisibleCount);
+  $: visibleFollowerProfiles = filteredFollowerProfiles.slice(0, followerVisibleCount);
+  $: if (followingVisibleCount > filteredFollowingProfiles.length && filteredFollowingProfiles.length <= 8) {
+    followingVisibleCount = 8;
+  }
+  $: if (followerVisibleCount > filteredFollowerProfiles.length && filteredFollowerProfiles.length <= 8) {
+    followerVisibleCount = 8;
+  }
 
   onMount(async () => {
     returnTo = sanitizeReturnTo($page.url.searchParams.get('returnTo'), getReferrerFallback());
@@ -349,6 +375,57 @@
         actor: entry.profiles || null
       }));
       unreadNotifications = notifications.filter((entry: any) => !entry.read_at).length;
+
+      const [{ data: followingData, error: followingError }, { data: followerData, error: followerError }] = await Promise.all([
+        supabase
+          .from('user_follows')
+          .select(`
+            followed_user_id,
+            created_at,
+            followed:followed_user_id(
+              id,
+              full_name,
+              accountname,
+              avatar_url
+            )
+          `)
+          .eq('follower_user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(24),
+        supabase
+          .from('user_follows')
+          .select(`
+            follower_user_id,
+            created_at,
+            follower:follower_user_id(
+              id,
+              full_name,
+              accountname,
+              avatar_url
+            )
+          `)
+          .eq('followed_user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(24)
+      ]);
+
+      if (followingError) throw followingError;
+      if (followerError) throw followerError;
+
+      followingProfiles = (followingData || [])
+        .map((entry: any) => ({
+          followedAt: entry.created_at,
+          ...(entry.followed || {})
+        }))
+        .filter((entry: any) => entry.id);
+      followerProfiles = (followerData || [])
+        .map((entry: any) => ({
+          followedAt: entry.created_at,
+          ...(entry.follower || {})
+        }))
+        .filter((entry: any) => entry.id);
+      followingCount = followingProfiles.length;
+      followerCount = followerProfiles.length;
     } catch (error) {
       console.error('Error loading interactions:', error);
       recentItems = [];
@@ -357,6 +434,10 @@
       creatorInteractions = [];
       notifications = [];
       unreadNotifications = 0;
+      followingProfiles = [];
+      followerProfiles = [];
+      followingCount = 0;
+      followerCount = 0;
     } finally {
       interactionLoading = false;
     }
@@ -425,7 +506,39 @@
       )
       .subscribe();
 
-    liveChannels = [notificationsChannel, conversationsChannel];
+    const followingChannel = supabase
+      .channel(`profile-follows-following-${currentUserId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_follows',
+          filter: `follower_user_id=eq.${currentUserId}`
+        },
+        async () => {
+          await loadInteractions();
+        }
+      )
+      .subscribe();
+
+    const followersChannel = supabase
+      .channel(`profile-follows-followers-${currentUserId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_follows',
+          filter: `followed_user_id=eq.${currentUserId}`
+        },
+        async () => {
+          await loadInteractions();
+        }
+      )
+      .subscribe();
+
+    liveChannels = [notificationsChannel, conversationsChannel, followingChannel, followersChannel];
   }
 
   function setupMessageChannel(conversationId: string) {
@@ -459,6 +572,15 @@
     if (!avatarUrl) return '';
     if (String(avatarUrl).startsWith('http')) return avatarUrl;
     return `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/avatars/${avatarUrl}`;
+  }
+
+  function getProfileHref(entry: any) {
+    return entry?.accountname ? `/${encodeURIComponent(entry.accountname)}` : '#';
+  }
+
+  async function startConversationWith(userId: string) {
+    if (!userId) return;
+    await goto(`/profile?chatWith=${encodeURIComponent(userId)}`);
   }
 
   function buildParticipantKey(firstUserId: string, secondUserId: string) {
@@ -975,6 +1097,8 @@
         return 'hat kommentiert';
       case 'chat_message':
         return 'hat dir geschrieben';
+      case 'follow_create':
+        return 'folgt jetzt deinem Profil';
       default:
         return 'hat interagiert';
     }
@@ -983,6 +1107,10 @@
   function getNotificationHref(entry: any) {
     if (entry?.event_type === 'chat_message' && entry?.payload?.conversation_id) {
       return `/profile?conversation=${encodeURIComponent(entry.payload.conversation_id)}`;
+    }
+
+    if (entry?.event_type === 'follow_create' && entry?.actor?.accountname) {
+      return `/${encodeURIComponent(entry.actor.accountname)}`;
     }
 
     return entry.item ? getPublicItemHref(entry.item) : '#';
@@ -995,6 +1123,10 @@
 
     if (entry?.event_type === 'comment_create' && entry?.payload?.comment_excerpt) {
       return entry.payload.comment_excerpt;
+    }
+
+    if (entry?.event_type === 'follow_create') {
+      return 'Neuer Follower';
     }
 
     return '';
@@ -1374,6 +1506,124 @@
                 Keine offenen Daten. Dein Bestand ist aktuell sauber gepflegt.
               </div>
             {/if}
+          </div>
+
+          <div class="card">
+            <h3 class="section-title">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3zM8 11c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zM8 13c-2.33 0-7 1.17-7 3.5V19h14v-2.5C15 14.17 10.33 13 8 13zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
+              </svg>
+              Netzwerk
+            </h3>
+
+            <div class="follow-summary">
+              <div class="follow-metric">
+                <strong>{followerCount}</strong>
+                <span>Follower</span>
+              </div>
+              <div class="follow-metric">
+                <strong>{followingCount}</strong>
+                <span>Du folgst</span>
+              </div>
+            </div>
+
+            <div class="follow-columns">
+              <div class="follow-column">
+                <h4>Du folgst</h4>
+                {#if interactionLoading}
+                  <p class="help-text">Follow-Liste wird geladen...</p>
+                {:else if followingProfiles.length > 0}
+                  <input
+                    class="follow-search"
+                    type="search"
+                    bind:value={followingSearch}
+                    placeholder="Gefolgtes Profil suchen..."
+                    on:input={() => (followingVisibleCount = 8)}
+                  />
+                  <div class="follow-list">
+                    {#each visibleFollowingProfiles as entry}
+                      <div class="follow-card">
+                        <a class="follow-card__profile" href={getProfileHref(entry)}>
+                          {#if getAvatarUrl(entry)}
+                            <img src={getAvatarUrl(entry)} alt={entry.full_name || entry.accountname || 'Profil'} loading="lazy" />
+                          {:else}
+                            <span class="follow-card__avatar-fallback">
+                              {(entry.full_name || entry.accountname || '?').slice(0, 1).toUpperCase()}
+                            </span>
+                          {/if}
+                          <div>
+                            <strong>{entry.full_name || entry.accountname || 'Profil'}</strong>
+                            <span>@{entry.accountname || 'ohne-accountname'}</span>
+                          </div>
+                        </a>
+                        <div class="follow-card__actions">
+                          <button type="button" class="mark-read-btn" on:click={() => startConversationWith(entry.id)}>
+                            Chat
+                          </button>
+                        </div>
+                      </div>
+                    {/each}
+                  </div>
+                  {#if filteredFollowingProfiles.length === 0}
+                    <p class="help-text">Kein passendes Profil gefunden.</p>
+                  {:else if filteredFollowingProfiles.length > visibleFollowingProfiles.length}
+                    <button type="button" class="mark-read-btn" on:click={() => (followingVisibleCount += 8)}>
+                      Mehr anzeigen ({filteredFollowingProfiles.length - visibleFollowingProfiles.length})
+                    </button>
+                  {/if}
+                {:else}
+                  <p class="help-text">Du folgst aktuell noch keinem Profil.</p>
+                {/if}
+              </div>
+
+              <div class="follow-column">
+                <h4>Follower</h4>
+                {#if interactionLoading}
+                  <p class="help-text">Follower werden geladen...</p>
+                {:else if followerProfiles.length > 0}
+                  <input
+                    class="follow-search"
+                    type="search"
+                    bind:value={followerSearch}
+                    placeholder="Follower suchen..."
+                    on:input={() => (followerVisibleCount = 8)}
+                  />
+                  <div class="follow-list">
+                    {#each visibleFollowerProfiles as entry}
+                      <div class="follow-card">
+                        <a class="follow-card__profile" href={getProfileHref(entry)}>
+                          {#if getAvatarUrl(entry)}
+                            <img src={getAvatarUrl(entry)} alt={entry.full_name || entry.accountname || 'Profil'} loading="lazy" />
+                          {:else}
+                            <span class="follow-card__avatar-fallback">
+                              {(entry.full_name || entry.accountname || '?').slice(0, 1).toUpperCase()}
+                            </span>
+                          {/if}
+                          <div>
+                            <strong>{entry.full_name || entry.accountname || 'Profil'}</strong>
+                            <span>@{entry.accountname || 'ohne-accountname'}</span>
+                          </div>
+                        </a>
+                        <div class="follow-card__actions">
+                          <button type="button" class="mark-read-btn" on:click={() => startConversationWith(entry.id)}>
+                            Antworten
+                          </button>
+                        </div>
+                      </div>
+                    {/each}
+                  </div>
+                  {#if filteredFollowerProfiles.length === 0}
+                    <p class="help-text">Kein passender Follower gefunden.</p>
+                  {:else if filteredFollowerProfiles.length > visibleFollowerProfiles.length}
+                    <button type="button" class="mark-read-btn" on:click={() => (followerVisibleCount += 8)}>
+                      Mehr anzeigen ({filteredFollowerProfiles.length - visibleFollowerProfiles.length})
+                    </button>
+                  {/if}
+                {:else}
+                  <p class="help-text">Noch keine Follower vorhanden.</p>
+                {/if}
+              </div>
+            </div>
           </div>
 
           <div class="card">
@@ -2276,6 +2526,126 @@
     color: var(--text-secondary);
   }
 
+  .follow-summary {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+  }
+
+  .follow-metric {
+    min-width: 120px;
+    display: grid;
+    gap: 0.15rem;
+    padding: 0.8rem 0.95rem;
+    border-radius: 14px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+  }
+
+  .follow-metric strong {
+    font-size: 1.2rem;
+  }
+
+  .follow-metric span {
+    color: var(--text-secondary);
+    font-size: 0.88rem;
+  }
+
+  .follow-columns {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+  }
+
+  .follow-column {
+    min-width: 0;
+  }
+
+  .follow-column h4 {
+    margin: 0 0 0.75rem;
+    font-size: 1rem;
+  }
+
+  .follow-search {
+    width: 100%;
+    margin-bottom: 0.75rem;
+    padding: 0.72rem 0.85rem;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font: inherit;
+  }
+
+  .follow-search:focus {
+    outline: none;
+    border-color: var(--accent-color);
+  }
+
+  .follow-list {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .follow-card {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    align-items: center;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    background: var(--bg-secondary);
+  }
+
+  .follow-card__profile {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .follow-card__profile img,
+  .follow-card__avatar-fallback {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    object-fit: cover;
+    background: var(--bg-tertiary);
+    flex-shrink: 0;
+  }
+
+  .follow-card__avatar-fallback {
+    display: grid;
+    place-items: center;
+    font-weight: 700;
+    color: var(--culoca-orange);
+  }
+
+  .follow-card__profile div {
+    min-width: 0;
+    display: grid;
+  }
+
+  .follow-card__profile strong,
+  .follow-card__profile span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .follow-card__profile span {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+  }
+
+  .follow-card__actions {
+    flex-shrink: 0;
+  }
+
   .activity-list {
     display: grid;
     gap: 0.7rem;
@@ -2959,6 +3329,10 @@
     }
 
     .chat-layout {
+      grid-template-columns: 1fr;
+    }
+
+    .follow-columns {
       grid-template-columns: 1fr;
     }
 

@@ -1,48 +1,118 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { goto } from '$app/navigation';
-  import { supabase } from '$lib/supabaseClient';
-  import { filterStore } from '$lib/filterStore';
-  import { page } from '$app/stores';
+  import SiteNav from '$lib/SiteNav.svelte';
+  import SiteFooter from '$lib/SiteFooter.svelte';
+  import FollowButton from '$lib/FollowButton.svelte';
+  import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
+  import { appendReturnTo } from '$lib/content/routing';
+  import { absoluteUrl, buildBreadcrumbJsonLd, DEFAULT_OG_IMAGE, trimText } from '$lib/seo/site';
 
-  let loading = true;
-  let error = '';
+  export let data: any;
 
-  onMount(async () => {
-    const accountname = $page.params.accountname;
-    if (!accountname) {
-      error = 'Kein Accountname angegeben.';
-      loading = false;
-      goto('/');
-      return;
-    }
+  const canonicalUrl = absoluteUrl(data.seoPolicy.canonicalPath);
+  const creatorName = data.profile.full_name || data.profile.accountname;
+  const pageTitle = data.page > 1 ? `${creatorName}: Seite ${data.page} | Culoca` : `${creatorName} auf Culoca`;
+  const metaDescription = trimText(
+    data.profile.bio || `${creatorName} zeigt ${data.totalCount} öffentliche Inhalte auf Culoca. Galerie mit Bildern, Themen und Detailseiten.`
+  );
 
-    // First check if this is actually a valid accountname in the database
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('accountname', accountname.toLowerCase())
-      .single();
-
-    if (profile) {
-      // Valid accountname found - set user filter and redirect to main page
-      filterStore.setUserFilter({
-        userId: profile.id,
-        username: profile.full_name || profile.accountname || profile.id,
-        avatarUrl: profile.avatar_url || '',
-        accountName: profile.accountname || profile.full_name || profile.id
-      });
-      goto('/');
-    } else {
-      // Not a valid accountname - redirect to main page
-      // This prevents infinite loops and handles invalid accountnames gracefully
-      goto('/');
-    }
-  });
+  function itemHref(item: { canonical_path: string | null; slug: string }) {
+    return appendReturnTo(item.canonical_path || `/item/${item.slug}`, data.hubPath);
+  }
 </script>
 
-{#if loading}
-  <div>Profil wird geladen...</div>
-{:else if error}
-  <div>{error}</div>
-{/if} 
+<svelte:head>
+  <title>{pageTitle}</title>
+  <meta name="description" content={metaDescription} />
+  <link rel="canonical" href={canonicalUrl} />
+  <meta name="robots" content={data.seoPolicy.robots} />
+  <meta property="og:type" content="profile" />
+  <meta property="og:title" content={pageTitle} />
+  <meta property="og:description" content={metaDescription} />
+  <meta property="og:url" content={canonicalUrl} />
+  <meta property="og:image" content={DEFAULT_OG_IMAGE} />
+  <meta name="twitter:card" content="summary_large_image" />
+  {@html `<script type="application/ld+json">${JSON.stringify({
+    '@context': 'https://schema.org',
+    '@graph': [
+      buildBreadcrumbJsonLd([
+        { name: 'Culoca', path: '/' },
+        { name: creatorName, path: data.seoPolicy.canonicalPath }
+      ]),
+      {
+        '@type': 'Person',
+        name: creatorName,
+        ...(data.profile.website ? { url: data.profile.website } : {}),
+        ...(data.profile.avatar_url ? { image: data.profile.avatar_url } : {})
+      }
+    ]
+  })}</script>`}
+</svelte:head>
+
+<div class="page">
+  <SiteNav />
+  <main class="hub-page">
+    <div class="hub-inner">
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <a href="/">Culoca</a>
+        <span>/</span>
+        <span>{creatorName}</span>
+      </nav>
+      <header class="hub-header">
+        <div class="hub-header__top">
+          <div>
+            <p class="hub-kicker">Profil</p>
+            <h1>{creatorName}</h1>
+          </div>
+          <FollowButton
+            targetUserId={data.profile.id}
+            targetLabel={creatorName}
+          />
+        </div>
+        <p class="hub-copy">{metaDescription}</p>
+        <div class="hub-stats">
+          <div><strong>{data.totalCount}</strong><span>öffentliche Inhalte</span></div>
+          <div><strong>{data.followerCount}</strong><span>Follower</span></div>
+          <div><strong>{data.followingCount}</strong><span>folgt</span></div>
+        </div>
+      </header>
+      <div class="items-grid">
+        {#each data.items as item (item.id)}
+          <article class="item-card">
+            <a href={itemHref(item)}>
+              {#if item.path_512}
+                <img
+                  src={getSeoImageUrl(item.slug, item.path_512, '512')}
+                  alt={item.title || creatorName}
+                  loading="lazy"
+                  decoding="async"
+                  width="320"
+                  height="213"
+                />
+              {/if}
+              <h2>{item.title || item.slug}</h2>
+              <p>{trimText(item.description || item.caption || `Mehr Inhalte von ${creatorName}.`, 110)}</p>
+            </a>
+          </article>
+        {/each}
+      </div>
+    </div>
+  </main>
+  <SiteFooter />
+</div>
+
+<style>
+  .hub-page { padding: 2rem 1rem 4rem; }
+  .hub-inner { max-width: 1100px; margin: 0 auto; }
+  .breadcrumb { display: flex; gap: 0.45rem; flex-wrap: wrap; margin-bottom: 1rem; color: var(--text-secondary); }
+  .hub-header { margin-bottom: 1.5rem; }
+  .hub-header__top { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
+  .hub-kicker { text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent-color); font-size: 0.85rem; }
+  .hub-copy { max-width: 70ch; }
+  .hub-stats { display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 1rem; }
+  .hub-stats div { display: grid; gap: 0.15rem; min-width: 120px; }
+  .hub-stats strong { font-size: 1.2rem; }
+  .hub-stats span { color: var(--text-secondary); font-size: 0.92rem; }
+  .items-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
+  .item-card a { display: block; color: inherit; text-decoration: none; }
+  .item-card img { width: 100%; height: auto; border-radius: 12px; margin-bottom: 0.75rem; background: var(--bg-secondary); }
+</style>

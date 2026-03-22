@@ -83,6 +83,7 @@ let showMapPicker = false;
 let showRightsManager = false;
   import { useJustifiedLayout } from '$lib/galleryStore';
   import FloatingActionButtons from '$lib/FloatingActionButtons.svelte';
+  import FollowButton from '$lib/FollowButton.svelte';
 
   // Scroll to top state
   let showScrollToTop = false;
@@ -4030,17 +4031,30 @@ let showRightsManager = false;
                   </svg>
                 </a>
               {/if}
+              {#if image.profile_id}
+                <FollowButton
+                  targetUserId={image.profile_id}
+                  targetLabel={image.profile.full_name || image.profile.accountname || 'Profil'}
+                  iconOnly={true}
+                />
+              {/if}
             </div>
             {#if image.profile.show_bio && image.profile.bio}
               <div class="creator-bio">
                 <div>{@html image.profile.bio.replace(/\n/g, '<br>')}</div>
               </div>
             {/if}
-            {#if currentUser?.id !== image.profile_id}
-              <button type="button" class="creator-chat-btn" on:click={startCreatorChat}>
-                Nachricht schreiben
-              </button>
-            {/if}
+            <div class="creator-actions">
+              {#if currentUser?.id !== image.profile_id}
+                <FollowButton
+                  targetUserId={image.profile_id}
+                  targetLabel={image.profile.full_name || image.profile.accountname || 'Profil'}
+                />
+                <button type="button" class="creator-chat-btn" on:click={startCreatorChat}>
+                  Nachricht schreiben
+                </button>
+              {/if}
+            </div>
           </div>
         {/if}
       </div>
@@ -4859,9 +4873,14 @@ let showRightsManager = false;
     line-height: 1.4;
     background: transparent;
   }
+  .creator-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: center;
+    margin-top: 0.85rem;
+  }
   .creator-chat-btn {
-    align-self: flex-start;
-    margin-top: 0.75rem;
     border: 1px solid var(--border-color);
     background: var(--bg-secondary);
     color: var(--text-primary);

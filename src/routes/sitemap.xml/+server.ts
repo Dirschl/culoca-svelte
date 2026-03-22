@@ -179,7 +179,7 @@ export const GET: RequestHandler = async () => {
       for (const profile of profiles || []) {
         if (!profile.accountname) continue;
         xml += '  <url>\n';
-        xml += `    <loc>${baseUrl}/fotograf/${profile.accountname}</loc>\n`;
+        xml += `    <loc>${baseUrl}/${profile.accountname}</loc>\n`;
         xml += `    <lastmod>${new Date().toISOString().split('T')[0]}</lastmod>\n`;
         xml += '    <priority>0.7</priority>\n';
         xml += '    <changefreq>weekly</changefreq>\n';

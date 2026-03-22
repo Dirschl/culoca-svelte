@@ -12,7 +12,7 @@ export function buildKeywordHubPath(keyword: string): string {
 }
 
 export function buildPhotographerHubPath(accountname: string): string {
-  return `/fotograf/${slugifySegment(accountname)}`;
+  return `/${slugifySegment(accountname)}`;
 }
 
 export function buildPlaceHubPath(place: string): string {
