@@ -15,40 +15,12 @@
   import { authFetch } from '$lib/authFetch';
   import { supabase } from '$lib/supabaseClient';
   import { buildBreadcrumbJsonLd, DEFAULT_OG_IMAGE, trimText } from '$lib/seo/site';
-  import DashboardLocationPanel from '$lib/DashboardLocationPanel.svelte';
   import HomeTypeSectionsFeed from '$lib/HomeTypeSectionsFeed.svelte';
+  import HomeDashboardDiscover from '$lib/HomeDashboardDiscover.svelte';
 
   export let data: PageData;
   type DashboardView = 'all' | 'inbox' | 'creator' | 'network';
 
-  /** Reihenfolge rechts „Entdecken“: Termine → Fotos → Firmen → … */
-  const DASHBOARD_DISCOVER_SLUG_ORDER = [
-    'event',
-    'foto',
-    'firma',
-    'video',
-    'link',
-    'text',
-    'musik',
-    'ki-bild'
-  ] as const;
-
-  function orderSectionsForDiscover(sections: PageData['sections']): PageData['sections'] {
-    if (!sections?.length) return [];
-    const preferred = new Set<string>(DASHBOARD_DISCOVER_SLUG_ORDER);
-    const bySlug = new Map(sections.map((s) => [s.slug, s]));
-    const out: PageData['sections'] = [];
-    for (const slug of DASHBOARD_DISCOVER_SLUG_ORDER) {
-      const s = bySlug.get(slug);
-      if (s) out.push(s);
-    }
-    for (const s of sections) {
-      if (!preferred.has(s.slug)) out.push(s);
-    }
-    return out;
-  }
-
-  $: discoverSections = orderSectionsForDiscover(data.sections ?? []);
   let savedLocation: RememberedLocation | null = null;
   let currentUserFullName = '';
   let currentUserId = '';
@@ -782,45 +754,90 @@
 
   <main>
     {#if $isAuthenticated}
+      <section class="hero dashboard-hero">
+        <div class="hero-inner">
+          <div class="hero-layout hero-layout--dashboard">
+            <div class="hero-copy">
+              {#if currentUserFullName}
+                <p class="hero-greeting">Hallo, {currentUserFullName}</p>
+              {/if}
+              <h1><span class="hero-line">Dein Dashboard</span></h1>
+              <p class="hero-sub">
+                Reaktionen, Netzwerk und priorisierte Sprünge – Chats laufen zentral unter „Chat“ in der Navigation.
+              </p>
+              <div class="hero-dash-actions">
+                <a href="/chat" class="btn-secondary">Nachrichten</a>
+                <a href="/galerie" class="btn-primary">Galerie</a>
+                <a href={publicProfileHref} class="btn-secondary">Öffentliches Profil</a>
+              </div>
+              <div class="dashboard-tabs" role="tablist" aria-label="Dashboard-Fokus">
+                <button type="button" class="dashboard-tab" class:is-active={activeDashboardView === 'all'} on:click={() => (activeDashboardView = 'all')}>
+                  <span>Alle</span>
+                  <strong>{dashboardTabCounts.all}</strong>
+                </button>
+                <button type="button" class="dashboard-tab" class:is-active={activeDashboardView === 'inbox'} on:click={() => (activeDashboardView = 'inbox')}>
+                  <span>Inbox</span>
+                  <strong>{dashboardTabCounts.inbox}</strong>
+                </button>
+                <button type="button" class="dashboard-tab" class:is-active={activeDashboardView === 'creator'} on:click={() => (activeDashboardView = 'creator')}>
+                  <span>Creator</span>
+                  <strong>{dashboardTabCounts.creator}</strong>
+                </button>
+                <button type="button" class="dashboard-tab" class:is-active={activeDashboardView === 'network'} on:click={() => (activeDashboardView = 'network')}>
+                  <span>Netzwerk</span>
+                  <strong>{dashboardTabCounts.network}</strong>
+                </button>
+              </div>
+            </div>
+            <aside class="hero-side surface-responsive surface-responsive--panel">
+              <section class="hero-side-section">
+                <span class="hero-side-kicker">Standort</span>
+                <h2>
+                  {savedLocation?.source === 'gps'
+                    ? 'Live-Standort aktiv'
+                    : savedLocation
+                      ? 'Location manuell gesetzt'
+                      : 'Standort freigeben'}
+                </h2>
+                <p>
+                  {#if savedLocation?.source === 'gps'}
+                    Culoca nutzt deinen aktuellen Live-Standort und kann Inhalte, Distanzen und Sortierung laufend an deine Position anpassen.
+                  {:else if savedLocation}
+                    Bei einem manuell gesetzten Location Punkt, wird der Standort nicht verändert. Die mobile Galerie kann daher nicht verwendet werden.
+                  {:else}
+                    Ohne Standort kann nur nach Aktualität, aber nicht nach Entfernungen oder Locations gefiltert werden. Mit Standort Festlegung oder Live Standort wird Culoca interaktiv und zeigt dir zuerst Inhalte in der gewünschten Umgebung an.
+                  {/if}
+                </p>
+                {#if savedLocation}
+                  <div class="hero-location-status">
+                    <strong>{savedLocation.label || 'Standort gespeichert'}</strong>
+                    <p class="hero-coords">{savedLocation.lat.toFixed(5)}, {savedLocation.lon.toFixed(5)}</p>
+                    <div class="hero-location-map">
+                      <iframe
+                        src={locationPreviewUrl}
+                        title="Kartenausschnitt des aktuell verwendeten Standorts"
+                        loading="lazy"
+                        referrerpolicy="no-referrer-when-downgrade"
+                      ></iframe>
+                    </div>
+                  </div>
+                {/if}
+                <div class="hero-side-actions">
+                  <a href="/standort?returnTo=%2F" class="btn-primary hero-wide-btn" class:btn-attention={!savedLocation}>
+                    {savedLocation ? 'Standortfreigabe ändern' : 'Standort jetzt festlegen'}
+                  </a>
+                </div>
+              </section>
+            </aside>
+          </div>
+        </div>
+      </section>
+
       <section class="dashboard">
         <div class="dashboard-page-layout">
           <div class="dashboard-page-layout__main">
             <div class="dashboard-inner">
-          <header class="dashboard-header">
-            <div>
-              {#if currentUserFullName}
-                <p class="hero-greeting">Hallo, {currentUserFullName}</p>
-              {/if}
-              <h1>Dein Dashboard</h1>
-              <p class="dashboard-copy">Reaktionen, Netzwerk und priorisierte Sprünge – Chats laufen zentral unter „Chat“ in der Navigation.</p>
-            </div>
-            <div class="dashboard-actions">
-              <a href="/chat" class="btn-secondary">Nachrichten</a>
-              <a href="/galerie" class="btn-primary">Galerie</a>
-              <a href={publicProfileHref} class="btn-secondary">Öffentliches Profil</a>
-            </div>
-          </header>
-
-          <div class="dashboard-tabs" role="tablist" aria-label="Dashboard-Fokus">
-            <button type="button" class="dashboard-tab" class:is-active={activeDashboardView === 'all'} on:click={() => (activeDashboardView = 'all')}>
-              <span>Alle</span>
-              <strong>{dashboardTabCounts.all}</strong>
-            </button>
-            <button type="button" class="dashboard-tab" class:is-active={activeDashboardView === 'inbox'} on:click={() => (activeDashboardView = 'inbox')}>
-              <span>Inbox</span>
-              <strong>{dashboardTabCounts.inbox}</strong>
-            </button>
-            <button type="button" class="dashboard-tab" class:is-active={activeDashboardView === 'creator'} on:click={() => (activeDashboardView = 'creator')}>
-              <span>Creator</span>
-              <strong>{dashboardTabCounts.creator}</strong>
-            </button>
-            <button type="button" class="dashboard-tab" class:is-active={activeDashboardView === 'network'} on:click={() => (activeDashboardView = 'network')}>
-              <span>Netzwerk</span>
-              <strong>{dashboardTabCounts.network}</strong>
-            </button>
-          </div>
-
-          <div class="dashboard-top-row">
+          <div class="dashboard-top-stack">
             {#if showDashboardUserSearch()}
               <section class="dashboard-search" id="profile-finden">
                 <div class="dashboard-panel__head">
@@ -904,8 +921,6 @@
                   <p class="dashboard-empty">Suche nach Name, `@accountname` oder Organisation, um Chats zu starten oder Profile zu folgen.</p>
                 {/if}
               </section>
-            {:else}
-              <DashboardLocationPanel {savedLocation} />
             {/if}
 
             <section class="dashboard-priority">
@@ -967,14 +982,6 @@
               {/if}
             </section>
           </div>
-
-          {#if showDashboardUserSearch()}
-            <div class="dashboard-location-row">
-              <div class="dashboard-location-row__cell">
-                <DashboardLocationPanel {savedLocation} />
-              </div>
-            </div>
-          {/if}
 
           <div class="dashboard-grid">
             {#if showDashboardPanel('inbox')}
@@ -1283,22 +1290,21 @@
             </div>
           </div>
 
-          {#if data.sections && data.sections.length > 0}
-            <aside class="dashboard-page-layout__aside" aria-label="Neu auf Culoca">
-              <div class="dashboard-discover-panel">
-                <header class="dashboard-discover-head">
-                  <span class="dashboard-kicker">Entdecken</span>
-                  <h2 class="dashboard-discover-title">Neu auf Culoca</h2>
-                  <p class="dashboard-discover-lede">
-                  Termine, Fotos, Firmen und mehr – sortiert zum Stöbern (öffentliche Inhalte).
+          {#if data.dashboardDiscover}
+            <aside class="dashboard-page-layout__aside" aria-label="Entdecken">
+              <header class="dashboard-discover-head">
+                <span class="dashboard-kicker">Entdecken</span>
+                <h2 class="dashboard-discover-title">Neu auf Culoca</h2>
+                <p class="dashboard-discover-lede">
+                  Nächste Termine, neueste Fotos (wie unter /foto) und Firmen – mit Entfernung, wenn ein Standort gesetzt ist.
                 </p>
-                </header>
-                <HomeTypeSectionsFeed
-                  sections={discoverSections}
-                  variant="discover"
-                  maxItemsPerSection={8}
-                />
-              </div>
+              </header>
+              <HomeDashboardDiscover
+                upcomingEvents={data.dashboardDiscover.upcomingEvents}
+                latestPhotos={data.dashboardDiscover.latestPhotos}
+                latestFirms={data.dashboardDiscover.latestFirms}
+                referenceLocation={savedLocation}
+              />
             </aside>
           {/if}
         </div>
@@ -1406,8 +1412,8 @@
     max-width: 1680px;
     margin: 0 auto;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(340px, 520px);
-    gap: 1.25rem 1.5rem;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+    gap: 1.25rem 1.75rem;
     align-items: start;
   }
 
@@ -1417,18 +1423,32 @@
 
   .dashboard-page-layout__aside {
     min-width: 0;
+    padding-top: 0.15rem;
   }
 
-  .dashboard-discover-panel {
-    position: sticky;
-    top: 0.85rem;
-    max-height: calc(100vh - 1.25rem);
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    padding: 0.85rem 1rem 1.1rem;
-    border-radius: 20px;
-    border: 1px solid color-mix(in srgb, var(--culoca-orange) 12%, var(--border-color) 88%);
-    background: color-mix(in srgb, var(--bg-secondary) 88%, white 12%);
+  .dashboard-top-stack {
+    display: grid;
+    gap: 1rem;
+    align-items: start;
+  }
+
+  .dashboard-hero .hero-dash-actions {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-top: 1rem;
+  }
+
+  .dashboard-hero .dashboard-tabs {
+    margin-top: 1.1rem;
+  }
+
+  .hero-coords {
+    margin: 0.25rem 0 0;
+    font-size: 0.82rem;
+    font-family: ui-monospace, monospace;
+    color: var(--text-secondary);
+    word-break: break-all;
   }
 
   .dashboard-discover-head {
@@ -1575,25 +1595,6 @@
   .dashboard-search__clear:hover {
     color: var(--text-primary);
     border-color: color-mix(in srgb, var(--culoca-orange) 38%, var(--border-color) 62%);
-  }
-
-  /* Persönliche Gruppen untereinander (keine 2-Spalten-Lücken) */
-  .dashboard-top-row {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 1rem;
-    align-items: start;
-  }
-
-  .dashboard-location-row {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 1rem;
-    align-items: start;
-  }
-
-  .dashboard-location-row__cell {
-    min-width: 0;
   }
 
   .dashboard-grid {
@@ -2025,8 +2026,6 @@
 
   /* ---- Responsive ---- */
   @media (max-width: 960px) {
-    .dashboard-top-row,
-    .dashboard-location-row,
     .dashboard-grid,
     .dashboard-shortcuts {
       grid-template-columns: 1fr;
@@ -2053,12 +2052,6 @@
 
     .dashboard-page-layout {
       grid-template-columns: 1fr;
-    }
-
-    .dashboard-discover-panel {
-      position: static;
-      max-height: none;
-      overflow: visible;
     }
   }
   @media (max-width: 680px) {
