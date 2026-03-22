@@ -3,9 +3,11 @@ import { createClient } from '@supabase/supabase-js';
 import {
   buildDownloadFilename,
   canBypassImageProcessing,
+  canRewriteMetadataWithoutSharp,
   fetchOriginalItemBuffer,
   normalizeDownloadExportOptions,
   renderDownloadExport,
+  rewriteJpegMetadataWithoutSharp,
   type DownloadExportOptions
 } from '$lib/server/downloadExport';
 
@@ -226,10 +228,6 @@ function isSharpRuntimeError(err: unknown) {
   return message.toLowerCase().includes('sharp');
 }
 
-function canFallbackToOriginalDownload(options: DownloadExportOptions) {
-  return options.sizeMode === 'full' && options.format === 'jpg';
-}
-
 function getUserFacingDownloadErrorMessage(err: unknown, mode: 'download' | 'estimate') {
   if (isSharpRuntimeError(err)) {
     return mode === 'estimate'
@@ -376,7 +374,34 @@ export const POST: RequestHandler = async ({ params, request }) => {
         }
       });
     } catch (renderError) {
-      if (!isSharpRuntimeError(renderError) || !canFallbackToOriginalDownload(options)) {
+      if (!isSharpRuntimeError(renderError)) {
+        throw renderError;
+      }
+
+      if (canRewriteMetadataWithoutSharp(originalBuffer, options)) {
+        console.warn('Download render failed due to sharp runtime issue, retrying with exiftool metadata rewrite:', renderError);
+
+        const rewritten = await rewriteJpegMetadataWithoutSharp(originalBuffer, item, options);
+
+        await logDownload(
+          supabase,
+          item,
+          user.id,
+          options.sizeMode === 'full' ? 'full_resolution_custom' : 'custom_export'
+        );
+
+        return new Response(rewritten.buffer, {
+          status: 200,
+          headers: {
+            'Content-Type': rewritten.contentType,
+            'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(rewritten.filename)}`,
+            'Cache-Control': 'private, max-age=0, must-revalidate',
+            'X-Culoca-Download-Fallback': 'exiftool-rewrite'
+          }
+        });
+      }
+
+      if (options.sizeMode !== 'full' || options.format !== 'jpg') {
         throw renderError;
       }
 

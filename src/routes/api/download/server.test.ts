@@ -3,9 +3,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const createClientMock = vi.fn();
 const buildDownloadFilenameMock = vi.fn();
 const canBypassImageProcessingMock = vi.fn();
+const canRewriteMetadataWithoutSharpMock = vi.fn();
 const fetchOriginalItemBufferMock = vi.fn();
 const normalizeDownloadExportOptionsMock = vi.fn();
 const renderDownloadExportMock = vi.fn();
+const rewriteJpegMetadataWithoutSharpMock = vi.fn();
 
 vi.mock('@supabase/supabase-js', () => ({
   createClient: createClientMock
@@ -14,9 +16,11 @@ vi.mock('@supabase/supabase-js', () => ({
 vi.mock('$lib/server/downloadExport', () => ({
   buildDownloadFilename: buildDownloadFilenameMock,
   canBypassImageProcessing: canBypassImageProcessingMock,
+  canRewriteMetadataWithoutSharp: canRewriteMetadataWithoutSharpMock,
   fetchOriginalItemBuffer: fetchOriginalItemBufferMock,
   normalizeDownloadExportOptions: normalizeDownloadExportOptionsMock,
-  renderDownloadExport: renderDownloadExportMock
+  renderDownloadExport: renderDownloadExportMock,
+  rewriteJpegMetadataWithoutSharp: rewriteJpegMetadataWithoutSharpMock
 }));
 
 describe('/api/download/[id] POST', () => {
@@ -88,6 +92,7 @@ describe('/api/download/[id] POST', () => {
 
     createClientMock.mockReturnValue(createSupabaseMock());
     fetchOriginalItemBufferMock.mockResolvedValue(Buffer.from('original-jpg'));
+    canRewriteMetadataWithoutSharpMock.mockReturnValue(false);
   });
 
   it('returns an estimate payload for custom open graph exports', async () => {
@@ -177,5 +182,47 @@ describe('/api/download/[id] POST', () => {
     expect(await response.json()).toEqual({
       error: 'Die gewaehlte Exportvariante ist gerade nicht verfuegbar. Bitte versuche JPG in voller Aufloesung oder Original-Metadaten.'
     });
+  });
+
+  it('rewrites full jpg culoca downloads with exiftool when sharp is unavailable', async () => {
+    const options = {
+      sizeMode: 'full',
+      format: 'jpg',
+      metadataMode: 'culoca',
+      filenameMode: 'web'
+    };
+
+    normalizeDownloadExportOptionsMock.mockReturnValue(options);
+    canBypassImageProcessingMock.mockReturnValue(false);
+    canRewriteMetadataWithoutSharpMock.mockReturnValue(true);
+    renderDownloadExportMock.mockRejectedValue(new Error('sharp failed during render'));
+    rewriteJpegMetadataWithoutSharpMock.mockResolvedValue({
+      buffer: Buffer.from('rewritten-jpg'),
+      contentType: 'image/jpeg',
+      filename: 'abendlicht-am-weiher-culoca-abc123def4.jpg',
+      outputWidth: 4032,
+      outputHeight: 3024
+    });
+
+    const { POST } = await import('./[id]/+server');
+    const response = await POST({
+      params: { id: itemRecord.id },
+      request: new Request('http://localhost/api/download/' + itemRecord.id, {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer token',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          mode: 'download',
+          options
+        })
+      })
+    } as any);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('x-culoca-download-fallback')).toBe('exiftool-rewrite');
+    expect(rewriteJpegMetadataWithoutSharpMock).toHaveBeenCalledWith(Buffer.from('original-jpg'), itemRecord, options);
+    expect(Buffer.from(await response.arrayBuffer()).toString()).toBe('rewritten-jpg');
   });
 });

@@ -1,4 +1,9 @@
 import sharp, { type Gravity, type Metadata, type Sharp, type Strategy } from 'sharp';
+import { exiftool } from 'exiftool-vendored';
+import { promises as fs } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { createClient as createWebDavClient } from 'webdav';
 import { extractPhotoMetadataFields } from '$lib/metadata/photoMetadata';
 
@@ -436,6 +441,95 @@ function buildCulocaXmp(item: DownloadableItem) {
     </rdf:Description>
   </rdf:RDF>
 </x:xmpmeta>`;
+}
+
+function buildCulocaExiftoolTags(item: DownloadableItem) {
+  const extracted = extractPhotoMetadataFields(item.exif_data || {});
+  const title = firstString(item.title, extracted.title);
+  const caption = firstString(item.caption, extracted.caption, extracted.title);
+  const description = firstString(item.description, extracted.description, caption, 'Culoca Export');
+  const creator = firstString(item.profile?.full_name, item.profile?.accountname, extracted.creator, 'Unbekannt');
+  const originalCopyright = firstString(item.exif_data?.Copyright, extracted.copyright);
+  const copyright = originalCopyright ? `${originalCopyright} | culoca.com` : `${creator} | culoca.com`;
+  const keywords = Array.isArray(item.keywords)
+    ? item.keywords.filter((keyword): keyword is string => typeof keyword === 'string' && keyword.trim().length > 0)
+    : [];
+  const gpsLat = firstNumber(item.lat, item.exif_data?.latitude, item.exif_data?.Latitude);
+  const gpsLon = firstNumber(item.lon, item.exif_data?.longitude, item.exif_data?.Longitude);
+
+  return compactObject({
+    Artist: creator,
+    Creator: creator,
+    Copyright: copyright,
+    'IPTC:CopyrightNotice': copyright,
+    'XMP-dc:Rights': copyright,
+    Headline: caption,
+    'IPTC:Headline': caption,
+    'XMP-photoshop:Headline': caption,
+    Title: title,
+    'XMP-dc:Title': title,
+    ImageDescription: description,
+    Description: description,
+    'IPTC:Caption-Abstract': description,
+    'XMP-dc:Description': description,
+    XPTitle: title,
+    XPComment: caption || description,
+    XPAuthor: creator,
+    XPKeywords: keywords.length ? keywords.join('; ') : null,
+    XPSubject: firstString(caption, title, description),
+    Keywords: keywords.length ? keywords : null,
+    Subject: keywords.length ? keywords : null,
+    GPSLatitude: gpsLat,
+    GPSLongitude: gpsLon
+  });
+}
+
+function isJpegBuffer(buffer: Buffer) {
+  return buffer.byteLength >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+}
+
+export function canRewriteMetadataWithoutSharp(originalBuffer: Buffer, rawOptions: DownloadExportOptions) {
+  const options = normalizeDownloadExportOptions(rawOptions);
+  if (options.sizeMode !== 'full' || options.format !== 'jpg') return false;
+  if (options.metadataMode !== 'culoca' && options.metadataMode !== 'none') return false;
+  return isJpegBuffer(originalBuffer);
+}
+
+export async function rewriteJpegMetadataWithoutSharp(
+  originalBuffer: Buffer,
+  item: DownloadableItem,
+  rawOptions: DownloadExportOptions
+) {
+  const options = normalizeDownloadExportOptions(rawOptions);
+
+  if (!canRewriteMetadataWithoutSharp(originalBuffer, options)) {
+    throw new Error('Exiftool-Fallback ist fuer diese Exportvariante nicht verfuegbar');
+  }
+
+  const tempFile = join(tmpdir(), `culoca-download-${randomUUID()}.jpg`);
+  const tempOriginalFile = `${tempFile}_original`;
+
+  try {
+    await fs.writeFile(tempFile, originalBuffer);
+
+    if (options.metadataMode === 'none') {
+      await exiftool.deleteAllTags(tempFile);
+    } else {
+      await exiftool.write(tempFile, buildCulocaExiftoolTags(item));
+    }
+
+    const buffer = await fs.readFile(tempFile);
+
+    return {
+      buffer,
+      contentType: 'image/jpeg',
+      filename: buildDownloadFilename(item, options),
+      outputWidth: item.width || null,
+      outputHeight: item.height || null
+    };
+  } finally {
+    await Promise.allSettled([fs.unlink(tempFile), fs.unlink(tempOriginalFile)]);
+  }
 }
 
 function applyFormat(pipeline: Sharp, format: DownloadExportFormat, compression: number | null | undefined) {

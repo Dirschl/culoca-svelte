@@ -1,6 +1,15 @@
+import { exiftool } from 'exiftool-vendored';
+import { promises as fs } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { randomUUID } from 'node:crypto';
 import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
-import { renderDownloadExport, buildDownloadFilename } from './downloadExport';
+import {
+  renderDownloadExport,
+  buildDownloadFilename,
+  rewriteJpegMetadataWithoutSharp
+} from './downloadExport';
 
 describe('downloadExport', () => {
   it('renders open graph exports from auto-oriented JPEGs without failing crop math', async () => {
@@ -67,5 +76,59 @@ describe('downloadExport', () => {
     );
 
     expect(filename).toBe('abendlicht-am-weiher-culoca-abc123def4.jpg');
+  });
+
+  it('rewrites full resolution culoca jpeg metadata without sharp', async () => {
+    const source = await sharp({
+      create: {
+        width: 1200,
+        height: 800,
+        channels: 3,
+        background: { r: 60, g: 90, b: 120 }
+      }
+    })
+      .jpeg()
+      .toBuffer();
+
+    const result = await rewriteJpegMetadataWithoutSharp(
+      source,
+      {
+        id: '28fe6820-16af-4cda-90dc-a36243acea7d',
+        short_id: 'abc123def4',
+        title: 'Abendlicht am Weiher',
+        caption: 'Ein stiller Moment im Abendlicht.',
+        description: 'Ein stiller Moment im Abendlicht.',
+        keywords: ['abend', 'weiher'],
+        profile: {
+          full_name: 'Test Creator'
+        },
+        exif_data: {
+          Copyright: 'Johann Dirschl'
+        },
+        lat: 48.123,
+        lon: 12.456,
+        width: 1200,
+        height: 800
+      },
+      {
+        sizeMode: 'full',
+        format: 'jpg',
+        metadataMode: 'culoca',
+        filenameMode: 'web'
+      }
+    );
+
+    const tempFile = join(tmpdir(), `culoca-download-test-${randomUUID()}.jpg`);
+
+    try {
+      await fs.writeFile(tempFile, result.buffer);
+      const tags = await exiftool.read(tempFile);
+
+      expect(tags.Copyright).toBe('Johann Dirschl | culoca.com');
+      expect(tags.Headline).toBe('Ein stiller Moment im Abendlicht.');
+      expect(tags.ImageDescription).toBe('Ein stiller Moment im Abendlicht.');
+    } finally {
+      await fs.unlink(tempFile).catch(() => undefined);
+    }
   });
 });
