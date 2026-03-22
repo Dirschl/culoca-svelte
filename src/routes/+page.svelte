@@ -3,7 +3,7 @@
   import { get } from 'svelte/store';
   import { browser } from '$app/environment';
   import { page } from '$app/stores';
-  import { goto } from '$app/navigation';
+  import { afterNavigate, goto } from '$app/navigation';
   import type { PageData } from './$types';
   import SiteNav from '$lib/SiteNav.svelte';
   import SiteFooter from '$lib/SiteFooter.svelte';
@@ -15,6 +15,7 @@
   import { authFetch } from '$lib/authFetch';
   import { supabase } from '$lib/supabaseClient';
   import { buildBreadcrumbJsonLd, DEFAULT_OG_IMAGE, trimText } from '$lib/seo/site';
+  import DashboardLocationPanel from '$lib/DashboardLocationPanel.svelte';
 
   export let data: PageData;
   type DashboardView = 'all' | 'inbox' | 'creator' | 'network';
@@ -98,6 +99,8 @@
     if (activeDashboardView === 'network') return entry.category === 'network';
     return true;
   });
+  /** In der Kachel „Jetzt wichtig“ nur die ersten 5 Einträge (halbe Breite). */
+  $: displayedPriorityFeed = filteredDashboardPriorityFeed.slice(0, 5);
   $: dashboardTabCounts = {
     all: dashboardPriorityFeed.length,
     inbox: dashboardPriorityFeed.filter((entry: any) => entry.category === 'inbox').length,
@@ -725,6 +728,10 @@
     ]
   };
 
+  afterNavigate(() => {
+    if (browser) savedLocation = readRememberedLocation();
+  });
+
   onMount(() => {
     savedLocation = readRememberedLocation();
     if (browser) {
@@ -809,144 +816,157 @@
             </button>
           </div>
 
-          {#if showDashboardUserSearch()}
-            <section class="dashboard-search" id="profile-finden">
+          <div class="dashboard-top-row">
+            {#if showDashboardUserSearch()}
+              <section class="dashboard-search" id="profile-finden">
+                <div class="dashboard-panel__head">
+                  <div>
+                    <span class="dashboard-kicker">Netzwerk</span>
+                    <h2>Profile finden</h2>
+                  </div>
+                  <a href="/chat">Zum Chat</a>
+                </div>
+
+                <div class="dashboard-search__bar">
+                  <input
+                    class="dashboard-search__input"
+                    type="search"
+                    bind:value={dashboardUserSearchQuery}
+                    on:input={handleDashboardUserSearchInput}
+                    placeholder="Name, @accountname oder Organisation suchen"
+                    autocomplete="off"
+                    spellcheck="false"
+                  />
+                  {#if dashboardUserSearchQuery}
+                    <button type="button" class="dashboard-search__clear" on:click={clearDashboardUserSearch}>
+                      Zurücksetzen
+                    </button>
+                  {/if}
+                </div>
+
+                {#if dashboardUserSearchLoading}
+                  <p class="dashboard-empty">Profile werden gesucht...</p>
+                {:else if dashboardUserSearchResults.length > 0}
+                  <div class="dashboard-list">
+                    {#each dashboardUserSearchResults as profile (profile.id)}
+                      <div class="dashboard-entry dashboard-entry--static dashboard-entry--search">
+                        {#if getAvatarUrl(profile)}
+                          <img
+                            class="dashboard-entry__thumb"
+                            src={getAvatarUrl(profile)}
+                            alt={profile.full_name || profile.accountname || 'Profil'}
+                            width="64"
+                            height="64"
+                            loading="lazy"
+                          />
+                        {:else}
+                          <div class="dashboard-entry__thumb dashboard-entry__thumb--fallback">
+                            {(profile.full_name || profile.accountname || '?').slice(0, 1).toUpperCase()}
+                          </div>
+                        {/if}
+
+                        <div class="dashboard-entry__body">
+                          <div class="dashboard-entry__meta">
+                            <strong>{profile.full_name || profile.accountname || 'Profil'}</strong>
+                            {#if profile.accountname}
+                              <span class="dashboard-entry__handle">@{profile.accountname}</span>
+                            {/if}
+                          </div>
+                          <span class="dashboard-entry__context">Profil finden, folgen oder direkt schreiben</span>
+                          <p>{profile.email || 'Öffentliches Profil und Direktnachrichten sind von hier aus erreichbar.'}</p>
+                        </div>
+
+                        <div class="dashboard-entry__actions">
+                          <a class="dashboard-inline-action" href={`/chat?chatWith=${encodeURIComponent(profile.id)}`}>
+                            Chat
+                          </a>
+                          {#if profile.accountname}
+                            <a class="dashboard-inline-action" href={`/${encodeURIComponent(profile.accountname)}`}>
+                              Profil
+                            </a>
+                          {/if}
+                          <FollowButton
+                            targetUserId={profile.id}
+                            targetLabel={profile.full_name || profile.accountname || 'Profil'}
+                            compact={true}
+                          />
+                        </div>
+                      </div>
+                    {/each}
+                  </div>
+                {:else if dashboardUserSearchMessage}
+                  <p class="dashboard-empty">{dashboardUserSearchMessage}</p>
+                {:else}
+                  <p class="dashboard-empty">Suche nach Name, `@accountname` oder Organisation, um Chats zu starten oder Profile zu folgen.</p>
+                {/if}
+              </section>
+            {:else}
+              <DashboardLocationPanel {savedLocation} />
+            {/if}
+
+            <section class="dashboard-priority">
               <div class="dashboard-panel__head">
                 <div>
-                  <span class="dashboard-kicker">Netzwerk</span>
-                  <h2>Profile finden</h2>
+                  <span class="dashboard-kicker">Jetzt wichtig</span>
+                  <h2>Priorisierte Übersicht</h2>
                 </div>
                 <a href="/chat">Zum Chat</a>
               </div>
 
-              <div class="dashboard-search__bar">
-                <input
-                  class="dashboard-search__input"
-                  type="search"
-                  bind:value={dashboardUserSearchQuery}
-                  on:input={handleDashboardUserSearchInput}
-                  placeholder="Name, @accountname oder Organisation suchen"
-                  autocomplete="off"
-                  spellcheck="false"
-                />
-                {#if dashboardUserSearchQuery}
-                  <button type="button" class="dashboard-search__clear" on:click={clearDashboardUserSearch}>
-                    Zurücksetzen
-                  </button>
-                {/if}
-              </div>
-
-              {#if dashboardUserSearchLoading}
-                <p class="dashboard-empty">Profile werden gesucht...</p>
-              {:else if dashboardUserSearchResults.length > 0}
-                <div class="dashboard-list">
-                  {#each dashboardUserSearchResults as profile (profile.id)}
-                    <div class="dashboard-entry dashboard-entry--static dashboard-entry--search">
-                      {#if getAvatarUrl(profile)}
+              {#if dashboardLoading && filteredDashboardPriorityFeed.length === 0}
+                <p class="dashboard-empty">Prioritäten werden geladen...</p>
+              {:else if displayedPriorityFeed.length > 0}
+                <div class="dashboard-priority-list">
+                  {#each displayedPriorityFeed as entry (entry.id)}
+                    <a class="dashboard-entry dashboard-entry--link" href={entry.href}>
+                      {#if entry.thumbUrl}
                         <img
                           class="dashboard-entry__thumb"
-                          src={getAvatarUrl(profile)}
-                          alt={profile.full_name || profile.accountname || 'Profil'}
+                          src={entry.thumbUrl}
+                          alt={entry.title}
                           width="64"
                           height="64"
                           loading="lazy"
                         />
                       {:else}
                         <div class="dashboard-entry__thumb dashboard-entry__thumb--fallback">
-                          {(profile.full_name || profile.accountname || '?').slice(0, 1).toUpperCase()}
+                          {entry.fallback}
                         </div>
                       {/if}
 
                       <div class="dashboard-entry__body">
                         <div class="dashboard-entry__meta">
-                          <strong>{profile.full_name || profile.accountname || 'Profil'}</strong>
-                          {#if profile.accountname}
-                            <span class="dashboard-entry__handle">@{profile.accountname}</span>
+                          <strong>{entry.title}</strong>
+                          {#if entry.timestamp > 0}
+                            {@const meta = formatMetaDateLines(entry.timestamp)}
+                            {#if meta.date || meta.time}
+                              <time class="dashboard-entry__datetime" datetime={meta.iso}>
+                                {#if meta.date}<span class="dashboard-entry__date-line">{meta.date}</span>{/if}
+                                {#if meta.time}<span class="dashboard-entry__time-line">{meta.time}</span>{/if}
+                              </time>
+                            {/if}
                           {/if}
                         </div>
-                        <span class="dashboard-entry__context">Profil finden, folgen oder direkt schreiben</span>
-                        <p>{profile.email || 'Öffentliches Profil und Direktnachrichten sind von hier aus erreichbar.'}</p>
+                        <span class="dashboard-entry__context">{entry.subtitle}</span>
+                        <p>{entry.preview}</p>
                       </div>
-
-                      <div class="dashboard-entry__actions">
-                        <a class="dashboard-inline-action" href={`/chat?chatWith=${encodeURIComponent(profile.id)}`}>
-                          Chat
-                        </a>
-                        {#if profile.accountname}
-                          <a class="dashboard-inline-action" href={`/${encodeURIComponent(profile.accountname)}`}>
-                            Profil
-                          </a>
-                        {/if}
-                        <FollowButton
-                          targetUserId={profile.id}
-                          targetLabel={profile.full_name || profile.accountname || 'Profil'}
-                          compact={true}
-                        />
-                      </div>
-                    </div>
+                    </a>
                   {/each}
                 </div>
-              {:else if dashboardUserSearchMessage}
-                <p class="dashboard-empty">{dashboardUserSearchMessage}</p>
+                {#if filteredDashboardPriorityFeed.length > 5}
+                  <p class="dashboard-priority-more">
+                    +{filteredDashboardPriorityFeed.length - 5} weitere in den Bereichen unten oder über die Tabs.
+                  </p>
+                {/if}
               {:else}
-                <p class="dashboard-empty">Suche nach Name, `@accountname` oder Organisation, um Chats zu starten oder Profile zu folgen.</p>
+                <p class="dashboard-empty">Für diesen Fokus liegen aktuell noch keine priorisierten Einträge vor.</p>
               {/if}
             </section>
+          </div>
+
+          {#if showDashboardUserSearch()}
+            <DashboardLocationPanel {savedLocation} />
           {/if}
-
-          <section class="dashboard-priority">
-            <div class="dashboard-panel__head">
-              <div>
-                <span class="dashboard-kicker">Jetzt wichtig</span>
-                <h2>Priorisierte Übersicht</h2>
-              </div>
-                <a href="/chat">Zum Chat</a>
-            </div>
-
-            {#if dashboardLoading && filteredDashboardPriorityFeed.length === 0}
-              <p class="dashboard-empty">Prioritäten werden geladen...</p>
-            {:else if filteredDashboardPriorityFeed.length > 0}
-              <div class="dashboard-priority-list">
-                {#each filteredDashboardPriorityFeed as entry (entry.id)}
-                  <a class="dashboard-entry dashboard-entry--link" href={entry.href}>
-                    {#if entry.thumbUrl}
-                      <img
-                        class="dashboard-entry__thumb"
-                        src={entry.thumbUrl}
-                        alt={entry.title}
-                        width="64"
-                        height="64"
-                        loading="lazy"
-                      />
-                    {:else}
-                      <div class="dashboard-entry__thumb dashboard-entry__thumb--fallback">
-                        {entry.fallback}
-                      </div>
-                    {/if}
-
-                    <div class="dashboard-entry__body">
-                      <div class="dashboard-entry__meta">
-                        <strong>{entry.title}</strong>
-                        {#if entry.timestamp > 0}
-                          {@const meta = formatMetaDateLines(entry.timestamp)}
-                          {#if meta.date || meta.time}
-                            <time class="dashboard-entry__datetime" datetime={meta.iso}>
-                              {#if meta.date}<span class="dashboard-entry__date-line">{meta.date}</span>{/if}
-                              {#if meta.time}<span class="dashboard-entry__time-line">{meta.time}</span>{/if}
-                            </time>
-                          {/if}
-                        {/if}
-                      </div>
-                      <span class="dashboard-entry__context">{entry.subtitle}</span>
-                      <p>{entry.preview}</p>
-                    </div>
-                  </a>
-                {/each}
-              </div>
-            {:else}
-              <p class="dashboard-empty">Für diesen Fokus liegen aktuell noch keine priorisierten Einträge vor.</p>
-            {/if}
-          </section>
 
           <div class="dashboard-grid">
             {#if showDashboardPanel('inbox')}
@@ -1538,6 +1558,13 @@
     border-color: color-mix(in srgb, var(--culoca-orange) 38%, var(--border-color) 62%);
   }
 
+  .dashboard-top-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+    align-items: start;
+  }
+
   .dashboard-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1559,9 +1586,16 @@
 
   .dashboard-priority-list {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
     gap: 0.75rem;
     align-items: start;
+  }
+
+  .dashboard-priority-more {
+    margin: 0;
+    font-size: 0.82rem;
+    line-height: 1.4;
+    color: var(--text-secondary);
   }
 
   .dashboard-panel {
@@ -2096,7 +2130,7 @@
 
   /* ---- Responsive ---- */
   @media (max-width: 960px) {
-    .dashboard-priority-list,
+    .dashboard-top-row,
     .dashboard-grid,
     .dashboard-shortcuts {
       grid-template-columns: 1fr;
