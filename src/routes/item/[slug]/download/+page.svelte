@@ -91,6 +91,7 @@
   let activeRatioInput: 'width' | 'height' = 'width';
   let estimateTimer: ReturnType<typeof setTimeout> | null = null;
   let estimateKey = '';
+  let upscaleWarning = '';
   let previewMetrics: PreviewMetrics = { left: 0, top: 0, width: 1, height: 1 };
   let handleWindowResize: (() => void) | null = null;
   let previewResizeObserver: ResizeObserver | null = null;
@@ -154,6 +155,8 @@
   $: if (browser && image?.id && estimateKey && estimateEnabled) {
     queueEstimate();
   }
+
+  $: upscaleWarning = getUpscaleWarning();
 
   $: metadataPreviewKey = JSON.stringify({
     format: settings.format,
@@ -351,6 +354,26 @@
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  }
+
+  function getUpscaleWarning() {
+    if (settings.sizeMode !== 'custom' || !settings.cropEnabled || !image?.width || !image?.height) {
+      return '';
+    }
+
+    const sourceCropWidth = Math.max(1, Math.round(image.width * cropRect.width));
+    const sourceCropHeight = Math.max(1, Math.round(image.height * cropRect.height));
+    const targetWidth = Math.max(1, settings.width || sourceCropWidth);
+    const targetHeight = Math.max(1, settings.height || sourceCropHeight);
+    const scaleX = targetWidth / sourceCropWidth;
+    const scaleY = targetHeight / sourceCropHeight;
+    const upscaleFactor = Math.max(scaleX, scaleY);
+
+    if (!Number.isFinite(upscaleFactor) || upscaleFactor <= 1.02) {
+      return '';
+    }
+
+    return `Ausschnitt wird um ${upscaleFactor.toFixed(1)}x hochskaliert, die eingestellte Aufloesung wird nicht nativ erreicht.`;
   }
 
   function firstText(...values: Array<unknown>) {
@@ -977,6 +1000,9 @@
         <div class="preview-meta">
           <strong>{image?.title || image?.original_name || 'Bild'}</strong>
           <span>{estimateLabel}</span>
+          {#if upscaleWarning}
+            <span class="warning-text">{upscaleWarning}</span>
+          {/if}
           {#if isEstimating}
             <span>Vorschau wird aktualisiert...</span>
           {/if}
@@ -1320,6 +1346,11 @@
 
   .preview-meta span {
     color: var(--download-text-soft);
+  }
+
+  .warning-text {
+    color: #a55a00;
+    font-weight: 600;
   }
 
   .settings-card {
