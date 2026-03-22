@@ -6,6 +6,7 @@
   import SiteNav from '$lib/SiteNav.svelte';
   import SiteFooter from '$lib/SiteFooter.svelte';
   import { authFetch } from '$lib/authFetch';
+  import { supabase } from '$lib/supabaseClient';
   import { sessionStore } from '$lib/sessionStore';
   import { unifiedRightsStore } from '$lib/unifiedRightsStore';
   import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
@@ -36,7 +37,14 @@
     quality: number | null;
     metadataMode: 'original' | 'culoca' | 'none';
     filenameMode: 'original' | 'web';
-    remember: boolean;
+  };
+
+  type DownloadPreset = {
+    id: string;
+    name: string;
+    settings: ExportSettings;
+    cropRect: CropRect;
+    updatedAt: string;
   };
 
   type CropRect = { x: number; y: number; width: number; height: number };
@@ -59,7 +67,6 @@
     gps: string | null;
   };
 
-  const SETTINGS_KEY = 'culoca-download-settings-v1';
   const DEFAULT_SETTINGS: ExportSettings = {
     sizeMode: 'full',
     width: Math.max(512, data?.image?.width || 2048),
@@ -69,8 +76,7 @@
     format: 'jpg',
     quality: null,
     metadataMode: 'original',
-    filenameMode: 'original',
-    remember: true
+    filenameMode: 'original'
   };
 
   let image = data?.image ?? null;
@@ -100,6 +106,13 @@
   let previewMetrics: PreviewMetrics = { left: 0, top: 0, width: 1, height: 1 };
   let handleWindowResize: (() => void) | null = null;
   let previewResizeObserver: ResizeObserver | null = null;
+  let downloadPresets: DownloadPreset[] = [];
+  let downloadPresetsLoading = false;
+  let downloadPresetsError = '';
+  let downloadPresetsStatus = '';
+  let isSavingPreset = false;
+  let activePresetId = '';
+  let lastPresetUserId = '';
   let metadataPreviewKey = '';
   let metadataPreview: MetadataPreview = {
     title: null,
@@ -136,6 +149,21 @@
 
   $: if (browser && image?.id && currentUser?.id) {
     unifiedRightsStore.loadRights(image.id);
+  }
+
+  $: if (browser) {
+    const nextUserId = currentUser?.id || '';
+
+    if (!nextUserId) {
+      lastPresetUserId = '';
+      downloadPresets = [];
+      downloadPresetsError = '';
+      downloadPresetsStatus = '';
+      activePresetId = '';
+    } else if (nextUserId !== lastPresetUserId) {
+      lastPresetUserId = nextUserId;
+      loadDownloadPresets(nextUserId);
+    }
   }
 
   $: if (settings.format === 'webp') {
@@ -404,7 +432,7 @@
       return '';
     }
 
-    return `Ausschnitt wird um ${upscaleFactor.toFixed(1)}x hochskaliert, die eingestellte Aufloesung wird nicht nativ erreicht.`;
+    return `Ausschnitt wird um ${upscaleFactor.toFixed(1)}x hochskaliert, Auflösung wird nicht nativ erreicht.`;
   }
 
   function firstText(...values: Array<unknown>) {
@@ -719,43 +747,184 @@
     }, 350);
   }
 
-  function readRememberedSettings() {
-    if (!browser) return;
-    const raw = localStorage.getItem(SETTINGS_KEY);
-    if (!raw) return;
+  function createPresetId() {
+    if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+      return crypto.randomUUID();
+    }
+    return `preset-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  }
+
+  function sanitizeCropRect(value: unknown): CropRect {
+    const rect = value as Partial<CropRect> | null;
+    return clampRect({
+      x: Number(rect?.x ?? 0.1),
+      y: Number(rect?.y ?? 0.1),
+      width: Number(rect?.width ?? 0.8),
+      height: Number(rect?.height ?? 0.8)
+    });
+  }
+
+  function sanitizeExportSettings(value: unknown): ExportSettings {
+    const parsed = (value && typeof value === 'object' ? value : {}) as Partial<ExportSettings>;
+    const format = parsed.format === 'webp' ? 'webp' : 'jpg';
+    const metadataMode =
+      format === 'jpg' && (parsed.metadataMode === 'culoca' || parsed.metadataMode === 'none')
+        ? parsed.metadataMode
+        : format === 'jpg'
+          ? 'original'
+          : 'none';
+    const aspectRatio =
+      parsed.aspectRatio &&
+      ['original', 'free', '1:1', '2:1', '3:2', '2:3', '5:4', '4:5', '16:9', '9:16', 'open_graph'].includes(parsed.aspectRatio)
+        ? parsed.aspectRatio
+        : DEFAULT_SETTINGS.aspectRatio;
+
+    return {
+      ...DEFAULT_SETTINGS,
+      ...parsed,
+      sizeMode: parsed.sizeMode === 'custom' ? 'custom' : 'full',
+      width: Math.max(32, Number(parsed.width ?? DEFAULT_SETTINGS.width)),
+      height: Math.max(32, Number(parsed.height ?? DEFAULT_SETTINGS.height)),
+      aspectRatio: aspectRatio as AspectRatioPreset,
+      cropEnabled: Boolean(parsed.cropEnabled),
+      format,
+      quality:
+        parsed.quality == null
+          ? null
+          : Math.max(25, Math.min(85, Number(parsed.quality))),
+      metadataMode,
+      filenameMode: parsed.filenameMode === 'web' ? 'web' : 'original'
+    };
+  }
+
+  function sanitizePreset(value: unknown): DownloadPreset | null {
+    if (!value || typeof value !== 'object') return null;
+    const parsed = value as Record<string, unknown>;
+    const rawName = typeof parsed.name === 'string' ? parsed.name.trim() : '';
+
+    if (!rawName) return null;
+
+    return {
+      id: typeof parsed.id === 'string' && parsed.id.trim() ? parsed.id : createPresetId(),
+      name: rawName.slice(0, 80),
+      settings: sanitizeExportSettings(parsed.settings),
+      cropRect: sanitizeCropRect(parsed.cropRect),
+      updatedAt: typeof parsed.updatedAt === 'string' && parsed.updatedAt ? parsed.updatedAt : new Date().toISOString()
+    };
+  }
+
+  async function loadDownloadPresets(userId: string) {
+    downloadPresetsLoading = true;
+    downloadPresetsError = '';
 
     try {
-      const parsed = JSON.parse(raw) as Partial<ExportSettings>;
-      settings = {
-        ...DEFAULT_SETTINGS,
-        ...parsed,
-        width: Math.max(32, Number(parsed.width || DEFAULT_SETTINGS.width)),
-        height: Math.max(32, Number(parsed.height || DEFAULT_SETTINGS.height)),
-        quality:
-          parsed.quality == null
-            ? null
-            : Math.max(25, Math.min(85, Number(parsed.quality))),
-        remember: true
-      };
-    } catch {
-      localStorage.removeItem(SETTINGS_KEY);
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('download_presets')
+        .eq('id', userId)
+        .single();
+
+      if (error) throw error;
+
+      const presets = Array.isArray(data?.download_presets)
+        ? data.download_presets.map((entry: unknown) => sanitizePreset(entry)).filter(Boolean) as DownloadPreset[]
+        : [];
+
+      downloadPresets = presets.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    } catch (error) {
+      console.error('Download presets could not be loaded:', error);
+      downloadPresets = [];
+      downloadPresetsError = 'Eigene Einstellungen konnten nicht geladen werden.';
+    } finally {
+      downloadPresetsLoading = false;
     }
   }
 
-  function persistRememberedSettings() {
-    if (!browser) return;
-    if (!settings.remember) {
-      localStorage.removeItem(SETTINGS_KEY);
+  async function saveDownloadPresets(nextPresets: DownloadPreset[], statusMessage = '') {
+    if (!currentUser?.id) return false;
+
+    const payload = nextPresets.map((preset) => ({
+      id: preset.id,
+      name: preset.name,
+      settings: preset.settings,
+      cropRect: preset.cropRect,
+      updatedAt: preset.updatedAt
+    }));
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        download_presets: payload,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', currentUser.id);
+
+    if (error) {
+      console.error('Download presets could not be saved:', error);
+      downloadPresetsError = 'Eigene Einstellungen konnten nicht gespeichert werden.';
+      return false;
+    }
+
+    downloadPresets = nextPresets;
+    downloadPresetsError = '';
+    downloadPresetsStatus = statusMessage;
+    return true;
+  }
+
+  async function handleSavePreset() {
+    if (!browser || !currentUser?.id || isSavingPreset) return;
+
+    const presetName = window.prompt('Name für diese Einstellungen');
+    const trimmedName = presetName?.trim();
+
+    if (!trimmedName) {
       return;
     }
 
-    localStorage.setItem(
-      SETTINGS_KEY,
-      JSON.stringify({
-        ...settings,
-        metadataMode: settings.format === 'jpg' ? settings.metadataMode : 'none'
-      })
-    );
+    isSavingPreset = true;
+    downloadPresetsStatus = '';
+    downloadPresetsError = '';
+
+    const nextPreset: DownloadPreset = {
+      id: createPresetId(),
+      name: trimmedName.slice(0, 80),
+      settings: sanitizeExportSettings(settings),
+      cropRect: sanitizeCropRect(cropRect),
+      updatedAt: new Date().toISOString()
+    };
+    const dedupedPresets = downloadPresets.filter((preset) => preset.name.toLowerCase() !== nextPreset.name.toLowerCase());
+    const nextPresets = [nextPreset, ...dedupedPresets].slice(0, 10);
+    const saved = await saveDownloadPresets(nextPresets, 'Einstellungen gespeichert.');
+
+    if (saved) {
+      activePresetId = nextPreset.id;
+    }
+
+    isSavingPreset = false;
+  }
+
+  function applyPreset(preset: DownloadPreset) {
+    settings = sanitizeExportSettings(preset.settings);
+    cropRect = sanitizeCropRect(preset.cropRect);
+    activePresetId = preset.id;
+    downloadPresetsStatus = `Einstellung „${preset.name}“ übernommen.`;
+    downloadPresetsError = '';
+  }
+
+  async function deletePreset(presetId: string) {
+    if (!browser || !currentUser?.id) return;
+
+    const nextPresets = downloadPresets.filter((preset) => preset.id !== presetId);
+    const deletedPreset = downloadPresets.find((preset) => preset.id === presetId);
+    const saved = await saveDownloadPresets(nextPresets, 'Einstellung gelöscht.');
+
+    if (saved && activePresetId === presetId) {
+      activePresetId = '';
+    }
+
+    if (saved && deletedPreset) {
+      downloadPresetsStatus = `Einstellung „${deletedPreset.name}“ gelöscht.`;
+    }
   }
 
   function pointerToNormalized(event: PointerEvent) {
@@ -942,10 +1111,6 @@
     settings.quality = checked ? null : 75;
   }
 
-  function touchSettings() {
-    settings = { ...settings };
-  }
-
   function setFormat(format: ExportSettings['format']) {
     settings = { ...settings, format };
   }
@@ -992,7 +1157,6 @@
   }
 
   onMount(() => {
-    readRememberedSettings();
     cropRect = centeredCropRect(getAspectRatioValue());
     window.addEventListener('pointermove', handlePointerMove);
     window.addEventListener('pointerup', handlePointerUp);
@@ -1021,8 +1185,6 @@
     previewResizeObserver?.disconnect();
     if (estimateTimer) clearTimeout(estimateTimer);
   });
-
-  $: persistRememberedSettings();
 </script>
 
 <svelte:head>
@@ -1123,6 +1285,43 @@
               <input type="checkbox" bind:checked={settings.cropEnabled} on:change={handleCropToggle} />
               Zuschnitt aktivieren
             </label>
+
+            {#if currentUser}
+              <div class="preset-panel">
+                <div class="preset-panel-header">
+                  <h3>Eigene Einstellungen</h3>
+                  <button class="preset-save-btn" type="button" on:click={handleSavePreset} disabled={isSavingPreset}>
+                    {isSavingPreset ? 'Speichert...' : 'Einstellungen speichern'}
+                  </button>
+                </div>
+
+                {#if downloadPresetsLoading}
+                  <p class="preset-note">Eigene Einstellungen werden geladen...</p>
+                {:else if downloadPresets.length > 0}
+                  <div class="preset-list">
+                    {#each downloadPresets as preset (preset.id)}
+                      <div class={`preset-item ${activePresetId === preset.id ? 'is-active' : ''}`}>
+                        <button class="preset-apply-btn" type="button" on:click={() => applyPreset(preset)}>
+                          {preset.name}
+                        </button>
+                        <button class="preset-delete-btn" type="button" on:click={() => deletePreset(preset.id)} aria-label={`${preset.name} löschen`}>
+                          X
+                        </button>
+                      </div>
+                    {/each}
+                  </div>
+                {:else}
+                  <p class="preset-note">Noch keine eigenen Einstellungen gespeichert.</p>
+                {/if}
+
+                {#if downloadPresetsStatus}
+                  <p class="preset-status">{downloadPresetsStatus}</p>
+                {/if}
+                {#if downloadPresetsError}
+                  <p class="preset-error">{downloadPresetsError}</p>
+                {/if}
+              </div>
+            {/if}
           {/if}
         </div>
 
@@ -1171,11 +1370,6 @@
             <label><input type="radio" checked={settings.filenameMode === 'web'} on:change={() => setFilenameMode('web')} /> Webtaugliche Dateibenennung + culoca-{image?.short_id || image?.id?.slice(0, 10)}</label>
           </div>
         </div>
-
-        <label class="checkbox remember-box">
-          <input type="checkbox" bind:checked={settings.remember} />
-          Einstellungen merken
-        </label>
 
         <div class="actions">
           <button class="secondary-btn" type="button" on:click={goBack}>Abbrechen</button>
@@ -1538,10 +1732,100 @@
     accent-color: #ee7221;
   }
 
-  .remember-box {
-    margin-top: 1.4rem;
-    padding-top: 1rem;
+  .preset-panel {
+    margin-top: 1rem;
+    display: grid;
+    gap: 0.8rem;
     border-top: 1px solid var(--download-border-soft);
+    padding-top: 1rem;
+  }
+
+  .preset-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .preset-panel h3 {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 700;
+  }
+
+  .preset-save-btn,
+  .preset-apply-btn,
+  .preset-delete-btn {
+    font: inherit;
+    border: 1px solid var(--download-border);
+    background: var(--download-input);
+    color: inherit;
+  }
+
+  .preset-save-btn {
+    border-radius: 999px;
+    padding: 0.55rem 0.95rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .preset-save-btn:disabled {
+    opacity: 0.7;
+    cursor: wait;
+  }
+
+  .preset-list {
+    display: grid;
+    gap: 0.55rem;
+  }
+
+  .preset-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .preset-item.is-active .preset-apply-btn {
+    border-color: rgba(238, 114, 33, 0.55);
+    box-shadow: 0 0 0 2px rgba(238, 114, 33, 0.12);
+  }
+
+  .preset-apply-btn {
+    width: 100%;
+    border-radius: 12px;
+    padding: 0.7rem 0.9rem;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .preset-delete-btn {
+    border-radius: 12px;
+    width: 2.5rem;
+    min-width: 2.5rem;
+    height: 2.5rem;
+    cursor: pointer;
+    font-weight: 700;
+  }
+
+  .preset-note,
+  .preset-status,
+  .preset-error {
+    margin: 0;
+    font-size: 0.92rem;
+  }
+
+  .preset-note {
+    color: var(--download-text-soft);
+  }
+
+  .preset-status {
+    color: var(--download-text-soft);
+  }
+
+  .preset-error {
+    color: var(--download-error);
   }
 
   .metadata-preview-card {
