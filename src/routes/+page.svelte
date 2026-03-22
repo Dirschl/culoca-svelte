@@ -187,7 +187,7 @@
 
   function getNotificationHref(entry: any) {
     if (entry?.event_type === 'chat_message' && entry?.payload?.conversation_id) {
-      return `/?conversation=${encodeURIComponent(entry.payload.conversation_id)}`;
+      return `/chat?conversation=${encodeURIComponent(entry.payload.conversation_id)}`;
     }
 
     if (entry?.event_type === 'follow_create' && entry?.actor?.accountname) {
@@ -249,7 +249,7 @@
         title: entry.otherUser?.full_name || entry.otherUser?.accountname || 'Unbekannt',
         subtitle: entry.starter_item?.title || entry.starter_item?.original_name || 'Gespräch',
         preview: truncate(entry.last_message_preview, 120) || 'Neue Nachricht ansehen',
-        href: `/?conversation=${encodeURIComponent(entry.id)}`,
+        href: `/chat?conversation=${encodeURIComponent(entry.id)}`,
         thumbUrl: entry.starter_item ? getItemPreviewUrl(entry.starter_item) : '',
         fallback: (entry.otherUser?.full_name || entry.otherUser?.accountname || '?').slice(0, 1).toUpperCase()
       })),
@@ -301,7 +301,7 @@
         title: entry.full_name || entry.accountname || 'Profil',
         subtitle: 'Direktnachricht',
         preview: 'Schnell wieder in den Chat einsteigen',
-        href: `/?chatWith=${encodeURIComponent(entry.id)}`,
+        href: `/chat?chatWith=${encodeURIComponent(entry.id)}`,
         thumbUrl: getAvatarUrl(entry),
         fallback: (entry.full_name || entry.accountname || '?').slice(0, 1).toUpperCase()
       }))
@@ -722,7 +722,7 @@
     await markConversationRead(conversation);
 
     if (updateUrl) {
-      await goto(`/?conversation=${encodeURIComponent(conversation.id)}`, {
+      await goto(`/chat?conversation=${encodeURIComponent(conversation.id)}`, {
         replaceState: true,
         noScroll: true,
         keepFocus: true
@@ -1120,7 +1120,7 @@
               <p class="dashboard-copy">Nachrichten zuerst. Danach folgen Reaktionen, Netzwerk und deine wichtigsten Sprünge.</p>
             </div>
             <div class="dashboard-actions">
-              <a href="#startseite-inbox" class="btn-primary">Nachrichten</a>
+              <a href="/chat" class="btn-primary">Nachrichten</a>
               <a href="/galerie" class="btn-secondary">Galerie</a>
               <a href={publicProfileHref} class="btn-secondary">Öffentliches Profil</a>
             </div>
@@ -1267,7 +1267,7 @@
                   <span class="dashboard-kicker">Netzwerk</span>
                   <h2>Menschen finden</h2>
                 </div>
-                <a href="/#startseite-inbox">Inbox</a>
+                <a href="/chat">Inbox</a>
               </div>
 
               <div class="dashboard-search__bar">
@@ -1320,7 +1320,7 @@
                       </div>
 
                       <div class="dashboard-entry__actions">
-                        <a class="dashboard-inline-action" href={`/?chatWith=${encodeURIComponent(profile.id)}`}>
+                        <a class="dashboard-inline-action" href={`/chat?chatWith=${encodeURIComponent(profile.id)}`}>
                           Chat
                         </a>
                         {#if profile.accountname}
@@ -1351,7 +1351,7 @@
                 <span class="dashboard-kicker">Jetzt wichtig</span>
                 <h2>Priorisierte Übersicht</h2>
               </div>
-                <a href="/#startseite-inbox">Inbox</a>
+                <a href="/chat">Inbox</a>
             </div>
 
             {#if dashboardLoading && filteredDashboardPriorityFeed.length === 0}
@@ -1401,7 +1401,7 @@
                   <span class="dashboard-kicker">Nachrichten</span>
                   <h2>Letzte Gespräche</h2>
                 </div>
-                <a href="/#startseite-inbox">Alle ansehen</a>
+                <a href="/chat">Alle ansehen</a>
               </div>
 
               {#if dashboardLoading && dashboardConversations.length === 0}
@@ -1456,7 +1456,7 @@
                   <span class="dashboard-kicker">Aktivität</span>
                   <h2>Neue Reaktionen</h2>
                 </div>
-                <a href="/#startseite-inbox">{dashboardUnreadCount > 0 ? `${dashboardUnreadCount} neu` : 'Inbox'}</a>
+                <a href="/chat">{dashboardUnreadCount > 0 ? `${dashboardUnreadCount} neu` : 'Inbox'}</a>
               </div>
 
               {#if dashboardLoading && dashboardNotifications.length === 0}
@@ -1624,7 +1624,7 @@
               {:else if dashboardFollowedProfiles.length > 0}
                 <div class="dashboard-list">
                   {#each dashboardFollowedProfiles as profile (profile.id)}
-                    <a class="dashboard-entry dashboard-entry--link" href={`/?chatWith=${encodeURIComponent(profile.id)}`}>
+                    <a class="dashboard-entry dashboard-entry--link" href={`/chat?chatWith=${encodeURIComponent(profile.id)}`}>
                       {#if getAvatarUrl(profile)}
                         <img
                           class="dashboard-entry__thumb"
@@ -1707,7 +1707,7 @@
           </div>
 
           <section class="dashboard-shortcuts">
-            <a class="dashboard-shortcut" href="/#startseite-inbox">
+            <a class="dashboard-shortcut" href="/chat">
               <strong>Inbox</strong>
               <span>Gespräche direkt oben auf der Startseite öffnen und beantworten.</span>
             </a>

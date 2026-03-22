@@ -579,7 +579,7 @@
 
   async function startConversationWith(userId: string) {
     if (!userId) return;
-    await goto(`/?chatWith=${encodeURIComponent(userId)}`);
+    await goto(`/chat?chatWith=${encodeURIComponent(userId)}`);
   }
 
   function buildParticipantKey(firstUserId: string, secondUserId: string) {
@@ -605,7 +605,7 @@
 
   function getConversationHref(entry: any) {
     if (!entry?.id) return '/';
-    return `/?conversation=${encodeURIComponent(entry.id)}`;
+    return `/chat?conversation=${encodeURIComponent(entry.id)}`;
   }
 
   async function loadConversations(preferredConversationId: string | null = null) {
@@ -1105,7 +1105,7 @@
 
   function getNotificationHref(entry: any) {
     if (entry?.event_type === 'chat_message' && entry?.payload?.conversation_id) {
-      return `/?conversation=${encodeURIComponent(entry.payload.conversation_id)}`;
+      return `/chat?conversation=${encodeURIComponent(entry.payload.conversation_id)}`;
     }
 
     if (entry?.event_type === 'follow_create' && entry?.actor?.accountname) {
@@ -1679,7 +1679,7 @@
             </h3>
             <p class="help-text">Die Inbox liegt jetzt auf der Startseite und steht dort ganz oben.</p>
             <div class="review-actions">
-              <a class="review-link" href="/#startseite-inbox">Inbox auf der Startseite öffnen</a>
+              <a class="review-link" href="/chat">Inbox öffnen</a>
               <a class="review-link review-link--secondary" href="/#menschen-finden">Neuen Chat starten</a>
             </div>
           </div>

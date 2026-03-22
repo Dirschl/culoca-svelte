@@ -18,6 +18,8 @@
   let lastInboxRefreshKey = '';
   let liveInboxChannels: any[] = [];
   let liveInboxChannelKey = '';
+  let chatDrawerOpen = false;
+  let chatDrawerSrc = '/chat?embed=1';
 
   const navLinks = [
     { href: '/foto', label: 'Fotos' },
@@ -49,6 +51,7 @@
   ];
 
   const userLinks = [
+    { href: '/chat', label: 'Chat' },
     { href: '/settings', label: 'Einstellungen' },
     { href: '/standort', label: 'Standort' },
     { href: '/profile', label: 'Profil' },
@@ -58,9 +61,10 @@
   ];
 
   $: currentPath = $page.url.pathname;
+  $: isChatRoute = isActive('/chat');
   $: displayName = $customerBranding?.fullName || $customerBranding?.accountName || '';
   $: userMenuLabel = $isAuthenticated && displayName ? displayName : ($isAuthenticated ? 'Konto' : 'Login');
-  $: userMenuActive = isActive('/settings') || isActive('/standort') || isActive('/profile') || isActive('/profile/freigaben') || isActive('/login') || ($hasAdminPermission && adminLinks.some(l => isActive(l.href)));
+  $: userMenuActive = isActive('/chat') || isActive('/settings') || isActive('/standort') || isActive('/profile') || isActive('/profile/freigaben') || isActive('/login') || ($hasAdminPermission && adminLinks.some(l => isActive(l.href)));
   $: inheritedReturnTo = sanitizeReturnTo($page.url.searchParams.get('returnTo'), currentPathWithSearch($page.url));
   $: {
     const nextInboxKey = `${$isAuthenticated ? 'auth' : 'anon'}:${$currentUserId || 'none'}:${currentPath}`;
@@ -234,6 +238,47 @@
     openDropdown = null;
   }
 
+  function buildChatDrawerSrc(options?: { chatWith?: string; conversation?: string; item?: string }) {
+    const params = new URLSearchParams();
+    params.set('embed', '1');
+
+    if (options?.chatWith) params.set('chatWith', options.chatWith);
+    if (options?.conversation) params.set('conversation', options.conversation);
+    if (options?.item) params.set('item', options.item);
+
+    return `/chat?${params.toString()}`;
+  }
+
+  function openChatDrawer(options?: { chatWith?: string; conversation?: string; item?: string }) {
+    if (!$isAuthenticated) {
+      goto('/login');
+      return;
+    }
+
+    if (isChatRoute) {
+      const params = new URLSearchParams();
+      if (options?.chatWith) params.set('chatWith', options.chatWith);
+      if (options?.conversation) params.set('conversation', options.conversation);
+      if (options?.item) params.set('item', options.item);
+      const nextHref = params.toString() ? `/chat?${params.toString()}` : '/chat';
+      goto(nextHref);
+      return;
+    }
+
+    chatDrawerSrc = buildChatDrawerSrc(options);
+    chatDrawerOpen = true;
+    mobileOpen = false;
+    openDropdown = null;
+  }
+
+  function closeChatDrawer() {
+    chatDrawerOpen = false;
+  }
+
+  function handleChatLauncherClick() {
+    openChatDrawer();
+  }
+
   function handleUserMenuClick() {
     if (!$isAuthenticated) {
       goto('/login');
@@ -272,8 +317,21 @@
       }
     };
     document.addEventListener('click', handler);
+    const handleKeydown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && chatDrawerOpen) {
+        closeChatDrawer();
+      }
+    };
+    const handleOpenChat = (event: Event) => {
+      const customEvent = event as CustomEvent<{ chatWith?: string; conversation?: string; item?: string }>;
+      openChatDrawer(customEvent.detail || undefined);
+    };
+    document.addEventListener('keydown', handleKeydown);
+    window.addEventListener('culoca:open-chat', handleOpenChat as EventListener);
     return () => {
       document.removeEventListener('click', handler);
+      document.removeEventListener('keydown', handleKeydown);
+      window.removeEventListener('culoca:open-chat', handleOpenChat as EventListener);
       teardownLiveInboxChannels();
     };
   });
@@ -284,6 +342,10 @@
       liveInboxChannelKey = nextLiveInboxChannelKey;
       setupLiveInboxChannels();
     }
+  }
+
+  $: if (isChatRoute && chatDrawerOpen) {
+    chatDrawerOpen = false;
   }
 </script>
 
@@ -411,7 +473,7 @@
                 {#if link.href === '/profile/review' && reviewCount > 0}
                   <span class="review-badge review-badge--inline">{reviewCount}</span>
                 {/if}
-                {#if link.href === '/profile' && inboxCount > 0}
+                {#if link.href === '/chat' && inboxCount > 0}
                   <span class="inbox-badge inbox-badge--inline">{inboxCount}</span>
                 {/if}
                 {#if link.href === '/profile' && followerAlertCount > 0}
@@ -450,7 +512,7 @@
               {#if link.href === '/profile/review' && reviewCount > 0}
                 <span class="review-badge review-badge--inline">{reviewCount}</span>
               {/if}
-              {#if link.href === '/profile' && inboxCount > 0}
+              {#if link.href === '/chat' && inboxCount > 0}
                 <span class="inbox-badge inbox-badge--inline">{inboxCount}</span>
               {/if}
               {#if link.href === '/profile' && followerAlertCount > 0}
@@ -499,6 +561,48 @@
   {/if}
 </nav>
 
+{#if $isAuthenticated && !isChatRoute}
+  <button
+    type="button"
+    class="chat-launcher"
+    aria-label="Chat öffnen"
+    aria-expanded={chatDrawerOpen}
+    on:click={handleChatLauncherClick}
+  >
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M6.5 18.5L3.5 20l1.2-3.7A7.8 7.8 0 0 1 4 13c0-4.4 4-8 9-8s9 3.6 9 8-4 8-9 8c-1.5 0-2.9-.3-4.1-.9H6.5z" />
+      <path d="M8.5 11.5h9" />
+      <path d="M8.5 15.5h6" />
+    </svg>
+    <span>Chat</span>
+    {#if inboxCount > 0}
+      <span class="chat-launcher__badge">{inboxCount}</span>
+    {/if}
+  </button>
+{/if}
+
+{#if chatDrawerOpen && $isAuthenticated && !isChatRoute}
+  <button type="button" class="chat-drawer-backdrop" aria-label="Chat schließen" on:click={closeChatDrawer}></button>
+  <aside class="chat-drawer" aria-label="Chat">
+    <div class="chat-drawer__header">
+      <div>
+        <strong>Chat</strong>
+        <span>Nachrichten zentral von überall</span>
+      </div>
+      <div class="chat-drawer__actions">
+        <a href="/chat" class="chat-drawer__link" on:click={closeChatDrawer}>Vollansicht</a>
+        <button type="button" class="chat-drawer__close" aria-label="Schließen" on:click={closeChatDrawer}>×</button>
+      </div>
+    </div>
+    <iframe
+      class="chat-drawer__frame"
+      src="/chat?embed=1"
+      title="Culoca Chat"
+      loading="lazy"
+    ></iframe>
+  </aside>
+{/if}
+
 <style>
   .site-nav {
     position: sticky;
@@ -517,6 +621,135 @@
     align-items: center;
     justify-content: space-between;
     gap: 2rem;
+  }
+
+  .chat-launcher {
+    position: fixed;
+    right: 1.25rem;
+    bottom: 1.25rem;
+    z-index: 240;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.85rem 1rem;
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--culoca-orange) 24%, var(--border-color));
+    background: color-mix(in srgb, var(--bg-primary) 82%, transparent);
+    backdrop-filter: blur(18px) saturate(1.25);
+    -webkit-backdrop-filter: blur(18px) saturate(1.25);
+    color: var(--text-primary);
+    box-shadow: 0 18px 38px rgba(15, 23, 42, 0.18);
+    cursor: pointer;
+  }
+
+  .chat-launcher:hover {
+    border-color: color-mix(in srgb, var(--culoca-orange) 48%, var(--border-color));
+    color: var(--culoca-orange);
+  }
+
+  .chat-launcher svg {
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .chat-launcher__badge {
+    min-width: 1.5rem;
+    height: 1.5rem;
+    padding: 0 0.35rem;
+    border-radius: 999px;
+    background: var(--culoca-orange);
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.78rem;
+    font-weight: 700;
+  }
+
+  .chat-drawer-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 245;
+    border: 0;
+    background: rgba(15, 23, 42, 0.32);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
+
+  .chat-drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    z-index: 250;
+    width: min(960px, 100vw);
+    height: 100dvh;
+    display: grid;
+    grid-template-rows: auto 1fr;
+    background: var(--bg-primary);
+    border-left: 1px solid var(--border-color);
+    box-shadow: -18px 0 48px rgba(15, 23, 42, 0.24);
+  }
+
+  .chat-drawer__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.95rem 1rem;
+    border-bottom: 1px solid var(--border-color);
+    background: color-mix(in srgb, var(--bg-primary) 90%, transparent);
+  }
+
+  .chat-drawer__header strong,
+  .chat-drawer__header span {
+    display: block;
+  }
+
+  .chat-drawer__header span {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+  }
+
+  .chat-drawer__actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .chat-drawer__link,
+  .chat-drawer__close {
+    border: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border-radius: 999px;
+    padding: 0.55rem 0.9rem;
+    font: inherit;
+    text-decoration: none;
+    cursor: pointer;
+  }
+
+  .chat-drawer__link:hover,
+  .chat-drawer__close:hover {
+    border-color: color-mix(in srgb, var(--culoca-orange) 40%, var(--border-color));
+    color: var(--culoca-orange);
+  }
+
+  .chat-drawer__close {
+    min-width: 2.5rem;
+    font-size: 1.15rem;
+    line-height: 1;
+  }
+
+  .chat-drawer__frame {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    background: var(--bg-primary);
   }
 
   /* Logo */

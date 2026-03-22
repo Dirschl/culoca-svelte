@@ -158,7 +158,7 @@
           <button
             class="square-btn chat-btn"
             on:click={onStartChat}
-            title="Nachricht zum Item schreiben"
+            title="Nachricht an den Ersteller"
           >
             <svg
               width="30"

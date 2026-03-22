@@ -1747,6 +1747,18 @@ let showRightsManager = false;
       return;
     }
 
+    if (browser) {
+      window.dispatchEvent(
+        new CustomEvent('culoca:open-chat', {
+          detail: {
+            chatWith: creatorUserId,
+            item: image?.id || undefined
+          }
+        })
+      );
+      return;
+    }
+
     const params = new URLSearchParams({
       chatWith: creatorUserId
     });
@@ -1755,7 +1767,7 @@ let showRightsManager = false;
       params.set('item', image.id);
     }
 
-    await goto(`/profile?${params.toString()}`);
+    await goto(`/chat?${params.toString()}`);
   }
   function formatFileSize(bytes: number | null | undefined) {
     if (!bytes) return '';
@@ -4078,7 +4090,7 @@ let showRightsManager = false;
                   targetLabel={image.profile.full_name || image.profile.accountname || 'Profil'}
                 />
                 <button type="button" class="creator-chat-btn" on:click={startCreatorChat}>
-                  Nachricht schreiben
+                  Nachricht an den Ersteller
                 </button>
               {/if}
             </div>
