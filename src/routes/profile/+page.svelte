@@ -1,6 +1,6 @@
 <script lang="ts">
   import { supabase } from '$lib/supabaseClient';
-  import { onDestroy, onMount } from 'svelte';
+  import { onDestroy, onMount, tick } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import SiteNav from '$lib/SiteNav.svelte';
@@ -74,6 +74,7 @@
   let messageStatus = '';
   let liveChannels: any[] = [];
   let activeMessageChannel: any = null;
+  let messageListElement: HTMLDivElement | null = null;
 
   $: nameValid = name.length >= 2 && name.length <= 60;
   $: phoneValid = phone.length === 0 || /^\+?[0-9\- ]{7,20}$/.test(phone);
@@ -611,6 +612,7 @@
         ...entry,
         item: entry.items || null
       }));
+      await scrollMessagesToBottom();
     } catch (error) {
       console.error('Error loading conversation messages:', error);
       conversationMessages = [];
@@ -838,6 +840,7 @@
         }
       ];
       messageDraft = '';
+      await scrollMessagesToBottom();
 
       conversations = conversations
         .map((entry: any) =>
@@ -892,6 +895,19 @@
     } finally {
       messageSendLoading = false;
     }
+  }
+
+  async function scrollMessagesToBottom() {
+    await tick();
+    if (messageListElement) {
+      messageListElement.scrollTop = messageListElement.scrollHeight;
+    }
+  }
+
+  async function handleMessageKeydown(event: KeyboardEvent) {
+    if (event.key !== 'Enter' || event.shiftKey) return;
+    event.preventDefault();
+    await sendMessage();
   }
 
   function getItemPreviewUrl(item: any) {
@@ -1478,7 +1494,7 @@
                       {#if messagesLoading}
                         <p class="help-text">Nachrichten werden geladen...</p>
                       {:else if conversationMessages.length > 0}
-                        <div class="message-list">
+                        <div class="message-list" bind:this={messageListElement}>
                           {#each conversationMessages as entry}
                             <div class="message-bubble" class:is-own={entry.sender_user_id === user.id}>
                               <p>{entry.body}</p>
@@ -1500,6 +1516,7 @@
                           bind:value={messageDraft}
                           rows="4"
                           placeholder="Nachricht schreiben..."
+                          on:keydown={handleMessageKeydown}
                         />
                         <div class="chat-compose__actions">
                           {#if messageStatus}
