@@ -673,6 +673,12 @@ let showRightsManager = false;
   let likeLoading = false;
   let likeStatus = '';
   let lastLikeKey = '';
+  let comments: any[] = [];
+  let commentsLoading = false;
+  let commentDraft = '';
+  let commentLoading = false;
+  let commentStatus = '';
+  let lastCommentItemId = '';
   
   // Function to initialize GPS if not available
   async function initializeGpsIfNeeded() {
@@ -741,6 +747,7 @@ let showRightsManager = false;
 
       if (image?.id) {
         await loadFavoriteState();
+        await loadComments();
       }
 
       // Initialize slider progress
@@ -819,6 +826,16 @@ let showRightsManager = false;
       }
     } catch (error) {
       console.error('[Item Detail] Error logging item view:', error);
+    }
+  }
+
+  $: if (image?.id && image.id !== lastCommentItemId) {
+    lastCommentItemId = image.id;
+    comments = [];
+    commentDraft = '';
+    commentStatus = '';
+    if (browser) {
+      void loadComments();
     }
   }
 
@@ -927,6 +944,162 @@ let showRightsManager = false;
       });
     } catch (error) {
       console.warn('Failed to log like event:', error);
+    }
+  }
+
+  async function logCommentEvent(eventType: 'comment_create' | 'comment_delete', commentId: string) {
+    if (!currentUser?.id || !image?.id) return;
+
+    try {
+      await supabase.from('item_events').insert({
+        item_id: image.id,
+        actor_user_id: currentUser.id,
+        owner_user_id: image.profile_id || image.user_id || null,
+        event_type: eventType,
+        source: 'item_detail',
+        metadata: {
+          comment_id: commentId,
+          canonical_path: canonicalPath || image.canonical_path || null
+        }
+      });
+    } catch (error) {
+      console.warn('Failed to log comment event:', error);
+    }
+  }
+
+  async function loadComments() {
+    if (!image?.id) {
+      comments = [];
+      return;
+    }
+
+    commentsLoading = true;
+
+    try {
+      const { data, error } = await supabase
+        .from('item_comments')
+        .select(`
+          id,
+          body,
+          status,
+          created_at,
+          user_id,
+          profiles!inner(
+            full_name,
+            accountname,
+            avatar_url
+          )
+        `)
+        .eq('item_id', image.id)
+        .eq('status', 'visible')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      comments = data || [];
+    } catch (error) {
+      console.error('Failed to load comments:', error);
+      comments = [];
+    } finally {
+      commentsLoading = false;
+    }
+  }
+
+  function getCommentAuthor(comment: any) {
+    return comment?.profiles?.full_name || comment?.profiles?.accountname || 'Unbekannt';
+  }
+
+  function getCommentAvatarUrl(comment: any) {
+    const avatarUrl = comment?.profiles?.avatar_url;
+    if (!avatarUrl) return '';
+    if (String(avatarUrl).startsWith('http')) return avatarUrl;
+    return `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/avatars/${avatarUrl}`;
+  }
+
+  function formatCommentDate(value: string | null | undefined) {
+    if (!value) return '';
+    return new Date(value).toLocaleString('de-DE', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  }
+
+  async function submitComment() {
+    const body = commentDraft.trim();
+
+    if (!image?.id) return;
+
+    if (!currentUser?.id) {
+      const returnTo = browser ? `${window.location.pathname}${window.location.search}` : canonicalPath || '/';
+      await goto(`/login?returnTo=${encodeURIComponent(returnTo)}`);
+      return;
+    }
+
+    if (!body) {
+      commentStatus = 'Bitte zuerst einen Kommentar eingeben.';
+      return;
+    }
+
+    commentLoading = true;
+    commentStatus = '';
+
+    try {
+      const { data, error } = await supabase
+        .from('item_comments')
+        .insert({
+          item_id: image.id,
+          user_id: currentUser.id,
+          body,
+          status: 'visible'
+        })
+        .select(`
+          id,
+          body,
+          status,
+          created_at,
+          user_id,
+          profiles!inner(
+            full_name,
+            accountname,
+            avatar_url
+          )
+        `)
+        .single();
+
+      if (error) throw error;
+
+      comments = [data, ...comments];
+      commentDraft = '';
+      commentStatus = 'Kommentar gespeichert.';
+      await logCommentEvent('comment_create', data.id);
+    } catch (error) {
+      console.error('Failed to save comment:', error);
+      commentStatus = 'Kommentar konnte nicht gespeichert werden.';
+    } finally {
+      commentLoading = false;
+    }
+  }
+
+  async function deleteComment(commentId: string) {
+    if (!currentUser?.id || !commentId) return;
+
+    try {
+      const { error } = await supabase
+        .from('item_comments')
+        .delete()
+        .eq('id', commentId)
+        .eq('user_id', currentUser.id);
+
+      if (error) throw error;
+
+      comments = comments.filter((comment) => comment.id !== commentId);
+      commentStatus = 'Kommentar gelöscht.';
+      await logCommentEvent('comment_delete', commentId);
+    } catch (error) {
+      console.error('Failed to delete comment:', error);
+      commentStatus = 'Kommentar konnte nicht gelöscht werden.';
     }
   }
 
@@ -2923,6 +3096,60 @@ let showRightsManager = false;
         </div>
       </section>
     {/if}
+    <section class="content-panel comments-panel">
+      <h2>Kommentare</h2>
+      <div class="comment-form">
+        <textarea
+          bind:value={commentDraft}
+          rows="3"
+          maxlength="1000"
+          placeholder={currentUser ? 'Kommentar schreiben...' : 'Zum Kommentieren bitte einloggen.'}
+          disabled={commentLoading}
+        ></textarea>
+        <div class="comment-form-footer">
+          <span>{commentDraft.trim().length}/1000</span>
+          <button type="button" class="comment-submit-btn" on:click={submitComment} disabled={commentLoading}>
+            {commentLoading ? 'Speichert...' : 'Kommentieren'}
+          </button>
+        </div>
+      </div>
+
+      {#if commentStatus}
+        <p class="comment-status">{commentStatus}</p>
+      {/if}
+
+      {#if commentsLoading}
+        <p class="comment-empty">Kommentare werden geladen...</p>
+      {:else if comments.length > 0}
+        <div class="comment-list">
+          {#each comments as comment}
+            <article class="comment-item">
+              <div class="comment-avatar">
+                {#if getCommentAvatarUrl(comment)}
+                  <img src={getCommentAvatarUrl(comment)} alt={getCommentAuthor(comment)} loading="lazy" />
+                {:else}
+                  <span>{getCommentAuthor(comment).slice(0, 1)}</span>
+                {/if}
+              </div>
+              <div class="comment-body">
+                <div class="comment-meta">
+                  <strong>{getCommentAuthor(comment)}</strong>
+                  <span>{formatCommentDate(comment.created_at)}</span>
+                </div>
+                <p>{comment.body}</p>
+              </div>
+              {#if currentUser?.id === comment.user_id}
+                <button type="button" class="comment-delete-btn" on:click={() => deleteComment(comment.id)}>
+                  Löschen
+                </button>
+              {/if}
+            </article>
+          {/each}
+        </div>
+      {:else}
+        <p class="comment-empty">Noch keine Kommentare vorhanden.</p>
+      {/if}
+    </section>
     {#if shouldShowNearbyGallery}
       <div class="radius-control">
         <div class="radius-value" class:limit-reached={isAtItemLimit}>
@@ -4963,6 +5190,124 @@ let showRightsManager = false;
     color: var(--text-primary);
     font-size: 1rem;
     line-height: 1.75;
+  }
+
+  .comments-panel {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .comment-form {
+    display: grid;
+    gap: 0.7rem;
+  }
+
+  .comment-form textarea {
+    width: 100%;
+    min-height: 5.5rem;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    padding: 0.85rem 0.95rem;
+    font: inherit;
+    resize: vertical;
+    box-sizing: border-box;
+  }
+
+  .comment-form-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+  }
+
+  .comment-submit-btn,
+  .comment-delete-btn {
+    border: 1px solid var(--border-color);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    border-radius: 999px;
+    padding: 0.55rem 0.95rem;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .comment-submit-btn:hover,
+  .comment-delete-btn:hover {
+    border-color: var(--accent-color);
+    color: var(--accent-color);
+  }
+
+  .comment-list {
+    display: grid;
+    gap: 0.9rem;
+  }
+
+  .comment-item {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 0.9rem;
+    align-items: flex-start;
+    padding: 0.9rem;
+    border-radius: 12px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+  }
+
+  .comment-avatar {
+    width: 2.4rem;
+    height: 2.4rem;
+    border-radius: 999px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    font-weight: 700;
+  }
+
+  .comment-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .comment-body {
+    min-width: 0;
+    display: grid;
+    gap: 0.35rem;
+  }
+
+  .comment-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 0.8rem;
+    align-items: baseline;
+  }
+
+  .comment-meta span {
+    color: var(--text-secondary);
+    font-size: 0.88rem;
+  }
+
+  .comment-body p,
+  .comment-status,
+  .comment-empty {
+    margin: 0;
+  }
+
+  .comment-body p {
+    white-space: pre-wrap;
+    line-height: 1.6;
+  }
+
+  .comment-status,
+  .comment-empty {
+    color: var(--text-secondary);
   }
 
   .rich-content :global(h2),
