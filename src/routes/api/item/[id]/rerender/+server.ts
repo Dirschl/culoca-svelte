@@ -74,6 +74,31 @@ function createServerClient() {
   });
 }
 
+type ServerClient = ReturnType<typeof createServerClient>;
+
+/**
+ * Stellt sicher, dass der Upload wirklich im Bucket liegt (manchmal schlägt die DB danach fehl —
+ * dann wären Pfade inkonsistent; hier fangen wir „stilles“ Scheitern früher).
+ */
+async function verifyStorageReadable(
+  serverClient: ServerClient,
+  bucket: string,
+  objectPath: string,
+  label: string
+) {
+  const { data, error } = await serverClient.storage.from(bucket).download(objectPath);
+  if (error) {
+    throw new Error(`${label}: Objekt "${objectPath}" in "${bucket}" nicht lesbar: ${error.message}`);
+  }
+  if (!data) {
+    throw new Error(`${label}: Leere Antwort für "${bucket}/${objectPath}".`);
+  }
+  const buf = await data.arrayBuffer();
+  if (buf.byteLength < 32) {
+    throw new Error(`${label}: "${bucket}/${objectPath}" ist zu klein (${buf.byteLength} B) — Upload vermutlich fehlgeschlagen.`);
+  }
+}
+
 async function requireUser(request: Request) {
   const authHeader = request.headers.get('authorization');
   if (!authHeader?.startsWith('Bearer ')) {
@@ -298,6 +323,10 @@ export async function POST({ params, request }: any) {
     });
     if (upload64Error) throw new Error(upload64Error.message);
 
+    await verifyStorageReadable(serverClient, 'images-2048', path2048, '2048px');
+    await verifyStorageReadable(serverClient, 'images-512', path512, '512px');
+    await verifyStorageReadable(serverClient, 'images-64', path64, '64px');
+
     const sharp = (await import('sharp')).default;
     const imageMeta = await sharp(originalBuffer).rotate().metadata();
 
@@ -353,18 +382,43 @@ export async function POST({ params, request }: any) {
       updatePayload.location_needs_review = false;
     }
 
-    const { data: updatedItem, error: updateError } = await serverClient
+    const { data: updatedRows, error: updateError } = await serverClient
       .from('items')
       .update(updatePayload)
       .eq('id', item.id)
       .select(
-        'id, slug, original_name, original_url, path_2048, path_512, path_64, width, height, type_id, profile_id, group_root_item_id, country_slug, district_slug, municipality_slug, title, description, caption, motif_label, keywords, country_name, state_name, region_name, district_name, municipality_name, locality_name, page_settings, location_needs_review, location_source, location_confidence, taxonomy_slug_suffix'
-      )
-      .single();
+        'id, slug, original_name, original_url, path_2048, path_512, path_64, width, height, type_id, profile_id, group_root_item_id, country_slug, district_slug, municipality_slug, title, description, caption, motif_label, keywords, country_name, state_name, region_name, district_name, municipality_name, locality_name, page_settings, location_needs_review, location_source, location_confidence, taxonomy_slug_suffix, created_at, updated_at'
+      );
 
     if (updateError) {
-      throw new Error(updateError.message);
+      throw new Error(
+        `Datenbank-Update fehlgeschlagen (Dateien liegen ggf. schon unter ${path512} / ${path2048} im Storage): ${updateError.message}`
+      );
     }
+
+    const updatedItem = updatedRows?.[0];
+    if (!updatedItem) {
+      throw new Error(
+        `Keine Zeile aktualisiert für Item ${item.id}. Uploads wurden geschrieben (${path512}, ${path2048}, ${path64}) — prüfe RLS, Trigger oder ob die ID noch existiert.`
+      );
+    }
+
+    if (updatedItem.path_512 !== path512 || updatedItem.path_2048 !== path2048 || updatedItem.path_64 !== path64) {
+      console.error('[rerender] Pfad-Mismatch nach Update', {
+        itemId: item.id,
+        expected: { path512, path2048, path64 },
+        actual: {
+          path_512: updatedItem.path_512,
+          path_2048: updatedItem.path_2048,
+          path_64: updatedItem.path_64
+        }
+      });
+      throw new Error(
+        'Datenbank enthält nach dem Update andere path_* Werte als erwartet (Trigger/View?). Bitte Logs und items-Zeile prüfen.'
+      );
+    }
+
+    console.log('[rerender] OK', { itemId: item.id, path512, path2048, path64 });
 
     if (replacingOriginal) {
       try {
