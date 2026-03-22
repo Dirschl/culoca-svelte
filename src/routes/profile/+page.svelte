@@ -132,8 +132,7 @@
       return;
     }
     user = currentUser;
-    await Promise.all([loadProfile(), loadReviewCount(), loadInteractions(), loadConversations()]);
-    await handleInitialConversationIntent();
+    await Promise.all([loadProfile(), loadReviewCount(), loadInteractions()]);
     loading = false;
     userId = user.id;
     const { data, error } = await supabase.storage.from('errorlogs').list('');
@@ -580,7 +579,7 @@
 
   async function startConversationWith(userId: string) {
     if (!userId) return;
-    await goto(`/profile?chatWith=${encodeURIComponent(userId)}`);
+    await goto(`/?chatWith=${encodeURIComponent(userId)}`);
   }
 
   function buildParticipantKey(firstUserId: string, secondUserId: string) {
@@ -605,8 +604,8 @@
   }
 
   function getConversationHref(entry: any) {
-    if (!entry?.id) return '/profile';
-    return `/profile?conversation=${encodeURIComponent(entry.id)}`;
+    if (!entry?.id) return '/';
+    return `/?conversation=${encodeURIComponent(entry.id)}`;
   }
 
   async function loadConversations(preferredConversationId: string | null = null) {
@@ -1106,7 +1105,7 @@
 
   function getNotificationHref(entry: any) {
     if (entry?.event_type === 'chat_message' && entry?.payload?.conversation_id) {
-      return `/profile?conversation=${encodeURIComponent(entry.payload.conversation_id)}`;
+      return `/?conversation=${encodeURIComponent(entry.payload.conversation_id)}`;
     }
 
     if (entry?.event_type === 'follow_create' && entry?.actor?.accountname) {
@@ -1678,112 +1677,11 @@
               </svg>
               Nachrichten
             </h3>
-            {#if conversationLoading}
-              <p class="help-text">Nachrichten werden geladen...</p>
-            {:else}
-              <div class="chat-layout">
-                <div class="conversation-list">
-                  {#if conversations.length > 0}
-                    {#each conversations as entry}
-                      <button
-                        type="button"
-                        class="conversation-card"
-                        class:is-active={entry.id === selectedConversationId}
-                        class:is-unread={getConversationUnread(entry)}
-                        on:click={() => selectConversation(entry)}
-                      >
-                        <div class="conversation-card__header">
-                          <div class="conversation-card__user">
-                            {#if getAvatarUrl(entry.otherUser)}
-                              <img
-                                src={getAvatarUrl(entry.otherUser)}
-                                alt={entry.otherUser?.full_name || entry.otherUser?.accountname || 'Profil'}
-                              />
-                            {:else}
-                              <span class="conversation-card__avatar-fallback">
-                                {(entry.otherUser?.full_name || entry.otherUser?.accountname || '?').slice(0, 1).toUpperCase()}
-                              </span>
-                            {/if}
-                            <strong>{entry.otherUser?.full_name || entry.otherUser?.accountname || 'Unbekannt'}</strong>
-                          </div>
-                          <time>{formatInteractionDate(entry.last_message_at || entry.created_at)}</time>
-                        </div>
-                        {#if entry.starter_item}
-                          <span class="conversation-card__item">
-                            Bezug: {entry.starter_item.title || entry.starter_item.original_name || 'Item'}
-                          </span>
-                        {/if}
-                        <span class="conversation-card__preview">
-                          {entry.last_message_preview || 'Noch keine Nachricht gesendet.'}
-                        </span>
-                      </button>
-                    {/each}
-                  {:else}
-                    <p class="help-text">Noch keine Gespräche vorhanden.</p>
-                  {/if}
-                </div>
-
-                <div class="chat-thread">
-                  {#if selectedConversationId}
-                    {@const activeConversation = conversations.find((entry) => entry.id === selectedConversationId)}
-                    {#if activeConversation}
-                      <div class="chat-thread__header">
-                        <div>
-                          <strong>{activeConversation.otherUser?.full_name || activeConversation.otherUser?.accountname || 'Unbekannt'}</strong>
-                          {#if activeConversation.starter_item}
-                            <span>
-                              zu
-                              <a href={getPublicItemHref(activeConversation.starter_item)}>
-                                {activeConversation.starter_item.title || activeConversation.starter_item.original_name || 'Item'}
-                              </a>
-                            </span>
-                          {/if}
-                        </div>
-                      </div>
-
-                      {#if messagesLoading}
-                        <p class="help-text">Nachrichten werden geladen...</p>
-                      {:else if conversationMessages.length > 0}
-                        <div class="message-list" bind:this={messageListElement}>
-                          {#each conversationMessages as entry}
-                            <div class="message-bubble" class:is-own={entry.sender_user_id === user.id}>
-                              <p>{entry.body}</p>
-                              {#if entry.item}
-                                <a class="message-bubble__item" href={getPublicItemHref(entry.item)}>
-                                  {entry.item.title || entry.item.original_name || 'Item'}
-                                </a>
-                              {/if}
-                              <time>{formatCommentDate(entry.created_at)}</time>
-                            </div>
-                          {/each}
-                        </div>
-                      {:else}
-                        <p class="help-text">Noch keine Nachrichten in diesem Gespräch.</p>
-                      {/if}
-
-                      <div class="chat-compose">
-                        <textarea
-                          bind:value={messageDraft}
-                          rows="4"
-                          placeholder="Nachricht schreiben..."
-                          on:keydown={handleMessageKeydown}
-                        />
-                        <div class="chat-compose__actions">
-                          {#if messageStatus}
-                            <span class="help-text">{messageStatus}</span>
-                          {/if}
-                          <button type="button" class="mark-read-btn" on:click={sendMessage} disabled={messageSendLoading}>
-                            {messageSendLoading ? 'Senden...' : 'Nachricht senden'}
-                          </button>
-                        </div>
-                      </div>
-                    {/if}
-                  {:else}
-                    <p class="help-text">Wähle links ein Gespräch aus oder starte eines von einer Item-Seite.</p>
-                  {/if}
-                </div>
-              </div>
-            {/if}
+            <p class="help-text">Die Inbox liegt jetzt auf der Startseite und steht dort ganz oben.</p>
+            <div class="review-actions">
+              <a class="review-link" href="/#startseite-inbox">Inbox auf der Startseite öffnen</a>
+              <a class="review-link review-link--secondary" href="/#menschen-finden">Neuen Chat starten</a>
+            </div>
           </div>
 
           <div class="card">
@@ -2721,164 +2619,6 @@
     font-style: normal;
   }
 
-  .chat-layout {
-    display: grid;
-    grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
-    gap: 1rem;
-  }
-
-  .conversation-list {
-    display: grid;
-    gap: 0.75rem;
-    align-content: start;
-  }
-
-  .conversation-card {
-    display: grid;
-    gap: 0.4rem;
-    width: 100%;
-    text-align: left;
-    padding: 0.9rem 1rem;
-    border-radius: 14px;
-    border: 1px solid var(--border-color);
-    background: var(--bg-tertiary);
-    color: inherit;
-    cursor: pointer;
-  }
-
-  .conversation-card:hover,
-  .conversation-card.is-active {
-    border-color: var(--accent-color);
-  }
-
-  .conversation-card.is-unread {
-    box-shadow: inset 3px 0 0 var(--accent-color);
-  }
-
-  .conversation-card__header {
-    display: flex;
-    justify-content: space-between;
-    gap: 0.75rem;
-    align-items: center;
-  }
-
-  .conversation-card__user {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    min-width: 0;
-  }
-
-  .conversation-card__user img,
-  .conversation-card__avatar-fallback {
-    width: 38px;
-    height: 38px;
-    border-radius: 999px;
-    flex-shrink: 0;
-  }
-
-  .conversation-card__user img {
-    object-fit: cover;
-  }
-
-  .conversation-card__avatar-fallback {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background: color-mix(in srgb, var(--accent-color) 16%, var(--bg-secondary));
-    color: var(--text-primary);
-    font-weight: 700;
-  }
-
-  .conversation-card__user strong,
-  .conversation-card__preview,
-  .conversation-card__item {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .conversation-card__item,
-  .conversation-card__preview,
-  .conversation-card time {
-    color: var(--text-secondary);
-    font-size: 0.9rem;
-  }
-
-  .chat-thread {
-    display: grid;
-    gap: 1rem;
-    min-width: 0;
-  }
-
-  .chat-thread__header {
-    padding: 0.9rem 1rem;
-    border-radius: 14px;
-    border: 1px solid var(--border-color);
-    background: var(--bg-tertiary);
-  }
-
-  .chat-thread__header div {
-    display: grid;
-    gap: 0.2rem;
-  }
-
-  .chat-thread__header span,
-  .chat-thread__header a {
-    color: var(--text-secondary);
-    font-size: 0.95rem;
-  }
-
-  .message-list {
-    display: grid;
-    gap: 0.75rem;
-    max-height: 560px;
-    overflow-y: auto;
-    padding-right: 0.25rem;
-  }
-
-  .message-bubble {
-    display: grid;
-    gap: 0.35rem;
-    padding: 0.9rem 1rem;
-    border-radius: 16px 16px 16px 6px;
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border-color);
-    max-width: min(100%, 42rem);
-  }
-
-  .message-bubble.is-own {
-    margin-left: auto;
-    border-radius: 16px 16px 6px 16px;
-    background: color-mix(in srgb, var(--accent-color) 12%, var(--bg-tertiary));
-    border-color: color-mix(in srgb, var(--accent-color) 28%, var(--border-color));
-  }
-
-  .message-bubble p {
-    margin: 0;
-    white-space: pre-wrap;
-    line-height: 1.5;
-  }
-
-  .message-bubble__item,
-  .message-bubble time {
-    color: var(--text-secondary);
-    font-size: 0.85rem;
-  }
-
-  .chat-compose {
-    display: grid;
-    gap: 0.75rem;
-  }
-
-  .chat-compose__actions {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 1rem;
-    flex-wrap: wrap;
-  }
-
   .section-title {
     display: flex;
     align-items: center;
@@ -3326,10 +3066,6 @@
 
     .card {
       padding: 1.5rem;
-    }
-
-    .chat-layout {
-      grid-template-columns: 1fr;
     }
 
     .follow-columns {
