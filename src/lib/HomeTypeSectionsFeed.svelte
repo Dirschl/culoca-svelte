@@ -24,8 +24,11 @@
 
   /** Öffentliche Typ-Sektionen von der Startseiten-load */
   export let sections: Section[];
-  /** Schmale Spalte (Dashboard rechts): eine Karte pro Zeile, kompaktere Typografie */
-  export let compact = false;
+  /**
+   * full = Startseite Gäste (breites Raster)
+   * discover = Dashboard rechts: kompakte Köpfe, mehrspaltige Kacheln
+   */
+  export let variant: 'full' | 'discover' = 'full';
   /** Pro Typ maximal so viele Karten (Server liefert bis zu 8) */
   export let maxItemsPerSection = 8;
 
@@ -62,12 +65,13 @@
     }
   }
 
-  $: descMax = compact ? 72 : 100;
+  $: isDiscover = variant === 'discover';
+  $: descMax = 100;
 </script>
 
-<div class="home-sections-feed" class:home-sections-feed--compact={compact}>
+<div class="home-sections-feed" class:home-sections-feed--discover={isDiscover}>
   {#each sections as section (section.typeId)}
-    <section class="content-section" id={compact ? undefined : section.slug}>
+    <section class="content-section" id={isDiscover ? undefined : section.slug}>
       <div class="section-inner">
         <div class="section-head">
           <h2>
@@ -77,7 +81,7 @@
             </a>
           </h2>
           <a href="/{section.slug}" class="see-all">
-            {#if compact}
+            {#if isDiscover}
               Alle {section.totalCount}
             {:else}
               Alle {section.totalCount} anzeigen
@@ -116,7 +120,7 @@
                 {/if}
                 <div class="item-body">
                   <h3>{item.title || item.slug}</h3>
-                  {#if item.description || item.caption}
+                  {#if !isDiscover && (item.description || item.caption)}
                     <p class="item-desc">{truncate(item.description || item.caption, descMax)}</p>
                   {/if}
                   {#if item.starts_at}
@@ -135,16 +139,15 @@
 </div>
 
 <style>
-  .home-sections-feed--compact .content-section {
+  .home-sections-feed--discover .content-section {
     border-top: 1px solid var(--border-color);
   }
 
-  .home-sections-feed--compact .content-section:first-child {
+  .home-sections-feed--discover .content-section:first-child {
     border-top: 0;
-    padding-top: 0;
   }
 
-  .home-sections-feed:not(.home-sections-feed--compact) .content-section {
+  .home-sections-feed:not(.home-sections-feed--discover) .content-section {
     border-top: 1px solid var(--border-color);
   }
 
@@ -152,8 +155,8 @@
     padding: 2.5rem 2rem;
   }
 
-  .home-sections-feed--compact .section-inner {
-    padding: 1.15rem 0;
+  .home-sections-feed--discover .section-inner {
+    padding: 1rem 0;
   }
 
   .section-head {
@@ -164,8 +167,8 @@
     gap: 0.75rem;
   }
 
-  .home-sections-feed--compact .section-head {
-    margin-bottom: 0.65rem;
+  .home-sections-feed--discover .section-head {
+    margin-bottom: 0.6rem;
   }
 
   .section-head h2 {
@@ -175,8 +178,8 @@
     min-width: 0;
   }
 
-  .home-sections-feed--compact .section-head h2 {
-    font-size: 1.02rem;
+  .home-sections-feed--discover .section-head h2 {
+    font-size: 1.05rem;
     font-weight: 650;
   }
 
@@ -206,7 +209,7 @@
     flex-shrink: 0;
   }
 
-  .home-sections-feed--compact .see-all {
+  .home-sections-feed--discover .see-all {
     font-size: 0.78rem;
   }
 
@@ -220,9 +223,21 @@
     gap: 1rem;
   }
 
-  .home-sections-feed--compact .items-grid {
-    grid-template-columns: 1fr;
+  /* Mehrspaltige Entdecken-Kacheln (Breite der Spalte nutzt auto-fill) */
+  .home-sections-feed--discover {
+    container-type: inline-size;
+    container-name: discoverfeed;
+  }
+
+  .home-sections-feed--discover .items-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.65rem;
+  }
+
+  @container discoverfeed (min-width: 400px) {
+    .home-sections-feed--discover .items-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
   }
 
   .item-card {
@@ -252,8 +267,8 @@
     background: var(--bg-tertiary);
   }
 
-  .home-sections-feed--compact .item-thumb {
-    aspect-ratio: 16 / 10;
+  .home-sections-feed--discover .item-thumb {
+    aspect-ratio: 1 / 1;
   }
 
   .item-thumb img {
@@ -274,9 +289,18 @@
     min-height: 5rem;
   }
 
+  .home-sections-feed--discover .item-thumb--empty {
+    min-height: 4.5rem;
+    aspect-ratio: 1 / 1;
+  }
+
   .thumb-icon {
     font-size: 1.75rem;
     opacity: 0.4;
+  }
+
+  .home-sections-feed--discover .thumb-icon {
+    font-size: 1.35rem;
   }
 
   .item-body {
@@ -287,8 +311,8 @@
     flex: 1;
   }
 
-  .home-sections-feed--compact .item-body {
-    padding: 0.55rem 0.65rem;
+  .home-sections-feed--discover .item-body {
+    padding: 0.45rem 0.5rem 0.55rem;
   }
 
   .item-body h3 {
@@ -304,10 +328,11 @@
     overflow: hidden;
   }
 
-  .home-sections-feed--compact .item-body h3 {
-    font-size: 0.84rem;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
+  .home-sections-feed--discover .item-body h3 {
+    font-size: 0.72rem;
+    line-height: 1.3;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
   }
 
   .item-desc {
@@ -322,12 +347,6 @@
     overflow: hidden;
   }
 
-  .home-sections-feed--compact .item-desc {
-    font-size: 0.74rem;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-  }
-
   .item-date {
     font-size: 0.75rem;
     color: var(--text-muted);
@@ -335,37 +354,37 @@
     padding-top: 0.2rem;
   }
 
-  .home-sections-feed--compact .item-date {
-    font-size: 0.7rem;
+  .home-sections-feed--discover .item-date {
+    font-size: 0.62rem;
   }
 
   @media (max-width: 960px) {
-    .home-sections-feed:not(.home-sections-feed--compact) .items-grid {
+    .home-sections-feed:not(.home-sections-feed--discover) .items-grid {
       grid-template-columns: repeat(3, 1fr);
     }
   }
 
   @media (max-width: 680px) {
-    .home-sections-feed:not(.home-sections-feed--compact) .section-inner {
+    .home-sections-feed:not(.home-sections-feed--discover) .section-inner {
       padding: 2rem 1.25rem;
     }
 
-    .home-sections-feed:not(.home-sections-feed--compact) .items-grid {
+    .home-sections-feed:not(.home-sections-feed--discover) .items-grid {
       grid-template-columns: repeat(2, 1fr);
       gap: 0.75rem;
     }
   }
 
   @media (max-width: 420px) {
-    .home-sections-feed:not(.home-sections-feed--compact) .items-grid {
+    .home-sections-feed:not(.home-sections-feed--discover) .items-grid {
       grid-template-columns: 1fr;
     }
 
-    .home-sections-feed:not(.home-sections-feed--compact) .item-link {
+    .home-sections-feed:not(.home-sections-feed--discover) .item-link {
       flex-direction: row;
     }
 
-    .home-sections-feed:not(.home-sections-feed--compact) .item-thumb {
+    .home-sections-feed:not(.home-sections-feed--discover) .item-thumb {
       width: 100px;
       min-height: 80px;
       aspect-ratio: auto;

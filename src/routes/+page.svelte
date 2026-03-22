@@ -20,6 +20,35 @@
 
   export let data: PageData;
   type DashboardView = 'all' | 'inbox' | 'creator' | 'network';
+
+  /** Reihenfolge rechts „Entdecken“: Termine → Fotos → Firmen → … */
+  const DASHBOARD_DISCOVER_SLUG_ORDER = [
+    'event',
+    'foto',
+    'firma',
+    'video',
+    'link',
+    'text',
+    'musik',
+    'ki-bild'
+  ] as const;
+
+  function orderSectionsForDiscover(sections: PageData['sections']): PageData['sections'] {
+    if (!sections?.length) return [];
+    const preferred = new Set<string>(DASHBOARD_DISCOVER_SLUG_ORDER);
+    const bySlug = new Map(sections.map((s) => [s.slug, s]));
+    const out: PageData['sections'] = [];
+    for (const slug of DASHBOARD_DISCOVER_SLUG_ORDER) {
+      const s = bySlug.get(slug);
+      if (s) out.push(s);
+    }
+    for (const s of sections) {
+      if (!preferred.has(s.slug)) out.push(s);
+    }
+    return out;
+  }
+
+  $: discoverSections = orderSectionsForDiscover(data.sections ?? []);
   let savedLocation: RememberedLocation | null = null;
   let currentUserFullName = '';
   let currentUserId = '';
@@ -72,8 +101,8 @@
     if (activeDashboardView === 'network') return entry.category === 'network';
     return true;
   });
-  /** In der Kachel „Jetzt wichtig“ nur die ersten 5 Einträge (halbe Breite). */
-  $: displayedPriorityFeed = filteredDashboardPriorityFeed.slice(0, 5);
+  /** Kachel „Jetzt wichtig“: nur die ersten Einträge, Rest über Tabs/unten. */
+  $: displayedPriorityFeed = filteredDashboardPriorityFeed.slice(0, 8);
   $: dashboardTabCounts = {
     all: dashboardPriorityFeed.length,
     inbox: dashboardPriorityFeed.filter((entry: any) => entry.category === 'inbox').length,
@@ -928,9 +957,9 @@
                     </a>
                   {/each}
                 </div>
-                {#if filteredDashboardPriorityFeed.length > 5}
+                {#if filteredDashboardPriorityFeed.length > 8}
                   <p class="dashboard-priority-more">
-                    +{filteredDashboardPriorityFeed.length - 5} weitere in den Bereichen unten oder über die Tabs.
+                    +{filteredDashboardPriorityFeed.length - 8} weitere in den Bereichen unten oder über die Tabs.
                   </p>
                 {/if}
               {:else}
@@ -1260,9 +1289,15 @@
                 <header class="dashboard-discover-head">
                   <span class="dashboard-kicker">Entdecken</span>
                   <h2 class="dashboard-discover-title">Neu auf Culoca</h2>
-                  <p class="dashboard-discover-lede">Aktuelle öffentliche Inhalte – wie auf der Startseite für Besucher.</p>
+                  <p class="dashboard-discover-lede">
+                  Termine, Fotos, Firmen und mehr – sortiert zum Stöbern (öffentliche Inhalte).
+                </p>
                 </header>
-                <HomeTypeSectionsFeed sections={data.sections} compact={true} maxItemsPerSection={4} />
+                <HomeTypeSectionsFeed
+                  sections={discoverSections}
+                  variant="discover"
+                  maxItemsPerSection={8}
+                />
               </div>
             </aside>
           {/if}
@@ -1371,7 +1406,7 @@
     max-width: 1680px;
     margin: 0 auto;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(280px, 380px);
+    grid-template-columns: minmax(0, 1fr) minmax(340px, 520px);
     gap: 1.25rem 1.5rem;
     align-items: start;
   }
@@ -1542,17 +1577,17 @@
     border-color: color-mix(in srgb, var(--culoca-orange) 38%, var(--border-color) 62%);
   }
 
+  /* Persönliche Gruppen untereinander (keine 2-Spalten-Lücken) */
   .dashboard-top-row {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
     gap: 1rem;
     align-items: start;
   }
 
-  /* Standort nur linke Spalte (halbe Content-Breite), sonst wirkt die Karte wie ein Streifen */
   .dashboard-location-row {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
     gap: 1rem;
     align-items: start;
   }
@@ -1563,7 +1598,7 @@
 
   .dashboard-grid {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
     gap: 1rem;
     align-items: start;
   }
