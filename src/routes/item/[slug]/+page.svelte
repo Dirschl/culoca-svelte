@@ -669,6 +669,10 @@ let showRightsManager = false;
   let favoriteLoading = false;
   let favoriteStatus = '';
   let lastFavoriteKey = '';
+  let isLiked = false;
+  let likeLoading = false;
+  let likeStatus = '';
+  let lastLikeKey = '';
   
   // Function to initialize GPS if not available
   async function initializeGpsIfNeeded() {
@@ -831,6 +835,19 @@ let showRightsManager = false;
     }
   }
 
+  $: {
+    const nextLikeKey = `${currentUser?.id || 'anon'}:${image?.id || 'no-item'}`;
+    if (nextLikeKey !== lastLikeKey) {
+      lastLikeKey = nextLikeKey;
+      likeStatus = '';
+      if (!currentUser?.id || !image?.id) {
+        isLiked = false;
+      } else if (browser) {
+        void loadLikeState();
+      }
+    }
+  }
+
   async function loadFavoriteState() {
     if (!browser || !image?.id || !currentUser?.id) {
       isFavorited = false;
@@ -853,6 +870,28 @@ let showRightsManager = false;
     }
   }
 
+  async function loadLikeState() {
+    if (!browser || !image?.id || !currentUser?.id) {
+      isLiked = false;
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('item_likes')
+        .select('item_id')
+        .eq('user_id', currentUser.id)
+        .eq('item_id', image.id)
+        .maybeSingle();
+
+      if (error) throw error;
+      isLiked = !!data;
+    } catch (error) {
+      console.error('Failed to load like state:', error);
+      isLiked = false;
+    }
+  }
+
   async function logFavoriteEvent(eventType: 'favorite_add' | 'favorite_remove') {
     if (!currentUser?.id || !image?.id) return;
 
@@ -869,6 +908,25 @@ let showRightsManager = false;
       });
     } catch (error) {
       console.warn('Failed to log favorite event:', error);
+    }
+  }
+
+  async function logLikeEvent(eventType: 'like_add' | 'like_remove') {
+    if (!currentUser?.id || !image?.id) return;
+
+    try {
+      await supabase.from('item_events').insert({
+        item_id: image.id,
+        actor_user_id: currentUser.id,
+        owner_user_id: image.profile_id || image.user_id || null,
+        event_type: eventType,
+        source: 'item_detail',
+        metadata: {
+          canonical_path: canonicalPath || image.canonical_path || null
+        }
+      });
+    } catch (error) {
+      console.warn('Failed to log like event:', error);
     }
   }
 
@@ -918,6 +976,55 @@ let showRightsManager = false;
       favoriteStatus = 'Merken ist gerade nicht verfügbar.';
     } finally {
       favoriteLoading = false;
+    }
+  }
+
+  async function toggleLike() {
+    if (!image?.id) return;
+
+    if (!currentUser?.id) {
+      const returnTo = browser ? `${window.location.pathname}${window.location.search}` : canonicalPath || '/';
+      await goto(`/login?returnTo=${encodeURIComponent(returnTo)}`);
+      return;
+    }
+
+    likeLoading = true;
+    likeStatus = '';
+
+    try {
+      if (isLiked) {
+        const { error } = await supabase
+          .from('item_likes')
+          .delete()
+          .eq('user_id', currentUser.id)
+          .eq('item_id', image.id);
+
+        if (error) throw error;
+        isLiked = false;
+        likeStatus = 'Like entfernt.';
+        await logLikeEvent('like_remove');
+      } else {
+        const { error } = await supabase
+          .from('item_likes')
+          .upsert(
+            {
+              user_id: currentUser.id,
+              item_id: image.id,
+              created_at: new Date().toISOString()
+            },
+            { onConflict: 'user_id,item_id' }
+          );
+
+        if (error) throw error;
+        isLiked = true;
+        likeStatus = 'Gefällt mir gespeichert.';
+        await logLikeEvent('like_add');
+      }
+    } catch (error) {
+      console.error('Failed to toggle like:', error);
+      likeStatus = 'Gefällt mir ist gerade nicht verfügbar.';
+    } finally {
+      likeLoading = false;
     }
   }
   
@@ -2768,8 +2875,11 @@ let showRightsManager = false;
       isCreator={isCreator}
       editMode={canEditItem && editMode}
       canFavorite={!!image?.id}
+      canLike={!!image?.id}
       {isFavorited}
       {favoriteLoading}
+      {isLiked}
+      {likeLoading}
       bind:externalUrl={managementForm.external_url}
       bind:videoUrl={managementForm.video_url}
       bind:contentHtml={managementForm.content}
@@ -2783,10 +2893,14 @@ let showRightsManager = false;
       onDeleteImage={deleteImage}
       onDownloadOriginal={downloadOriginal}
       onToggleFavorite={toggleFavorite}
+      onToggleLike={toggleLike}
       onToggleGallery={toggleGallery}
     />
     {#if favoriteStatus}
       <p class="favorite-status">{favoriteStatus}</p>
+    {/if}
+    {#if likeStatus}
+      <p class="favorite-status">{likeStatus}</p>
     {/if}
     {#if hasVideoEmbed && !(canEditItem && editMode)}
       <section class="content-panel">

@@ -8,6 +8,7 @@
   export let onDeleteImage: () => void;
   export let onDownloadOriginal: (id: string, name: string) => void;
   export let onToggleFavorite: () => void;
+  export let onToggleLike: () => void;
   export let onToggleGallery: () => void;
   export let calendarUrl: string | null = null;
   export let editMode = false;
@@ -23,6 +24,9 @@
   export let canFavorite = false;
   export let isFavorited = false;
   export let favoriteLoading = false;
+  export let canLike = false;
+  export let isLiked = false;
+  export let likeLoading = false;
 
   type HtmlSnippet = {
     label: string;
@@ -50,7 +54,7 @@
   $: loading = $unifiedRightsStore.loading;
   $: hasMapLocation = !!(image?.lat && image?.lon);
   $: canDownload = !!(rights?.download || rights?.download_original || isCreator);
-  $: showControls = hasMapLocation || canFavorite || canDownload || (isCreator && editMode);
+  $: showControls = hasMapLocation || canFavorite || canLike || canDownload || (isCreator && editMode);
 
   function insertHtmlSnippet(tool: HtmlSnippet) {
     if (!contentTextarea) {
@@ -79,7 +83,7 @@
 
 <div class="controls-section" class:dark={darkMode}>
   {#if showControls}
-    {#if hasMapLocation || canFavorite || canDownload}
+    {#if hasMapLocation || canFavorite || canLike || canDownload}
       <div class="action-buttons">
         {#if externalUrl?.trim()}
           <a class="square-btn website-btn" href={externalUrl} target="_blank" rel="noopener noreferrer" title="Webseite öffnen">
@@ -119,6 +123,21 @@
           >
             <svg width="30" height="30" viewBox="0 0 24 24" fill={isFavorited ? 'currentColor' : 'none'} stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+            </svg>
+          </button>
+        {/if}
+
+        {#if canLike}
+          <button
+            class="square-btn like-btn"
+            class:is-active={isLiked}
+            on:click={onToggleLike}
+            title={isLiked ? 'Like entfernen' : 'Gefällt mir'}
+            disabled={likeLoading}
+          >
+            <svg width="30" height="30" viewBox="0 0 24 24" fill={isLiked ? 'currentColor' : 'none'} stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M7 11V21" />
+              <path d="M14 5.88L13 10H18.76A2 2 0 0 1 20.72 12.39L19.77 18.39A2 2 0 0 1 17.79 20H7V10L10.59 3.82A1 1 0 0 1 12.4 4.22V5.88Z" />
             </svg>
           </button>
         {/if}
@@ -389,6 +408,16 @@
     background: rgba(238, 114, 33, 0.12);
     color: #ee7221;
     border-color: rgba(238, 114, 33, 0.4);
+  }
+  .like-btn {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+  }
+  .like-btn:hover,
+  .like-btn.is-active {
+    background: rgba(37, 99, 235, 0.12);
+    color: #2563eb;
+    border-color: rgba(37, 99, 235, 0.36);
   }
   .delete-btn:hover {
     background: #dc3545;
