@@ -1710,6 +1710,31 @@ let showRightsManager = false;
     });
     goto('/');
   }
+  async function startCreatorChat() {
+    const creatorUserId = image?.profile_id || image?.user_id || null;
+    if (!creatorUserId) return;
+
+    if (!currentUser?.id) {
+      const returnTo = browser ? `${window.location.pathname}${window.location.search}` : canonicalPath || '/';
+      await goto(`/login?returnTo=${encodeURIComponent(returnTo)}`);
+      return;
+    }
+
+    if (creatorUserId === currentUser.id) {
+      await goto('/profile');
+      return;
+    }
+
+    const params = new URLSearchParams({
+      chatWith: creatorUserId
+    });
+
+    if (image?.id) {
+      params.set('item', image.id);
+    }
+
+    await goto(`/profile?${params.toString()}`);
+  }
   function formatFileSize(bytes: number | null | undefined) {
     if (!bytes) return '';
     const kb = bytes / 1024;
@@ -3995,6 +4020,11 @@ let showRightsManager = false;
                 <div>{@html image.profile.bio.replace(/\n/g, '<br>')}</div>
               </div>
             {/if}
+            {#if currentUser?.id !== image.profile_id}
+              <button type="button" class="creator-chat-btn" on:click={startCreatorChat}>
+                Nachricht schreiben
+              </button>
+            {/if}
           </div>
         {/if}
       </div>
@@ -4812,6 +4842,23 @@ let showRightsManager = false;
     font-size: 0.9em;
     line-height: 1.4;
     background: transparent;
+  }
+  .creator-chat-btn {
+    align-self: flex-start;
+    margin-top: 0.75rem;
+    border: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border-radius: 999px;
+    padding: 0.65rem 1rem;
+    font: inherit;
+    cursor: pointer;
+    transition: border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+  }
+  .creator-chat-btn:hover {
+    border-color: var(--culoca-orange);
+    color: var(--culoca-orange);
+    transform: translateY(-1px);
   }
   .creator-socials {
     margin-top: 0.5rem;

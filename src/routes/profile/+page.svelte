@@ -64,6 +64,14 @@
   let notifications: any[] = [];
   let unreadNotifications = 0;
   let interactionLoading = true;
+  let conversations: any[] = [];
+  let conversationLoading = true;
+  let selectedConversationId = '';
+  let conversationMessages: any[] = [];
+  let messagesLoading = false;
+  let messageDraft = '';
+  let messageSendLoading = false;
+  let messageStatus = '';
 
   $: nameValid = name.length >= 2 && name.length <= 60;
   $: phoneValid = phone.length === 0 || /^\+?[0-9\- ]{7,20}$/.test(phone);
@@ -95,7 +103,8 @@
       return;
     }
     user = currentUser;
-    await Promise.all([loadProfile(), loadReviewCount(), loadInteractions()]);
+    await Promise.all([loadProfile(), loadReviewCount(), loadInteractions(), loadConversations()]);
+    await handleInitialConversationIntent();
     loading = false;
     userId = user.id;
     const { data, error } = await supabase.storage.from('errorlogs').list('');
@@ -343,6 +352,425 @@
     }
   }
 
+  function getAvatarUrl(profileEntry: any) {
+    const avatarUrl = profileEntry?.avatar_url;
+    if (!avatarUrl) return '';
+    if (String(avatarUrl).startsWith('http')) return avatarUrl;
+    return `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/avatars/${avatarUrl}`;
+  }
+
+  function buildParticipantKey(firstUserId: string, secondUserId: string) {
+    return [firstUserId, secondUserId].sort().join(':');
+  }
+
+  function getOtherConversationUser(entry: any) {
+    if (!entry || !user?.id) return null;
+    return entry.user_a_id === user.id ? entry.user_b : entry.user_a;
+  }
+
+  function getOwnConversationReadAt(entry: any) {
+    if (!entry || !user?.id) return null;
+    return entry.user_a_id === user.id ? entry.user_a_last_read_at : entry.user_b_last_read_at;
+  }
+
+  function getConversationUnread(entry: any) {
+    if (!entry || !user?.id || !entry.last_message_at) return false;
+    if (entry.last_message_sender_id === user.id) return false;
+    const ownReadAt = getOwnConversationReadAt(entry);
+    return !ownReadAt || new Date(entry.last_message_at).getTime() > new Date(ownReadAt).getTime();
+  }
+
+  function getConversationHref(entry: any) {
+    if (!entry?.id) return '/profile';
+    return `/profile?conversation=${encodeURIComponent(entry.id)}`;
+  }
+
+  async function loadConversations(preferredConversationId: string | null = null) {
+    if (!user?.id) return;
+
+    conversationLoading = true;
+
+    try {
+      const { data, error } = await supabase
+        .from('user_conversations')
+        .select(`
+          id,
+          participant_key,
+          user_a_id,
+          user_b_id,
+          starter_item_id,
+          last_message_at,
+          last_message_preview,
+          last_message_sender_id,
+          user_a_last_read_at,
+          user_b_last_read_at,
+          created_at,
+          user_a:user_a_id(
+            id,
+            full_name,
+            accountname,
+            avatar_url
+          ),
+          user_b:user_b_id(
+            id,
+            full_name,
+            accountname,
+            avatar_url
+          ),
+          starter_item:starter_item_id(
+            id,
+            slug,
+            title,
+            original_name,
+            canonical_path,
+            country_slug,
+            district_slug,
+            municipality_slug,
+            path_512
+          )
+        `)
+        .or(`user_a_id.eq.${user.id},user_b_id.eq.${user.id}`)
+        .order('last_message_at', { ascending: false });
+
+      if (error) throw error;
+
+      conversations = (data || []).map((entry: any) => ({
+        ...entry,
+        otherUser: entry.user_a_id === user.id ? entry.user_b : entry.user_a
+      }));
+
+      const nextConversationId =
+        preferredConversationId ||
+        selectedConversationId ||
+        ($page.url.searchParams.get('conversation') || '').trim() ||
+        conversations[0]?.id ||
+        '';
+
+      if (nextConversationId) {
+        const conversation = conversations.find((entry: any) => entry.id === nextConversationId);
+        if (conversation) {
+          await selectConversation(conversation, false);
+        } else {
+          selectedConversationId = '';
+          conversationMessages = [];
+        }
+      } else {
+        selectedConversationId = '';
+        conversationMessages = [];
+      }
+    } catch (error) {
+      console.error('Error loading conversations:', error);
+      conversations = [];
+      selectedConversationId = '';
+      conversationMessages = [];
+    } finally {
+      conversationLoading = false;
+    }
+  }
+
+  async function loadConversationMessages(conversationId: string) {
+    if (!conversationId || !user?.id) {
+      conversationMessages = [];
+      return;
+    }
+
+    messagesLoading = true;
+
+    try {
+      const { data, error } = await supabase
+        .from('user_messages')
+        .select(`
+          id,
+          sender_user_id,
+          item_id,
+          body,
+          created_at,
+          items:item_id(
+            id,
+            slug,
+            title,
+            original_name,
+            canonical_path,
+            country_slug,
+            district_slug,
+            municipality_slug,
+            path_512
+          )
+        `)
+        .eq('conversation_id', conversationId)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      conversationMessages = (data || []).map((entry: any) => ({
+        ...entry,
+        item: entry.items || null
+      }));
+    } catch (error) {
+      console.error('Error loading conversation messages:', error);
+      conversationMessages = [];
+    } finally {
+      messagesLoading = false;
+    }
+  }
+
+  async function markConversationRead(conversation: any) {
+    if (!conversation?.id || !user?.id) return;
+
+    const updateColumn = conversation.user_a_id === user.id ? 'user_a_last_read_at' : 'user_b_last_read_at';
+    const now = new Date().toISOString();
+
+    try {
+      const { error } = await supabase
+        .from('user_conversations')
+        .update({ [updateColumn]: now, updated_at: now })
+        .eq('id', conversation.id);
+
+      if (error) throw error;
+
+      conversations = conversations.map((entry: any) =>
+        entry.id === conversation.id
+          ? {
+              ...entry,
+              [updateColumn]: now
+            }
+          : entry
+      );
+    } catch (error) {
+      console.error('Error marking conversation as read:', error);
+    }
+  }
+
+  async function selectConversation(conversation: any, shouldMarkRead = true) {
+    if (!conversation?.id) return;
+
+    selectedConversationId = conversation.id;
+    messageStatus = '';
+    await loadConversationMessages(conversation.id);
+
+    if (shouldMarkRead && getConversationUnread(conversation)) {
+      await markConversationRead(conversation);
+    }
+  }
+
+  async function ensureConversation(otherUserId: string, starterItemId: string | null = null) {
+    if (!user?.id || !otherUserId || otherUserId === user.id) return null;
+
+    const participantKey = buildParticipantKey(user.id, otherUserId);
+    const now = new Date().toISOString();
+
+    const existingConversation =
+      conversations.find((entry: any) => entry.participant_key === participantKey) ||
+      null;
+
+    if (existingConversation) {
+      return existingConversation;
+    }
+
+    const userAId = [user.id, otherUserId].sort()[0];
+    const userBId = [user.id, otherUserId].sort()[1];
+
+    try {
+      const { data, error } = await supabase
+        .from('user_conversations')
+        .insert({
+          participant_key: participantKey,
+          user_a_id: userAId,
+          user_b_id: userBId,
+          starter_item_id: starterItemId,
+          created_by_user_id: user.id,
+          last_message_at: now,
+          user_a_last_read_at: userAId === user.id ? now : null,
+          user_b_last_read_at: userBId === user.id ? now : null,
+          updated_at: now
+        })
+        .select(`
+          id,
+          participant_key,
+          user_a_id,
+          user_b_id,
+          starter_item_id,
+          last_message_at,
+          last_message_preview,
+          last_message_sender_id,
+          user_a_last_read_at,
+          user_b_last_read_at,
+          created_at,
+          user_a:user_a_id(
+            id,
+            full_name,
+            accountname,
+            avatar_url
+          ),
+          user_b:user_b_id(
+            id,
+            full_name,
+            accountname,
+            avatar_url
+          ),
+          starter_item:starter_item_id(
+            id,
+            slug,
+            title,
+            original_name,
+            canonical_path,
+            country_slug,
+            district_slug,
+            municipality_slug,
+            path_512
+          )
+        `)
+        .single();
+
+      if (error) throw error;
+
+      const conversation = {
+        ...data,
+        otherUser: data.user_a_id === user.id ? data.user_b : data.user_a
+      };
+      conversations = [conversation, ...conversations];
+      return conversation;
+    } catch (error: any) {
+      if (error?.code === '23505') {
+        await loadConversations();
+        return conversations.find((entry: any) => entry.participant_key === participantKey) || null;
+      }
+
+      console.error('Error ensuring conversation:', error);
+      return null;
+    }
+  }
+
+  async function handleInitialConversationIntent() {
+    if (!user?.id) return;
+
+    const chatWith = ($page.url.searchParams.get('chatWith') || '').trim();
+    const conversationId = ($page.url.searchParams.get('conversation') || '').trim();
+    const itemId = ($page.url.searchParams.get('item') || '').trim() || null;
+
+    if (chatWith && chatWith !== user.id) {
+      const conversation = await ensureConversation(chatWith, itemId);
+      if (conversation) {
+        await selectConversation(conversation);
+      }
+      return;
+    }
+
+    if (conversationId) {
+      const conversation = conversations.find((entry: any) => entry.id === conversationId);
+      if (conversation) {
+        await selectConversation(conversation);
+      }
+    }
+  }
+
+  async function sendMessage() {
+    const body = messageDraft.trim();
+    const conversation = conversations.find((entry: any) => entry.id === selectedConversationId);
+
+    if (!user?.id || !conversation?.id) return;
+    if (!body) {
+      messageStatus = 'Bitte zuerst eine Nachricht eingeben.';
+      return;
+    }
+
+    messageSendLoading = true;
+    messageStatus = '';
+
+    try {
+      const now = new Date().toISOString();
+      const { data, error } = await supabase
+        .from('user_messages')
+        .insert({
+          conversation_id: conversation.id,
+          sender_user_id: user.id,
+          item_id: conversation.starter_item_id || null,
+          body
+        })
+        .select(`
+          id,
+          sender_user_id,
+          item_id,
+          body,
+          created_at,
+          items:item_id(
+            id,
+            slug,
+            title,
+            original_name,
+            canonical_path,
+            country_slug,
+            district_slug,
+            municipality_slug,
+            path_512
+          )
+        `)
+        .single();
+
+      if (error) throw error;
+
+      const readColumn = conversation.user_a_id === user.id ? 'user_a_last_read_at' : 'user_b_last_read_at';
+      const { error: updateError } = await supabase
+        .from('user_conversations')
+        .update({
+          last_message_at: now,
+          last_message_preview: body.slice(0, 180),
+          last_message_sender_id: user.id,
+          [readColumn]: now,
+          updated_at: now
+        })
+        .eq('id', conversation.id);
+
+      if (updateError) throw updateError;
+
+      conversationMessages = [
+        ...conversationMessages,
+        {
+          ...data,
+          item: data.items || null
+        }
+      ];
+      messageDraft = '';
+
+      conversations = conversations
+        .map((entry: any) =>
+          entry.id === conversation.id
+            ? {
+                ...entry,
+                last_message_at: now,
+                last_message_preview: body.slice(0, 180),
+                last_message_sender_id: user.id,
+                [readColumn]: now
+              }
+            : entry
+        )
+        .sort(
+          (left: any, right: any) =>
+            new Date(right.last_message_at || 0).getTime() - new Date(left.last_message_at || 0).getTime()
+        );
+
+      const recipientUserId = conversation.user_a_id === user.id ? conversation.user_b_id : conversation.user_a_id;
+      if (recipientUserId && recipientUserId !== user.id) {
+        await supabase.from('user_notifications').insert({
+          recipient_user_id: recipientUserId,
+          actor_user_id: user.id,
+          item_id: conversation.starter_item_id || null,
+          event_type: 'chat_message',
+          payload: {
+            conversation_id: conversation.id,
+            message_excerpt: body.slice(0, 180),
+            starter_item_id: conversation.starter_item_id || null
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+      messageStatus = 'Nachricht konnte gerade nicht gesendet werden.';
+    } finally {
+      messageSendLoading = false;
+    }
+  }
+
   function getItemPreviewUrl(item: any) {
     return item?.slug && item?.path_512 ? getSeoImageUrl(item.slug, item.path_512, '512') : '';
   }
@@ -393,9 +821,19 @@
         return 'findet dein Bild gut';
       case 'comment_create':
         return 'hat kommentiert';
+      case 'chat_message':
+        return 'hat dir geschrieben';
       default:
         return 'hat interagiert';
     }
+  }
+
+  function getNotificationHref(entry: any) {
+    if (entry?.event_type === 'chat_message' && entry?.payload?.conversation_id) {
+      return `/profile?conversation=${encodeURIComponent(entry.payload.conversation_id)}`;
+    }
+
+    return entry.item ? getPublicItemHref(entry.item) : '#';
   }
 
   async function markNotificationRead(notificationId: string) {
@@ -797,7 +1235,7 @@
                   <a
                     class="activity-item"
                     class:is-unread={!entry.read_at}
-                    href={entry.item ? getPublicItemHref(entry.item) : '#'}
+                    href={getNotificationHref(entry)}
                     on:click={() => markNotificationRead(entry.id)}
                   >
                     <div class="activity-copy">
@@ -813,6 +1251,120 @@
               </div>
             {:else}
               <p class="help-text">Noch keine Benachrichtigungen vorhanden.</p>
+            {/if}
+          </div>
+
+          <div class="card">
+            <h3 class="section-title">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              </svg>
+              Nachrichten
+            </h3>
+            {#if conversationLoading}
+              <p class="help-text">Nachrichten werden geladen...</p>
+            {:else}
+              <div class="chat-layout">
+                <div class="conversation-list">
+                  {#if conversations.length > 0}
+                    {#each conversations as entry}
+                      <button
+                        type="button"
+                        class="conversation-card"
+                        class:is-active={entry.id === selectedConversationId}
+                        class:is-unread={getConversationUnread(entry)}
+                        on:click={() => selectConversation(entry)}
+                      >
+                        <div class="conversation-card__header">
+                          <div class="conversation-card__user">
+                            {#if getAvatarUrl(entry.otherUser)}
+                              <img
+                                src={getAvatarUrl(entry.otherUser)}
+                                alt={entry.otherUser?.full_name || entry.otherUser?.accountname || 'Profil'}
+                              />
+                            {:else}
+                              <span class="conversation-card__avatar-fallback">
+                                {(entry.otherUser?.full_name || entry.otherUser?.accountname || '?').slice(0, 1).toUpperCase()}
+                              </span>
+                            {/if}
+                            <strong>{entry.otherUser?.full_name || entry.otherUser?.accountname || 'Unbekannt'}</strong>
+                          </div>
+                          <time>{formatInteractionDate(entry.last_message_at || entry.created_at)}</time>
+                        </div>
+                        {#if entry.starter_item}
+                          <span class="conversation-card__item">
+                            Bezug: {entry.starter_item.title || entry.starter_item.original_name || 'Item'}
+                          </span>
+                        {/if}
+                        <span class="conversation-card__preview">
+                          {entry.last_message_preview || 'Noch keine Nachricht gesendet.'}
+                        </span>
+                      </button>
+                    {/each}
+                  {:else}
+                    <p class="help-text">Noch keine Gespräche vorhanden.</p>
+                  {/if}
+                </div>
+
+                <div class="chat-thread">
+                  {#if selectedConversationId}
+                    {@const activeConversation = conversations.find((entry) => entry.id === selectedConversationId)}
+                    {#if activeConversation}
+                      <div class="chat-thread__header">
+                        <div>
+                          <strong>{activeConversation.otherUser?.full_name || activeConversation.otherUser?.accountname || 'Unbekannt'}</strong>
+                          {#if activeConversation.starter_item}
+                            <span>
+                              zu
+                              <a href={getPublicItemHref(activeConversation.starter_item)}>
+                                {activeConversation.starter_item.title || activeConversation.starter_item.original_name || 'Item'}
+                              </a>
+                            </span>
+                          {/if}
+                        </div>
+                      </div>
+
+                      {#if messagesLoading}
+                        <p class="help-text">Nachrichten werden geladen...</p>
+                      {:else if conversationMessages.length > 0}
+                        <div class="message-list">
+                          {#each conversationMessages as entry}
+                            <div class="message-bubble" class:is-own={entry.sender_user_id === user.id}>
+                              <p>{entry.body}</p>
+                              {#if entry.item}
+                                <a class="message-bubble__item" href={getPublicItemHref(entry.item)}>
+                                  {entry.item.title || entry.item.original_name || 'Item'}
+                                </a>
+                              {/if}
+                              <time>{formatCommentDate(entry.created_at)}</time>
+                            </div>
+                          {/each}
+                        </div>
+                      {:else}
+                        <p class="help-text">Noch keine Nachrichten in diesem Gespräch.</p>
+                      {/if}
+
+                      <div class="chat-compose">
+                        <textarea
+                          bind:value={messageDraft}
+                          rows="4"
+                          placeholder="Nachricht schreiben..."
+                        />
+                        <div class="chat-compose__actions">
+                          {#if messageStatus}
+                            <span class="help-text">{messageStatus}</span>
+                          {/if}
+                          <button type="button" class="mark-read-btn" on:click={sendMessage} disabled={messageSendLoading}>
+                            {messageSendLoading ? 'Senden...' : 'Nachricht senden'}
+                          </button>
+                        </div>
+                      </div>
+                    {/if}
+                  {:else}
+                    <p class="help-text">Wähle links ein Gespräch aus oder starte eines von einer Item-Seite.</p>
+                  {/if}
+                </div>
+              </div>
             {/if}
           </div>
 
@@ -1631,6 +2183,164 @@
     font-style: normal;
   }
 
+  .chat-layout {
+    display: grid;
+    grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+    gap: 1rem;
+  }
+
+  .conversation-list {
+    display: grid;
+    gap: 0.75rem;
+    align-content: start;
+  }
+
+  .conversation-card {
+    display: grid;
+    gap: 0.4rem;
+    width: 100%;
+    text-align: left;
+    padding: 0.9rem 1rem;
+    border-radius: 14px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-tertiary);
+    color: inherit;
+    cursor: pointer;
+  }
+
+  .conversation-card:hover,
+  .conversation-card.is-active {
+    border-color: var(--accent-color);
+  }
+
+  .conversation-card.is-unread {
+    box-shadow: inset 3px 0 0 var(--accent-color);
+  }
+
+  .conversation-card__header {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    align-items: center;
+  }
+
+  .conversation-card__user {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 0;
+  }
+
+  .conversation-card__user img,
+  .conversation-card__avatar-fallback {
+    width: 38px;
+    height: 38px;
+    border-radius: 999px;
+    flex-shrink: 0;
+  }
+
+  .conversation-card__user img {
+    object-fit: cover;
+  }
+
+  .conversation-card__avatar-fallback {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: color-mix(in srgb, var(--accent-color) 16%, var(--bg-secondary));
+    color: var(--text-primary);
+    font-weight: 700;
+  }
+
+  .conversation-card__user strong,
+  .conversation-card__preview,
+  .conversation-card__item {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .conversation-card__item,
+  .conversation-card__preview,
+  .conversation-card time {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+  }
+
+  .chat-thread {
+    display: grid;
+    gap: 1rem;
+    min-width: 0;
+  }
+
+  .chat-thread__header {
+    padding: 0.9rem 1rem;
+    border-radius: 14px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-tertiary);
+  }
+
+  .chat-thread__header div {
+    display: grid;
+    gap: 0.2rem;
+  }
+
+  .chat-thread__header span,
+  .chat-thread__header a {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+  }
+
+  .message-list {
+    display: grid;
+    gap: 0.75rem;
+    max-height: 560px;
+    overflow-y: auto;
+    padding-right: 0.25rem;
+  }
+
+  .message-bubble {
+    display: grid;
+    gap: 0.35rem;
+    padding: 0.9rem 1rem;
+    border-radius: 16px 16px 16px 6px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    max-width: min(100%, 42rem);
+  }
+
+  .message-bubble.is-own {
+    margin-left: auto;
+    border-radius: 16px 16px 6px 16px;
+    background: color-mix(in srgb, var(--accent-color) 12%, var(--bg-tertiary));
+    border-color: color-mix(in srgb, var(--accent-color) 28%, var(--border-color));
+  }
+
+  .message-bubble p {
+    margin: 0;
+    white-space: pre-wrap;
+    line-height: 1.5;
+  }
+
+  .message-bubble__item,
+  .message-bubble time {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+  }
+
+  .chat-compose {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .chat-compose__actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
   .section-title {
     display: flex;
     align-items: center;
@@ -2078,6 +2788,10 @@
 
     .card {
       padding: 1.5rem;
+    }
+
+    .chat-layout {
+      grid-template-columns: 1fr;
     }
 
     .errorlog-actions {
