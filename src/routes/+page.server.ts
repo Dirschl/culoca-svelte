@@ -8,7 +8,7 @@ export const ssr = true;
 const ITEMS_PER_SECTION = 8;
 
 const DISCOVER_SELECT =
-  'id, slug, title, description, caption, canonical_path, country_slug, district_slug, municipality_slug, path_512, width, height, created_at, starts_at, ends_at, lat, lon';
+  'id, slug, title, description, caption, canonical_path, country_slug, district_slug, municipality_slug, path_512, path_2048, width, height, created_at, starts_at, ends_at, lat, lon';
 
 type DiscoverRow = {
   id: string;
@@ -18,6 +18,7 @@ type DiscoverRow = {
   caption: string | null;
   canonical_path: string | null;
   path_512: string | null;
+  path_2048: string | null;
   width: number | null;
   height: number | null;
   created_at: string | null;
@@ -33,31 +34,40 @@ type DiscoverRow = {
 /** Server client ohne generiertes Database-Schema */
 type ServerSupabase = SupabaseClient<any, 'public', any>;
 
-async function attachFotoVariants(
+type VariantRow = { slug: string; path_512: string | null; path_2048: string | null };
+
+function hasDisplayableImagePath(p512: string | null | undefined, p2048: string | null | undefined): boolean {
+  return Boolean(p512 || p2048);
+}
+
+/** Varianten inkl. Einträge nur mit path_2048 (path_512 fehlt noch) – wie sichtbar auf /foto */
+async function attachDiscoverVariants(
   supabase: ServerSupabase,
   items: DiscoverRow[]
-): Promise<Array<DiscoverRow & { variants: Array<{ slug: string; path_512: string | null }>; child_count: number }>> {
+): Promise<Array<DiscoverRow & { variants: VariantRow[]; child_count: number }>> {
   if (!items.length) {
     return items.map((i) => ({ ...i, variants: [], child_count: 0 }));
   }
   const rootIds = items.map((i) => i.id);
   const { data: variantRows } = await supabase
     .from('items')
-    .select('id, slug, path_512, width, height, group_root_item_id')
+    .select('id, slug, path_512, path_2048, width, height, group_root_item_id, created_at')
     .in('group_root_item_id', rootIds)
     .eq('is_private', false)
     .eq('admin_hidden', false)
     .not('slug', 'is', null)
-    .not('path_512', 'is', null)
     .order('created_at', { ascending: false });
 
-  const variantsByRoot = new Map<string, Array<{ slug: string; path_512: string | null }>>();
+  const variantsByRoot = new Map<string, VariantRow[]>();
   for (const row of variantRows || []) {
     const rootId = row.group_root_item_id as string | null;
     if (!rootId) continue;
+    const p512 = (row.path_512 || null) as string | null;
+    const p2048 = (row.path_2048 || null) as string | null;
+    if (!hasDisplayableImagePath(p512, p2048)) continue;
     const cur = variantsByRoot.get(rootId) || [];
-    if (cur.length >= 5) continue;
-    cur.push({ slug: row.slug as string, path_512: (row.path_512 || null) as string | null });
+    if (cur.length >= 8) continue;
+    cur.push({ slug: row.slug as string, path_512: p512, path_2048: p2048 });
     variantsByRoot.set(rootId, cur);
   }
 
@@ -93,7 +103,7 @@ async function loadDashboardDiscover(supabase: ServerSupabase) {
     console.error('[home] dashboard discover events', evErr);
   }
 
-  const upcomingEvents = (rawEvents || [])
+  const upcomingEventsRaw = (rawEvents || [])
     .filter((row) => {
       const starts = new Date(row.starts_at as string).getTime();
       const ends = row.ends_at ? new Date(row.ends_at as string).getTime() : Number.POSITIVE_INFINITY;
@@ -102,11 +112,13 @@ async function loadDashboardDiscover(supabase: ServerSupabase) {
       if (starts < nowMs && ends >= nowMs) return true;
       return false;
     })
-    .slice(0, 10)
-    .map((item) => ({
-      ...(item as DiscoverRow),
-      canonical_path: getPublicItemHref(item as DiscoverRow)
-    }));
+    .slice(0, 10) as DiscoverRow[];
+
+  const upcomingEventsWithVariants = await attachDiscoverVariants(supabase, upcomingEventsRaw);
+  const upcomingEvents = upcomingEventsWithVariants.map((item) => ({
+    ...item,
+    canonical_path: getPublicItemHref(item)
+  }));
 
   const { data: rawPhotos, error: phErr } = await supabase
     .from('items')
@@ -117,13 +129,13 @@ async function loadDashboardDiscover(supabase: ServerSupabase) {
     .is('group_root_item_id', null)
     .not('slug', 'is', null)
     .order('created_at', { ascending: false })
-    .limit(10);
+    .limit(20);
 
   if (phErr) {
     console.error('[home] dashboard discover photos', phErr);
   }
 
-  const photosWithVariants = await attachFotoVariants(supabase, (rawPhotos || []) as DiscoverRow[]);
+  const photosWithVariants = await attachDiscoverVariants(supabase, (rawPhotos || []) as DiscoverRow[]);
   const latestPhotos = photosWithVariants.map((item) => ({
     ...item,
     canonical_path: getPublicItemHref(item)
@@ -144,9 +156,10 @@ async function loadDashboardDiscover(supabase: ServerSupabase) {
     console.error('[home] dashboard discover firms', frErr);
   }
 
-  const latestFirms = (rawFirms || []).map((item) => ({
-    ...(item as DiscoverRow),
-    canonical_path: getPublicItemHref(item as DiscoverRow)
+  const firmsWithVariants = await attachDiscoverVariants(supabase, (rawFirms || []) as DiscoverRow[]);
+  const latestFirms = firmsWithVariants.map((item) => ({
+    ...item,
+    canonical_path: getPublicItemHref(item)
   }));
 
   return { upcomingEvents, latestPhotos, latestFirms };

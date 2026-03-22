@@ -18,6 +18,7 @@
     caption?: string | null;
     canonical_path: string | null;
     path_512: string | null;
+    path_2048?: string | null;
     width?: number | null;
     height?: number | null;
     created_at?: string | null;
@@ -30,7 +31,7 @@
     profile_id?: string | null;
     original_name?: string | null;
     child_count?: number;
-    variants?: Array<{ slug: string; path_512: string | null }>;
+    variants?: Array<{ slug: string; path_512: string | null; path_2048?: string | null }>;
     distance?: number | null;
   };
 
@@ -128,8 +129,12 @@
     return appendReturnTo(item.canonical_path || `/item/${item.slug}`, currentListPath);
   }
 
-  function thumbUrl(item: { slug: string; path_512: string | null }): string {
-    return getSeoImageUrl(item.slug, item.path_512, '512');
+  function pickImagePath(item: { path_512?: string | null; path_2048?: string | null }): string | null {
+    return item.path_512 || item.path_2048 || null;
+  }
+
+  function thumbUrl(item: { slug: string; path_512?: string | null; path_2048?: string | null }): string {
+    return getSeoImageUrl(item.slug, pickImagePath(item), '512');
   }
 
   function truncate(text: string | null | undefined, max: number): string {
@@ -323,20 +328,22 @@
     const rootIds = items.map((item) => item.id);
     const { data: variantRows } = await supabase
       .from('items')
-      .select('id, slug, path_512, width, height, group_root_item_id')
+      .select('id, slug, path_512, path_2048, width, height, group_root_item_id, created_at')
       .in('group_root_item_id', rootIds)
       .eq('is_private', false)
       .eq('admin_hidden', false)
       .not('slug', 'is', null)
-      .not('path_512', 'is', null)
       .order('created_at', { ascending: false });
 
     const variantsByRoot = new Map<string, any[]>();
     for (const row of variantRows || []) {
       const rootId = row.group_root_item_id as string | null;
       if (!rootId) continue;
+      const p512 = row.path_512 as string | null | undefined;
+      const p2048 = row.path_2048 as string | null | undefined;
+      if (!p512 && !p2048) continue;
       const current = variantsByRoot.get(rootId) || [];
-      if (current.length >= 5) continue;
+      if (current.length >= 8) continue;
       current.push(row);
       variantsByRoot.set(rootId, current);
     }
@@ -365,12 +372,11 @@
       while (true) {
         let pageQuery = supabase
           .from('items')
-          .select('id, slug, title, description, caption, canonical_path, path_512, width, height, created_at, starts_at, ends_at, external_url, lat, lon, is_private, profile_id')
+          .select('id, slug, title, description, caption, canonical_path, path_512, path_2048, width, height, created_at, starts_at, ends_at, external_url, lat, lon, is_private, profile_id')
           .eq('type_id', data.typeDef.id)
           .eq('admin_hidden', false)
           .is('group_root_item_id', null)
           .not('slug', 'is', null)
-          .not('path_512', 'is', null)
           .range(from, from + pageFetchSize - 1);
 
         if (search) {
@@ -394,6 +400,7 @@
               item.is_private == null;
 
             if (!isVisible) return false;
+            if (!pickImagePath(item)) return false;
             return !search || matchesAllSearchWords(item, search);
           })
         );
@@ -487,8 +494,12 @@
     const variants = Array.isArray(item.variants) ? item.variants : [];
     const rootUrl = thumbUrl(item);
     return variants
-      .filter((variant: { slug: string; path_512: string | null } | undefined) => variant?.slug && variant?.path_512)
-      .map((variant: { slug: string; path_512: string | null }) => getSeoImageUrl(variant.slug, variant.path_512, '512'))
+      .filter((variant: { slug: string; path_512?: string | null; path_2048?: string | null } | undefined) => {
+        return Boolean(variant?.slug && pickImagePath(variant));
+      })
+      .map((variant: { slug: string; path_512?: string | null; path_2048?: string | null }) =>
+        getSeoImageUrl(variant.slug, pickImagePath(variant), '512')
+      )
       .filter((url): url is string => Boolean(url) && url !== rootUrl);
   }
 
@@ -728,7 +739,7 @@
             {#each displayedItems as item (item.id)}
               <article class="item-card">
                 <a href={itemHref(item)} class="item-link">
-                  {#if item.path_512}
+                  {#if pickImagePath(item)}
                     {@const previewUrl = currentThumbUrl(item)}
                     <div
                       class="item-thumb"

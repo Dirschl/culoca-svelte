@@ -106,7 +106,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
   const buildBaseQuery = () => {
     let query = supabase
       .from('items')
-      .select('id, slug, title, description, caption, canonical_path, country_slug, district_slug, municipality_slug, path_512, width, height, created_at, starts_at, ends_at, external_url, lat, lon, original_name')
+      .select('id, slug, title, description, caption, canonical_path, country_slug, district_slug, municipality_slug, path_512, path_2048, width, height, created_at, starts_at, ends_at, external_url, lat, lon, original_name')
       .eq('type_id', typeDef.id)
       .eq('is_private', false)
       .eq('admin_hidden', false)
@@ -181,6 +181,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
     caption: (item.caption || null) as string | null,
     canonical_path: (item.canonical_path || null) as string | null,
     path_512: (item.path_512 || null) as string | null,
+    path_2048: (item.path_2048 || null) as string | null,
     width: (item.width || null) as number | null,
     height: (item.height || null) as number | null,
     created_at: (item.created_at || null) as string | null,
@@ -202,18 +203,18 @@ export const load: PageServerLoad = async ({ params, url }) => {
     const rootIds = baseItems.map((item) => item.id);
     const { data: variantRows } = await supabase
       .from('items')
-      .select('id, slug, path_512, width, height, group_root_item_id')
+      .select('id, slug, path_512, path_2048, width, height, group_root_item_id, created_at')
       .in('group_root_item_id', rootIds)
       .eq('is_private', false)
       .eq('admin_hidden', false)
       .not('slug', 'is', null)
-      .not('path_512', 'is', null)
       .order('created_at', { ascending: false });
 
     const variantsByRoot = new Map<string, Array<{
       id: string;
       slug: string;
       path_512: string | null;
+      path_2048: string | null;
       width: number | null;
       height: number | null;
     }>>();
@@ -221,12 +222,16 @@ export const load: PageServerLoad = async ({ params, url }) => {
     for (const row of variantRows || []) {
       const rootId = row.group_root_item_id as string | null;
       if (!rootId) continue;
+      const p512 = (row.path_512 || null) as string | null;
+      const p2048 = (row.path_2048 || null) as string | null;
+      if (!p512 && !p2048) continue;
       const current = variantsByRoot.get(rootId) || [];
-      if (current.length >= 5) continue;
+      if (current.length >= 8) continue;
       current.push({
         id: row.id as string,
         slug: row.slug as string,
-        path_512: (row.path_512 || null) as string | null,
+        path_512: p512,
+        path_2048: p2048,
         width: (row.width || null) as number | null,
         height: (row.height || null) as number | null
       });

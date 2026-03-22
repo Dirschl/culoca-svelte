@@ -1,7 +1,8 @@
 <script lang="ts">
+  import { onDestroy } from 'svelte';
+  import { browser } from '$app/environment';
   import { appendReturnTo } from '$lib/content/routing';
   import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
-  import type { RememberedLocation } from '$lib/locationPreferences';
 
   type DiscoverListItem = {
     id: string;
@@ -11,27 +12,39 @@
     caption: string | null;
     canonical_path: string | null;
     path_512: string | null;
+    path_2048: string | null;
     created_at: string | null;
     starts_at: string | null;
     ends_at: string | null;
     lat: number | null;
     lon: number | null;
-    variants?: Array<{ slug: string; path_512: string | null }>;
+    variants?: Array<{ slug: string; path_512: string | null; path_2048: string | null }>;
     child_count?: number;
   };
 
   export let upcomingEvents: DiscoverListItem[] = [];
   export let latestPhotos: DiscoverListItem[] = [];
   export let latestFirms: DiscoverListItem[] = [];
-  /** Für Entfernungs-Badges (wie /foto) */
-  export let referenceLocation: RememberedLocation | null = null;
+  /** Wie /foto: userLat/userLon, Filter-Store, Fallback savedLocation */
+  export let referenceCoords: { lat: number; lon: number } | null = null;
+
+  let animatedPreviewUrls: Record<string, string> = {};
+  let variantImageIndexes: Record<string, number> = {};
+  let variantTimer: ReturnType<typeof setInterval> | null = null;
+  let lastRotationKey = '';
+  let previewImageElements: Record<string, HTMLImageElement | null> = {};
+  let previewThumbElements: Record<string, HTMLDivElement | null> = {};
 
   function itemHref(item: { canonical_path: string | null; slug: string }): string {
     return appendReturnTo(item.canonical_path || `/item/${item.slug}`, '/');
   }
 
-  function thumbUrl(item: { slug: string; path_512: string | null }): string {
-    return getSeoImageUrl(item.slug, item.path_512, '512');
+  function pickPath(item: { path_512?: string | null; path_2048?: string | null }): string | null {
+    return item.path_512 || item.path_2048 || null;
+  }
+
+  function thumbUrl(item: { slug: string; path_512?: string | null; path_2048?: string | null }): string {
+    return getSeoImageUrl(item.slug, pickPath(item), '512');
   }
 
   function truncate(text: string | null | undefined, max: number): string {
@@ -68,12 +81,102 @@
   }
 
   function distanceForItem(item: DiscoverListItem): number | null {
-    if (!referenceLocation) return null;
+    if (!referenceCoords) return null;
     const lat = Number(item.lat);
     const lon = Number(item.lon);
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
-    return getDistanceInMeters(referenceLocation.lat, referenceLocation.lon, lat, lon);
+    return getDistanceInMeters(referenceCoords.lat, referenceCoords.lon, lat, lon);
   }
+
+  function variantThumbUrls(item: DiscoverListItem): string[] {
+    const variants = Array.isArray(item.variants) ? item.variants : [];
+    const rootUrl = thumbUrl(item);
+    return variants
+      .filter((v) => v?.slug && pickPath(v))
+      .map((v) => getSeoImageUrl(v.slug, pickPath(v), '512'))
+      .filter((url) => Boolean(url) && url !== rootUrl);
+  }
+
+  function rotationThumbUrls(item: DiscoverListItem): string[] {
+    const rootUrl = thumbUrl(item);
+    const variantUrls = variantThumbUrls(item);
+    return variantUrls.length ? [rootUrl, ...variantUrls] : [rootUrl];
+  }
+
+  function currentThumbUrl(item: DiscoverListItem): string {
+    return animatedPreviewUrls[item.id] || thumbUrl(item);
+  }
+
+  function applyPreviewUrl(itemId: string, url: string) {
+    const imageEl = previewImageElements[itemId];
+    if (imageEl && imageEl.src !== url) {
+      imageEl.src = url;
+    }
+    const thumbEl = previewThumbElements[itemId];
+    if (thumbEl) {
+      const safe = url.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+      thumbEl.style.setProperty('--thumb-preview', `url('${safe}')`);
+    }
+  }
+
+  function preloadVariantImages(items: DiscoverListItem[]) {
+    if (!browser) return;
+    for (const item of items) {
+      for (const url of rotationThumbUrls(item).slice(1)) {
+        const img = new Image();
+        img.decoding = 'async';
+        img.src = url;
+      }
+    }
+  }
+
+  function startVariantRotation(items: DiscoverListItem[]) {
+    variantTimer = setInterval(() => {
+      const nextUrls: Record<string, string> = {};
+      const nextIndexes: Record<string, number> = { ...variantImageIndexes };
+
+      for (const item of items) {
+        const variants = rotationThumbUrls(item);
+        if (variants.length <= 1) continue;
+        const nextIndex = ((nextIndexes[item.id] ?? 0) + 1) % variants.length;
+        nextIndexes[item.id] = nextIndex;
+        nextUrls[item.id] = variants[nextIndex];
+        applyPreviewUrl(item.id, variants[nextIndex]);
+      }
+
+      variantImageIndexes = nextIndexes;
+      animatedPreviewUrls = nextUrls;
+    }, 2800);
+  }
+
+  function refreshVariantRotation(items: DiscoverListItem[]) {
+    if (!browser) return;
+    const nextKey = items.map((item) => `${item.id}:${item.child_count || 0}`).join('|');
+    if (nextKey === lastRotationKey) return;
+    lastRotationKey = nextKey;
+
+    if (variantTimer) {
+      clearInterval(variantTimer);
+      variantTimer = null;
+    }
+
+    animatedPreviewUrls = {};
+    variantImageIndexes = {};
+
+    const hasVariants = items.some((item) => variantThumbUrls(item).length > 0);
+    if (!hasVariants) return;
+    preloadVariantImages(items);
+    startVariantRotation(items);
+  }
+
+  $: allRotationItems = [...upcomingEvents, ...latestPhotos, ...latestFirms];
+  $: if (browser && allRotationItems.length > 0) {
+    refreshVariantRotation(allRotationItems);
+  }
+
+  onDestroy(() => {
+    if (variantTimer) clearInterval(variantTimer);
+  });
 </script>
 
 <div class="discover-hub">
@@ -87,20 +190,30 @@
       </div>
       <div class="items-grid">
         {#each upcomingEvents as item (item.id)}
+          {@const previewUrl = currentThumbUrl(item)}
+          {@const dist = distanceForItem(item)}
           <article class="item-card">
             <a href={itemHref(item)} class="item-link">
-              {#if item.path_512}
-                <div class="item-thumb">
-                  {#if distanceForItem(item) != null}
-                    <div class="item-distance-badge">{formatDistance(distanceForItem(item))}</div>
+              {#if pickPath(item)}
+                <div
+                  class="item-thumb item-thumb--foto"
+                  bind:this={previewThumbElements[item.id]}
+                  style={`--thumb-preview:url('${previewUrl.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}')`}
+                >
+                  {#if (item.child_count || 0) > 0}
+                    <div class="item-variant-count">+{(item.child_count || 0) + 1}</div>
+                  {/if}
+                  {#if dist != null}
+                    <div class="item-distance-badge">{formatDistance(dist)}</div>
                   {/if}
                   <img
-                    src={thumbUrl(item)}
+                    src={previewUrl}
                     alt={item.title || item.slug}
-                    width="320"
-                    height="213"
+                    width="400"
+                    height="267"
                     loading="lazy"
                     decoding="async"
+                    bind:this={previewImageElements[item.id]}
                   />
                 </div>
               {:else}
@@ -138,14 +251,15 @@
       </div>
       <div class="items-grid">
         {#each latestPhotos as item (item.id)}
+          {@const previewUrl = currentThumbUrl(item)}
           {@const dist = distanceForItem(item)}
-          {@const previewUrl = thumbUrl(item)}
           <article class="item-card">
             <a href={itemHref(item)} class="item-link">
-              {#if item.path_512}
+              {#if pickPath(item)}
                 <div
                   class="item-thumb item-thumb--foto"
-                  style={`--thumb-preview:url('${previewUrl.replace(/'/g, "\\'")}')`}
+                  bind:this={previewThumbElements[item.id]}
+                  style={`--thumb-preview:url('${previewUrl.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}')`}
                 >
                   {#if (item.child_count || 0) > 0}
                     <div class="item-variant-count">+{(item.child_count || 0) + 1}</div>
@@ -153,7 +267,15 @@
                   {#if dist != null}
                     <div class="item-distance-badge">{formatDistance(dist)}</div>
                   {/if}
-                  <img src={previewUrl} alt={item.title || item.slug} width="320" height="213" loading="lazy" decoding="async" />
+                  <img
+                    src={previewUrl}
+                    alt={item.title || item.slug}
+                    width="400"
+                    height="267"
+                    loading="lazy"
+                    decoding="async"
+                    bind:this={previewImageElements[item.id]}
+                  />
                 </div>
               {:else}
                 <div class="item-thumb item-thumb--empty">
@@ -180,20 +302,30 @@
       </div>
       <div class="items-grid">
         {#each latestFirms as item (item.id)}
+          {@const previewUrl = currentThumbUrl(item)}
+          {@const dist = distanceForItem(item)}
           <article class="item-card">
             <a href={itemHref(item)} class="item-link">
-              {#if item.path_512}
-                <div class="item-thumb">
-                  {#if distanceForItem(item) != null}
-                    <div class="item-distance-badge">{formatDistance(distanceForItem(item))}</div>
+              {#if pickPath(item)}
+                <div
+                  class="item-thumb item-thumb--foto"
+                  bind:this={previewThumbElements[item.id]}
+                  style={`--thumb-preview:url('${previewUrl.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}')`}
+                >
+                  {#if (item.child_count || 0) > 0}
+                    <div class="item-variant-count">+{(item.child_count || 0) + 1}</div>
+                  {/if}
+                  {#if dist != null}
+                    <div class="item-distance-badge">{formatDistance(dist)}</div>
                   {/if}
                   <img
-                    src={thumbUrl(item)}
+                    src={previewUrl}
                     alt={item.title || item.slug}
-                    width="320"
-                    height="213"
+                    width="400"
+                    height="267"
                     loading="lazy"
                     decoding="async"
+                    bind:this={previewImageElements[item.id]}
                   />
                 </div>
               {:else}
@@ -271,11 +403,11 @@
     text-decoration: underline;
   }
 
-  /* Wie /foto-Hub: keine runden Ecken an den Karten */
+  /* Größere Kacheln als zuvor (4 → 3 Spalten) */
   .items-grid {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 1rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1.15rem;
   }
 
   .item-card {
@@ -378,15 +510,15 @@
   }
 
   .item-body {
-    padding: 0.75rem 0.85rem;
+    padding: 0.85rem 0.95rem;
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: 0.3rem;
     flex: 1;
   }
 
   .item-body h3 {
-    font-size: 0.9rem;
+    font-size: 0.95rem;
     font-weight: 600;
     line-height: 1.35;
     margin: 0;
@@ -399,7 +531,7 @@
   }
 
   .item-desc {
-    font-size: 0.8rem;
+    font-size: 0.82rem;
     line-height: 1.45;
     color: var(--text-muted);
     margin: 0;
@@ -417,15 +549,16 @@
     padding-top: 0.2rem;
   }
 
-  @media (max-width: 1200px) {
+  @media (max-width: 1100px) {
     .items-grid {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
 
   @media (max-width: 720px) {
     .items-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.85rem;
     }
   }
 

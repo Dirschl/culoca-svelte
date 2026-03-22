@@ -17,11 +17,19 @@
   import { buildBreadcrumbJsonLd, DEFAULT_OG_IMAGE, trimText } from '$lib/seo/site';
   import HomeTypeSectionsFeed from '$lib/HomeTypeSectionsFeed.svelte';
   import HomeDashboardDiscover from '$lib/HomeDashboardDiscover.svelte';
+  import { getStoredGpsPositionForHub } from '$lib/storedGpsReadout';
 
   export let data: PageData;
   type DashboardView = 'all' | 'inbox' | 'creator' | 'network';
 
   let savedLocation: RememberedLocation | null = null;
+
+  /** Wie /foto: gleiche Koordinaten-Quellen, nicht nur readRememberedLocation (gpsAllowed) */
+  $: discoverDistanceCoords =
+    browser
+      ? getStoredGpsPositionForHub() ??
+        (savedLocation ? { lat: savedLocation.lat, lon: savedLocation.lon } : null)
+      : null;
   let currentUserFullName = '';
   let currentUserId = '';
   let currentUserAccountname = '';
@@ -1296,14 +1304,14 @@
                 <span class="dashboard-kicker">Entdecken</span>
                 <h2 class="dashboard-discover-title">Neu auf Culoca</h2>
                 <p class="dashboard-discover-lede">
-                  Nächste Termine, neueste Fotos (wie unter /foto) und Firmen – mit Entfernung, wenn ein Standort gesetzt ist.
+                  Nächste Termine, 20 neueste Fotos und Firmen wie unter /foto – Varianten-Wechsel, Entfernung bei bekannter Position.
                 </p>
               </header>
               <HomeDashboardDiscover
                 upcomingEvents={data.dashboardDiscover.upcomingEvents}
                 latestPhotos={data.dashboardDiscover.latestPhotos}
                 latestFirms={data.dashboardDiscover.latestFirms}
-                referenceLocation={savedLocation}
+                referenceCoords={discoverDistanceCoords}
               />
             </aside>
           {/if}
