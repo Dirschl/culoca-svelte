@@ -1,6 +1,5 @@
 import { error } from '@sveltejs/kit';
 import { supabase } from '$lib/supabaseClient';
-import sharp from 'sharp';
 
 export const GET = async ({ params }) => {
   const { slug } = params;
@@ -71,6 +70,8 @@ export const GET = async ({ params }) => {
 
     // 5. Konvertiere zu PNG für bessere Browser-Kompatibilität
     try {
+      const { default: sharp } = await import('sharp');
+
       // Vercel-optimierte Sharp-Konfiguration mit zusätzlichen Sicherheitsmaßnahmen
       const pngBuffer = await sharp(imageBuffer, { 
         failOnError: false,

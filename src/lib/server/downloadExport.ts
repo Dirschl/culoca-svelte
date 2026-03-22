@@ -1,4 +1,4 @@
-import sharp, { type Gravity, type Metadata, type Sharp, type Strategy } from 'sharp';
+import type { Gravity, Metadata, Sharp, Strategy } from 'sharp';
 import { promises as fs } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -56,6 +56,16 @@ const DEFAULT_OPTIONS: Required<Pick<DownloadExportOptions, 'sizeMode' | 'format
   metadataMode: 'original',
   filenameMode: 'original'
 };
+
+let sharpFactoryPromise: Promise<(typeof import('sharp'))['default']> | null = null;
+
+async function getSharp() {
+  if (!sharpFactoryPromise) {
+    sharpFactoryPromise = import('sharp').then((module) => module.default);
+  }
+
+  return sharpFactoryPromise;
+}
 
 function clampNumber(value: unknown, min: number, max: number, fallback: number) {
   const num = typeof value === 'number' ? value : Number(value);
@@ -581,6 +591,7 @@ export async function renderDownloadExport(
   rawOptions: DownloadExportOptions
 ) {
   const options = normalizeDownloadExportOptions(rawOptions);
+  const sharp = await getSharp();
   const baseImage = sharp(originalBuffer).rotate();
   const metadata = await baseImage.metadata();
   const orientedDimensions = getAutoOrientedDimensions(metadata);
@@ -695,7 +706,7 @@ export async function renderDownloadExport(
     return nextPipeline;
   };
 
-  const renderTransformedBuffer = async (inputPipeline: sharp.Sharp) => {
+  const renderTransformedBuffer = async (inputPipeline: Sharp) => {
     const transformed = applyFormat(inputPipeline, options.format, options.compression);
     return transformed.toBuffer({ resolveWithObject: true });
   };
