@@ -21,7 +21,7 @@
   let currentPage = 1;
   let totalItems = 0;
   let historyBusy = false;
-  let activeSection: 'recent' | 'photos' | 'events' | 'favorites' | 'likes' | 'notifications' | 'interactions' | 'following' | 'followers' | 'review' = 'recent';
+  let activeSection: 'recent' | 'photos' | 'events' | 'favorites' | 'likes' | 'notifications' | 'interactions' | 'following' | 'followers' | 'shares' | 'review' = 'recent';
   let unreadChats: any[] = [];
   let interactions: any[] = [];
   let reviewCount = 0;
@@ -827,6 +827,21 @@
           <button
             type="button"
             class="dashboard-menu__link"
+            class:is-active={activeSection === 'shares'}
+            on:click={() => setActiveSection('shares')}
+          >
+            <span class="dashboard-menu__label">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <rect x="3" y="5" width="18" height="14" rx="2" />
+                <path d="M8 12h8M12 8v8" />
+              </svg>
+              <span>Globale Freigaben</span>
+            </span>
+            <strong>→</strong>
+          </button>
+          <button
+            type="button"
+            class="dashboard-menu__link"
             class:is-active={activeSection === 'review'}
             on:click={() => setActiveSection('review')}
           >
@@ -1188,6 +1203,17 @@
               {/each}
             </div>
           {/if}
+        {:else if activeSection === 'shares'}
+          <div class="panel-head panel-head--space">
+            <h2>Globale Freigaben</h2>
+            <span>Verwaltung</span>
+          </div>
+          <p class="dashboard-empty">
+            Verwalte hier die globalen Freigaben deiner Inhalte.
+          </p>
+          <div class="entry-actions">
+            <a href="/profile/freigaben">Freigaben öffnen</a>
+          </div>
         {:else}
           <div class="panel-head panel-head--space">
             <h2>Datenprüfung</h2>
