@@ -1400,7 +1400,7 @@
                   <span class="dashboard-kicker">Creator</span>
                   <h2>Letzte Downloads</h2>
                 </div>
-                <a href="/profile">Mehr</a>
+                <a href="/dashboard?section=photos">Mehr</a>
               </div>
 
               {#if dashboardLoading && dashboardLatestDownloads.length === 0}
@@ -1408,7 +1408,7 @@
               {:else if dashboardLatestDownloads.length > 0}
                 <div class="dashboard-list">
                   {#each dashboardLatestDownloads as entry (entry.id)}
-                    <a class="dashboard-entry dashboard-entry--link" href={entry.item ? getPublicItemHref(entry.item) : '/profile'}>
+                    <a class="dashboard-entry dashboard-entry--link" href={entry.item ? getPublicItemHref(entry.item) : '/dashboard?section=photos'}>
                       {#if entry.item && getItemPreviewUrl(entry.item)}
                         <img
                           class="dashboard-entry__thumb"

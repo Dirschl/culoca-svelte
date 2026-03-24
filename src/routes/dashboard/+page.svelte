@@ -31,6 +31,9 @@
   let followedProfiles: any[] = [];
   let followerProfiles: any[] = [];
   let networkBusy = false;
+  let followingSearchQuery = '';
+  let followingSearchResults: any[] = [];
+  let followingSearchBusy = false;
 
   $: totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
   $: canPrev = currentPage > 1;
@@ -461,6 +464,64 @@
     }
   }
 
+  async function searchProfilesToFollow() {
+    const q = followingSearchQuery.trim();
+    if (q.length < 2) {
+      followingSearchResults = [];
+      return;
+    }
+
+    followingSearchBusy = true;
+    errorMessage = '';
+    try {
+      const escaped = q.replace(/[%]/g, '');
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, accountname, avatar_url, website')
+        .or(`full_name.ilike.%${escaped}%,accountname.ilike.%${escaped}%,website.ilike.%${escaped}%`)
+        .neq('id', currentUserId)
+        .limit(8);
+      if (error) throw error;
+
+      const followedSet = new Set(followedProfiles.map((profile: any) => profile.id));
+      followingSearchResults = (data || []).filter((profile: any) => !followedSet.has(profile.id));
+    } catch (error: any) {
+      errorMessage = error?.message || 'Profile konnten nicht gesucht werden.';
+    } finally {
+      followingSearchBusy = false;
+    }
+  }
+
+  async function followProfile(targetUserId: string) {
+    if (!targetUserId || networkBusy) return;
+    networkBusy = true;
+    errorMessage = '';
+    try {
+      const { data: existing, error: existingError } = await supabase
+        .from('user_follows')
+        .select('follower_user_id')
+        .eq('follower_user_id', currentUserId)
+        .eq('followed_user_id', targetUserId)
+        .maybeSingle();
+      if (existingError) throw existingError;
+
+      if (!existing) {
+        const { error } = await supabase.from('user_follows').insert({
+          follower_user_id: currentUserId,
+          followed_user_id: targetUserId
+        });
+        if (error) throw error;
+      }
+
+      await loadNetworkProfiles();
+      await searchProfilesToFollow();
+    } catch (error: any) {
+      errorMessage = error?.message || 'Profil konnte nicht gefolgt werden.';
+    } finally {
+      networkBusy = false;
+    }
+  }
+
   async function loadNotifications() {
     const { data, error } = await supabase
       .from('user_conversations')
@@ -633,7 +694,13 @@
             class:is-active={activeSection === 'recent'}
             on:click={() => (activeSection = 'recent')}
           >
-            <span>Zuletzt angesehen</span>
+            <span class="dashboard-menu__label">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M12 7v6l4 2" />
+              </svg>
+              <span>Zuletzt angesehen</span>
+            </span>
             <strong>{recentItems.length}</strong>
           </button>
           <button
@@ -698,7 +765,12 @@
             class:is-active={activeSection === 'notifications'}
             on:click={() => (activeSection = 'notifications')}
           >
-            <span>Chat ungelesen</span>
+            <span class="dashboard-menu__label">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              </svg>
+              <span>Chat ungelesen</span>
+            </span>
             <strong>{unreadChats.length}</strong>
           </button>
           <button
@@ -707,7 +779,12 @@
             class:is-active={activeSection === 'interactions'}
             on:click={() => (activeSection = 'interactions')}
           >
-            <span>Interaktionen</span>
+            <span class="dashboard-menu__label">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M7 11a3 3 0 1 1 3-3 3 3 0 0 1-3 3zm10 0a3 3 0 1 1 3-3 3 3 0 0 1-3 3zM7 13c-3.3 0-6 1.6-6 3.6V19h12v-2.4C13 14.6 10.3 13 7 13zm10 0c-1 0-1.9.1-2.8.4 1.1.8 1.8 1.9 1.8 3.2V19h8v-2.4c0-2-2.7-3.6-6-3.6z"/>
+              </svg>
+              <span>Interaktionen</span>
+            </span>
             <strong>{interactions.length}</strong>
           </button>
           <button
@@ -716,7 +793,12 @@
             class:is-active={activeSection === 'following'}
             on:click={() => (activeSection = 'following')}
           >
-            <span>Du folgst</span>
+            <span class="dashboard-menu__label">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M15 12c2.2 0 4-1.8 4-4s-1.8-4-4-4-4 1.8-4 4 1.8 4 4 4zM6 10c1.7 0 3-1.3 3-3S7.7 4 6 4 3 5.3 3 7s1.3 3 3 3zm9 2c-2.7 0-8 1.3-8 4v3h16v-3c0-2.7-5.3-4-8-4zM6 12c-.5 0-1 .03-1.5.1C2.6 12.5 1 13.4 1 15v2h4v-1c0-1.5.8-2.9 2.2-4-.4 0-.8 0-1.2 0z"/>
+              </svg>
+              <span>Du folgst</span>
+            </span>
             <strong>{followedProfiles.length}</strong>
           </button>
           <button
@@ -725,7 +807,12 @@
             class:is-active={activeSection === 'followers'}
             on:click={() => (activeSection = 'followers')}
           >
-            <span>Follower</span>
+            <span class="dashboard-menu__label">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3zM8 11c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zM8 13c-2.33 0-7 1.17-7 3.5V19h14v-2.5C15 14.17 10.33 13 8 13zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z" />
+              </svg>
+              <span>Follower</span>
+            </span>
             <strong>{followerProfiles.length}</strong>
           </button>
           <button
@@ -1007,6 +1094,38 @@
             <h2>Du folgst</h2>
             <span>{followedProfiles.length} gesamt</span>
           </div>
+          <form class="search-row" on:submit|preventDefault={searchProfilesToFollow}>
+            <input type="search" bind:value={followingSearchQuery} placeholder="Profil suchen (Name, @accountname, Organisation)" />
+            <button type="submit" disabled={followingSearchBusy}>Suchen</button>
+          </form>
+          {#if followingSearchQuery.trim().length >= 2}
+            {#if followingSearchBusy}
+              <p class="dashboard-empty">Suche läuft...</p>
+            {:else if followingSearchResults.length > 0}
+              <div class="entry-list">
+                {#each followingSearchResults as profile (profile.id)}
+                  <article class="entry-card entry-card--history">
+                    {#if profile.avatar_url}
+                      <img src={profile.avatar_url.startsWith('http') ? profile.avatar_url : `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/avatars/${profile.avatar_url}`} alt={profile.full_name || profile.accountname || 'Profil'} width="56" height="56" loading="lazy" />
+                    {:else}
+                      <div class="entry-thumb-fallback">{(profile.full_name || profile.accountname || '?').slice(0, 1).toUpperCase()}</div>
+                    {/if}
+                    <span class="entry-content">
+                      <strong>{profile.full_name || profile.accountname || 'Profil'}</strong>
+                      {#if profile.accountname}
+                        <a href={`/${encodeURIComponent(profile.accountname)}`}>@{profile.accountname}</a>
+                      {/if}
+                    </span>
+                    <button type="button" class="ghost-btn entry-remove-btn" on:click={() => followProfile(profile.id)} disabled={networkBusy}>
+                      Folgen
+                    </button>
+                  </article>
+                {/each}
+              </div>
+            {:else}
+              <p class="dashboard-empty">Keine passenden Profile gefunden.</p>
+            {/if}
+          {/if}
           {#if followedProfiles.length === 0}
             <p class="dashboard-empty">Du folgst aktuell noch keinem Profil.</p>
           {:else}
