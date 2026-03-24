@@ -1314,7 +1314,7 @@
                 <p>
                   Berechtigte:
                   {globalProfileRights
-                    .map((entry: any) => entry.target?.full_name || entry.target?.accountname || 'Unbekannt')
+                    .map((entry) => entry.target?.full_name || entry.target?.accountname || 'Unbekannt')
                     .join(', ')}
                 </p>
               {/if}
