@@ -1,5 +1,13 @@
 import type { RequestHandler } from '@sveltejs/kit';
 import { supabase } from '$lib/supabaseClient';
+import { supabaseAdmin } from '$lib/supabaseAdmin';
+
+/**
+ * Öffentliche Bild-URLs müssen jedes nicht-private Item per Slug auflösen können.
+ * Der Anon-Client unterliegt RLS (z. B. nur Galerie + GPS + path_64) und liefert sonst 404,
+ * obwohl die Datei in Storage existiert — HEAD kann dabei irreführend aus dem CDN-Cache kommen.
+ */
+const dbForPublicImages = supabaseAdmin ?? supabase;
 
 const SUPABASE_STORAGE_URL = 'https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public';
 
@@ -149,7 +157,7 @@ export const GET: RequestHandler = async ({ params, url, request }) => {
       `🔍 [Images] Extracted slug: ${actualSlug}, size: ${requestedSize || 'default'}, extension: ${requestedExtension || 'none'}`
     );
 
-    const { data: rows, error: dbError } = await supabase
+    const { data: rows, error: dbError } = await dbForPublicImages
       .from('items')
       .select('id, slug, path_2048, path_512, title, description, is_private, created_at, updated_at')
       .eq('slug', actualSlug)
