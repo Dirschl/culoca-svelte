@@ -30,6 +30,7 @@
   let eventItems: any[] = [];
   let followedProfiles: any[] = [];
   let followerProfiles: any[] = [];
+  let sharedItemRights: any[] = [];
   let networkBusy = false;
   let followingSearchQuery = '';
   let followingSearchResults: any[] = [];
@@ -128,6 +129,14 @@
       result[key] = (result[key] || 0) + 1;
     }
     return result;
+  }
+
+  function getRightsText(rightsObj: any): string {
+    const rightsList = [];
+    if (rightsObj?.download) rightsList.push('Download');
+    if (rightsObj?.edit) rightsList.push('Bearbeiten');
+    if (rightsObj?.delete) rightsList.push('Löschen');
+    return rightsList.length > 0 ? rightsList.join(', ') : 'Keine Rechte';
   }
 
   async function ensureAuthUser() {
@@ -523,6 +532,56 @@
     }
   }
 
+  async function loadSharedItemRights() {
+    const { data, error } = await supabase
+      .from('item_rights')
+      .select(`
+        id,
+        target_user_id,
+        rights,
+        created_at,
+        updated_at,
+        items!inner(
+          id,
+          slug,
+          title,
+          original_name,
+          canonical_path,
+          country_slug,
+          district_slug,
+          municipality_slug,
+          path_512,
+          profile_id
+        )
+      `)
+      .eq('items.profile_id', currentUserId)
+      .order('updated_at', { ascending: false })
+      .limit(200);
+
+    if (error) throw error;
+
+    const rows = data || [];
+    const targetIds = [...new Set(rows.map((entry: any) => entry.target_user_id).filter(Boolean))];
+    const targetsById = new Map<string, any>();
+
+    if (targetIds.length > 0) {
+      const { data: targets, error: targetError } = await supabase
+        .from('profiles')
+        .select('id, full_name, accountname, avatar_url')
+        .in('id', targetIds);
+      if (targetError) throw targetError;
+      for (const profile of targets || []) {
+        targetsById.set(profile.id, profile);
+      }
+    }
+
+    sharedItemRights = rows.map((entry: any) => ({
+      ...entry,
+      item: entry.items || null,
+      target: targetsById.get(entry.target_user_id) || null
+    }));
+  }
+
   async function loadNotifications() {
     const { data, error } = await supabase
       .from('user_conversations')
@@ -649,7 +708,7 @@
       const ok = await ensureAuthUser();
       if (!ok) return;
       const sectionParam = new URL(window.location.href).searchParams.get('section');
-      if (sectionParam === 'following' || sectionParam === 'followers') {
+      if (sectionParam === 'following' || sectionParam === 'followers' || sectionParam === 'shares') {
         activeSection = sectionParam;
       }
       await Promise.all([
@@ -659,6 +718,7 @@
         loadFavoriteItems(),
         loadLikedItems(),
         loadNetworkProfiles(),
+        loadSharedItemRights(),
         loadNotifications(),
         loadInteractions(),
         loadReviewCount()
@@ -835,9 +895,9 @@
                 <rect x="3" y="5" width="18" height="14" rx="2" />
                 <path d="M8 12h8M12 8v8" />
               </svg>
-              <span>Globale Freigaben</span>
+              <span>Freigaben</span>
             </span>
-            <strong>→</strong>
+            <strong>{sharedItemRights.length}</strong>
           </button>
           <button
             type="button"
@@ -1205,15 +1265,38 @@
           {/if}
         {:else if activeSection === 'shares'}
           <div class="panel-head panel-head--space">
-            <h2>Globale Freigaben</h2>
-            <span>Verwaltung</span>
+            <h2>Freigaben</h2>
+            <span>{sharedItemRights.length} Einzelfreigaben</span>
           </div>
-          <p class="dashboard-empty">
-            Verwalte hier die globalen Freigaben deiner Inhalte.
-          </p>
           <div class="entry-actions">
-            <a href="/profile/freigaben">Freigaben öffnen</a>
+            <a href="/profile/freigaben">Globale Freigaben verwalten</a>
           </div>
+          {#if sharedItemRights.length === 0}
+            <p class="dashboard-empty">Noch keine Einzelfreigaben vorhanden.</p>
+          {:else}
+            <div class="entry-list">
+              {#each sharedItemRights as entry (entry.id)}
+                <article class="entry-card entry-card--history">
+                  <a class="entry-preview" href={entry.item ? getPublicItemHref(entry.item) : '/dashboard'}>
+                    {#if entry.item && getItemThumb(entry.item)}
+                      <img src={getItemThumb(entry.item)} alt={entry.item.title || entry.item.original_name || 'Item'} width="56" height="56" loading="lazy" />
+                    {:else}
+                      <div class="entry-thumb-fallback">?</div>
+                    {/if}
+                  </a>
+                  <span class="entry-content">
+                    <a href={entry.item ? getPublicItemHref(entry.item) : '/dashboard'}>
+                      <strong>{entry.item?.title || entry.item?.original_name || 'Ohne Titel'}</strong>
+                    </a>
+                    <span>
+                      Für {entry.target?.full_name || entry.target?.accountname || 'Unbekannt'} · {getRightsText(entry.rights)}
+                    </span>
+                    <span>Aktualisiert: {formatDateTime(entry.updated_at || entry.created_at)}</span>
+                  </span>
+                </article>
+              {/each}
+            </div>
+          {/if}
         {:else}
           <div class="panel-head panel-head--space">
             <h2>Datenprüfung</h2>
