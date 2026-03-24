@@ -20,6 +20,7 @@
   let currentPage = 1;
   let totalItems = 0;
   let historyBusy = false;
+  let activeSection: 'recent' | 'photos' = 'recent';
 
   $: totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
   $: canPrev = currentPage > 1;
@@ -231,98 +232,122 @@
     <p class="dashboard-error">{errorMessage}</p>
   {:else}
     <section class="dashboard-layout">
-      <aside class="dashboard-column dashboard-column--recent">
-        <div class="panel-head">
-          <h2>Zuletzt angesehen</h2>
-          {#if recentItems.length > 0}
-            <button type="button" class="ghost-btn" on:click={clearEntireHistory} disabled={historyBusy}>
-              Verlauf loeschen
-            </button>
-          {/if}
-        </div>
-        {#if recentItems.length === 0}
-          <p class="dashboard-empty">Noch keine zuletzt angesehenen Einträge.</p>
-        {:else}
-          <div class="entry-list">
-            {#each recentItems as item (item.id)}
-              <article class="entry-card entry-card--history">
-                <a class="entry-preview" href={getPublicItemHref(item)}>
-                  {#if getItemThumb(item)}
-                    <img src={getItemThumb(item)} alt={item.title || item.original_name || 'Item'} width="56" height="56" loading="lazy" />
-                  {:else}
-                    <div class="entry-thumb-fallback">?</div>
-                  {/if}
-                </a>
-                <span class="entry-content">
-                  <a href={getPublicItemHref(item)}>
-                    <strong>{item.title || item.original_name || 'Ohne Titel'}</strong>
-                  </a>
-                  <span>{formatDate(item.viewedAt)}</span>
-                </span>
-                <button
-                  type="button"
-                  class="ghost-btn entry-remove-btn"
-                  on:click={() => removeFromHistory(item.id)}
-                  disabled={historyBusy}
-                >
-                  Entfernen
-                </button>
-              </article>
-            {/each}
-          </div>
-        {/if}
+      <aside class="dashboard-column dashboard-column--menu">
+        <nav class="dashboard-menu" aria-label="Dashboard Navigation">
+          <button
+            type="button"
+            class="dashboard-menu__link"
+            class:is-active={activeSection === 'recent'}
+            on:click={() => (activeSection = 'recent')}
+          >
+            <span>Zuletzt angesehen</span>
+            <strong>{recentItems.length}</strong>
+          </button>
+          <button
+            type="button"
+            class="dashboard-menu__link"
+            class:is-active={activeSection === 'photos'}
+            on:click={() => (activeSection = 'photos')}
+          >
+            <span>Meine Fotos</span>
+            <strong>{totalItems}</strong>
+          </button>
+        </nav>
       </aside>
 
-      <section class="dashboard-column dashboard-column--all">
-        <div class="panel-head panel-head--space">
-          <h2>Alle eigenen Items</h2>
-          <span>{totalItems} gesamt</span>
-        </div>
+      <section class="dashboard-column dashboard-column--content">
+        {#if activeSection === 'recent'}
+          <div class="panel-head">
+            <h2>Zuletzt angesehen</h2>
+            {#if recentItems.length > 0}
+              <button type="button" class="ghost-btn" on:click={clearEntireHistory} disabled={historyBusy}>
+                Verlauf loeschen
+              </button>
+            {/if}
+          </div>
 
-        <form class="search-row" on:submit|preventDefault={applySearch}>
-          <input type="search" bind:value={searchQuery} placeholder="Suche nach Titel oder Slug" />
-          <button type="submit">Suchen</button>
-          {#if activeQuery}
-            <button type="button" class="ghost-btn" on:click={clearSearch}>Zurücksetzen</button>
-          {/if}
-        </form>
-
-        {#if loadingItems}
-          <p class="dashboard-empty">Einträge werden geladen...</p>
-        {:else if allItems.length === 0}
-          <p class="dashboard-empty">Keine Einträge gefunden.</p>
-        {:else}
-          <div class="entry-list entry-list--large">
-            {#each allItems as item (item.id)}
-              <article class="entry-card entry-card--large">
-                <a class="entry-preview" href={getPublicItemHref(item)}>
-                  {#if getItemThumb(item)}
-                    <img src={getItemThumb(item)} alt={item.title || item.original_name || 'Item'} width="72" height="72" loading="lazy" />
-                  {:else}
-                    <div class="entry-thumb-fallback">?</div>
-                  {/if}
-                </a>
-                <div class="entry-content entry-content--large">
-                  <a href={getPublicItemHref(item)}>
-                    <strong>{item.title || item.original_name || 'Ohne Titel'}</strong>
+          {#if recentItems.length === 0}
+            <p class="dashboard-empty">Noch keine zuletzt angesehenen Einträge.</p>
+          {:else}
+            <div class="entry-list">
+              {#each recentItems as item (item.id)}
+                <article class="entry-card entry-card--history">
+                  <a class="entry-preview" href={getPublicItemHref(item)}>
+                    {#if getItemThumb(item)}
+                      <img src={getItemThumb(item)} alt={item.title || item.original_name || 'Item'} width="56" height="56" loading="lazy" />
+                    {:else}
+                      <div class="entry-thumb-fallback">?</div>
+                    {/if}
                   </a>
-                  <span>Aktualisiert: {formatDate(item.updated_at || item.created_at)}</span>
-                  <div class="entry-actions">
-                    <a href={getPublicItemHref(item)}>Öffnen</a>
-                    <a href={`/item/${encodeURIComponent(item.slug)}`}>Bearbeiten</a>
-                    <a href={`/item/${encodeURIComponent(item.slug)}/download`}>Verwalten</a>
+                  <span class="entry-content">
+                    <a href={getPublicItemHref(item)}>
+                      <strong>{item.title || item.original_name || 'Ohne Titel'}</strong>
+                    </a>
+                    <span>{formatDate(item.viewedAt)}</span>
+                  </span>
+                  <button
+                    type="button"
+                    class="ghost-btn entry-remove-btn"
+                    on:click={() => removeFromHistory(item.id)}
+                    disabled={historyBusy}
+                  >
+                    Entfernen
+                  </button>
+                </article>
+              {/each}
+            </div>
+          {/if}
+        {:else}
+          <div class="panel-head panel-head--space">
+            <h2>Meine Fotos</h2>
+            <span>{totalItems} gesamt</span>
+          </div>
+
+          <form class="search-row" on:submit|preventDefault={applySearch}>
+            <input type="search" bind:value={searchQuery} placeholder="Suche nach Titel oder Slug" />
+            <button type="submit">Suchen</button>
+            {#if activeQuery}
+              <button type="button" class="ghost-btn" on:click={clearSearch}>Zurücksetzen</button>
+            {/if}
+          </form>
+
+          {#if loadingItems}
+            <p class="dashboard-empty">Einträge werden geladen...</p>
+          {:else if allItems.length === 0}
+            <p class="dashboard-empty">Keine Einträge gefunden.</p>
+          {:else}
+            <div class="entry-list entry-list--large">
+              {#each allItems as item (item.id)}
+                <article class="entry-card entry-card--large">
+                  <a class="entry-preview" href={getPublicItemHref(item)}>
+                    {#if getItemThumb(item)}
+                      <img src={getItemThumb(item)} alt={item.title || item.original_name || 'Item'} width="72" height="72" loading="lazy" />
+                    {:else}
+                      <div class="entry-thumb-fallback">?</div>
+                    {/if}
+                  </a>
+                  <div class="entry-content entry-content--large">
+                    <a href={getPublicItemHref(item)}>
+                      <strong>{item.title || item.original_name || 'Ohne Titel'}</strong>
+                    </a>
+                    <span>Aktualisiert: {formatDate(item.updated_at || item.created_at)}</span>
+                    <div class="entry-actions">
+                      <a href={getPublicItemHref(item)}>Öffnen</a>
+                      <a href={`/item/${encodeURIComponent(item.slug)}`}>Bearbeiten</a>
+                      <a href={`/item/${encodeURIComponent(item.slug)}/download`}>Verwalten</a>
+                    </div>
                   </div>
-                </div>
-              </article>
-            {/each}
+                </article>
+              {/each}
+            </div>
+          {/if}
+
+          <div class="pagination">
+            <button type="button" on:click={() => goToPage(currentPage - 1)} disabled={!canPrev}>Zurück</button>
+            <span>Seite {currentPage} von {totalPages}</span>
+            <button type="button" on:click={() => goToPage(currentPage + 1)} disabled={!canNext}>Weiter</button>
           </div>
         {/if}
-
-        <div class="pagination">
-          <button type="button" on:click={() => goToPage(currentPage - 1)} disabled={!canPrev}>Zurück</button>
-          <span>Seite {currentPage} von {totalPages}</span>
-          <button type="button" on:click={() => goToPage(currentPage + 1)} disabled={!canNext}>Weiter</button>
-        </div>
       </section>
     </section>
   {/if}
@@ -346,8 +371,37 @@
     margin-top: 1.2rem;
     display: grid;
     gap: 1rem;
-    grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+    grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
     align-items: start;
+  }
+  .dashboard-column--menu {
+    position: sticky;
+    top: 4.6rem;
+  }
+  .dashboard-menu {
+    display: grid;
+    gap: 0.55rem;
+  }
+  .dashboard-menu__link {
+    border: 1px solid var(--border-color);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    border-radius: 12px;
+    padding: 0.7rem 0.8rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.8rem;
+    cursor: pointer;
+    font: inherit;
+  }
+  .dashboard-menu__link strong {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+  }
+  .dashboard-menu__link.is-active {
+    border-color: color-mix(in srgb, var(--culoca-orange) 45%, var(--border-color) 55%);
+    background: color-mix(in srgb, var(--culoca-orange) 10%, var(--bg-primary) 90%);
   }
   .dashboard-column {
     border: 1px solid var(--border-color);
