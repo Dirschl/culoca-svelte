@@ -71,7 +71,7 @@
           path_512
         )
       `)
-      .eq('user_id', currentUserId)
+      .eq('actor_user_id', currentUserId)
       .eq('event_type', 'item_view')
       .order('created_at', { ascending: false })
       .limit(24);
@@ -105,7 +105,7 @@
       const { error } = await supabase
         .from('item_events')
         .delete()
-        .eq('user_id', currentUserId)
+        .eq('actor_user_id', currentUserId)
         .eq('event_type', 'item_view')
         .eq('item_id', itemId);
       if (error) throw error;
@@ -129,7 +129,7 @@
       const { error } = await supabase
         .from('item_events')
         .delete()
-        .eq('user_id', currentUserId)
+        .eq('actor_user_id', currentUserId)
         .eq('event_type', 'item_view');
       if (error) throw error;
       recentItems = [];
