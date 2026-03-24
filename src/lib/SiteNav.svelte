@@ -26,15 +26,7 @@
     { href: '/foto', label: 'Fotos' },
     { href: '/event', label: 'Events' },
     { href: '/firma', label: 'Firmen' },
-  ];
-
-  const galleryLinks = [
-    { href: '/galerie?mobile=true', label: 'Mobil' },
-    { href: '/map-view', label: 'Karte' },
-  ];
-
-  const infoLinks = [
-    { href: '/web', label: 'System' },
+    { href: '/web', label: 'Info' },
     { href: '/seo', label: 'SEO' },
   ];
 
@@ -54,9 +46,19 @@
 
   $: currentPath = $page.url?.pathname || '/';
   $: isChatRoute = isActive('/chat');
-  $: displayName = $customerBranding?.fullName || $customerBranding?.accountName || '';
-  $: userMenuLabel = $isAuthenticated && displayName ? displayName : ($isAuthenticated ? 'Dashboard' : 'Login');
-  $: userMenuActive = isActive('/dashboard') || isActive('/chat') || isActive('/settings') || isActive('/standort') || isActive('/profile') || isActive('/profile/freigaben') || isActive('/login') || ($hasAdminPermission && adminLinks.some(l => isActive(l.href)));
+  $: userIdentityLabel = $customerBranding?.accountName || $customerBranding?.fullName || '';
+  $: userMenuAsLogin = !$isAuthenticated || !userIdentityLabel;
+  $: userMenuLabel = userMenuAsLogin ? 'Login' : userIdentityLabel;
+  $: userEntryHref = userMenuAsLogin ? '/login' : getUserLinkHref('/dashboard');
+  $: userMenuActive =
+    isActive('/login') ||
+    isActive('/dashboard') ||
+    isActive('/chat') ||
+    isActive('/settings') ||
+    isActive('/standort') ||
+    isActive('/profile') ||
+    isActive('/profile/freigaben') ||
+    ($hasAdminPermission && adminLinks.some((l) => isActive(l.href)));
   $: inheritedReturnTo = sanitizeReturnTo($page.url.searchParams.get('returnTo'), currentPathWithSearch($page.url));
   $: {
     const nextInboxKey = `${$isAuthenticated ? 'auth' : 'anon'}:${$currentUserId || 'none'}:${currentPath}`;
@@ -216,10 +218,6 @@
     return currentPath === href || currentPath.startsWith(href + '/');
   }
 
-  function isDropdownActive(links: { href: string }[]): boolean {
-    return links.some((l) => isActive(l.href));
-  }
-
   function toggleDropdown(id: string) {
     openDropdown = openDropdown === id ? null : id;
   }
@@ -368,68 +366,17 @@
         <a href={link.href} class="nav-link" class:active={isActive(link.href)} on:click={closeMobile}>{link.label}</a>
       {/each}
 
-      <div class="dropdown desktop-only">
-        <button
-          class="nav-link dropdown-toggle"
-          class:active={isDropdownActive(galleryLinks)}
-          on:click|stopPropagation={() => toggleDropdown('gallery')}
-        >
-          Galerie
-          <svg class="dd-arrow" class:dd-open={openDropdown === 'gallery'} width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5l3 3 3-3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>
-        </button>
-        {#if openDropdown === 'gallery'}
-          <div class="dropdown-menu">
-            {#each galleryLinks as link}
-              <a href={link.href} class="dropdown-item" class:active={isActive(link.href)} on:click={closeDropdowns}>{link.label}</a>
-            {/each}
-          </div>
-        {/if}
-      </div>
-
-      <div class="mobile-only nav-group">
-        <span class="nav-group-label">Galerie</span>
-        {#each galleryLinks as link}
-          <a href={link.href} class="nav-link nav-link--sub" class:active={isActive(link.href)} on:click={closeMobile}>{link.label}</a>
-        {/each}
-      </div>
-
-      <!-- Web dropdown (desktop) / expanded list (mobile) -->
-      <div class="dropdown desktop-only">
-        <button
-          class="nav-link dropdown-toggle"
-          class:active={isDropdownActive(infoLinks)}
-          on:click|stopPropagation={() => toggleDropdown('info')}
-        >
-          Web
-          <svg class="dd-arrow" class:dd-open={openDropdown === 'info'} width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5l3 3 3-3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>
-        </button>
-        {#if openDropdown === 'info'}
-          <div class="dropdown-menu">
-            {#each infoLinks as link}
-              <a href={link.href} class="dropdown-item" class:active={isActive(link.href)} on:click={closeDropdowns}>{link.label}</a>
-            {/each}
-          </div>
-        {/if}
-      </div>
-      <!-- Web links inline for mobile -->
-      <div class="mobile-only nav-group">
-        <span class="nav-group-label">Web</span>
-        {#each infoLinks as link}
-          <a href={link.href} class="nav-link nav-link--sub" class:active={isActive(link.href)} on:click={closeMobile}>{link.label}</a>
-        {/each}
-      </div>
-
       <!-- User menu (desktop) -->
       <div class="dropdown desktop-only">
         <a
-          href={$isAuthenticated ? getUserLinkHref('/dashboard') : '/login'}
+          href={userEntryHref}
           class="nav-link user-toggle"
           class:active={userMenuActive}
           on:click={closeDropdowns}
         >
           <svg class="user-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
           {userMenuLabel}
-          {#if reviewCount > 0}
+          {#if !userMenuAsLogin && reviewCount > 0}
             <button
               type="button"
               class="review-badge review-badge--button"
@@ -440,7 +387,7 @@
               {reviewCount}
             </button>
           {/if}
-          {#if inboxCount > 0}
+          {#if !userMenuAsLogin && inboxCount > 0}
             <span
               class="inbox-badge"
               aria-label={`${inboxCount} ungelesene Benachrichtigungen oder Nachrichten`}
@@ -450,7 +397,7 @@
             </span>
           {/if}
         </a>
-        {#if $isAuthenticated}
+        {#if $isAuthenticated && userIdentityLabel}
           <button
             type="button"
             class="nav-link dropdown-toggle user-toggle user-toggle--menu"
@@ -461,7 +408,7 @@
             <svg class="dd-arrow" class:dd-open={openDropdown === 'user'} width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5l3 3 3-3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>
           </button>
         {/if}
-        {#if $isAuthenticated && openDropdown === 'user'}
+        {#if $isAuthenticated && userIdentityLabel && openDropdown === 'user'}
           <div class="dropdown-menu dropdown-menu--user">
             {#if inboxCount > 0}
               <div class="dropdown-status-row">
@@ -507,7 +454,7 @@
 
       <!-- User menu (mobile) -->
       <div class="mobile-only nav-group">
-        {#if $isAuthenticated}
+        {#if $isAuthenticated && userIdentityLabel}
           <span class="nav-group-label">{userMenuLabel}</span>
           <a href={getUserLinkHref('/dashboard')} class="nav-link nav-link--sub" class:active={isActive('/dashboard')} on:click={closeMobile}>
             Dashboard
