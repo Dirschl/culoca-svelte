@@ -6,6 +6,7 @@
   import { supabase } from '$lib/supabaseClient';
   import { getPublicItemHref } from '$lib/content/routing';
   import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
+  import { fetchProfileReviewItems } from '$lib/profile/review';
 
   const PAGE_SIZE = 12;
 
@@ -20,9 +21,10 @@
   let currentPage = 1;
   let totalItems = 0;
   let historyBusy = false;
-  let activeSection: 'recent' | 'photos' | 'notifications' | 'interactions' = 'recent';
+  let activeSection: 'recent' | 'photos' | 'notifications' | 'interactions' | 'review' = 'recent';
   let notifications: any[] = [];
   let interactions: any[] = [];
+  let reviewCount = 0;
 
   $: totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
   $: canPrev = currentPage > 1;
@@ -318,6 +320,11 @@
     }));
   }
 
+  async function loadReviewCount() {
+    const reviewItems = await fetchProfileReviewItems(supabase, currentUserId);
+    reviewCount = reviewItems.length;
+  }
+
   async function applySearch() {
     activeQuery = searchQuery.trim();
     await loadOwnItems(1, activeQuery);
@@ -340,7 +347,13 @@
     try {
       const ok = await ensureAuthUser();
       if (!ok) return;
-      await Promise.all([loadRecentItems(), loadOwnItems(1, ''), loadNotifications(), loadInteractions()]);
+      await Promise.all([
+        loadRecentItems(),
+        loadOwnItems(1, ''),
+        loadNotifications(),
+        loadInteractions(),
+        loadReviewCount()
+      ]);
     } catch (error: any) {
       errorMessage = error?.message || 'Dashboard konnte nicht geladen werden.';
     } finally {
@@ -410,6 +423,20 @@
           >
             <span>Interaktionen</span>
             <strong>{interactions.length}</strong>
+          </button>
+          <button
+            type="button"
+            class="dashboard-menu__link"
+            class:is-active={activeSection === 'review'}
+            on:click={() => (activeSection = 'review')}
+          >
+            <span class="dashboard-menu__label">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M12 2L1 21h22L12 2zm0 5 6.53 12H5.47L12 7zm-1 3v4h2v-4h-2zm0 6v2h2v-2h-2z"/>
+              </svg>
+              <span>Datenpruefung</span>
+            </span>
+            <strong>{reviewCount}</strong>
           </button>
         </nav>
       </aside>
@@ -535,7 +562,7 @@
               {/each}
             </div>
           {/if}
-        {:else}
+        {:else if activeSection === 'interactions'}
           <div class="panel-head panel-head--space">
             <h2>Interaktionen auf deinen Items</h2>
             <span>{interactions.length} gesamt</span>
@@ -563,6 +590,22 @@
                 </a>
               {/each}
             </div>
+          {/if}
+        {:else}
+          <div class="panel-head panel-head--space">
+            <h2>Datenpruefung</h2>
+            <span>{reviewCount} offen</span>
+          </div>
+          {#if reviewCount > 0}
+            <p class="dashboard-empty">
+              <strong>{reviewCount}</strong> Eintraege brauchen noch fehlende Daten oder Ortspruefung.
+            </p>
+            <div class="entry-actions">
+              <a href="/profile/review">Offene Eintraege anzeigen</a>
+              <a href="/foto/upload">Neues Foto hochladen</a>
+            </div>
+          {:else}
+            <p class="dashboard-empty">Keine offenen Daten. Dein Bestand ist aktuell sauber gepflegt.</p>
           {/if}
         {/if}
       </section>
@@ -611,6 +654,11 @@
     gap: 0.8rem;
     cursor: pointer;
     font: inherit;
+  }
+  .dashboard-menu__label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
   }
   .dashboard-menu__link strong {
     color: var(--text-secondary);
