@@ -57,7 +57,6 @@
   let errorLogFiles: string[] = [];
   let returnTo = '/';
   let reviewCount = 0;
-  let creatorInteractions: any[] = [];
   let interactionLoading = true;
   let conversations: any[] = [];
   let conversationLoading = true;
@@ -101,7 +100,7 @@
       return;
     }
     user = currentUser;
-    await Promise.all([loadProfile(), loadReviewCount(), loadInteractions()]);
+    await Promise.all([loadProfile(), loadReviewCount()]);
     loading = false;
     userId = user.id;
     const { data, error } = await supabase.storage.from('errorlogs').list('');
@@ -173,57 +172,7 @@
     }
   }
 
-  async function loadInteractions() {
-    if (!user?.id) return;
-
-    interactionLoading = true;
-
-    try {
-      const [{ data: creatorData, error: creatorError }] = await Promise.all([
-        supabase
-          .from('item_events')
-          .select(`
-            id,
-            event_type,
-            created_at,
-            actor_user_id,
-            metadata,
-            items!inner(
-              id,
-              slug,
-              title,
-              original_name,
-              canonical_path,
-              country_slug,
-              district_slug,
-              municipality_slug,
-              path_512
-            ),
-            profiles:actor_user_id(
-              full_name,
-              accountname
-            )
-          `)
-          .eq('owner_user_id', user.id)
-          .in('event_type', ['download', 'favorite_add', 'like_add', 'comment_create', 'comment_hide', 'comment_restore', 'chat_message'])
-          .order('created_at', { ascending: false })
-          .limit(20)
-      ]);
-
-      if (creatorError) throw creatorError;
-
-      creatorInteractions = (creatorData || []).map((entry: any) => ({
-        ...entry,
-        item: entry.items || null,
-        actor: entry.profiles || null
-      }));
-    } catch (error) {
-      console.error('Error loading interactions:', error);
-      creatorInteractions = [];
-    } finally {
-      interactionLoading = false;
-    }
-  }
+  interactionLoading = false;
 
   function teardownLiveChannels() {
     for (const channel of liveChannels) {
@@ -272,39 +221,7 @@
       )
       .subscribe();
 
-    const followingChannel = supabase
-      .channel(`profile-follows-following-${currentUserId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'user_follows',
-          filter: `follower_user_id=eq.${currentUserId}`
-        },
-        async () => {
-          await loadInteractions();
-        }
-      )
-      .subscribe();
-
-    const followersChannel = supabase
-      .channel(`profile-follows-followers-${currentUserId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'user_follows',
-          filter: `followed_user_id=eq.${currentUserId}`
-        },
-        async () => {
-          await loadInteractions();
-        }
-      )
-      .subscribe();
-
-    liveChannels = [conversationsChannel, followingChannel, followersChannel];
+    liveChannels = [conversationsChannel];
   }
 
   function setupMessageChannel(conversationId: string) {
@@ -793,15 +710,6 @@
     return item?.slug && item?.path_512 ? getSeoImageUrl(item.slug, item.path_512, '512') : '';
   }
 
-  function formatInteractionDate(value: string | null | undefined) {
-    if (!value) return '';
-    return new Date(value).toLocaleDateString('de-DE', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    });
-  }
-
   function formatCommentDate(value: string | null | undefined) {
     if (!value) return '';
     return new Date(value).toLocaleString('de-DE', {
@@ -811,31 +719,6 @@
       hour: '2-digit',
       minute: '2-digit'
     });
-  }
-
-  function getCreatorInteractionActor(entry: any) {
-    return entry?.actor?.full_name || entry?.actor?.accountname || (entry?.actor_user_id ? 'Nutzer' : 'Anonym');
-  }
-
-  function getCreatorInteractionLabel(entry: any) {
-    switch (entry?.event_type) {
-      case 'download':
-        return 'hat dein Bild heruntergeladen';
-      case 'favorite_add':
-        return 'hat dein Bild gemerkt';
-      case 'like_add':
-        return 'findet dein Bild gut';
-      case 'comment_create':
-        return 'hat kommentiert';
-      case 'comment_hide':
-        return 'wurde ausgeblendet';
-      case 'comment_restore':
-        return 'wurde wieder eingeblendet';
-      case 'chat_message':
-        return 'hat dir zu einem Bild geschrieben';
-      default:
-        return entry?.event_type || 'hat interagiert';
-    }
   }
 
   function getNotificationActor(entry: any) {
@@ -1277,37 +1160,6 @@
               <a class="review-link" href="/chat">Inbox öffnen</a>
               <a class="review-link review-link--secondary" href="/#profile-finden">Neuen Chat starten</a>
             </div>
-          </div>
-
-          <div class="card">
-            <h3 class="section-title">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M3 12h18" />
-                <path d="M3 6h18" />
-                <path d="M3 18h12" />
-              </svg>
-              Interaktionen auf deinen Items
-            </h3>
-            {#if interactionLoading}
-              <p class="help-text">Interaktionen werden geladen...</p>
-            {:else if creatorInteractions.length > 0}
-              <div class="activity-list">
-                {#each creatorInteractions as entry}
-                  <a class="activity-item" href={entry.item ? getPublicItemHref(entry.item) : '#'}>
-                    <div class="activity-copy">
-                      <strong>{getCreatorInteractionActor(entry)}</strong>
-                      <span>{getCreatorInteractionLabel(entry)}</span>
-                      {#if entry.item}
-                        <em>{entry.item.title || entry.item.original_name || 'Ohne Titel'}</em>
-                      {/if}
-                    </div>
-                    <time>{formatInteractionDate(entry.created_at)}</time>
-                  </a>
-                {/each}
-              </div>
-            {:else}
-              <p class="help-text">Noch keine Interaktionen auf deinen Items vorhanden.</p>
-            {/if}
           </div>
 
           <!-- Persönliche Informationen -->

@@ -20,8 +20,9 @@
   let currentPage = 1;
   let totalItems = 0;
   let historyBusy = false;
-  let activeSection: 'recent' | 'photos' | 'notifications' = 'recent';
+  let activeSection: 'recent' | 'photos' | 'notifications' | 'interactions' = 'recent';
   let notifications: any[] = [];
+  let interactions: any[] = [];
 
   $: totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
   $: canPrev = currentPage > 1;
@@ -80,6 +81,31 @@
       return `/chat?conversation=${encodeURIComponent(entry.payload.conversation_id)}`;
     }
     return entry?.item ? getPublicItemHref(entry.item) : '/dashboard';
+  }
+
+  function getInteractionActor(entry: any): string {
+    return entry?.actor?.full_name || entry?.actor?.accountname || 'Jemand';
+  }
+
+  function getInteractionLabel(entry: any): string {
+    switch (entry?.event_type) {
+      case 'download':
+        return 'hat dein Item heruntergeladen';
+      case 'favorite_add':
+        return 'hat dein Item gemerkt';
+      case 'like_add':
+        return 'hat dein Item geliked';
+      case 'comment_create':
+        return 'hat kommentiert';
+      case 'comment_hide':
+        return 'hat einen Kommentar ausgeblendet';
+      case 'comment_restore':
+        return 'hat einen Kommentar wiederhergestellt';
+      case 'chat_message':
+        return 'hat dir zu einem Item geschrieben';
+      default:
+        return entry?.event_type || 'hat interagiert';
+    }
   }
 
   async function ensureAuthUser() {
@@ -253,6 +279,45 @@
     }));
   }
 
+  async function loadInteractions() {
+    const { data, error } = await supabase
+      .from('item_events')
+      .select(`
+        id,
+        event_type,
+        created_at,
+        actor_user_id,
+        metadata,
+        items!inner(
+          id,
+          slug,
+          title,
+          original_name,
+          canonical_path,
+          country_slug,
+          district_slug,
+          municipality_slug,
+          path_512
+        ),
+        profiles:actor_user_id(
+          full_name,
+          accountname,
+          avatar_url
+        )
+      `)
+      .eq('owner_user_id', currentUserId)
+      .in('event_type', ['download', 'favorite_add', 'like_add', 'comment_create', 'comment_hide', 'comment_restore', 'chat_message'])
+      .order('created_at', { ascending: false })
+      .limit(30);
+
+    if (error) throw error;
+    interactions = (data || []).map((entry: any) => ({
+      ...entry,
+      item: entry.items || null,
+      actor: entry.profiles || null
+    }));
+  }
+
   async function applySearch() {
     activeQuery = searchQuery.trim();
     await loadOwnItems(1, activeQuery);
@@ -275,7 +340,7 @@
     try {
       const ok = await ensureAuthUser();
       if (!ok) return;
-      await Promise.all([loadRecentItems(), loadOwnItems(1, ''), loadNotifications()]);
+      await Promise.all([loadRecentItems(), loadOwnItems(1, ''), loadNotifications(), loadInteractions()]);
     } catch (error: any) {
       errorMessage = error?.message || 'Dashboard konnte nicht geladen werden.';
     } finally {
@@ -336,6 +401,15 @@
           >
             <span>Benachrichtigungen</span>
             <strong>{notifications.length}</strong>
+          </button>
+          <button
+            type="button"
+            class="dashboard-menu__link"
+            class:is-active={activeSection === 'interactions'}
+            on:click={() => (activeSection = 'interactions')}
+          >
+            <span>Interaktionen</span>
+            <strong>{interactions.length}</strong>
           </button>
         </nav>
       </aside>
@@ -432,7 +506,7 @@
             <span>Seite {currentPage} von {totalPages}</span>
             <button type="button" on:click={() => goToPage(currentPage + 1)} disabled={!canNext}>Weiter</button>
           </div>
-        {:else}
+        {:else if activeSection === 'notifications'}
           <div class="panel-head panel-head--space">
             <h2>Benachrichtigungen</h2>
             <span>{notifications.length} gesamt</span>
@@ -454,6 +528,35 @@
                     <span>{getNotificationLabel(entry)}</span>
                     {#if getNotificationPreview(entry)}
                       <span>{getNotificationPreview(entry)}</span>
+                    {/if}
+                    <span>{formatDate(entry.created_at)}</span>
+                  </span>
+                </a>
+              {/each}
+            </div>
+          {/if}
+        {:else}
+          <div class="panel-head panel-head--space">
+            <h2>Interaktionen auf deinen Items</h2>
+            <span>{interactions.length} gesamt</span>
+          </div>
+
+          {#if interactions.length === 0}
+            <p class="dashboard-empty">Noch keine Interaktionen auf deinen Items vorhanden.</p>
+          {:else}
+            <div class="entry-list">
+              {#each interactions as entry (entry.id)}
+                <a class="entry-card entry-card--link" href={entry.item ? getPublicItemHref(entry.item) : '/dashboard'}>
+                  {#if entry.item && getItemThumb(entry.item)}
+                    <img src={getItemThumb(entry.item)} alt={entry.item.title || entry.item.original_name || 'Item'} width="56" height="56" loading="lazy" />
+                  {:else}
+                    <div class="entry-thumb-fallback">{getInteractionActor(entry).slice(0, 1).toUpperCase()}</div>
+                  {/if}
+                  <span class="entry-content">
+                    <strong>{getInteractionActor(entry)}</strong>
+                    <span>{getInteractionLabel(entry)}</span>
+                    {#if entry.item}
+                      <span>{entry.item.title || entry.item.original_name || 'Ohne Titel'}</span>
                     {/if}
                     <span>{formatDate(entry.created_at)}</span>
                   </span>
