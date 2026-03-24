@@ -12,6 +12,8 @@
   let loginError = '';
   let loginInfo = '';
   let showRegister = false;
+  let showPasswordReset = false;
+  let resetEmail = '';
 
   const loginBenefits = [
     'Eigene Objekte und Einträge anlegen',
@@ -127,7 +129,8 @@
   }
 
   async function resetPassword() {
-    if (!loginEmail) {
+    const targetEmail = (resetEmail || loginEmail).trim();
+    if (!targetEmail) {
       loginError = 'Bitte gib zuerst deine E-Mail-Adresse ein.';
       return;
     }
@@ -137,7 +140,7 @@
     loginInfo = '';
 
     const redirectTo = getAuthRedirectUrl('recovery');
-    const { error } = await supabase.auth.resetPasswordForEmail(loginEmail, {
+    const { error } = await supabase.auth.resetPasswordForEmail(targetEmail, {
       redirectTo
     });
 
@@ -145,9 +148,24 @@
       loginError = error.message;
     } else {
       loginInfo = 'Ein Link zum Zurücksetzen wurde an deine E-Mail-Adresse gesendet.';
+      showPasswordReset = false;
+      loginEmail = targetEmail;
+      resetEmail = '';
     }
 
     loginLoading = false;
+  }
+
+  function openPasswordReset() {
+    showPasswordReset = true;
+    resetEmail = loginEmail;
+    loginError = '';
+    loginInfo = '';
+  }
+
+  function closePasswordReset() {
+    showPasswordReset = false;
+    loginError = '';
   }
 
   function setAnonymousMode() {
@@ -205,25 +223,38 @@
           </div>
 
           <div class="tab-row">
-            <button class:active={!showRegister} class="tab-btn" on:click={() => showRegister = false}>Anmelden</button>
-            <button class:active={showRegister} class="tab-btn" on:click={() => showRegister = true}>Registrieren</button>
+            <button class:active={!showRegister} class="tab-btn" on:click={() => { showRegister = false; showPasswordReset = false; }}>Anmelden</button>
+            <button class:active={showRegister} class="tab-btn" on:click={() => { showRegister = true; showPasswordReset = false; }}>Registrieren</button>
           </div>
 
           {#if !showRegister}
-            <form class="auth-form" on:submit|preventDefault={loginWithEmail}>
-              <label class="field">
-                <span>E-Mail</span>
-                <input type="email" bind:value={loginEmail} placeholder="name@beispiel.de" autocomplete="email" required />
-              </label>
-              <label class="field">
-                <span>Passwort</span>
-                <input type="password" bind:value={loginPassword} placeholder="Passwort" autocomplete="current-password" required />
-              </label>
-              <button class="primary-btn" type="submit" disabled={loginLoading}>
-                {loginLoading ? 'Anmelden…' : 'Anmelden'}
-              </button>
-              <button type="button" class="link-btn" on:click={resetPassword}>Passwort vergessen?</button>
-            </form>
+            {#if showPasswordReset}
+              <form class="auth-form" on:submit|preventDefault={resetPassword}>
+                <label class="field">
+                  <span>E-Mail für Passwort-Reset</span>
+                  <input type="email" bind:value={resetEmail} placeholder="name@beispiel.de" autocomplete="email" required />
+                </label>
+                <button class="primary-btn" type="submit" disabled={loginLoading}>
+                  {loginLoading ? 'Sende Link…' : 'Reset-Link senden'}
+                </button>
+                <button type="button" class="link-btn" on:click={closePasswordReset}>Zurück zum Login</button>
+              </form>
+            {:else}
+              <form class="auth-form" on:submit|preventDefault={loginWithEmail}>
+                <label class="field">
+                  <span>E-Mail</span>
+                  <input type="email" bind:value={loginEmail} placeholder="name@beispiel.de" autocomplete="email" required />
+                </label>
+                <label class="field">
+                  <span>Passwort</span>
+                  <input type="password" bind:value={loginPassword} placeholder="Passwort" autocomplete="current-password" required />
+                </label>
+                <button class="primary-btn" type="submit" disabled={loginLoading}>
+                  {loginLoading ? 'Anmelden…' : 'Anmelden'}
+                </button>
+                <button type="button" class="link-btn" on:click={openPasswordReset}>Passwort vergessen?</button>
+              </form>
+            {/if}
           {:else}
             <form class="auth-form" on:submit|preventDefault={signupWithEmail}>
               <label class="field">
