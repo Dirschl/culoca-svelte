@@ -21,13 +21,16 @@
   let currentPage = 1;
   let totalItems = 0;
   let historyBusy = false;
-  let activeSection: 'recent' | 'photos' | 'events' | 'favorites' | 'likes' | 'notifications' | 'interactions' | 'review' = 'recent';
+  let activeSection: 'recent' | 'photos' | 'events' | 'favorites' | 'likes' | 'notifications' | 'interactions' | 'following' | 'followers' | 'review' = 'recent';
   let unreadChats: any[] = [];
   let interactions: any[] = [];
   let reviewCount = 0;
   let favoriteItems: any[] = [];
   let likedItems: any[] = [];
   let eventItems: any[] = [];
+  let followedProfiles: any[] = [];
+  let followerProfiles: any[] = [];
+  let networkBusy = false;
 
   $: totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
   $: canPrev = currentPage > 1;
@@ -320,6 +323,96 @@
     }));
   }
 
+  async function loadNetworkProfiles() {
+    const [{ data: followsOutData, error: followsOutError }, { data: followsInData, error: followsInError }] =
+      await Promise.all([
+        supabase
+          .from('user_follows')
+          .select('followed_user_id, created_at')
+          .eq('follower_user_id', currentUserId)
+          .order('created_at', { ascending: false })
+          .limit(100),
+        supabase
+          .from('user_follows')
+          .select('follower_user_id, created_at')
+          .eq('followed_user_id', currentUserId)
+          .order('created_at', { ascending: false })
+          .limit(100)
+      ]);
+
+    if (followsOutError) throw followsOutError;
+    if (followsInError) throw followsInError;
+
+    const followedIds = [...new Set((followsOutData || []).map((entry: any) => entry.followed_user_id).filter(Boolean))];
+    const followerIds = [...new Set((followsInData || []).map((entry: any) => entry.follower_user_id).filter(Boolean))];
+
+    if (followedIds.length > 0) {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, accountname, avatar_url, website')
+        .in('id', followedIds);
+      if (error) throw error;
+      const byId = new Map((data || []).map((entry: any) => [entry.id, entry]));
+      followedProfiles = followedIds.map((id) => byId.get(id)).filter(Boolean);
+    } else {
+      followedProfiles = [];
+    }
+
+    if (followerIds.length > 0) {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, accountname, avatar_url, website')
+        .in('id', followerIds);
+      if (error) throw error;
+      const byId = new Map((data || []).map((entry: any) => [entry.id, entry]));
+      followerProfiles = followerIds.map((id) => byId.get(id)).filter(Boolean);
+    } else {
+      followerProfiles = [];
+    }
+  }
+
+  async function unfollowProfile(targetUserId: string) {
+    if (!targetUserId || networkBusy) return;
+    if (!browser) return;
+    const ok = window.confirm('Dieses Profil wirklich entfolgen?');
+    if (!ok) return;
+    networkBusy = true;
+    try {
+      const { error } = await supabase
+        .from('user_follows')
+        .delete()
+        .eq('follower_user_id', currentUserId)
+        .eq('followed_user_id', targetUserId);
+      if (error) throw error;
+      await loadNetworkProfiles();
+    } catch (error: any) {
+      errorMessage = error?.message || 'Profil konnte nicht entfolgt werden.';
+    } finally {
+      networkBusy = false;
+    }
+  }
+
+  async function removeFollower(targetUserId: string) {
+    if (!targetUserId || networkBusy) return;
+    if (!browser) return;
+    const ok = window.confirm('Diesen Follower wirklich aus deiner Liste entfernen?');
+    if (!ok) return;
+    networkBusy = true;
+    try {
+      const { error } = await supabase
+        .from('user_follows')
+        .delete()
+        .eq('follower_user_id', targetUserId)
+        .eq('followed_user_id', currentUserId);
+      if (error) throw error;
+      await loadNetworkProfiles();
+    } catch (error: any) {
+      errorMessage = error?.message || 'Follower konnte nicht entfernt werden.';
+    } finally {
+      networkBusy = false;
+    }
+  }
+
   async function loadNotifications() {
     const { data, error } = await supabase
       .from('user_conversations')
@@ -437,12 +530,17 @@
     try {
       const ok = await ensureAuthUser();
       if (!ok) return;
+      const sectionParam = new URL(window.location.href).searchParams.get('section');
+      if (sectionParam === 'following' || sectionParam === 'followers') {
+        activeSection = sectionParam;
+      }
       await Promise.all([
         loadRecentItems(),
         loadOwnItems(1, ''),
         loadEventItems(),
         loadFavoriteItems(),
         loadLikedItems(),
+        loadNetworkProfiles(),
         loadNotifications(),
         loadInteractions(),
         loadReviewCount()
@@ -563,6 +661,24 @@
           >
             <span>Interaktionen</span>
             <strong>{interactions.length}</strong>
+          </button>
+          <button
+            type="button"
+            class="dashboard-menu__link"
+            class:is-active={activeSection === 'following'}
+            on:click={() => (activeSection = 'following')}
+          >
+            <span>Du folgst</span>
+            <strong>{followedProfiles.length}</strong>
+          </button>
+          <button
+            type="button"
+            class="dashboard-menu__link"
+            class:is-active={activeSection === 'followers'}
+            on:click={() => (activeSection = 'followers')}
+          >
+            <span>Follower</span>
+            <strong>{followerProfiles.length}</strong>
           </button>
           <button
             type="button"
@@ -832,6 +948,60 @@
                     <span>{formatDateTime(entry.created_at)}</span>
                   </span>
                 </a>
+              {/each}
+            </div>
+          {/if}
+        {:else if activeSection === 'following'}
+          <div class="panel-head panel-head--space">
+            <h2>Du folgst</h2>
+            <span>{followedProfiles.length} gesamt</span>
+          </div>
+          {#if followedProfiles.length === 0}
+            <p class="dashboard-empty">Du folgst aktuell noch keinem Profil.</p>
+          {:else}
+            <div class="entry-list">
+              {#each followedProfiles as profile (profile.id)}
+                <article class="entry-card entry-card--history">
+                  {#if profile.avatar_url}
+                    <img src={profile.avatar_url.startsWith('http') ? profile.avatar_url : `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/avatars/${profile.avatar_url}`} alt={profile.full_name || profile.accountname || 'Profil'} width="56" height="56" loading="lazy" />
+                  {:else}
+                    <div class="entry-thumb-fallback">{(profile.full_name || profile.accountname || '?').slice(0, 1).toUpperCase()}</div>
+                  {/if}
+                  <span class="entry-content">
+                    <strong>{profile.full_name || profile.accountname || 'Profil'}</strong>
+                    {#if profile.accountname}
+                      <a href={`/${encodeURIComponent(profile.accountname)}`}>@{profile.accountname}</a>
+                    {/if}
+                  </span>
+                  <button type="button" class="ghost-btn entry-remove-btn" on:click={() => unfollowProfile(profile.id)} disabled={networkBusy}>Entfolgen</button>
+                </article>
+              {/each}
+            </div>
+          {/if}
+        {:else if activeSection === 'followers'}
+          <div class="panel-head panel-head--space">
+            <h2>Follower</h2>
+            <span>{followerProfiles.length} gesamt</span>
+          </div>
+          {#if followerProfiles.length === 0}
+            <p class="dashboard-empty">Noch keine Follower vorhanden.</p>
+          {:else}
+            <div class="entry-list">
+              {#each followerProfiles as profile (profile.id)}
+                <article class="entry-card entry-card--history">
+                  {#if profile.avatar_url}
+                    <img src={profile.avatar_url.startsWith('http') ? profile.avatar_url : `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/avatars/${profile.avatar_url}`} alt={profile.full_name || profile.accountname || 'Profil'} width="56" height="56" loading="lazy" />
+                  {:else}
+                    <div class="entry-thumb-fallback">{(profile.full_name || profile.accountname || '?').slice(0, 1).toUpperCase()}</div>
+                  {/if}
+                  <span class="entry-content">
+                    <strong>{profile.full_name || profile.accountname || 'Profil'}</strong>
+                    {#if profile.accountname}
+                      <a href={`/${encodeURIComponent(profile.accountname)}`}>@{profile.accountname}</a>
+                    {/if}
+                  </span>
+                  <button type="button" class="ghost-btn entry-remove-btn" on:click={() => removeFollower(profile.id)} disabled={networkBusy}>Entfernen</button>
+                </article>
               {/each}
             </div>
           {/if}

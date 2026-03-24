@@ -1712,7 +1712,10 @@
                     </div>
                   </div>
                 </div>
-                <a href="/#profile-finden">Profile finden</a>
+                <span class="dashboard-network-links">
+                  <a href="/dashboard?section=following">Du folgst</a>
+                  <a href="/dashboard?section=followers">Follower</a>
+                </span>
               </div>
 
               {#if dashboardLoading && dashboardNetworkProfiles.length === 0}
@@ -1739,23 +1742,26 @@
                       <div class="dashboard-entry__body">
                         <div class="dashboard-entry__meta">
                           <strong>{profile.full_name || profile.accountname || 'Profil'}</strong>
+                          <a
+                            class="dashboard-inline-link dashboard-inline-link--icon"
+                            href={`/chat?chatWith=${encodeURIComponent(profile.id)}`}
+                            aria-label="Chat öffnen"
+                            title="Chat öffnen"
+                          >
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                            </svg>
+                          </a>
+                        </div>
+                        <div class="dashboard-entry__meta">
                           {#if profile.accountname}
-                            <a
-                              class="dashboard-entry__handle dashboard-entry__handle-link"
-                              href={`/${encodeURIComponent(profile.accountname)}`}
-                            >
+                            <a class="dashboard-entry__handle dashboard-entry__handle-link" href={`/${encodeURIComponent(profile.accountname)}`}>
                               @{profile.accountname}
                             </a>
                           {:else}
                             <span class="dashboard-entry__handle">@profil</span>
                           {/if}
                         </div>
-                        <span class="dashboard-entry__context">Direktnachricht</span>
-                        <p>
-                          <a class="dashboard-inline-link" href={`/chat?chatWith=${encodeURIComponent(profile.id)}`}>
-                            Chat mit diesem Profil öffnen.
-                          </a>
-                        </p>
                       </div>
                     </article>
                   {/each}
@@ -2521,6 +2527,30 @@
 
   .dashboard-inline-link:hover {
     color: var(--culoca-orange);
+  }
+
+  .dashboard-inline-link--icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.55rem;
+    height: 1.55rem;
+    border-radius: 999px;
+    text-decoration: none;
+    color: #fff;
+    background: color-mix(in srgb, var(--text-primary) 22%, transparent);
+  }
+
+  .dashboard-inline-link--icon:hover {
+    color: #fff;
+    background: color-mix(in srgb, var(--culoca-orange) 45%, transparent);
+  }
+
+  .dashboard-network-links {
+    display: inline-flex;
+    gap: 0.7rem;
+    align-items: center;
+    flex-wrap: wrap;
   }
 
   .dashboard-entry__body p,
