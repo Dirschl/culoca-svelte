@@ -863,8 +863,20 @@
                     <div class="message-bubble" class:is-own={entry.sender_user_id === currentUserId}>
                       <p>{entry.body}</p>
                       {#if entry.item}
-                        <a class="message-bubble__item" href={getPublicItemHref(entry.item)}>
-                          {entry.item.title || entry.item.original_name || 'Item'}
+                        <a class="message-bubble__item-card" href={getPublicItemHref(entry.item)}>
+                          {#if getItemPreviewUrl(entry.item)}
+                            <img
+                              src={getItemPreviewUrl(entry.item)}
+                              alt={entry.item.title || entry.item.original_name || 'Item'}
+                              width="56"
+                              height="56"
+                              loading="lazy"
+                            />
+                          {/if}
+                          <span class="message-bubble__item-body">
+                            <strong>{entry.item.title || entry.item.original_name || 'Item'}</strong>
+                            <span>Item öffnen</span>
+                          </span>
                         </a>
                       {/if}
                       <time>{formatDateTime(entry.created_at)}</time>
@@ -1320,10 +1332,53 @@
     line-height: 1.5;
   }
 
-  .message-bubble__item,
   .message-bubble time {
     color: var(--text-secondary);
     font-size: 0.85rem;
+  }
+
+  .message-bubble__item-card {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 0.65rem;
+    align-items: center;
+    text-decoration: none;
+    color: inherit;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--bg-primary) 94%, white 6%);
+    padding: 0.45rem;
+    max-width: min(100%, 24rem);
+  }
+
+  .message-bubble__item-card:hover {
+    border-color: color-mix(in srgb, var(--culoca-orange) 46%, var(--border-color) 54%);
+  }
+
+  .message-bubble__item-card img {
+    width: 56px;
+    height: 56px;
+    border-radius: 10px;
+    object-fit: cover;
+    display: block;
+  }
+
+  .message-bubble__item-body {
+    display: grid;
+    gap: 0.15rem;
+    min-width: 0;
+  }
+
+  .message-bubble__item-body strong,
+  .message-bubble__item-body span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .message-bubble__item-body span {
+    color: var(--text-secondary);
+    font-size: 0.82rem;
   }
 
   .chat-compose {

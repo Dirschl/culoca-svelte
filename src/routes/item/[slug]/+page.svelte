@@ -532,6 +532,9 @@ let showRightsManager = false;
 
   // Für CreatorCard
   let currentUser: any = null;
+  let itemChatUnreadCount = 0;
+  let itemChatChannel: any = null;
+  let itemChatUserId = '';
   $: currentUser = $sessionStore.isAuthenticated && $sessionStore.userId
     ? { id: $sessionStore.userId }
     : null;
@@ -558,6 +561,67 @@ let showRightsManager = false;
   // Load unified rights when image is available
   $: if (image && browser && image.id) {
     unifiedRightsStore.loadRights(image.id);
+  }
+
+  async function loadItemChatUnreadCount() {
+    if (!itemChatUserId) {
+      itemChatUnreadCount = 0;
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('user_conversations')
+      .select('id, user_a_id, user_b_id, user_a_last_read_at, user_b_last_read_at, last_message_at, last_message_sender_id')
+      .or(`user_a_id.eq.${itemChatUserId},user_b_id.eq.${itemChatUserId}`)
+      .not('last_message_sender_id', 'is', null);
+
+    if (error || !data) {
+      itemChatUnreadCount = 0;
+      return;
+    }
+
+    itemChatUnreadCount = data.filter((entry: any) => {
+      if (!entry?.last_message_at) return false;
+      if (entry.last_message_sender_id === itemChatUserId) return false;
+      const ownReadAt =
+        entry.user_a_id === itemChatUserId ? entry.user_a_last_read_at : entry.user_b_last_read_at;
+      return !ownReadAt || new Date(entry.last_message_at).getTime() > new Date(ownReadAt).getTime();
+    }).length;
+  }
+
+  function teardownItemChatChannel() {
+    if (itemChatChannel) {
+      supabase.removeChannel(itemChatChannel);
+      itemChatChannel = null;
+    }
+  }
+
+  function setupItemChatChannel() {
+    teardownItemChatChannel();
+    if (!itemChatUserId) return;
+
+    itemChatChannel = supabase
+      .channel(`item-chat-fab-${itemChatUserId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'user_conversations', filter: `user_a_id=eq.${itemChatUserId}` },
+        async () => loadItemChatUnreadCount()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'user_conversations', filter: `user_b_id=eq.${itemChatUserId}` },
+        async () => loadItemChatUnreadCount()
+      )
+      .subscribe();
+  }
+
+  $: if (browser) {
+    const nextChatUserId = currentUser?.id || '';
+    if (nextChatUserId !== itemChatUserId) {
+      itemChatUserId = nextChatUserId;
+      void loadItemChatUnreadCount();
+      setupItemChatChannel();
+    }
   }
 
   /** Dashboard-Startseite: zuletzt angesehenes Item als Hero-Hintergrund (nur eingeloggt) */
@@ -606,6 +670,7 @@ let showRightsManager = false;
     return () => {
       unifiedRightsStore.reset();
       window.removeEventListener('storage', onStorageChange);
+      teardownItemChatChannel();
     };
   });
 
@@ -4321,6 +4386,9 @@ let showRightsManager = false;
     <svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
       <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
     </svg>
+    {#if itemChatUnreadCount > 0}
+      <span class="fab-chat-badge">{itemChatUnreadCount > 99 ? '99+' : itemChatUnreadCount}</span>
+    {/if}
   </button>
 
   <!-- Scroll to Top / Fullscreen FAB - ersetzt sich gegenseitig -->
@@ -5401,6 +5469,25 @@ let showRightsManager = false;
 
   .fab-button.chat-floating {
     bottom: 12rem;
+  }
+
+  .fab-chat-badge {
+    position: absolute;
+    top: -0.28rem;
+    right: -0.2rem;
+    min-width: 1.2rem;
+    height: 1.2rem;
+    padding: 0 0.3rem;
+    border-radius: 999px;
+    background: #dc2626;
+    border: 2px solid #fff;
+    color: #fff;
+    font-size: 0.68rem;
+    font-weight: 700;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .fab-button.edit-toggle.active {
