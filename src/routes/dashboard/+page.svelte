@@ -34,6 +34,7 @@
   let followingSearchQuery = '';
   let followingSearchResults: any[] = [];
   let followingSearchBusy = false;
+  let contentSectionEl: HTMLElement | null = null;
 
   $: totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
   $: canPrev = currentPage > 1;
@@ -633,6 +634,14 @@
     await loadOwnItems(page, activeQuery);
   }
 
+  function setActiveSection(section: typeof activeSection) {
+    activeSection = section;
+    if (!browser) return;
+    requestAnimationFrame(() => {
+      contentSectionEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
+
   async function initDashboard() {
     loading = true;
     errorMessage = '';
@@ -692,7 +701,7 @@
             type="button"
             class="dashboard-menu__link"
             class:is-active={activeSection === 'recent'}
-            on:click={() => (activeSection = 'recent')}
+            on:click={() => setActiveSection('recent')}
           >
             <span class="dashboard-menu__label">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -707,7 +716,7 @@
             type="button"
             class="dashboard-menu__link"
             class:is-active={activeSection === 'photos'}
-            on:click={() => (activeSection = 'photos')}
+            on:click={() => setActiveSection('photos')}
           >
             <span class="dashboard-menu__label">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -721,7 +730,7 @@
             type="button"
             class="dashboard-menu__link"
             class:is-active={activeSection === 'events'}
-            on:click={() => (activeSection = 'events')}
+            on:click={() => setActiveSection('events')}
           >
             <span class="dashboard-menu__label">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -735,7 +744,7 @@
             type="button"
             class="dashboard-menu__link"
             class:is-active={activeSection === 'favorites'}
-            on:click={() => (activeSection = 'favorites')}
+            on:click={() => setActiveSection('favorites')}
           >
             <span class="dashboard-menu__label">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -749,7 +758,7 @@
             type="button"
             class="dashboard-menu__link"
             class:is-active={activeSection === 'likes'}
-            on:click={() => (activeSection = 'likes')}
+            on:click={() => setActiveSection('likes')}
           >
             <span class="dashboard-menu__label">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -763,7 +772,7 @@
             type="button"
             class="dashboard-menu__link"
             class:is-active={activeSection === 'notifications'}
-            on:click={() => (activeSection = 'notifications')}
+            on:click={() => setActiveSection('notifications')}
           >
             <span class="dashboard-menu__label">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -777,7 +786,7 @@
             type="button"
             class="dashboard-menu__link"
             class:is-active={activeSection === 'interactions'}
-            on:click={() => (activeSection = 'interactions')}
+            on:click={() => setActiveSection('interactions')}
           >
             <span class="dashboard-menu__label">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -791,7 +800,7 @@
             type="button"
             class="dashboard-menu__link"
             class:is-active={activeSection === 'following'}
-            on:click={() => (activeSection = 'following')}
+            on:click={() => setActiveSection('following')}
           >
             <span class="dashboard-menu__label">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -805,7 +814,7 @@
             type="button"
             class="dashboard-menu__link"
             class:is-active={activeSection === 'followers'}
-            on:click={() => (activeSection = 'followers')}
+            on:click={() => setActiveSection('followers')}
           >
             <span class="dashboard-menu__label">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -819,7 +828,7 @@
             type="button"
             class="dashboard-menu__link"
             class:is-active={activeSection === 'review'}
-            on:click={() => (activeSection = 'review')}
+            on:click={() => setActiveSection('review')}
           >
             <span class="dashboard-menu__label">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -832,7 +841,7 @@
         </nav>
       </aside>
 
-      <section class="dashboard-column dashboard-column--content">
+      <section class="dashboard-column dashboard-column--content" bind:this={contentSectionEl}>
         {#if activeSection === 'recent'}
           <div class="panel-head">
             <h2>Zuletzt angesehen</h2>
