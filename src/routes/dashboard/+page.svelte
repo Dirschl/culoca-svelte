@@ -31,6 +31,7 @@
   let followedProfiles: any[] = [];
   let followerProfiles: any[] = [];
   let sharedItemRights: any[] = [];
+  let globalProfileRights: any[] = [];
   let networkBusy = false;
   let followingSearchQuery = '';
   let followingSearchResults: any[] = [];
@@ -582,6 +583,37 @@
     }));
   }
 
+  async function loadGlobalProfileRights() {
+    const { data, error } = await supabase
+      .from('profile_rights')
+      .select('id, target_user_id, rights, created_at, updated_at')
+      .eq('profile_id', currentUserId)
+      .order('updated_at', { ascending: false })
+      .limit(200);
+
+    if (error) throw error;
+
+    const rows = data || [];
+    const targetIds = [...new Set(rows.map((entry: any) => entry.target_user_id).filter(Boolean))];
+    const targetsById = new Map<string, any>();
+
+    if (targetIds.length > 0) {
+      const { data: targets, error: targetError } = await supabase
+        .from('profiles')
+        .select('id, full_name, accountname, avatar_url')
+        .in('id', targetIds);
+      if (targetError) throw targetError;
+      for (const profile of targets || []) {
+        targetsById.set(profile.id, profile);
+      }
+    }
+
+    globalProfileRights = rows.map((entry: any) => ({
+      ...entry,
+      target: targetsById.get(entry.target_user_id) || null
+    }));
+  }
+
   async function loadNotifications() {
     const { data, error } = await supabase
       .from('user_conversations')
@@ -719,6 +751,7 @@
         loadLikedItems(),
         loadNetworkProfiles(),
         loadSharedItemRights(),
+        loadGlobalProfileRights(),
         loadNotifications(),
         loadInteractions(),
         loadReviewCount()
@@ -897,7 +930,7 @@
               </svg>
               <span>Freigaben</span>
             </span>
-            <strong>{sharedItemRights.length}</strong>
+            <strong>{globalProfileRights.length} +{sharedItemRights.length}</strong>
           </button>
           <button
             type="button"
@@ -1266,11 +1299,27 @@
         {:else if activeSection === 'shares'}
           <div class="panel-head panel-head--space">
             <h2>Freigaben</h2>
-            <span>{sharedItemRights.length} Einzelfreigaben</span>
+            <span>{globalProfileRights.length} globale · {sharedItemRights.length} Einzelfreigaben</span>
           </div>
           <div class="entry-actions">
             <a href="/profile/freigaben">Globale Freigaben verwalten</a>
           </div>
+          <section class="dashboard-global-shares">
+            <div class="dashboard-global-shares__count">{globalProfileRights.length}</div>
+            <div class="dashboard-global-shares__body">
+              <strong>Globale Freigaben</strong>
+              {#if globalProfileRights.length === 0}
+                <p>Keine globalen Freigaben vergeben.</p>
+              {:else}
+                <p>
+                  Berechtigte:
+                  {globalProfileRights
+                    .map((entry: any) => entry.target?.full_name || entry.target?.accountname || 'Unbekannt')
+                    .join(', ')}
+                </p>
+              {/if}
+            </div>
+          </section>
           {#if sharedItemRights.length === 0}
             <p class="dashboard-empty">Noch keine Einzelfreigaben vorhanden.</p>
           {:else}
@@ -1557,6 +1606,33 @@
   .dashboard-empty,
   .dashboard-error {
     color: var(--text-secondary);
+  }
+
+  .dashboard-global-shares {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.85rem;
+    align-items: center;
+    margin: 0.75rem 0 1rem;
+    padding: 0.85rem 1rem;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    background: color-mix(in srgb, var(--bg-secondary) 82%, transparent);
+  }
+
+  .dashboard-global-shares__count {
+    font-size: 1.75rem;
+    font-weight: 800;
+    line-height: 1;
+    color: var(--culoca-orange);
+    min-width: 2.2rem;
+    text-align: center;
+  }
+
+  .dashboard-global-shares__body p {
+    margin: 0.2rem 0 0;
+    color: var(--text-secondary);
+    font-size: 0.92rem;
   }
   .dashboard-error {
     color: #ffb4b4;
