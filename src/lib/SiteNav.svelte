@@ -578,6 +578,30 @@
   {/if}
 </nav>
 
+{#if chatDrawerOpen}
+  <button
+    type="button"
+    class="chat-drawer-backdrop"
+    aria-label="Chat schließen"
+    on:click={closeChatDrawer}
+  ></button>
+  <aside class="chat-drawer" aria-label="Chatfenster">
+    <header class="chat-drawer__header">
+      <div>
+        <strong>Chat</strong>
+        <span>Nachrichten beantworten</span>
+      </div>
+      <div class="chat-drawer__actions">
+        <a class="chat-drawer__link" href="/chat">Vollbild</a>
+        <button type="button" class="chat-drawer__close" aria-label="Chat schließen" on:click={closeChatDrawer}>
+          ×
+        </button>
+      </div>
+    </header>
+    <iframe class="chat-drawer__frame" src={chatDrawerSrc} title="Culoca Chat"></iframe>
+  </aside>
+{/if}
+
 
 
 <style>

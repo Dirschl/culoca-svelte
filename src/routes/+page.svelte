@@ -93,6 +93,7 @@
   }
 
   $: locationPreviewUrl = buildLocationPreviewUrl(savedLocation);
+  $: canUseMobileGallery = savedLocation?.source === 'gps';
   $: publicProfileHref = currentUserAccountname ? `/${encodeURIComponent(currentUserAccountname)}` : '/profile';
   $: publicProfileUrl = currentUserAccountname ? `https://culoca.com/${encodeURIComponent(currentUserAccountname)}` : null;
   $: filteredDashboardPriorityFeed = dashboardPriorityFeed.filter((entry: any) => {
@@ -1075,17 +1076,21 @@
                 <h1 class="hero-dashboard-name">{currentUserFullName}</h1>
               {/if}
               <p class="hero-dashboard-lede">
-                Dein Culoca zeigt dir einen schnellen Überblick.
+                Das Culoca Dashboard zeigt dir einen schnellen Überblick.
                 {#if publicProfileUrl}
                   <span class="hero-dashboard-link-line">
                     Deine persönliche Galerie findest du hier:
-                    <a class="hero-dashboard-inline-link" href={publicProfileHref}>{publicProfileUrl}</a>
+                    <a class="hero-dashboard-inline-link hero-dashboard-inline-link--block" href={publicProfileHref}>
+                      {publicProfileUrl}
+                    </a>
                   </span>
                 {/if}
               </p>
               <div class="hero-dash-actions">
                 <a href="/galerie" class="btn-primary">Galerie</a>
-                <a href="/galerie?mobile=true" class="btn-secondary">Mobile Galerie</a>
+                {#if canUseMobileGallery}
+                  <a href="/galerie?mobile=true" class="btn-secondary btn-attention">Mobile Galerie</a>
+                {/if}
                 <a href="/map-view" class="btn-secondary">Karte</a>
               </div>
               <div class="dashboard-tabs" role="tablist" aria-label="Dashboard-Fokus">
@@ -2089,6 +2094,12 @@
   .hero-dashboard-link-line {
     display: block;
     margin-top: 0.12rem;
+  }
+
+  .hero-dashboard-inline-link--block {
+    display: block;
+    margin-left: 0;
+    margin-top: 0.2rem;
   }
 
   .hero-dashboard-inline-link:hover {
