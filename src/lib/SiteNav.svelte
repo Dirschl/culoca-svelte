@@ -47,9 +47,8 @@
   $: currentPath = $page.url?.pathname || '/';
   $: isChatRoute = isActive('/chat');
   $: userIdentityLabel = $customerBranding?.accountName || $customerBranding?.fullName || '';
-  $: userMenuAsLogin = !$isAuthenticated || !userIdentityLabel;
-  $: userMenuLabel = userMenuAsLogin ? 'Login' : userIdentityLabel;
-  $: userEntryHref = userMenuAsLogin ? '/login' : getUserLinkHref('/dashboard');
+  $: userMenuLabel = $isAuthenticated ? userIdentityLabel || 'Dashboard' : 'Login';
+  $: userEntryHref = $isAuthenticated ? getUserLinkHref('/dashboard') : '/login';
   $: userMenuActive =
     isActive('/login') ||
     isActive('/dashboard') ||
@@ -376,7 +375,7 @@
         >
           <svg class="user-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
           {userMenuLabel}
-          {#if !userMenuAsLogin && reviewCount > 0}
+          {#if $isAuthenticated && reviewCount > 0}
             <button
               type="button"
               class="review-badge review-badge--button"
@@ -387,7 +386,7 @@
               {reviewCount}
             </button>
           {/if}
-          {#if !userMenuAsLogin && inboxCount > 0}
+          {#if $isAuthenticated && inboxCount > 0}
             <span
               class="inbox-badge"
               aria-label={`${inboxCount} ungelesene Benachrichtigungen oder Nachrichten`}
@@ -397,7 +396,7 @@
             </span>
           {/if}
         </a>
-        {#if $isAuthenticated && userIdentityLabel}
+        {#if $isAuthenticated}
           <button
             type="button"
             class="nav-link dropdown-toggle user-toggle user-toggle--menu"
@@ -408,7 +407,7 @@
             <svg class="dd-arrow" class:dd-open={openDropdown === 'user'} width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5l3 3 3-3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>
           </button>
         {/if}
-        {#if $isAuthenticated && userIdentityLabel && openDropdown === 'user'}
+        {#if $isAuthenticated && openDropdown === 'user'}
           <div class="dropdown-menu dropdown-menu--user">
             {#if inboxCount > 0}
               <div class="dropdown-status-row">
@@ -454,7 +453,7 @@
 
       <!-- User menu (mobile) -->
       <div class="mobile-only nav-group">
-        {#if $isAuthenticated && userIdentityLabel}
+        {#if $isAuthenticated}
           <span class="nav-group-label">{userMenuLabel}</span>
           <a href={getUserLinkHref('/dashboard')} class="nav-link nav-link--sub" class:active={isActive('/dashboard')} on:click={closeMobile}>
             Dashboard
