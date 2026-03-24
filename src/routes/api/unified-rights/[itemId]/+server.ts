@@ -5,13 +5,28 @@ export async function GET({ params, request }) {
   console.log('🔍 [UnifiedRights API] GET request for item:', params.itemId);
   
   try {
+    const guestResponse = {
+      rights: {
+        download: false,
+        download_original: false,
+        edit: false,
+        delete: false
+      },
+      roleInfo: {
+        role_id: 0,
+        role_name: 'guest',
+        permissions: {}
+      },
+      isOwner: false
+    };
+
     // Extract authorization header
     const authHeader = request.headers.get('authorization');
     console.log('🔍 [UnifiedRights API] Auth header present:', !!authHeader);
     
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.log('❌ [UnifiedRights API] No valid authorization header');
-      return json({ error: 'Nicht angemeldet' }, { status: 401 });
+      console.log('ℹ️ [UnifiedRights API] No valid authorization header, returning guest rights');
+      return json(guestResponse);
     }
 
     const token = authHeader.substring(7);
@@ -38,8 +53,8 @@ export async function GET({ params, request }) {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     
     if (userError || !user) {
-      console.log('❌ [UnifiedRights API] User authentication failed:', userError?.message);
-      return json({ error: 'Nicht angemeldet' }, { status: 401 });
+      console.log('ℹ️ [UnifiedRights API] User authentication failed, returning guest rights:', userError?.message);
+      return json(guestResponse);
     }
 
     console.log('🔍 [UnifiedRights API] User authenticated:', user.id);
