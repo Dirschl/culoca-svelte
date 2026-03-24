@@ -451,41 +451,47 @@
         {/if}
       </div>
 
-      <!-- User menu (mobile) -->
+      <!-- User menu (mobile): section header + indented branch (Admin nested) -->
       <div class="mobile-only nav-group">
         {#if $isAuthenticated}
           <span class="nav-group-label">{userMenuLabel}</span>
-          <a href={getUserLinkHref('/dashboard')} class="nav-link nav-link--sub" class:active={isActive('/dashboard')} on:click={closeMobile}>
-            Dashboard
-          </a>
-          {#each userLinks as link}
-            <a href={getUserLinkHref(link.href)} class="nav-link nav-link--sub" class:active={isActive(link.href)} on:click={closeMobile}>
-              {link.label}
-              {#if link.href === '/profile' && followerAlertCount > 0}
-                <span class="mini-status-chip mini-status-chip--inline mini-status-chip--accent">+{followerAlertCount} Follower</span>
-              {/if}
+          <div class="nav-group__branch">
+            <a href={getUserLinkHref('/dashboard')} class="nav-link nav-link--sub" class:active={isActive('/dashboard')} on:click={closeMobile}>
+              Dashboard
             </a>
-          {/each}
-          {#if $hasAdminPermission}
-            <span class="nav-group-label nav-group-label--nested">Admin</span>
-            {#each adminLinks as link}
-              <a href={link.href} class="nav-link nav-link--sub" class:active={isActive(link.href)} on:click={closeMobile}>
+            {#each userLinks as link}
+              <a href={getUserLinkHref(link.href)} class="nav-link nav-link--sub" class:active={isActive(link.href)} on:click={closeMobile}>
                 {link.label}
-                {#if link.href === '/admin/moderation' && adminReviewCount > 0}
-                  <span class="review-badge review-badge--inline">{adminReviewCount}</span>
+                {#if link.href === '/profile' && followerAlertCount > 0}
+                  <span class="mini-status-chip mini-status-chip--inline mini-status-chip--accent">+{followerAlertCount} Follower</span>
                 {/if}
               </a>
             {/each}
-          {/if}
-          <button class="nav-link nav-link--sub nav-link--logout" on:click={handleLogout}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M10.09 15.59L11.5 17l5-5-5-5-1.41 1.41L12.67 11H3v2h9.67l-2.58 2.59zM19 3H5c-1.11 0-2 .9-2 2v4h2V5h14v14H5v-4H3v4c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg>
-            Abmelden
-          </button>
+            {#if $hasAdminPermission}
+              <div class="nav-group__nest" role="group" aria-label="Administration">
+                <span class="nav-group-label nav-group-label--nested">Admin</span>
+                {#each adminLinks as link}
+                  <a href={link.href} class="nav-link nav-link--sub nav-link--sub-nested" class:active={isActive(link.href)} on:click={closeMobile}>
+                    {link.label}
+                    {#if link.href === '/admin/moderation' && adminReviewCount > 0}
+                      <span class="review-badge review-badge--inline">{adminReviewCount}</span>
+                    {/if}
+                  </a>
+                {/each}
+              </div>
+            {/if}
+            <button class="nav-link nav-link--sub nav-link--logout" on:click={handleLogout}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M10.09 15.59L11.5 17l5-5-5-5-1.41 1.41L12.67 11H3v2h9.67l-2.58 2.59zM19 3H5c-1.11 0-2 .9-2 2v4h2V5h14v14H5v-4H3v4c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg>
+              Abmelden
+            </button>
+          </div>
         {:else}
-          <a href="/login" class="nav-link nav-link--sub" class:active={isActive('/login')} on:click={closeMobile}>
-            <svg class="user-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-            Login
-          </a>
+          <div class="nav-group__branch">
+            <a href="/login" class="nav-link nav-link--sub" class:active={isActive('/login')} on:click={closeMobile}>
+              <svg class="user-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              Login
+            </a>
+          </div>
         {/if}
       </div>
     </div>
@@ -880,7 +886,11 @@
     letter-spacing: 0.06em;
     color: var(--text-muted);
   }
+  /* Sub-indent only used inside mobile .nav-group__branch (desktop: block hidden) */
   .nav-link--sub { padding-left: 1.5rem; }
+  .nav-link--sub-nested {
+    font-weight: 500;
+  }
 
   /* Hamburger */
   .nav-burger {
@@ -940,7 +950,63 @@
     .nav-link { padding: 0.75rem 1rem; font-size: 1rem; border-radius: 10px; }
     .nav-link.active::after { display: none; }
     .nav-link.active { background: var(--bg-tertiary); }
-    .nav-link--sub { padding-left: 2rem; font-size: 0.925rem; }
+
+    .nav-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+      margin-top: 0.35rem;
+      padding-top: 0.45rem;
+      border-top: 1px solid var(--border-color);
+    }
+    .nav-group__branch {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      margin-left: 0.15rem;
+      padding: 0.2rem 0 0.15rem 0.65rem;
+      border-left: 3px solid color-mix(in srgb, var(--culoca-orange) 40%, var(--border-color) 60%);
+      border-radius: 0 10px 10px 0;
+    }
+    .nav-group__nest {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      margin-top: 0.35rem;
+      padding: 0.35rem 0 0.3rem 0.55rem;
+      margin-left: 0.1rem;
+      border-left: 2px solid var(--border-color);
+      background: color-mix(in srgb, var(--bg-secondary) 52%, transparent 48%);
+      border-radius: 0 8px 8px 0;
+    }
+    .nav-group .nav-group-label {
+      padding-left: 0.25rem;
+      padding-right: 0.75rem;
+    }
+    .nav-group__nest .nav-group-label--nested {
+      margin-top: 0;
+      padding: 0.3rem 0.35rem 0.15rem 0.35rem;
+    }
+    .nav-group .nav-link--sub,
+    .nav-group .nav-link--sub-nested {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      min-width: 0;
+      padding: 0.65rem 0.75rem 0.65rem 0.45rem;
+      font-size: 0.93rem;
+      text-align: left;
+    }
+    .nav-group .nav-link--sub-nested {
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+    }
+    .nav-group .nav-link--sub.active,
+    .nav-group .nav-link--sub-nested.active {
+      color: var(--culoca-orange);
+    }
+
     .nav-link--logout {
       display: flex;
       align-items: center;
@@ -954,7 +1020,6 @@
       text-align: left;
     }
     .nav-link--logout:hover { color: #e74c3c; }
-    :global(.nav-group-label--nested) { margin-top: 0.25rem; }
     .nav-backdrop { display: block; }
   }
 </style>
