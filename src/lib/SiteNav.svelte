@@ -22,23 +22,20 @@
   let chatDrawerSrc = '/chat?embed=1';
 
   const navLinks = [
+    { href: '/galerie', label: 'Galerie' },
     { href: '/foto', label: 'Fotos' },
     { href: '/event', label: 'Events' },
     { href: '/firma', label: 'Firmen' },
   ];
 
   const galleryLinks = [
-    { href: '/galerie', label: 'Galerie' },
-    { href: '/galerie?mobile=true', label: 'Mobile Galerie' },
-    { href: '/map-view', label: 'Kartenansicht' },
+    { href: '/galerie?mobile=true', label: 'Mobil' },
+    { href: '/map-view', label: 'Karte' },
   ];
 
   const infoLinks = [
     { href: '/web', label: 'System' },
     { href: '/seo', label: 'SEO' },
-    { href: '/web/license', label: 'Lizenz' },
-    { href: '/web/impressum', label: 'Impressum' },
-    { href: '/web/datenschutz', label: 'Datenschutz' },
   ];
 
   const adminLinks = [
@@ -51,16 +48,14 @@
   ];
 
   const userLinks = [
-    { href: '/dashboard', label: 'Dashboard' },
-    { href: '/settings', label: 'Einstellungen' },
     { href: '/profile', label: 'Profil' },
-    { href: '/profile/review', label: 'Daten prüfen' },
+    { href: '/settings', label: 'Settings' },
   ];
 
   $: currentPath = $page.url?.pathname || '/';
   $: isChatRoute = isActive('/chat');
   $: displayName = $customerBranding?.fullName || $customerBranding?.accountName || '';
-  $: userMenuLabel = $isAuthenticated && displayName ? displayName : ($isAuthenticated ? 'Konto' : 'Login');
+  $: userMenuLabel = $isAuthenticated && displayName ? displayName : ($isAuthenticated ? 'Dashboard' : 'Login');
   $: userMenuActive = isActive('/dashboard') || isActive('/chat') || isActive('/settings') || isActive('/standort') || isActive('/profile') || isActive('/profile/freigaben') || isActive('/login') || ($hasAdminPermission && adminLinks.some(l => isActive(l.href)));
   $: inheritedReturnTo = sanitizeReturnTo($page.url.searchParams.get('returnTo'), currentPathWithSearch($page.url));
   $: {
@@ -287,15 +282,6 @@
     openChatDrawer();
   }
 
-  function handleUserMenuClick() {
-    if (!$isAuthenticated) {
-      goto('/login');
-      closeMobile();
-      return;
-    }
-    toggleDropdown('user');
-  }
-
   async function handleLogout() {
     closeDropdowns();
     closeMobile();
@@ -407,14 +393,14 @@
         {/each}
       </div>
 
-      <!-- Info dropdown (desktop) / expanded list (mobile) -->
+      <!-- Web dropdown (desktop) / expanded list (mobile) -->
       <div class="dropdown desktop-only">
         <button
           class="nav-link dropdown-toggle"
           class:active={isDropdownActive(infoLinks)}
           on:click|stopPropagation={() => toggleDropdown('info')}
         >
-          Info
+          Web
           <svg class="dd-arrow" class:dd-open={openDropdown === 'info'} width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5l3 3 3-3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>
         </button>
         {#if openDropdown === 'info'}
@@ -425,9 +411,9 @@
           </div>
         {/if}
       </div>
-      <!-- Info links inline for mobile -->
+      <!-- Web links inline for mobile -->
       <div class="mobile-only nav-group">
-        <span class="nav-group-label">Info</span>
+        <span class="nav-group-label">Web</span>
         {#each infoLinks as link}
           <a href={link.href} class="nav-link nav-link--sub" class:active={isActive(link.href)} on:click={closeMobile}>{link.label}</a>
         {/each}
@@ -435,10 +421,11 @@
 
       <!-- User menu (desktop) -->
       <div class="dropdown desktop-only">
-        <button
-          class="nav-link dropdown-toggle user-toggle"
+        <a
+          href={$isAuthenticated ? getUserLinkHref('/dashboard') : '/login'}
+          class="nav-link user-toggle"
           class:active={userMenuActive}
-          on:click|stopPropagation={() => handleUserMenuClick()}
+          on:click={closeDropdowns}
         >
           <svg class="user-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
           {userMenuLabel}
@@ -462,10 +449,18 @@
               {inboxCount}
             </span>
           {/if}
-          {#if $isAuthenticated}
+        </a>
+        {#if $isAuthenticated}
+          <button
+            type="button"
+            class="nav-link dropdown-toggle user-toggle user-toggle--menu"
+            aria-label="Benutzermenü öffnen"
+            class:active={openDropdown === 'user'}
+            on:click|stopPropagation={() => toggleDropdown('user')}
+          >
             <svg class="dd-arrow" class:dd-open={openDropdown === 'user'} width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5l3 3 3-3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>
-          {/if}
-        </button>
+          </button>
+        {/if}
         {#if $isAuthenticated && openDropdown === 'user'}
           <div class="dropdown-menu dropdown-menu--user">
             {#if inboxCount > 0}
@@ -484,12 +479,6 @@
             {#each userLinks as link}
               <a href={getUserLinkHref(link.href)} class="dropdown-item" class:active={isActive(link.href)} on:click={closeDropdowns}>
                 {link.label}
-                {#if link.href === '/profile/review' && reviewCount > 0}
-                  <span class="review-badge review-badge--inline">{reviewCount}</span>
-                {/if}
-                {#if link.href === '/chat' && inboxCount > 0}
-                  <span class="inbox-badge inbox-badge--inline">{inboxCount}</span>
-                {/if}
                 {#if link.href === '/profile' && followerAlertCount > 0}
                   <span class="mini-status-chip mini-status-chip--inline mini-status-chip--accent">+{followerAlertCount} Follower</span>
                 {/if}
@@ -520,15 +509,12 @@
       <div class="mobile-only nav-group">
         {#if $isAuthenticated}
           <span class="nav-group-label">{userMenuLabel}</span>
+          <a href={getUserLinkHref('/dashboard')} class="nav-link nav-link--sub" class:active={isActive('/dashboard')} on:click={closeMobile}>
+            Dashboard
+          </a>
           {#each userLinks as link}
             <a href={getUserLinkHref(link.href)} class="nav-link nav-link--sub" class:active={isActive(link.href)} on:click={closeMobile}>
               {link.label}
-              {#if link.href === '/profile/review' && reviewCount > 0}
-                <span class="review-badge review-badge--inline">{reviewCount}</span>
-              {/if}
-              {#if link.href === '/chat' && inboxCount > 0}
-                <span class="inbox-badge inbox-badge--inline">{inboxCount}</span>
-              {/if}
               {#if link.href === '/profile' && followerAlertCount > 0}
                 <span class="mini-status-chip mini-status-chip--inline mini-status-chip--accent">+{followerAlertCount} Follower</span>
               {/if}
@@ -866,6 +852,11 @@
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
+  }
+  .user-toggle--menu {
+    margin-left: 0.15rem;
+    padding-left: 0.55rem;
+    padding-right: 0.55rem;
   }
   .user-icon { flex-shrink: 0; opacity: 0.7; }
   .review-badge {
