@@ -16,7 +16,11 @@
   let lastAuthState = false;
 
   $: pathname = $page.url.pathname;
+  $: routeId = $page.route?.id || '';
   $: hideFabs =
+    routeId === '/item/[slug]' ||
+    routeId === '/[country=countrySlug]/[district]/[municipality]/[slug]' ||
+    routeId === '/[country=countrySlug]/[district]/[municipality]/[slug]/download' ||
     isDetailPath(pathname) ||
     pathname.startsWith('/item/') ||
     EXCLUDED_PREFIXES.some((prefix) => pathname.startsWith(prefix));
@@ -219,8 +223,13 @@
     -webkit-tap-highlight-color: transparent;
   }
 
+  .global-fab svg {
+    width: 40px;
+    height: 40px;
+  }
+
   .global-fab:hover {
-    background: rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.1);
     color: #fff;
     transform: scale(1.1);
     box-shadow: 0 6px 20px var(--shadow);

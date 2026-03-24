@@ -564,47 +564,7 @@
   {/if}
 </nav>
 
-{#if $isAuthenticated && !isChatRoute}
-  <button
-    type="button"
-    class="chat-launcher"
-    aria-label="Chat öffnen"
-    aria-expanded={chatDrawerOpen}
-    on:click={handleChatLauncherClick}
-  >
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M6.5 18.5L3.5 20l1.2-3.7A7.8 7.8 0 0 1 4 13c0-4.4 4-8 9-8s9 3.6 9 8-4 8-9 8c-1.5 0-2.9-.3-4.1-.9H6.5z" />
-      <path d="M8.5 11.5h9" />
-      <path d="M8.5 15.5h6" />
-    </svg>
-    <span>Chat</span>
-    {#if inboxCount > 0}
-      <span class="chat-launcher__badge">{inboxCount}</span>
-    {/if}
-  </button>
-{/if}
 
-{#if chatDrawerOpen && $isAuthenticated && !isChatRoute}
-  <button type="button" class="chat-drawer-backdrop" aria-label="Chat schließen" on:click={closeChatDrawer}></button>
-  <aside class="chat-drawer" aria-label="Chat">
-    <div class="chat-drawer__header">
-      <div>
-        <strong>Chat</strong>
-        <span>Nachrichten zentral von überall</span>
-      </div>
-      <div class="chat-drawer__actions">
-        <a href="/chat" class="chat-drawer__link" on:click={closeChatDrawer}>Vollansicht</a>
-        <button type="button" class="chat-drawer__close" aria-label="Schließen" on:click={closeChatDrawer}>×</button>
-      </div>
-    </div>
-    <iframe
-      class="chat-drawer__frame"
-      src={chatDrawerSrc}
-      title="Culoca Chat"
-      loading="lazy"
-    ></iframe>
-  </aside>
-{/if}
 
 <style>
   .site-nav {
