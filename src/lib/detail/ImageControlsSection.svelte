@@ -164,16 +164,10 @@
               width="30"
               height="30"
               viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
+              fill="currentColor"
               aria-hidden="true"
             >
-              <path d="M6.5 18.5L3.5 20l1.2-3.7A7.8 7.8 0 0 1 4 13c0-4.4 4-8 9-8s9 3.6 9 8-4 8-9 8c-1.5 0-2.9-.3-4.1-.9H6.5z" />
-              <path d="M8.5 11.5h9" />
-              <path d="M8.5 15.5h6" />
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
             </svg>
           </button>
         {/if}

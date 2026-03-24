@@ -94,6 +94,7 @@
 
   $: locationPreviewUrl = buildLocationPreviewUrl(savedLocation);
   $: publicProfileHref = currentUserAccountname ? `/${encodeURIComponent(currentUserAccountname)}` : '/profile';
+  $: publicProfileUrl = currentUserAccountname ? `https://culoca.com/${encodeURIComponent(currentUserAccountname)}` : null;
   $: filteredDashboardPriorityFeed = dashboardPriorityFeed.filter((entry: any) => {
     if (activeDashboardView === 'all') return true;
     if (activeDashboardView === 'inbox') return entry.category === 'inbox';
@@ -1073,32 +1074,16 @@
               {#if currentUserFullName}
                 <h1 class="hero-dashboard-name">{currentUserFullName}</h1>
               {/if}
-              <p class="hero-dashboard-lede">Dein Culoca Dashboard zeigt dir einen schnellen Überblick.</p>
-              {#if dashboardHeroBackdrop?.creatorName || dashboardHeroBackdrop?.title}
-                <p class="hero-dashboard-backdrop-meta">
-                  {#if dashboardHeroBackdrop?.creatorName}
-                    {#if dashboardHeroBackdrop.creatorHref}
-                      <a href={dashboardHeroBackdrop.creatorHref}>
-                        {dashboardHeroBackdrop.creatorName}
-                      </a>
-                    {:else}
-                      <span>{dashboardHeroBackdrop.creatorName}</span>
-                    {/if}
-                  {/if}
-                  {#if dashboardHeroBackdrop?.creatorName && dashboardHeroBackdrop?.title}
-                    <span aria-hidden="true"> | </span>
-                  {/if}
-                  {#if dashboardHeroBackdrop?.title}
-                    <a href={dashboardHeroBackdrop.href}>
-                      {dashboardHeroBackdrop.title}
-                    </a>
-                  {/if}
-                </p>
-              {/if}
+              <p class="hero-dashboard-lede">
+                Dein Culoca zeigt dir einen schnellen Überblick.
+                {#if publicProfileUrl}
+                  Deine persönliche Galerie findest du hier:
+                  <a class="hero-dashboard-inline-link" href={publicProfileHref}>{publicProfileUrl}</a>
+                {/if}
+              </p>
               <div class="hero-dash-actions">
-                <a href="/chat" class="btn-secondary">Nachrichten</a>
                 <a href="/galerie" class="btn-primary">Galerie</a>
-                <a href={publicProfileHref} class="btn-secondary">Öffentliches Profil</a>
+                <a href="/galerie?mobile=true" class="btn-secondary">Mobile Galerie</a>
               </div>
               <div class="dashboard-tabs" role="tablist" aria-label="Dashboard-Fokus">
                 <button type="button" class="dashboard-tab" class:is-active={activeDashboardView === 'all'} on:click={() => (activeDashboardView = 'all')}>
@@ -1160,6 +1145,27 @@
               </section>
             </aside>
           </div>
+          {#if dashboardHeroBackdrop?.creatorName || dashboardHeroBackdrop?.title}
+            <p class="hero-dashboard-backdrop-meta hero-dashboard-backdrop-meta--overlay">
+              {#if dashboardHeroBackdrop?.creatorName}
+                {#if dashboardHeroBackdrop.creatorHref}
+                  <a href={dashboardHeroBackdrop.creatorHref}>
+                    {dashboardHeroBackdrop.creatorName}
+                  </a>
+                {:else}
+                  <span>{dashboardHeroBackdrop.creatorName}</span>
+                {/if}
+              {/if}
+              {#if dashboardHeroBackdrop?.creatorName && dashboardHeroBackdrop?.title}
+                <span aria-hidden="true"> | </span>
+              {/if}
+              {#if dashboardHeroBackdrop?.title}
+                <a href={dashboardHeroBackdrop.href}>
+                  {dashboardHeroBackdrop.title}
+                </a>
+              {/if}
+            </p>
+          {/if}
         </div>
       </section>
 
@@ -2031,7 +2037,9 @@
   .dashboard-hero--has-backdrop .hero-dash-actions a,
   .dashboard-hero--has-backdrop .dashboard-tabs,
   .dashboard-hero--has-backdrop .dashboard-tabs button,
-  .dashboard-hero--has-backdrop .hero-side {
+  .dashboard-hero--has-backdrop .hero-side,
+  .dashboard-hero--has-backdrop .hero-dashboard-backdrop-meta,
+  .dashboard-hero--has-backdrop .hero-dashboard-backdrop-meta a {
     pointer-events: auto;
   }
 
@@ -2080,11 +2088,33 @@
     text-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
   }
 
+  .hero-dashboard-inline-link {
+    margin-left: 0.25rem;
+    color: inherit;
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, currentColor 60%, transparent 40%);
+    text-underline-offset: 0.12rem;
+    word-break: break-all;
+  }
+
+  .hero-dashboard-inline-link:hover {
+    color: var(--culoca-orange);
+    text-decoration-color: var(--culoca-orange);
+  }
+
   .hero-dashboard-backdrop-meta {
     margin: -0.3rem 0 1rem;
     font-size: 0.95rem;
     color: rgba(255, 255, 255, 0.92);
     text-shadow: 0 1px 6px rgba(0, 0, 0, 0.4);
+  }
+
+  .hero-dashboard-backdrop-meta--overlay {
+    position: absolute;
+    left: clamp(1rem, 3.2vw, 2rem);
+    bottom: clamp(0.9rem, 2.5vw, 1.7rem);
+    margin: 0;
+    z-index: 3;
   }
 
   .hero-dashboard-backdrop-meta a {

@@ -9,6 +9,7 @@
   import { browser } from '$app/environment';
   import { afterNavigate } from '$app/navigation';
   import { isDetailPath, LAST_LOCAL_ROUTE_KEY } from '$lib/returnTo';
+  import GlobalUtilityFabs from '$lib/GlobalUtilityFabs.svelte';
 
   function storeLastLocalRoute(url: URL) {
     if (!browser || isDetailPath(url.pathname)) return;
@@ -132,6 +133,7 @@
 
 <div class="app">
   <slot />
+  <GlobalUtilityFabs />
 </div>
 
 <style>
