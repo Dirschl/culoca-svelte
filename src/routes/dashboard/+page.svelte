@@ -116,6 +116,16 @@
     }
   }
 
+  function buildCountMap(rows: Array<{ item_id?: string | null }>): Record<string, number> {
+    const result: Record<string, number> = {};
+    for (const row of rows || []) {
+      const key = row?.item_id;
+      if (!key) continue;
+      result[key] = (result[key] || 0) + 1;
+    }
+    return result;
+  }
+
   async function ensureAuthUser() {
     const { data } = await supabase.auth.getUser();
     const userId = data.user?.id || '';
@@ -244,7 +254,45 @@
       throw error;
     }
 
-    allItems = data || [];
+    const items = data || [];
+    const itemIds = items.map((item: any) => item.id).filter(Boolean);
+
+    if (itemIds.length > 0) {
+      const [
+        { data: viewRows, error: viewsError },
+        { data: downloadRows, error: downloadsError },
+        { data: likeRows, error: likesError },
+        { data: favoriteRows, error: favoritesError }
+      ] = await Promise.all([
+        supabase.from('item_events').select('item_id').eq('event_type', 'item_view').in('item_id', itemIds),
+        supabase.from('item_events').select('item_id').eq('event_type', 'download').in('item_id', itemIds),
+        supabase.from('item_likes').select('item_id').in('item_id', itemIds),
+        supabase.from('item_favorites').select('item_id').in('item_id', itemIds)
+      ]);
+
+      if (viewsError) throw viewsError;
+      if (downloadsError) throw downloadsError;
+      if (likesError) throw likesError;
+      if (favoritesError) throw favoritesError;
+
+      const viewsByItem = buildCountMap((viewRows as Array<{ item_id?: string | null }>) || []);
+      const downloadsByItem = buildCountMap((downloadRows as Array<{ item_id?: string | null }>) || []);
+      const likesByItem = buildCountMap((likeRows as Array<{ item_id?: string | null }>) || []);
+      const favoritesByItem = buildCountMap((favoriteRows as Array<{ item_id?: string | null }>) || []);
+
+      allItems = items.map((item: any) => ({
+        ...item,
+        stats: {
+          views: viewsByItem[item.id] || 0,
+          likes: likesByItem[item.id] || 0,
+          favorites: favoritesByItem[item.id] || 0,
+          downloads: downloadsByItem[item.id] || 0
+        }
+      }));
+    } else {
+      allItems = [];
+    }
+
     totalItems = count || 0;
     currentPage = page;
     loadingItems = false;
@@ -774,9 +822,12 @@
                     </a>
                     <span>Aktualisiert: {formatDate(item.updated_at || item.created_at)}</span>
                     <div class="entry-actions">
-                      <a href={getPublicItemHref(item)}>Öffnen</a>
-                      <a href={`/item/${encodeURIComponent(item.slug)}`}>Bearbeiten</a>
-                      <a href={`/item/${encodeURIComponent(item.slug)}/download`}>Verwalten</a>
+                      <span>{item.stats?.views || 0} Aufrufe</span>
+                      <span>{item.stats?.likes || 0} Likes</span>
+                      <span>{item.stats?.favorites || 0} Gemerkte</span>
+                      <a href={`/item/${encodeURIComponent(item.slug)}/download`}>
+                        {item.stats?.downloads || 0} Downloads
+                      </a>
                     </div>
                   </div>
                 </article>
