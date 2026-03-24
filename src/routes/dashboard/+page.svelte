@@ -888,6 +888,10 @@
             <h2>Meine Fotos</h2>
             <span>{totalItems} gesamt</span>
           </div>
+          <div class="entry-actions">
+            <a href="/foto/upload">Upload</a>
+            <a href="/profile/freigaben">Globale Freigaben</a>
+          </div>
 
           <form class="search-row" on:submit|preventDefault={applySearch}>
             <input type="search" bind:value={searchQuery} placeholder="Suche nach Titel oder Slug" />

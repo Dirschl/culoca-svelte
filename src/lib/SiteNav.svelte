@@ -52,13 +52,9 @@
 
   const userLinks = [
     { href: '/dashboard', label: 'Dashboard' },
-    { href: '/chat', label: 'Chat' },
     { href: '/settings', label: 'Einstellungen' },
-    { href: '/standort', label: 'Standort' },
     { href: '/profile', label: 'Profil' },
     { href: '/profile/review', label: 'Daten prüfen' },
-    { href: '/foto/upload', label: 'Foto-Upload' },
-    { href: '/profile/freigaben', label: 'Freigaben' },
   ];
 
   $: currentPath = $page.url?.pathname || '/';
