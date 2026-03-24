@@ -702,11 +702,11 @@
       dashboardFavoriteItems = (favoriteItemData || []).map((entry: any) => ({
         favoritedAt: entry.created_at,
         ...(entry.items || {})
-      })).slice(0, 12);
+      })).slice(0, 3);
       dashboardLikedItems = (likedItemData || []).map((entry: any) => ({
         likedAt: entry.created_at,
         ...(entry.items || {})
-      })).slice(0, 12);
+      })).slice(0, 3);
       dashboardUnreadCount = dashboardNotifications.filter((entry: any) => !entry.read_at).length;
 
       const followedIds = [

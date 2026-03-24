@@ -1112,20 +1112,6 @@
 
         <!-- Profil-Formular -->
         <form class="profile-form" on:submit|preventDefault={saveProfile}>
-          <div class="card">
-            <h3 class="section-title">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-              </svg>
-              Nachrichten
-            </h3>
-            <p class="help-text">Die Inbox liegt jetzt auf der Startseite und steht dort ganz oben.</p>
-            <div class="review-actions">
-              <a class="review-link" href="/chat">Inbox öffnen</a>
-              <a class="review-link review-link--secondary" href="/#profile-finden">Neuen Chat starten</a>
-            </div>
-          </div>
-
           <!-- Persönliche Informationen -->
           <div class="card">
             <h3 class="section-title">

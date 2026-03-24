@@ -21,10 +21,13 @@
   let currentPage = 1;
   let totalItems = 0;
   let historyBusy = false;
-  let activeSection: 'recent' | 'photos' | 'notifications' | 'interactions' | 'review' = 'recent';
-  let notifications: any[] = [];
+  let activeSection: 'recent' | 'photos' | 'events' | 'favorites' | 'likes' | 'notifications' | 'interactions' | 'review' = 'recent';
+  let unreadChats: any[] = [];
   let interactions: any[] = [];
   let reviewCount = 0;
+  let favoriteItems: any[] = [];
+  let likedItems: any[] = [];
+  let eventItems: any[] = [];
 
   $: totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
   $: canPrev = currentPage > 1;
@@ -43,46 +46,27 @@
     }
   }
 
+  function formatDateTime(value: string | null | undefined): string {
+    if (!value) return '';
+    try {
+      return new Date(value).toLocaleString('de-DE', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch {
+      return '';
+    }
+  }
+
   function getItemThumb(item: any): string {
     return item?.slug && item?.path_512 ? getSeoImageUrl(item.slug, item.path_512, '512') : '';
   }
 
-  function getNotificationActor(entry: any): string {
-    return entry?.actor?.full_name || entry?.actor?.accountname || 'Jemand';
-  }
-
-  function getNotificationLabel(entry: any): string {
-    switch (entry?.event_type) {
-      case 'download':
-        return 'hat ein Item heruntergeladen';
-      case 'favorite_add':
-        return 'hat ein Item gemerkt';
-      case 'like_add':
-        return 'hat ein Item geliked';
-      case 'comment_create':
-        return 'hat kommentiert';
-      case 'comment_hide':
-        return 'hat einen Kommentar ausgeblendet';
-      case 'comment_restore':
-        return 'hat einen Kommentar wiederhergestellt';
-      case 'chat_message':
-        return 'hat eine Nachricht gesendet';
-      default:
-        return entry?.event_type || 'hat interagiert';
-    }
-  }
-
-  function getNotificationPreview(entry: any): string {
-    if (entry?.payload?.message_excerpt) return entry.payload.message_excerpt;
-    if (entry?.payload?.comment_excerpt) return entry.payload.comment_excerpt;
-    return entry?.item?.title || entry?.item?.original_name || '';
-  }
-
-  function getNotificationHref(entry: any): string {
-    if (entry?.event_type === 'chat_message' && entry?.payload?.conversation_id) {
-      return `/chat?conversation=${encodeURIComponent(entry.payload.conversation_id)}`;
-    }
-    return entry?.item ? getPublicItemHref(entry.item) : '/dashboard';
+  function getChatActor(entry: any): string {
+    return entry?.otherUser?.full_name || entry?.otherUser?.accountname || 'Chat';
   }
 
   function getInteractionActor(entry: any): string {
@@ -107,6 +91,25 @@
         return 'hat dir zu einem Item geschrieben';
       default:
         return entry?.event_type || 'hat interagiert';
+    }
+  }
+
+  function getInteractionIconKind(entry: any): 'download' | 'favorite' | 'like' | 'comment' | 'chat' | 'default' {
+    switch (entry?.event_type) {
+      case 'download':
+        return 'download';
+      case 'favorite_add':
+        return 'favorite';
+      case 'like_add':
+        return 'like';
+      case 'comment_create':
+      case 'comment_hide':
+      case 'comment_restore':
+        return 'comment';
+      case 'chat_message':
+        return 'chat';
+      default:
+        return 'default';
     }
   }
 
@@ -244,16 +247,92 @@
     loadingItems = false;
   }
 
+  async function loadEventItems() {
+    const { data, error } = await supabase
+      .from('items')
+      .select(
+        'id, slug, title, original_name, canonical_path, country_slug, district_slug, municipality_slug, path_512, created_at, updated_at, type_id'
+      )
+      .eq('profile_id', currentUserId)
+      .eq('type_id', 2)
+      .eq('admin_hidden', false)
+      .is('group_root_item_id', null)
+      .not('slug', 'is', null)
+      .order('updated_at', { ascending: false })
+      .limit(100);
+    if (error) throw error;
+    eventItems = data || [];
+  }
+
+  async function loadFavoriteItems() {
+    const { data, error } = await supabase
+      .from('item_favorites')
+      .select(`
+        item_id,
+        created_at,
+        items!inner(
+          id,
+          slug,
+          title,
+          original_name,
+          canonical_path,
+          country_slug,
+          district_slug,
+          municipality_slug,
+          path_512
+        )
+      `)
+      .eq('user_id', currentUserId)
+      .order('created_at', { ascending: false })
+      .limit(100);
+    if (error) throw error;
+    favoriteItems = (data || []).map((entry: any) => ({
+      favoritedAt: entry.created_at,
+      ...(entry.items || {})
+    }));
+  }
+
+  async function loadLikedItems() {
+    const { data, error } = await supabase
+      .from('item_likes')
+      .select(`
+        item_id,
+        created_at,
+        items!inner(
+          id,
+          slug,
+          title,
+          original_name,
+          canonical_path,
+          country_slug,
+          district_slug,
+          municipality_slug,
+          path_512
+        )
+      `)
+      .eq('user_id', currentUserId)
+      .order('created_at', { ascending: false })
+      .limit(100);
+    if (error) throw error;
+    likedItems = (data || []).map((entry: any) => ({
+      likedAt: entry.created_at,
+      ...(entry.items || {})
+    }));
+  }
+
   async function loadNotifications() {
     const { data, error } = await supabase
-      .from('user_notifications')
+      .from('user_conversations')
       .select(`
         id,
-        event_type,
-        payload,
-        read_at,
-        created_at,
-        items:item_id(
+        user_a_id,
+        user_b_id,
+        user_a_last_read_at,
+        user_b_last_read_at,
+        last_message_at,
+        last_message_preview,
+        last_message_sender_id,
+        starter_item:starter_item_id(
           id,
           slug,
           title,
@@ -264,21 +343,32 @@
           municipality_slug,
           path_512
         ),
-        profiles:actor_user_id(
+        user_a:user_a_id(
+          full_name,
+          accountname,
+          avatar_url
+        ),
+        user_b:user_b_id(
           full_name,
           accountname,
           avatar_url
         )
       `)
-      .eq('recipient_user_id', currentUserId)
-      .order('created_at', { ascending: false })
-      .limit(30);
+      .or(`user_a_id.eq.${currentUserId},user_b_id.eq.${currentUserId}`)
+      .order('last_message_at', { ascending: false })
+      .limit(50);
     if (error) throw error;
-    notifications = (data || []).map((entry: any) => ({
-      ...entry,
-      item: entry.items || null,
-      actor: entry.profiles || null
-    }));
+    unreadChats = (data || [])
+      .filter((entry: any) => {
+        if (!entry?.last_message_at) return false;
+        if (entry.last_message_sender_id === currentUserId) return false;
+        const ownReadAt = entry.user_a_id === currentUserId ? entry.user_a_last_read_at : entry.user_b_last_read_at;
+        return !ownReadAt || new Date(entry.last_message_at).getTime() > new Date(ownReadAt).getTime();
+      })
+      .map((entry: any) => ({
+        ...entry,
+        otherUser: entry.user_a_id === currentUserId ? entry.user_b : entry.user_a
+      }));
   }
 
   async function loadInteractions() {
@@ -350,6 +440,9 @@
       await Promise.all([
         loadRecentItems(),
         loadOwnItems(1, ''),
+        loadEventItems(),
+        loadFavoriteItems(),
+        loadLikedItems(),
         loadNotifications(),
         loadInteractions(),
         loadReviewCount()
@@ -403,8 +496,55 @@
             class:is-active={activeSection === 'photos'}
             on:click={() => (activeSection = 'photos')}
           >
-            <span>Meine Fotos</span>
+            <span class="dashboard-menu__label">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M4 5h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2zm0 2v7l4.2-4.2a1 1 0 0 1 1.4 0L13 13l2.2-2.2a1 1 0 0 1 1.4 0L20 14V7H4zm4 3.5A1.5 1.5 0 1 0 8 7.5a1.5 1.5 0 0 0 0 3z"/>
+              </svg>
+              <span>Meine Fotos</span>
+            </span>
             <strong>{totalItems}</strong>
+          </button>
+          <button
+            type="button"
+            class="dashboard-menu__link"
+            class:is-active={activeSection === 'events'}
+            on:click={() => (activeSection = 'events')}
+          >
+            <span class="dashboard-menu__label">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M7 2h2v2h6V2h2v2h2a2 2 0 0 1 2 2v13a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6a2 2 0 0 1 2-2h2V2zm12 8H5v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9zM6 6a1 1 0 0 0-1 1v1h14V7a1 1 0 0 0-1-1H6zm2 6h3v3H8v-3z"/>
+              </svg>
+              <span>Meine Events</span>
+            </span>
+            <strong>{eventItems.length}</strong>
+          </button>
+          <button
+            type="button"
+            class="dashboard-menu__link"
+            class:is-active={activeSection === 'favorites'}
+            on:click={() => (activeSection = 'favorites')}
+          >
+            <span class="dashboard-menu__label">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+              </svg>
+              <span>Gemerkte</span>
+            </span>
+            <strong>{favoriteItems.length}</strong>
+          </button>
+          <button
+            type="button"
+            class="dashboard-menu__link"
+            class:is-active={activeSection === 'likes'}
+            on:click={() => (activeSection = 'likes')}
+          >
+            <span class="dashboard-menu__label">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M12 20.5l-1.45-1.32C5.4 14.5 2 11.42 2 7.72 2 4.9 4.24 2.75 7.05 2.75c1.6 0 3.14.74 4.15 1.9 1.01-1.16 2.55-1.9 4.15-1.9C18.16 2.75 20.4 4.9 20.4 7.72c0 3.7-3.4 6.78-8.55 11.46L12 20.5z" />
+              </svg>
+              <span>Likes</span>
+            </span>
+            <strong>{likedItems.length}</strong>
           </button>
           <button
             type="button"
@@ -412,8 +552,8 @@
             class:is-active={activeSection === 'notifications'}
             on:click={() => (activeSection = 'notifications')}
           >
-            <span>Benachrichtigungen</span>
-            <strong>{notifications.length}</strong>
+            <span>Chat ungelesen</span>
+            <strong>{unreadChats.length}</strong>
           </button>
           <button
             type="button"
@@ -434,7 +574,7 @@
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                 <path d="M12 2L1 21h22L12 2zm0 5 6.53 12H5.47L12 7zm-1 3v4h2v-4h-2zm0 6v2h2v-2h-2z"/>
               </svg>
-              <span>Datenpruefung</span>
+              <span>Datenprüfung</span>
             </span>
             <strong>{reviewCount}</strong>
           </button>
@@ -533,30 +673,105 @@
             <span>Seite {currentPage} von {totalPages}</span>
             <button type="button" on:click={() => goToPage(currentPage + 1)} disabled={!canNext}>Weiter</button>
           </div>
-        {:else if activeSection === 'notifications'}
+        {:else if activeSection === 'events'}
           <div class="panel-head panel-head--space">
-            <h2>Benachrichtigungen</h2>
-            <span>{notifications.length} gesamt</span>
+            <h2>Meine Events</h2>
+            <span>{eventItems.length} gesamt</span>
           </div>
-
-          {#if notifications.length === 0}
-            <p class="dashboard-empty">Noch keine Benachrichtigungen vorhanden.</p>
+          {#if eventItems.length === 0}
+            <p class="dashboard-empty">Noch keine Events vorhanden.</p>
           {:else}
             <div class="entry-list">
-              {#each notifications as entry (entry.id)}
-                <a class="entry-card entry-card--link" href={getNotificationHref(entry)}>
-                  {#if entry.item && getItemThumb(entry.item)}
-                    <img src={getItemThumb(entry.item)} alt={entry.item.title || entry.item.original_name || 'Item'} width="56" height="56" loading="lazy" />
+              {#each eventItems as item (item.id)}
+                <a class="entry-card entry-card--link" href={getPublicItemHref(item)}>
+                  {#if getItemThumb(item)}
+                    <img src={getItemThumb(item)} alt={item.title || item.original_name || 'Event'} width="56" height="56" loading="lazy" />
                   {:else}
-                    <div class="entry-thumb-fallback">{getNotificationActor(entry).slice(0, 1).toUpperCase()}</div>
+                    <div class="entry-thumb-fallback">E</div>
                   {/if}
                   <span class="entry-content">
-                    <strong>{getNotificationActor(entry)}</strong>
-                    <span>{getNotificationLabel(entry)}</span>
-                    {#if getNotificationPreview(entry)}
-                      <span>{getNotificationPreview(entry)}</span>
+                    <strong>{item.title || item.original_name || 'Ohne Titel'}</strong>
+                    <span>Event</span>
+                    <span>{formatDateTime(item.updated_at || item.created_at)}</span>
+                  </span>
+                </a>
+              {/each}
+            </div>
+          {/if}
+        {:else if activeSection === 'favorites'}
+          <div class="panel-head panel-head--space">
+            <h2>Gemerkte</h2>
+            <span>{favoriteItems.length} gesamt</span>
+          </div>
+          {#if favoriteItems.length === 0}
+            <p class="dashboard-empty">Noch keine gemerkten Items vorhanden.</p>
+          {:else}
+            <div class="entry-list">
+              {#each favoriteItems as item (item.id)}
+                <a class="entry-card entry-card--link" href={getPublicItemHref(item)}>
+                  {#if getItemThumb(item)}
+                    <img src={getItemThumb(item)} alt={item.title || item.original_name || 'Item'} width="56" height="56" loading="lazy" />
+                  {:else}
+                    <div class="entry-thumb-fallback">?</div>
+                  {/if}
+                  <span class="entry-content">
+                    <strong>{item.title || item.original_name || 'Ohne Titel'}</strong>
+                    <span>Gemerkt</span>
+                    <span>{formatDateTime(item.favoritedAt)}</span>
+                  </span>
+                </a>
+              {/each}
+            </div>
+          {/if}
+        {:else if activeSection === 'likes'}
+          <div class="panel-head panel-head--space">
+            <h2>Likes</h2>
+            <span>{likedItems.length} gesamt</span>
+          </div>
+          {#if likedItems.length === 0}
+            <p class="dashboard-empty">Noch keine Likes vorhanden.</p>
+          {:else}
+            <div class="entry-list">
+              {#each likedItems as item (item.id)}
+                <a class="entry-card entry-card--link" href={getPublicItemHref(item)}>
+                  {#if getItemThumb(item)}
+                    <img src={getItemThumb(item)} alt={item.title || item.original_name || 'Item'} width="56" height="56" loading="lazy" />
+                  {:else}
+                    <div class="entry-thumb-fallback">?</div>
+                  {/if}
+                  <span class="entry-content">
+                    <strong>{item.title || item.original_name || 'Ohne Titel'}</strong>
+                    <span>Gefällt mir</span>
+                    <span>{formatDateTime(item.likedAt)}</span>
+                  </span>
+                </a>
+              {/each}
+            </div>
+          {/if}
+        {:else if activeSection === 'notifications'}
+          <div class="panel-head panel-head--space">
+            <h2>Chat ungelesen</h2>
+            <span>{unreadChats.length} offen</span>
+          </div>
+
+          {#if unreadChats.length === 0}
+            <p class="dashboard-empty">Keine ungelesenen Chat-Nachrichten vorhanden.</p>
+          {:else}
+            <div class="entry-list">
+              {#each unreadChats as entry (entry.id)}
+                <a class="entry-card entry-card--link" href={`/chat?conversation=${encodeURIComponent(entry.id)}`}>
+                  {#if entry.starter_item && getItemThumb(entry.starter_item)}
+                    <img src={getItemThumb(entry.starter_item)} alt={entry.starter_item.title || entry.starter_item.original_name || 'Item'} width="56" height="56" loading="lazy" />
+                  {:else}
+                    <div class="entry-thumb-fallback">{getChatActor(entry).slice(0, 1).toUpperCase()}</div>
+                  {/if}
+                  <span class="entry-content">
+                    <strong>{getChatActor(entry)}</strong>
+                    <span>Ungelesene Nachricht</span>
+                    {#if entry.last_message_preview}
+                      <span>{entry.last_message_preview}</span>
                     {/if}
-                    <span>{formatDate(entry.created_at)}</span>
+                    <span>{formatDateTime(entry.last_message_at)}</span>
                   </span>
                 </a>
               {/each}
@@ -581,11 +796,41 @@
                   {/if}
                   <span class="entry-content">
                     <strong>{getInteractionActor(entry)}</strong>
-                    <span>{getInteractionLabel(entry)}</span>
+                    <span class="entry-interaction-line">
+                      <span class="interaction-icon" aria-hidden="true">
+                        {@const iconKind = getInteractionIconKind(entry)}
+                        {#if iconKind === 'download'}
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 6v7m0 0l-3-3m3 3l3-3M6 18h12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                          </svg>
+                        {:else if iconKind === 'favorite'}
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+                          </svg>
+                        {:else if iconKind === 'like'}
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 20.5l-1.45-1.32C5.4 14.5 2 11.42 2 7.72 2 4.9 4.24 2.75 7.05 2.75c1.6 0 3.14.74 4.15 1.9 1.01-1.16 2.55-1.9 4.15-1.9C18.16 2.75 20.4 4.9 20.4 7.72c0 3.7-3.4 6.78-8.55 11.46L12 20.5z" />
+                          </svg>
+                        {:else if iconKind === 'comment'}
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                          </svg>
+                        {:else if iconKind === 'chat'}
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                          </svg>
+                        {:else}
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="9" />
+                          </svg>
+                        {/if}
+                      </span>
+                      <span>{getInteractionLabel(entry)}</span>
+                    </span>
                     {#if entry.item}
                       <span>{entry.item.title || entry.item.original_name || 'Ohne Titel'}</span>
                     {/if}
-                    <span>{formatDate(entry.created_at)}</span>
+                    <span>{formatDateTime(entry.created_at)}</span>
                   </span>
                 </a>
               {/each}
@@ -593,7 +838,7 @@
           {/if}
         {:else}
           <div class="panel-head panel-head--space">
-            <h2>Datenpruefung</h2>
+            <h2>Datenprüfung</h2>
             <span>{reviewCount} offen</span>
           </div>
           {#if reviewCount > 0}
@@ -813,6 +1058,22 @@
   }
   .entry-actions a:hover {
     color: var(--culoca-orange);
+  }
+  .entry-interaction-line {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+  .interaction-icon {
+    width: 1.15rem;
+    height: 1.15rem;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    background: color-mix(in srgb, var(--text-primary) 26%, transparent);
+    flex-shrink: 0;
   }
   .pagination {
     margin-top: 0.9rem;
