@@ -1759,40 +1759,36 @@ let showRightsManager = false;
     goto('/');
   }
   async function startCreatorChat() {
-    if (!creatorUserId) return;
-
     if (!currentUser?.id) {
       const returnTo = browser ? `${window.location.pathname}${window.location.search}` : canonicalPath || '/';
       await goto(`/login?returnTo=${encodeURIComponent(returnTo)}`);
       return;
     }
 
-    if (creatorUserId === currentUser.id) {
-      await goto('/profile');
-      return;
-    }
-
     if (browser) {
+      const chatDetail =
+        creatorUserId && creatorUserId !== currentUser.id
+          ? { chatWith: creatorUserId, item: image?.id || undefined }
+          : undefined;
       window.dispatchEvent(
         new CustomEvent('culoca:open-chat', {
-          detail: {
-            chatWith: creatorUserId,
-            item: image?.id || undefined
-          }
+          detail: chatDetail
         })
       );
       return;
     }
 
-    const params = new URLSearchParams({
-      chatWith: creatorUserId
-    });
+    const params = new URLSearchParams();
+
+    if (creatorUserId && creatorUserId !== currentUser.id) {
+      params.set('chatWith', creatorUserId);
+    }
 
     if (image?.id) {
       params.set('item', image.id);
     }
 
-    await goto(`/chat?${params.toString()}`);
+    await goto(params.toString() ? `/chat?${params.toString()}` : '/chat');
   }
   function formatFileSize(bytes: number | null | undefined) {
     if (!bytes) return '';
@@ -4315,18 +4311,16 @@ let showRightsManager = false;
 
 
   <!-- Scroll to Top / Fullscreen FAB - ersetzt sich gegenseitig -->
-  {#if canChatWithCreator}
-    <button
-      class="fab-button chat-floating"
-      on:click={startCreatorChat}
-      title="Chat mit Ersteller"
-      aria-label="Chat mit Ersteller"
-    >
-      <svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-      </svg>
-    </button>
-  {/if}
+  <button
+    class="fab-button chat-floating"
+    on:click={startCreatorChat}
+    title="Chat öffnen"
+    aria-label="Chat öffnen"
+  >
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  </button>
 
   <!-- Scroll to Top / Fullscreen FAB - ersetzt sich gegenseitig -->
   {#if showScrollToTop}
@@ -5397,15 +5391,15 @@ let showRightsManager = false;
 
   /* FAB Position für Rights Manager */
   .fab-button.rights-manager {
-    bottom: 12rem; /* Über dem Gallery Back FAB */
-  }
-
-  .fab-button.edit-toggle {
     bottom: 17rem;
   }
 
+  .fab-button.edit-toggle {
+    bottom: 22rem;
+  }
+
   .fab-button.chat-floating {
-    bottom: 7rem;
+    bottom: 12rem;
   }
 
   .fab-button.edit-toggle.active {
@@ -5423,15 +5417,15 @@ let showRightsManager = false;
     }
 
     .fab-button.rights-manager {
-      bottom: 10rem;
-    }
-
-    .fab-button.edit-toggle {
       bottom: 14rem;
     }
 
+    .fab-button.edit-toggle {
+      bottom: 18rem;
+    }
+
     .fab-button.chat-floating {
-      bottom: 5.2rem;
+      bottom: 10rem;
     }
   }
 
