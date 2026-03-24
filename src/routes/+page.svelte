@@ -65,6 +65,8 @@
     href: string;
     imageUrl: string;
     title: string | null;
+    creatorName: string | null;
+    creatorHref: string | null;
     source: 'visit' | 'upload';
   };
   let dashboardHeroBackdrop: DashboardHeroBackdrop | null = null;
@@ -162,7 +164,7 @@
         const { data: fresh, error: freshErr } = await supabase
           .from('items')
           .select(
-            'slug, path_2048, path_512, canonical_path, title, country_slug, district_slug, municipality_slug, updated_at'
+            'slug, path_2048, path_512, canonical_path, title, country_slug, district_slug, municipality_slug, updated_at, profile_id'
           )
           .eq('slug', stored.slug)
           .maybeSingle();
@@ -173,11 +175,26 @@
           const size: '2048' | '512' = fresh.path_2048 ? '2048' : '512';
           const imageUrl = getSeoImageUrl(fresh.slug, path, size);
           const href = getPublicItemHref(fresh);
+          let creatorName: string | null = null;
+          let creatorHref: string | null = null;
+          if (fresh.profile_id) {
+            const { data: creatorProfile } = await supabase
+              .from('profiles')
+              .select('full_name, accountname')
+              .eq('id', fresh.profile_id)
+              .maybeSingle();
+            creatorName = creatorProfile?.full_name || creatorProfile?.accountname || null;
+            creatorHref = creatorProfile?.accountname
+              ? `/${encodeURIComponent(creatorProfile.accountname)}`
+              : null;
+          }
           if (imageUrl) {
             dashboardHeroBackdrop = {
               href,
               imageUrl,
               title: fresh.title ?? null,
+              creatorName,
+              creatorHref,
               source: 'visit'
             };
             return;
@@ -195,6 +212,8 @@
               href,
               imageUrl,
               title: stored.title ?? null,
+              creatorName: null,
+              creatorHref: null,
               source: 'visit'
             };
             return;
@@ -209,7 +228,7 @@
       const { data: rows, error } = await supabase
         .from('items')
         .select(
-          'slug, path_2048, path_512, canonical_path, title, country_slug, district_slug, municipality_slug'
+          'slug, path_2048, path_512, canonical_path, title, country_slug, district_slug, municipality_slug, profile_id'
         )
         .eq('profile_id', currentUserId)
         .not('slug', 'is', null)
@@ -227,7 +246,28 @@
       if (!imageUrl) return;
 
       const href = getPublicItemHref(row);
-      dashboardHeroBackdrop = { href, imageUrl, title: row.title ?? null, source: 'upload' };
+      let creatorName: string | null = null;
+      let creatorHref: string | null = null;
+      if (row.profile_id) {
+        const { data: creatorProfile } = await supabase
+          .from('profiles')
+          .select('full_name, accountname')
+          .eq('id', row.profile_id)
+          .maybeSingle();
+        creatorName = creatorProfile?.full_name || creatorProfile?.accountname || null;
+        creatorHref = creatorProfile?.accountname
+          ? `/${encodeURIComponent(creatorProfile.accountname)}`
+          : null;
+      }
+
+      dashboardHeroBackdrop = {
+        href,
+        imageUrl,
+        title: row.title ?? null,
+        creatorName,
+        creatorHref,
+        source: 'upload'
+      };
     } catch (e) {
       console.warn('[home] dashboard hero backdrop failed', e);
     }
@@ -1034,6 +1074,27 @@
                 <h1 class="hero-dashboard-name">{currentUserFullName}</h1>
               {/if}
               <p class="hero-dashboard-lede">Dein Culoca Dashboard zeigt dir einen schnellen Überblick.</p>
+              {#if dashboardHeroBackdrop?.creatorName || dashboardHeroBackdrop?.title}
+                <p class="hero-dashboard-backdrop-meta">
+                  {#if dashboardHeroBackdrop?.creatorName}
+                    {#if dashboardHeroBackdrop.creatorHref}
+                      <a href={dashboardHeroBackdrop.creatorHref}>
+                        {dashboardHeroBackdrop.creatorName}
+                      </a>
+                    {:else}
+                      <span>{dashboardHeroBackdrop.creatorName}</span>
+                    {/if}
+                  {/if}
+                  {#if dashboardHeroBackdrop?.creatorName && dashboardHeroBackdrop?.title}
+                    <span aria-hidden="true"> | </span>
+                  {/if}
+                  {#if dashboardHeroBackdrop?.title}
+                    <a href={dashboardHeroBackdrop.href}>
+                      {dashboardHeroBackdrop.title}
+                    </a>
+                  {/if}
+                </p>
+              {/if}
               <div class="hero-dash-actions">
                 <a href="/chat" class="btn-secondary">Nachrichten</a>
                 <a href="/galerie" class="btn-primary">Galerie</a>
@@ -1645,7 +1706,7 @@
               {:else if dashboardNetworkProfiles.length > 0}
                 <div class="dashboard-list">
                   {#each dashboardNetworkProfiles as profile (profile.id)}
-                    <a class="dashboard-entry dashboard-entry--link" href={`/chat?chatWith=${encodeURIComponent(profile.id)}`}>
+                    <article class="dashboard-entry dashboard-entry--static">
                       {#if getAvatarUrl(profile)}
                         <img
                           class="dashboard-entry__thumb"
@@ -1664,12 +1725,25 @@
                       <div class="dashboard-entry__body">
                         <div class="dashboard-entry__meta">
                           <strong>{profile.full_name || profile.accountname || 'Profil'}</strong>
-                          <span class="dashboard-entry__handle">@{profile.accountname || 'profil'}</span>
+                          {#if profile.accountname}
+                            <a
+                              class="dashboard-entry__handle dashboard-entry__handle-link"
+                              href={`/${encodeURIComponent(profile.accountname)}`}
+                            >
+                              @{profile.accountname}
+                            </a>
+                          {:else}
+                            <span class="dashboard-entry__handle">@profil</span>
+                          {/if}
                         </div>
                         <span class="dashboard-entry__context">Direktnachricht</span>
-                        <p>Chat mit diesem Profil öffnen.</p>
+                        <p>
+                          <a class="dashboard-inline-link" href={`/chat?chatWith=${encodeURIComponent(profile.id)}`}>
+                            Chat mit diesem Profil öffnen.
+                          </a>
+                        </p>
                       </div>
-                    </a>
+                    </article>
                   {/each}
                 </div>
               {:else}
@@ -2004,6 +2078,25 @@
   .dashboard-hero--has-backdrop .hero-dashboard-lede {
     color: rgba(255, 255, 255, 0.9);
     text-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
+  }
+
+  .hero-dashboard-backdrop-meta {
+    margin: -0.3rem 0 1rem;
+    font-size: 0.95rem;
+    color: rgba(255, 255, 255, 0.92);
+    text-shadow: 0 1px 6px rgba(0, 0, 0, 0.4);
+  }
+
+  .hero-dashboard-backdrop-meta a {
+    color: inherit;
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, #fff 65%, transparent 35%);
+    text-underline-offset: 0.14rem;
+  }
+
+  .hero-dashboard-backdrop-meta a:hover {
+    color: #fff;
+    text-decoration-color: #fff;
   }
 
   .hero-coords {
@@ -2373,6 +2466,26 @@
     color: var(--text-secondary);
     font-size: 0.85rem;
     text-align: right;
+  }
+
+  .dashboard-entry__handle-link {
+    text-decoration: none;
+  }
+
+  .dashboard-entry__handle-link:hover {
+    color: var(--culoca-orange);
+    text-decoration: underline;
+  }
+
+  .dashboard-inline-link {
+    color: inherit;
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, var(--culoca-orange) 65%, transparent 35%);
+    text-underline-offset: 0.12rem;
+  }
+
+  .dashboard-inline-link:hover {
+    color: var(--culoca-orange);
   }
 
   .dashboard-entry__body p,

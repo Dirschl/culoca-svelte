@@ -9,9 +9,9 @@ type ProfileRow = {
   id: string;
   full_name: string | null;
   accountname: string | null;
-  bio: string | null;
   avatar_url: string | null;
   website: string | null;
+  bio?: string | null;
 };
 
 function normalizePermalinkSegment(raw: string): string {
@@ -47,8 +47,7 @@ async function resolveProfileForPermalink(
     return null;
   }
 
-  const select =
-    'id, full_name, accountname, bio, avatar_url, website' as const;
+  const select = 'id, full_name, accountname, avatar_url, website' as const;
 
   let { data: profile, error: err1 } = await supabase
     .from('profiles')
@@ -61,7 +60,10 @@ async function resolveProfileForPermalink(
   }
 
   if (profile?.id) {
-    return profile as ProfileRow;
+    return {
+      ...(profile as ProfileRow),
+      bio: (profile as any)?.bio ?? null
+    };
   }
 
   const { data: fallbackProfile, error: err2 } = await supabase
@@ -75,7 +77,10 @@ async function resolveProfileForPermalink(
   }
 
   if (fallbackProfile?.id) {
-    return fallbackProfile as ProfileRow;
+    return {
+      ...(fallbackProfile as ProfileRow),
+      bio: (fallbackProfile as any)?.bio ?? null
+    };
   }
 
   // Fallback: URL segment equals slugified display name (accountname unset / legacy / typo in marketing links)
@@ -102,10 +107,18 @@ async function resolveProfileForPermalink(
   );
 
   if (matches.length === 1) {
-    return matches[0];
+    return {
+      ...matches[0],
+      bio: matches[0]?.bio ?? null
+    };
   }
 
   return null;
+}
+
+export async function resolveProfileByPermalinkSegment(segment: string): Promise<ProfileRow | null> {
+  const supabase = createServerSupabase();
+  return resolveProfileForPermalink(supabase, segment);
 }
 
 function createServerSupabase() {
