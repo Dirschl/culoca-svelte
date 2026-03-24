@@ -4315,6 +4315,20 @@ let showRightsManager = false;
 
 
   <!-- Scroll to Top / Fullscreen FAB - ersetzt sich gegenseitig -->
+  {#if canChatWithCreator}
+    <button
+      class="fab-button chat-floating"
+      on:click={startCreatorChat}
+      title="Chat mit Ersteller"
+      aria-label="Chat mit Ersteller"
+    >
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+      </svg>
+    </button>
+  {/if}
+
+  <!-- Scroll to Top / Fullscreen FAB - ersetzt sich gegenseitig -->
   {#if showScrollToTop}
     <button
       class="fab-button scroll-to-top"
@@ -5390,6 +5404,10 @@ let showRightsManager = false;
     bottom: 17rem;
   }
 
+  .fab-button.chat-floating {
+    bottom: 7rem;
+  }
+
   .fab-button.edit-toggle.active {
     background: rgba(46, 125, 50, 0.28);
   }
@@ -5410,6 +5428,10 @@ let showRightsManager = false;
 
     .fab-button.edit-toggle {
       bottom: 14rem;
+    }
+
+    .fab-button.chat-floating {
+      bottom: 5.2rem;
     }
   }
 

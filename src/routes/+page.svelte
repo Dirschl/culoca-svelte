@@ -1820,10 +1820,6 @@
           </div>
 
           <section class="dashboard-shortcuts">
-            <a class="dashboard-shortcut" href="/chat">
-              <strong>Chat</strong>
-              <span>Direktnachrichten und Gespräche – zentral unter /chat.</span>
-            </a>
             <a class="dashboard-shortcut" href="/galerie">
               <strong>Eigene Galerie</strong>
               <span>Deine Inhalte direkt in der Galerie öffnen.</span>

@@ -16,7 +16,10 @@
   let lastAuthState = false;
 
   $: pathname = $page.url.pathname;
-  $: hideFabs = isDetailPath(pathname) || EXCLUDED_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+  $: hideFabs =
+    isDetailPath(pathname) ||
+    pathname.startsWith('/item/') ||
+    EXCLUDED_PREFIXES.some((prefix) => pathname.startsWith(prefix));
   $: hideChatFab = pathname.startsWith('/chat');
   $: showFabs = !hideFabs;
 
@@ -188,19 +191,19 @@
 <style>
   .global-fabs {
     position: fixed;
-    right: 1.1rem;
-    bottom: 1.1rem;
+    right: 2rem;
+    bottom: 2rem;
     display: flex;
     flex-direction: column;
-    gap: 0.7rem;
-    z-index: 1100;
+    gap: 0.5rem;
+    z-index: 1001;
   }
 
   .global-fab {
     position: relative;
-    width: 3.3rem;
-    height: 3.3rem;
-    border: 1px solid rgba(255, 255, 255, 0.45);
+    width: 4rem;
+    height: 4rem;
+    border: none;
     border-radius: 999px;
     background: transparent;
     color: #fff;
@@ -208,18 +211,27 @@
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    box-shadow: 0 12px 22px rgba(0, 0, 0, 0.25);
+    box-shadow: 0 4px 12px var(--shadow);
+    backdrop-filter: blur(10px);
+    pointer-events: auto;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
   }
 
   .global-fab:hover {
-    border-color: #fff;
     background: rgba(255, 255, 255, 0.12);
     color: #fff;
+    transform: scale(1.1);
+    box-shadow: 0 6px 20px var(--shadow);
+  }
+
+  .global-fab:active {
+    transform: scale(0.95);
   }
 
   .global-fab--chat {
     background: transparent;
-    border-color: rgba(255, 255, 255, 0.45);
     color: #fff;
   }
 
@@ -244,5 +256,23 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+  }
+
+  @media (max-width: 768px) {
+    .global-fabs {
+      right: 1rem;
+      bottom: 1rem;
+      gap: 0.7rem;
+    }
+
+    .global-fab {
+      width: 3.5rem;
+      height: 3.5rem;
+    }
+
+    .global-fab svg {
+      width: 36px;
+      height: 36px;
+    }
   }
 </style>
