@@ -798,24 +798,23 @@
                     <strong>{getInteractionActor(entry)}</strong>
                     <span class="entry-interaction-line">
                       <span class="interaction-icon" aria-hidden="true">
-                        {@const iconKind = getInteractionIconKind(entry)}
-                        {#if iconKind === 'download'}
+                        {#if getInteractionIconKind(entry) === 'download'}
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M12 6v7m0 0l-3-3m3 3l3-3M6 18h12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                           </svg>
-                        {:else if iconKind === 'favorite'}
+                        {:else if getInteractionIconKind(entry) === 'favorite'}
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
                           </svg>
-                        {:else if iconKind === 'like'}
+                        {:else if getInteractionIconKind(entry) === 'like'}
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M12 20.5l-1.45-1.32C5.4 14.5 2 11.42 2 7.72 2 4.9 4.24 2.75 7.05 2.75c1.6 0 3.14.74 4.15 1.9 1.01-1.16 2.55-1.9 4.15-1.9C18.16 2.75 20.4 4.9 20.4 7.72c0 3.7-3.4 6.78-8.55 11.46L12 20.5z" />
                           </svg>
-                        {:else if iconKind === 'comment'}
+                        {:else if getInteractionIconKind(entry) === 'comment'}
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                           </svg>
-                        {:else if iconKind === 'chat'}
+                        {:else if getInteractionIconKind(entry) === 'chat'}
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                           </svg>
