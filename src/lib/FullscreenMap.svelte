@@ -1515,7 +1515,9 @@
   <!-- Map container -->
   <div bind:this={mapEl} class="map-container" id="map"></div>
   <!-- Logo (exactly same position as main page) -->
-  <img src="/culoca-logo-512px.png" alt="Culoca" class="culoca-logo" />
+  <a href="/" class="culoca-logo-link" aria-label="Zur Startseite">
+    <img src="/culoca-logo-512px.png" alt="Culoca" class="culoca-logo" />
+  </a>
   <!-- FAB-Leiste -->
   <div class="fab-container">
     <!-- GPS-Track-FABs (oben, exakt wie die anderen FABs) -->
@@ -1807,19 +1809,24 @@
   }
   
   /* Logo - exact same positioning as main page */
-  .culoca-logo {
+  .culoca-logo-link {
     position: fixed;
     bottom: 1.8rem;
     left: 1.8rem;
     right: auto;
     z-index: 10001;
+    text-decoration: none;
+  }
+
+  .culoca-logo {
     width: 15rem;
     transition: opacity 0.2s ease;
     object-fit: contain;
     filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.3));
+    display: block;
   }
   
-  .culoca-logo:hover {
+  .culoca-logo-link:hover .culoca-logo {
     opacity: 1;
   }
   
