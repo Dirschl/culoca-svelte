@@ -5,6 +5,7 @@
   import { onDestroy, onMount } from 'svelte';
   import { supabase } from '$lib/supabaseClient';
   import { isAuthenticated } from '$lib/sessionStore';
+  import { isDetailPath } from '$lib/returnTo';
 
   const EXCLUDED_PREFIXES = ['/galerie', '/item', '/map-view', '/map-view-share', '/simulation'];
   let showScrollToTop = false;
@@ -12,9 +13,10 @@
   let unreadChatCount = 0;
   let currentUserId = '';
   let chatChannel: any = null;
+  let lastAuthState = false;
 
   $: pathname = $page.url.pathname;
-  $: hideFabs = EXCLUDED_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+  $: hideFabs = isDetailPath(pathname) || EXCLUDED_PREFIXES.some((prefix) => pathname.startsWith(prefix));
   $: hideChatFab = pathname.startsWith('/chat');
   $: showFabs = !hideFabs;
 
@@ -96,8 +98,8 @@
       .subscribe();
   }
 
-  async function updateUserAndChatState() {
-    if (!$isAuthenticated) {
+  async function updateUserAndChatState(isAuth: boolean) {
+    if (!isAuth) {
       currentUserId = '';
       unreadChatCount = 0;
       teardownChatChannel();
@@ -117,11 +119,15 @@
 
     window.addEventListener('scroll', updateScrollState, { passive: true });
     document.addEventListener('fullscreenchange', updateFullscreenState);
-    await updateUserAndChatState();
+    await updateUserAndChatState($isAuthenticated);
   });
 
   $: if (browser) {
-    void updateUserAndChatState();
+    const authState = $isAuthenticated;
+    if (authState !== lastAuthState) {
+      lastAuthState = authState;
+      void updateUserAndChatState(authState);
+    }
   }
 
   onDestroy(() => {
@@ -194,9 +200,9 @@
     position: relative;
     width: 3.3rem;
     height: 3.3rem;
-    border: 1px solid color-mix(in srgb, var(--culoca-orange) 30%, var(--border-color) 70%);
+    border: 1px solid rgba(255, 255, 255, 0.45);
     border-radius: 999px;
-    background: color-mix(in srgb, var(--bg-secondary) 86%, black 14%);
+    background: transparent;
     color: #fff;
     display: inline-flex;
     align-items: center;
@@ -206,19 +212,19 @@
   }
 
   .global-fab:hover {
-    border-color: var(--culoca-orange);
-    color: var(--culoca-orange);
+    border-color: #fff;
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
   }
 
   .global-fab--chat {
-    background: var(--culoca-orange);
-    border-color: var(--culoca-orange);
+    background: transparent;
+    border-color: rgba(255, 255, 255, 0.45);
     color: #fff;
   }
 
   .global-fab--chat:hover {
     color: #fff;
-    filter: brightness(1.05);
   }
 
   .global-fab__badge {
