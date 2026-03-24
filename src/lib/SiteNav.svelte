@@ -51,6 +51,7 @@
   ];
 
   const userLinks = [
+    { href: '/dashboard', label: 'Dashboard' },
     { href: '/chat', label: 'Chat' },
     { href: '/settings', label: 'Einstellungen' },
     { href: '/standort', label: 'Standort' },
@@ -64,7 +65,7 @@
   $: isChatRoute = isActive('/chat');
   $: displayName = $customerBranding?.fullName || $customerBranding?.accountName || '';
   $: userMenuLabel = $isAuthenticated && displayName ? displayName : ($isAuthenticated ? 'Konto' : 'Login');
-  $: userMenuActive = isActive('/chat') || isActive('/settings') || isActive('/standort') || isActive('/profile') || isActive('/profile/freigaben') || isActive('/login') || ($hasAdminPermission && adminLinks.some(l => isActive(l.href)));
+  $: userMenuActive = isActive('/dashboard') || isActive('/chat') || isActive('/settings') || isActive('/standort') || isActive('/profile') || isActive('/profile/freigaben') || isActive('/login') || ($hasAdminPermission && adminLinks.some(l => isActive(l.href)));
   $: inheritedReturnTo = sanitizeReturnTo($page.url.searchParams.get('returnTo'), currentPathWithSearch($page.url));
   $: {
     const nextInboxKey = `${$isAuthenticated ? 'auth' : 'anon'}:${$currentUserId || 'none'}:${currentPath}`;

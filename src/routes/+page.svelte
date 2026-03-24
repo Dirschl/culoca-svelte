@@ -698,7 +698,7 @@
           viewedAt: entry.created_at,
           ...(entry.items || {})
         }))
-        .slice(0, 5);
+        .slice(0, 3);
       dashboardFavoriteItems = (favoriteItemData || []).map((entry: any) => ({
         favoritedAt: entry.created_at,
         ...(entry.items || {})
@@ -1482,7 +1482,7 @@
                     <h2>Zuletzt angesehen</h2>
                   </div>
                 </div>
-                <a href="/galerie">Galerie</a>
+                <a href="/dashboard">Dashboard</a>
               </div>
 
               {#if dashboardLoading && dashboardRecentItems.length === 0}
