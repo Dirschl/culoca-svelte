@@ -559,7 +559,7 @@
             `)
             .eq('recipient_user_id', user.id)
             .order('created_at', { ascending: false })
-            .limit(5),
+            .limit(3),
           supabase
             .from('item_events')
             .select(`

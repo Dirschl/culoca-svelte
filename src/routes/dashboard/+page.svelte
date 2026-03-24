@@ -20,7 +20,8 @@
   let currentPage = 1;
   let totalItems = 0;
   let historyBusy = false;
-  let activeSection: 'recent' | 'photos' = 'recent';
+  let activeSection: 'recent' | 'photos' | 'notifications' = 'recent';
+  let notifications: any[] = [];
 
   $: totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
   $: canPrev = currentPage > 1;
@@ -41,6 +42,44 @@
 
   function getItemThumb(item: any): string {
     return item?.slug && item?.path_512 ? getSeoImageUrl(item.slug, item.path_512, '512') : '';
+  }
+
+  function getNotificationActor(entry: any): string {
+    return entry?.actor?.full_name || entry?.actor?.accountname || 'Jemand';
+  }
+
+  function getNotificationLabel(entry: any): string {
+    switch (entry?.event_type) {
+      case 'download':
+        return 'hat ein Item heruntergeladen';
+      case 'favorite_add':
+        return 'hat ein Item gemerkt';
+      case 'like_add':
+        return 'hat ein Item geliked';
+      case 'comment_create':
+        return 'hat kommentiert';
+      case 'comment_hide':
+        return 'hat einen Kommentar ausgeblendet';
+      case 'comment_restore':
+        return 'hat einen Kommentar wiederhergestellt';
+      case 'chat_message':
+        return 'hat eine Nachricht gesendet';
+      default:
+        return entry?.event_type || 'hat interagiert';
+    }
+  }
+
+  function getNotificationPreview(entry: any): string {
+    if (entry?.payload?.message_excerpt) return entry.payload.message_excerpt;
+    if (entry?.payload?.comment_excerpt) return entry.payload.comment_excerpt;
+    return entry?.item?.title || entry?.item?.original_name || '';
+  }
+
+  function getNotificationHref(entry: any): string {
+    if (entry?.event_type === 'chat_message' && entry?.payload?.conversation_id) {
+      return `/chat?conversation=${encodeURIComponent(entry.payload.conversation_id)}`;
+    }
+    return entry?.item ? getPublicItemHref(entry.item) : '/dashboard';
   }
 
   async function ensureAuthUser() {
@@ -177,6 +216,43 @@
     loadingItems = false;
   }
 
+  async function loadNotifications() {
+    const { data, error } = await supabase
+      .from('user_notifications')
+      .select(`
+        id,
+        event_type,
+        payload,
+        read_at,
+        created_at,
+        items:item_id(
+          id,
+          slug,
+          title,
+          original_name,
+          canonical_path,
+          country_slug,
+          district_slug,
+          municipality_slug,
+          path_512
+        ),
+        profiles:actor_user_id(
+          full_name,
+          accountname,
+          avatar_url
+        )
+      `)
+      .eq('recipient_user_id', currentUserId)
+      .order('created_at', { ascending: false })
+      .limit(30);
+    if (error) throw error;
+    notifications = (data || []).map((entry: any) => ({
+      ...entry,
+      item: entry.items || null,
+      actor: entry.profiles || null
+    }));
+  }
+
   async function applySearch() {
     activeQuery = searchQuery.trim();
     await loadOwnItems(1, activeQuery);
@@ -199,7 +275,7 @@
     try {
       const ok = await ensureAuthUser();
       if (!ok) return;
-      await Promise.all([loadRecentItems(), loadOwnItems(1, '')]);
+      await Promise.all([loadRecentItems(), loadOwnItems(1, ''), loadNotifications()]);
     } catch (error: any) {
       errorMessage = error?.message || 'Dashboard konnte nicht geladen werden.';
     } finally {
@@ -252,6 +328,15 @@
             <span>Meine Fotos</span>
             <strong>{totalItems}</strong>
           </button>
+          <button
+            type="button"
+            class="dashboard-menu__link"
+            class:is-active={activeSection === 'notifications'}
+            on:click={() => (activeSection = 'notifications')}
+          >
+            <span>Benachrichtigungen</span>
+            <strong>{notifications.length}</strong>
+          </button>
         </nav>
       </aside>
 
@@ -297,7 +382,7 @@
               {/each}
             </div>
           {/if}
-        {:else}
+        {:else if activeSection === 'photos'}
           <div class="panel-head panel-head--space">
             <h2>Meine Fotos</h2>
             <span>{totalItems} gesamt</span>
@@ -347,6 +432,35 @@
             <span>Seite {currentPage} von {totalPages}</span>
             <button type="button" on:click={() => goToPage(currentPage + 1)} disabled={!canNext}>Weiter</button>
           </div>
+        {:else}
+          <div class="panel-head panel-head--space">
+            <h2>Benachrichtigungen</h2>
+            <span>{notifications.length} gesamt</span>
+          </div>
+
+          {#if notifications.length === 0}
+            <p class="dashboard-empty">Noch keine Benachrichtigungen vorhanden.</p>
+          {:else}
+            <div class="entry-list">
+              {#each notifications as entry (entry.id)}
+                <a class="entry-card entry-card--link" href={getNotificationHref(entry)}>
+                  {#if entry.item && getItemThumb(entry.item)}
+                    <img src={getItemThumb(entry.item)} alt={entry.item.title || entry.item.original_name || 'Item'} width="56" height="56" loading="lazy" />
+                  {:else}
+                    <div class="entry-thumb-fallback">{getNotificationActor(entry).slice(0, 1).toUpperCase()}</div>
+                  {/if}
+                  <span class="entry-content">
+                    <strong>{getNotificationActor(entry)}</strong>
+                    <span>{getNotificationLabel(entry)}</span>
+                    {#if getNotificationPreview(entry)}
+                      <span>{getNotificationPreview(entry)}</span>
+                    {/if}
+                    <span>{formatDate(entry.created_at)}</span>
+                  </span>
+                </a>
+              {/each}
+            </div>
+          {/if}
         {/if}
       </section>
     </section>

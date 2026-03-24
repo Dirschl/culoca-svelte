@@ -58,8 +58,6 @@
   let returnTo = '/';
   let reviewCount = 0;
   let creatorInteractions: any[] = [];
-  let notifications: any[] = [];
-  let unreadNotifications = 0;
   let interactionLoading = true;
   let conversations: any[] = [];
   let conversationLoading = true;
@@ -181,10 +179,7 @@
     interactionLoading = true;
 
     try {
-      const [
-        { data: creatorData, error: creatorError },
-        { data: notificationData, error: notificationError }
-      ] = await Promise.all([
+      const [{ data: creatorData, error: creatorError }] = await Promise.all([
         supabase
           .from('item_events')
           .select(`
@@ -212,55 +207,19 @@
           .eq('owner_user_id', user.id)
           .in('event_type', ['download', 'favorite_add', 'like_add', 'comment_create', 'comment_hide', 'comment_restore', 'chat_message'])
           .order('created_at', { ascending: false })
-          .limit(20),
-        supabase
-          .from('user_notifications')
-          .select(`
-            id,
-            event_type,
-            payload,
-            read_at,
-            created_at,
-            items:item_id(
-              id,
-              slug,
-              title,
-              original_name,
-              canonical_path,
-              country_slug,
-              district_slug,
-              municipality_slug,
-              path_512
-            ),
-            profiles:actor_user_id(
-              full_name,
-              accountname
-            )
-          `)
-          .eq('recipient_user_id', user.id)
-          .order('created_at', { ascending: false })
           .limit(20)
       ]);
 
       if (creatorError) throw creatorError;
-      if (notificationError) throw notificationError;
 
       creatorInteractions = (creatorData || []).map((entry: any) => ({
         ...entry,
         item: entry.items || null,
         actor: entry.profiles || null
       }));
-      notifications = (notificationData || []).map((entry: any) => ({
-        ...entry,
-        item: entry.items || null,
-        actor: entry.profiles || null
-      }));
-      unreadNotifications = notifications.filter((entry: any) => !entry.read_at).length;
     } catch (error) {
       console.error('Error loading interactions:', error);
       creatorInteractions = [];
-      notifications = [];
-      unreadNotifications = 0;
     } finally {
       interactionLoading = false;
     }
@@ -284,22 +243,6 @@
     teardownLiveChannels();
 
     if (!currentUserId) return;
-
-    const notificationsChannel = supabase
-      .channel(`profile-notifications-${currentUserId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'user_notifications',
-          filter: `recipient_user_id=eq.${currentUserId}`
-        },
-        async () => {
-          await loadInteractions();
-        }
-      )
-      .subscribe();
 
     const conversationsChannel = supabase
       .channel(`profile-conversations-${currentUserId}`)
@@ -361,7 +304,7 @@
       )
       .subscribe();
 
-    liveChannels = [notificationsChannel, conversationsChannel, followingChannel, followersChannel];
+    liveChannels = [conversationsChannel, followingChannel, followersChannel];
   }
 
   function setupMessageChannel(conversationId: string) {
@@ -1319,51 +1262,6 @@
               <div class="review-ok">
                 Keine offenen Daten. Dein Bestand ist aktuell sauber gepflegt.
               </div>
-            {/if}
-          </div>
-
-          <div class="card">
-            <div class="notification-header">
-              <h3 class="section-title">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5" />
-                  <path d="M10 17a2 2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                </svg>
-                Benachrichtigungen
-              </h3>
-              {#if unreadNotifications > 0}
-                <button type="button" class="mark-read-btn" on:click={markAllNotificationsRead}>
-                  Alle als gelesen
-                </button>
-              {/if}
-            </div>
-            {#if interactionLoading}
-              <p class="help-text">Benachrichtigungen werden geladen...</p>
-            {:else if notifications.length > 0}
-              <div class="activity-list">
-                {#each notifications as entry}
-                  <a
-                    class="activity-item"
-                    class:is-unread={!entry.read_at}
-                    href={getNotificationHref(entry)}
-                    on:click={() => markNotificationRead(entry.id)}
-                  >
-                    <div class="activity-copy">
-                      <strong>{getNotificationActor(entry)}</strong>
-                      <span>{getNotificationLabel(entry)}</span>
-                      {#if entry.item}
-                        <em>{entry.item.title || entry.item.original_name || 'Ohne Titel'}</em>
-                      {/if}
-                      {#if getNotificationPreview(entry)}
-                        <em>{getNotificationPreview(entry)}</em>
-                      {/if}
-                    </div>
-                    <time>{formatInteractionDate(entry.created_at)}</time>
-                  </a>
-                {/each}
-              </div>
-            {:else}
-              <p class="help-text">Noch keine Benachrichtigungen vorhanden.</p>
             {/if}
           </div>
 
