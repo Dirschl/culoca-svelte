@@ -1077,13 +1077,16 @@
               <p class="hero-dashboard-lede">
                 Dein Culoca zeigt dir einen schnellen Überblick.
                 {#if publicProfileUrl}
-                  Deine persönliche Galerie findest du hier:
-                  <a class="hero-dashboard-inline-link" href={publicProfileHref}>{publicProfileUrl}</a>
+                  <span class="hero-dashboard-link-line">
+                    Deine persönliche Galerie findest du hier:
+                    <a class="hero-dashboard-inline-link" href={publicProfileHref}>{publicProfileUrl}</a>
+                  </span>
                 {/if}
               </p>
               <div class="hero-dash-actions">
                 <a href="/galerie" class="btn-primary">Galerie</a>
                 <a href="/galerie?mobile=true" class="btn-secondary">Mobile Galerie</a>
+                <a href="/map-view" class="btn-secondary">Karte</a>
               </div>
               <div class="dashboard-tabs" role="tablist" aria-label="Dashboard-Fokus">
                 <button type="button" class="dashboard-tab" class:is-active={activeDashboardView === 'all'} on:click={() => (activeDashboardView = 'all')}>
@@ -1819,16 +1822,6 @@
             {/if}
           </div>
 
-          <section class="dashboard-shortcuts">
-            <a class="dashboard-shortcut" href="/galerie">
-              <strong>Eigene Galerie</strong>
-              <span>Deine Inhalte direkt in der Galerie öffnen.</span>
-            </a>
-            <a class="dashboard-shortcut" href={publicProfileHref}>
-              <strong>Teilbarer Permalink</strong>
-              <span>Öffentliche Galerie unter deinem Accountnamen prüfen.</span>
-            </a>
-          </section>
             </div>
           </div>
 
@@ -2091,6 +2084,11 @@
     text-decoration-color: color-mix(in srgb, currentColor 60%, transparent 40%);
     text-underline-offset: 0.12rem;
     word-break: break-all;
+  }
+
+  .hero-dashboard-link-line {
+    display: block;
+    margin-top: 0.12rem;
   }
 
   .hero-dashboard-inline-link:hover {
@@ -2561,27 +2559,6 @@
     color: var(--text-secondary);
   }
 
-  .dashboard-shortcuts {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 1rem;
-  }
-
-  .dashboard-shortcut {
-    display: grid;
-    gap: 0.35rem;
-    padding: 1rem;
-    border-radius: 18px;
-    background: linear-gradient(180deg, color-mix(in srgb, var(--bg-secondary) 88%, white 12%), var(--bg-secondary));
-    border: 1px solid var(--border-color);
-    color: inherit;
-    text-decoration: none;
-  }
-
-  .dashboard-shortcut span {
-    color: var(--text-secondary);
-  }
-
   /* ---- Hero ---- */
   .hero {
     position: relative;
@@ -2773,8 +2750,7 @@
 
   /* ---- Responsive ---- */
   @media (max-width: 960px) {
-    .dashboard-grid,
-    .dashboard-shortcuts {
+    .dashboard-grid {
       grid-template-columns: 1fr;
     }
 

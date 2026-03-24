@@ -1,6 +1,5 @@
 <script lang="ts">
   import { browser } from '$app/environment';
-  import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import { onDestroy, onMount } from 'svelte';
   import { supabase } from '$lib/supabaseClient';
@@ -49,6 +48,11 @@
   function scrollToTop() {
     if (!browser) return;
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function toggleChatDrawer() {
+    if (!browser) return;
+    window.dispatchEvent(new CustomEvent('culoca:toggle-chat'));
   }
 
   async function loadUnreadChatCount() {
@@ -153,7 +157,7 @@
         class="global-fab global-fab--chat"
         aria-label="Chat öffnen"
         title="Chat öffnen"
-        on:click={() => goto('/chat')}
+        on:click={toggleChatDrawer}
       >
         <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
