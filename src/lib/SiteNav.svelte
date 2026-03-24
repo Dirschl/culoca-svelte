@@ -274,6 +274,14 @@
     openDropdown = null;
   }
 
+  function toggleChatDrawer(options?: { chatWith?: string; conversation?: string; item?: string }) {
+    if (chatDrawerOpen && !isChatRoute) {
+      closeChatDrawer();
+      return;
+    }
+    openChatDrawer(options);
+  }
+
   function closeChatDrawer() {
     chatDrawerOpen = false;
   }
@@ -329,12 +337,18 @@
       const customEvent = event as CustomEvent<{ chatWith?: string; conversation?: string; item?: string }>;
       openChatDrawer(customEvent.detail || undefined);
     };
+    const handleToggleChat = (event: Event) => {
+      const customEvent = event as CustomEvent<{ chatWith?: string; conversation?: string; item?: string }>;
+      toggleChatDrawer(customEvent.detail || undefined);
+    };
     document.addEventListener('keydown', handleKeydown);
     window.addEventListener('culoca:open-chat', handleOpenChat as EventListener);
+    window.addEventListener('culoca:toggle-chat', handleToggleChat as EventListener);
     return () => {
       document.removeEventListener('click', handler);
       document.removeEventListener('keydown', handleKeydown);
       window.removeEventListener('culoca:open-chat', handleOpenChat as EventListener);
+      window.removeEventListener('culoca:toggle-chat', handleToggleChat as EventListener);
       teardownLiveInboxChannels();
     };
   });

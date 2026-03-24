@@ -1765,13 +1765,14 @@ let showRightsManager = false;
       return;
     }
 
+    const chatDetail =
+      creatorUserId && creatorUserId !== currentUser.id
+        ? { chatWith: creatorUserId, item: image?.id || undefined }
+        : undefined;
+
     if (browser) {
-      const chatDetail =
-        creatorUserId && creatorUserId !== currentUser.id
-          ? { chatWith: creatorUserId, item: image?.id || undefined }
-          : undefined;
       window.dispatchEvent(
-        new CustomEvent('culoca:open-chat', {
+        new CustomEvent('culoca:toggle-chat', {
           detail: chatDetail
         })
       );
@@ -4279,7 +4280,7 @@ let showRightsManager = false;
   <!-- Zur Galerie zurückkehren FAB -->
   <button 
     class="gallery-back-fab"
-    on:click={() => goto('/')}
+    on:click={() => goto(imageBackHref || '/')}
     title="Zur Galerie zurückkehren"
     aria-label="Zur Galerie zurückkehren"
   >
