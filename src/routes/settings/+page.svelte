@@ -7,6 +7,11 @@
   import SiteNav from '$lib/SiteNav.svelte';
   import { currentPathWithSearch, sanitizeReturnTo } from '$lib/returnTo';
   import { welcomeVisible, resetWelcome } from '$lib/welcomeStore';
+  import { browser } from '$app/environment';
+  import SiteFooter from '$lib/SiteFooter.svelte';
+  import SettingsDashboardNav from '$lib/settings/SettingsDashboardNav.svelte';
+  import type { SettingsSection } from '$lib/settings/settingsSection';
+  import { isSettingsSection } from '$lib/settings/settingsSection';
 
   let user: any = null;
   let profile: any = null;
@@ -56,6 +61,41 @@
   let lastKnownLon: number | null = null;
   let gpsTrackingActive = false;
   let returnTo = '/';
+
+  let activeSettingsSection: SettingsSection = 'appearance';
+
+  function settingsSectionTitle(section: SettingsSection): string {
+    switch (section) {
+      case 'appearance':
+        return 'Erscheinungsbild';
+      case 'gallery':
+        return 'Galerie & Standort';
+      case 'audio':
+        return 'Audio';
+      case 'interface':
+        return 'Interface';
+      case 'upload':
+        return 'Upload & Adobe Stock';
+      default:
+        return 'Einstellungen';
+    }
+  }
+
+  function setSettingsSection(section: SettingsSection) {
+    activeSettingsSection = section;
+    if (!browser) return;
+    const u = new URL(window.location.href);
+    u.searchParams.set('section', section);
+    const q = u.searchParams.toString();
+    void goto(`${u.pathname}?${q}`, { replaceState: true, noScroll: true, keepFocus: true });
+  }
+
+  $: if (browser && !loading) {
+    const param = $page.url.searchParams.get('section');
+    if (isSettingsSection(param)) {
+      activeSettingsSection = param;
+    }
+  }
 
   onMount(() => {
     (async () => {
@@ -403,32 +443,49 @@
   </script>`}
 </svelte:head>
 
-<div class="settings-page">
-  <SiteNav />
+<SiteNav />
 
+<main class="dashboard-page settings-dashboard-page">
   {#if loading}
     <div class="loading-container">
       <div class="spinner"></div>
       <span>Lade Profil...</span>
     </div>
   {:else}
-    <div class="settings-container">
-      <!-- Header -->
-      <header class="header">
-        <div class="header-content">
-          <h1>Einstellungen</h1>
-          <p class="header-subtitle">Passe deine Culoca-Erfahrung an</p>
+    <section class="dashboard-page__hero settings-dashboard__hero">
+      <div class="settings-dashboard__hero-row">
+        <div>
+          <h1 class="settings-dashboard__title">Einstellungen</h1>
+          <p class="settings-dashboard__sub">Galerie, Darstellung, Upload und mehr — unabhängig vom Profil.</p>
         </div>
-      </header>
+      </div>
+    </section>
 
-      <!-- Message -->
-      {#if message}
-        <div class="message" class:success={messageType === 'success'} class:error={messageType === 'error'}>
-          {message}
+    <section class="dashboard-layout">
+      <aside class="dashboard-column dashboard-column--menu">
+        <SettingsDashboardNav
+          active={activeSettingsSection}
+          on:select={(e) => setSettingsSection(e.detail)}
+        />
+      </aside>
+      <section class="dashboard-column dashboard-column--content">
+        <div class="panel-head">
+          <h2>{settingsSectionTitle(activeSettingsSection)}</h2>
+          <span class="panel-head__hint">Änderungen mit „Einstellungen speichern“ sichern.</span>
         </div>
-      {/if}
 
-      <form class="settings-form" on:submit|preventDefault={saveProfile}>
+        {#if message}
+          <div class="message" class:success={messageType === 'success'} class:error={messageType === 'error'}>
+            {message}
+          </div>
+        {/if}
+
+        <div class="settings-dashboard__inner">
+          <form class="settings-form" on:submit|preventDefault={saveProfile}>
+      <div
+        class="settings-nav-panel"
+        class:settings-nav-panel--hidden={activeSettingsSection !== 'appearance'}
+      >
         <!-- Theme Settings -->
         <section class="settings-section">
           <div class="section-header">
@@ -450,6 +507,12 @@
             </div>
           </div>
         </section>
+      </div>
+
+      <div
+        class="settings-nav-panel"
+        class:settings-nav-panel--hidden={activeSettingsSection !== 'gallery'}
+      >
 
         <!-- Gallery Settings -->
         <section class="settings-section">
@@ -460,11 +523,15 @@
 
           <div class="setting-row">
             <div class="setting-info">
-              <label class="setting-label">News-Flash</label>
+              <div class="setting-label" id="settings-newsflash-label">News-Flash</div>
               <p class="setting-description">Lege fest, ob der News-Flash in deiner Galerie ausgeblendet bleibt oder eigene bzw. alle Uploads zeigt.</p>
             </div>
             <div class="setting-control">
-              <div class="radio-group">
+              <div
+                class="radio-group"
+                role="radiogroup"
+                aria-labelledby="settings-newsflash-label"
+              >
                 <label class="radio-option">
                   <input type="radio" bind:group={newsFlashMode} value="aus" />
                   <span class="radio-custom"></span>
@@ -528,11 +595,16 @@
 
           <div class="setting-row">
             <div class="setting-info">
-              <label class="setting-label">Standort festlegen</label>
+              <label class="setting-label" for="settings-location-page-btn">Standort festlegen</label>
               <p class="setting-description">Öffnet die neue Standort-Seite mit Erklärung, GPS-Freigabe und manueller Karten-Auswahl.</p>
             </div>
             <div class="setting-control">
-              <button type="button" class="location-dialog-btn" on:click={openLocationDialog}>
+              <button
+                type="button"
+                id="settings-location-page-btn"
+                class="location-dialog-btn"
+                on:click={openLocationDialog}
+              >
                 Standort-Seite öffnen
               </button>
             </div>
@@ -566,8 +638,12 @@
             </div>
           </div>
         </section>
+      </div>
 
-
+      <div
+        class="settings-nav-panel"
+        class:settings-nav-panel--hidden={activeSettingsSection !== 'audio'}
+      >
 
         <!-- Audio Settings -->
         <section class="settings-section">
@@ -590,6 +666,12 @@
             </div>
           </div>
         </section>
+      </div>
+
+      <div
+        class="settings-nav-panel"
+        class:settings-nav-panel--hidden={activeSettingsSection !== 'interface'}
+      >
 
         <!-- Interface Settings -->
         <section class="settings-section">
@@ -612,6 +694,12 @@
             </div>
           </div>
         </section>
+      </div>
+
+      <div
+        class="settings-nav-panel"
+        class:settings-nav-panel--hidden={activeSettingsSection !== 'upload'}
+      >
 
         <!-- Upload Settings -->
         <section class="settings-section">
@@ -712,6 +800,7 @@
             </div>
           </div>
         </section>
+      </div>
 
         <!-- Actions -->
         <div class="actions">
@@ -727,90 +816,111 @@
             {/if}
           </button>
         </div>
-      </form>
-    </div>
+        </form>
+        </div>
+      </section>
+    </section>
   {/if}
-</div>
+</main>
+
+<SiteFooter />
 
 <style>
-  .settings-page {
-    min-height: 100vh;
-    background: var(--bg-primary);
-    color: var(--text-primary);
-  }
+	.settings-dashboard-page {
+		min-height: 100vh;
+		background: var(--bg-primary);
+		color: var(--text-primary);
+		padding: 1.4rem 2rem 2.2rem;
+		box-sizing: border-box;
+	}
 
-/* ============================================================= */
-/* 🔄   CSS-Anpassungen – nur dieser Teil ist neu/aktualisiert   */
-/* ============================================================= */
+	.settings-dashboard__hero {
+		margin-bottom: 0;
+	}
 
-/* Distanz-Badge links unten */
-.pic-container .distance-label {
-  position: absolute;
-  left: 8px;
-  bottom: 8px;
-  background: rgba(0,0,0,0.55);
-  backdrop-filter: blur(4px);
-  color: #fff;
-  font-size: 0.7rem;
-  font-weight: 500;
-  border-radius: 6px;
-  padding: 1px 8px;
-  z-index: 10;
-  pointer-events: none;
-}
+	.settings-dashboard__hero-row {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 1rem;
+		flex-wrap: wrap;
+	}
 
-/* Spezifische Klasse für bessere CSS-Spezifität */
-.pic-container .distance-label.s-prPRSjF7NRSe {
-  position: absolute;
-  left: 8px;
-  bottom: 8px;
-  background: rgba(0,0,0,0.55);
-  backdrop-filter: blur(4px);
-  color: #fff;
-  font-size: 0.7rem;
-  font-weight: 500;
-  border-radius: 6px;
-  padding: 1px 8px;
-  z-index: 10;
-  pointer-events: none;
-}
+	.settings-dashboard__title {
+		margin: 0;
+		font-size: clamp(1.8rem, 3vw, 2.4rem);
+		font-weight: 700;
+		color: var(--text-primary);
+	}
 
-/* ============================================================= */
-/*   Bestehende Justified-Gallery-Styles (unverändert belassen)   */
-/* ============================================================= */
+	.settings-dashboard__sub {
+		margin: 0.45rem 0 0;
+		color: var(--text-secondary);
+		max-width: 42rem;
+	}
 
-/* Justified Gallery specific styles - higher specificity */
-.justified-wrapper .gallery {
-  position: relative !important;
-  width: 100% !important;
-  height: auto !important;
-  min-height: 200px !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  background: var(--bg-primary) !important;
-  border: none !important;
-  box-shadow: none !important;
-  overflow: hidden !important;
-}
+	.dashboard-layout {
+		margin-top: 1.2rem;
+		display: grid;
+		gap: 1rem;
+		grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
+		align-items: start;
+	}
 
-/* Bild-Container */
-.justified-wrapper .pic-container {
-  position: absolute !important;
-  cursor: pointer !important;
-  overflow: hidden !important;
-  transition: box-shadow 0.3s ease, background-color 0.3s ease !important;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
-  background: var(--bg-secondary) !important;
-}
+	.dashboard-column--menu {
+		position: sticky;
+		top: 4.6rem;
+	}
 
-.justified-wrapper .pic {
-  width: 100% !important;
-  height: 100% !important;
-  object-fit: cover !important;
-  display: block !important;
-  transition: transform 0.3s cubic-bezier(.4,0,.2,1) !important;
-  background: transparent !important;
-}
+	.dashboard-column {
+		border: 1px solid var(--border-color);
+		border-radius: 16px;
+		background: var(--bg-secondary);
+		padding: 1rem;
+	}
+
+	.panel-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		margin-bottom: 0.8rem;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+	}
+
+	.panel-head h2 {
+		margin: 0;
+		font-size: 1.1rem;
+	}
+
+	.panel-head__hint {
+		color: var(--text-secondary);
+		font-size: 0.88rem;
+	}
+
+	.settings-dashboard__inner {
+		border: none;
+		padding: 0;
+		background: transparent;
+	}
+
+	.settings-nav-panel--hidden {
+		display: none !important;
+	}
+
+	@media (max-width: 980px) {
+		.settings-dashboard-page {
+			padding: 1rem;
+		}
+
+		.dashboard-layout {
+			grid-template-columns: 1fr;
+		}
+
+		.dashboard-column--menu {
+			position: static;
+		}
+	}
 
   .loading-container {
     display: flex;
@@ -836,39 +946,10 @@
     100% { transform: rotate(360deg); }
   }
 
-  .settings-container {
-    max-width: 800px;
-    margin: 0 auto;
-    padding: 0;
-  }
-
-  /* Header */
-  .header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    padding: 2rem 1.5rem 1rem;
-  }
-
-  .header-content h1 {
-    margin: 0 0 0.5rem 0;
-    font-size: 2rem;
-    font-weight: 700;
-    color: var(--text-primary);
-  }
-
-  .header-subtitle {
-    margin: 0;
-    font-size: 1rem;
-    font-weight: 400;
-    color: var(--text-secondary);
-  }
-
-
 
   /* Message */
   .message {
-    margin: 0 1.5rem 1rem;
+    margin: 0 0 1rem;
     padding: 1rem 1.5rem;
     border-radius: 12px;
     font-weight: 500;
@@ -886,7 +967,7 @@
 
   /* Form */
   .settings-form {
-    padding: 0 1.5rem 2rem;
+    padding: 0 0 2rem;
   }
 
   .settings-section {
@@ -954,11 +1035,6 @@
     align-items: center;
     gap: 1rem;
     flex-shrink: 0;
-  }
-
-  .setting-control-wide {
-    width: 100%;
-    justify-content: flex-end;
   }
 
   .setting-control-stacked {
@@ -1080,62 +1156,6 @@
     color: var(--text-primary);
   }
 
-  /* Quality Control */
-  .quality-control {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.5rem;
-    min-width: 200px;
-  }
-
-  .quality-slider {
-    width: 100%;
-    height: 6px;
-    border-radius: 3px;
-    background: var(--border-color);
-    outline: none;
-    -webkit-appearance: none;
-    appearance: none;
-  }
-
-  .quality-slider::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background: var(--accent-color);
-    cursor: pointer;
-    box-shadow: 0 2px 4px var(--shadow);
-  }
-
-  .quality-slider::-moz-range-thumb {
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background: var(--accent-color);
-    cursor: pointer;
-    border: none;
-    box-shadow: 0 2px 4px var(--shadow);
-  }
-
-  .quality-value {
-    font-size: 1.1rem;
-    font-weight: 700;
-    color: var(--accent-color);
-    min-width: 50px;
-    text-align: center;
-  }
-
-  .quality-labels {
-    display: flex;
-    justify-content: space-between;
-    width: 100%;
-    font-size: 0.75rem;
-    color: var(--text-secondary);
-  }
-
   /* Actions */
   .actions {
     display: flex;
@@ -1202,21 +1222,6 @@
 
   /* Mobile Responsive */
   @media (max-width: 768px) {
-    .settings-container {
-      padding: 0;
-    }
-
-    .header {
-      padding: 1.5rem 1rem 1rem;
-      flex-direction: column;
-      gap: 1rem;
-      align-items: stretch;
-    }
-
-    .header-content h1 {
-      font-size: 1.8rem;
-    }
-
     .settings-form {
       padding: 0 1rem 1.5rem;
     }
@@ -1248,10 +1253,6 @@
   }
 
   @media (max-width: 480px) {
-    .header-content h1 {
-      font-size: 1.6rem;
-    }
-
     .settings-section {
       padding: 1rem;
     }
