@@ -1,110 +1,129 @@
 import { error, json, type RequestHandler } from '@sveltejs/kit';
 import { createClient } from '@supabase/supabase-js';
 import {
-  buildDownloadFilename,
-  canBypassImageProcessing,
-  canRewriteMetadataWithoutSharp,
-  fetchOriginalItemBuffer,
-  normalizeDownloadExportOptions,
-  renderDownloadExport,
-  rewriteJpegMetadataWithoutSharp,
-  type DownloadExportOptions
+	buildDownloadFilename,
+	canBypassImageProcessing,
+	canRewriteMetadataWithoutSharp,
+	fetchOriginalItemBuffer,
+	normalizeDownloadExportOptions,
+	renderDownloadExport,
+	rewriteJpegMetadataWithoutSharp,
+	type DownloadExportOptions
 } from '$lib/server/downloadExport';
 
 type DownloadItemRecord = {
-  id: string;
-  profile_id: string | null;
-  user_id: string | null;
-  short_id: string | null;
-  width: number | null;
-  height: number | null;
-  original_url: string | null;
-  path_2048: string | null;
-  path_512: string | null;
-  original_name: string | null;
-  title: string | null;
-  caption: string | null;
-  description: string | null;
-  keywords: string[] | null;
-  exif_data: Record<string, unknown> | null;
-  lat: number | null;
-  lon: number | null;
-  profile?: {
-    full_name?: string | null;
-    accountname?: string | null;
-  } | null;
+	id: string;
+	profile_id: string | null;
+	user_id: string | null;
+	short_id: string | null;
+	width: number | null;
+	height: number | null;
+	original_url: string | null;
+	path_2048: string | null;
+	path_512: string | null;
+	original_name: string | null;
+	title: string | null;
+	caption: string | null;
+	description: string | null;
+	keywords: string[] | null;
+	exif_data: Record<string, unknown> | null;
+	lat: number | null;
+	lon: number | null;
+	profile?: {
+		display_name_public?: string | null;
+		legal_entity_name?: string | null;
+		copyright_holder_name?: string | null;
+		default_creator_name?: string | null;
+		default_credit_text?: string | null;
+		default_copyright_notice?: string | null;
+		default_license_url?: string | null;
+		default_author_meta?: string | null;
+		organization_name?: string | null;
+		use_exif_creator_override?: boolean | null;
+		use_exif_credit_override?: boolean | null;
+		use_exif_copyright_override?: boolean | null;
+		photographer_label_mode?: string | null;
+		public_contact_name?: string | null;
+		// Legacy fallbacks
+		full_name?: string | null;
+		accountname?: string | null;
+	} | null;
 };
 
 function createAuthedSupabase(request: Request) {
-  const authHeader = request.headers.get('authorization');
-  if (!authHeader?.startsWith('Bearer ')) {
-    throw error(401, 'Nicht angemeldet. Bitte zuerst einloggen.');
-  }
+	const authHeader = request.headers.get('authorization');
+	if (!authHeader?.startsWith('Bearer ')) {
+		throw error(401, 'Nicht angemeldet. Bitte zuerst einloggen.');
+	}
 
-  const supabaseUrl =
-    process.env.PUBLIC_SUPABASE_URL ||
-    process.env.VITE_SUPABASE_URL ||
-    import.meta.env.PUBLIC_SUPABASE_URL ||
-    import.meta.env.VITE_SUPABASE_URL;
-  const supabaseAnonKey =
-    process.env.PUBLIC_SUPABASE_ANON_KEY ||
-    process.env.VITE_SUPABASE_ANON_KEY ||
-    import.meta.env.PUBLIC_SUPABASE_ANON_KEY ||
-    import.meta.env.VITE_SUPABASE_ANON_KEY;
+	const supabaseUrl =
+		process.env.PUBLIC_SUPABASE_URL ||
+		process.env.VITE_SUPABASE_URL ||
+		import.meta.env.PUBLIC_SUPABASE_URL ||
+		import.meta.env.VITE_SUPABASE_URL;
+	const supabaseAnonKey =
+		process.env.PUBLIC_SUPABASE_ANON_KEY ||
+		process.env.VITE_SUPABASE_ANON_KEY ||
+		import.meta.env.PUBLIC_SUPABASE_ANON_KEY ||
+		import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw error(500, 'Server-Konfigurationsfehler');
-  }
+	if (!supabaseUrl || !supabaseAnonKey) {
+		throw error(500, 'Server-Konfigurationsfehler');
+	}
 
-  return createClient(supabaseUrl, supabaseAnonKey, {
-    auth: { persistSession: false },
-    global: {
-      headers: {
-        Authorization: authHeader
-      }
-    }
-  });
+	return createClient(supabaseUrl, supabaseAnonKey, {
+		auth: { persistSession: false },
+		global: {
+			headers: {
+				Authorization: authHeader
+			}
+		}
+	});
 }
 
 async function getAuthenticatedUser(supabase: ReturnType<typeof createAuthedSupabase>) {
-  const {
-    data: { user },
-    error: userError
-  } = await supabase.auth.getUser();
+	const {
+		data: { user },
+		error: userError
+	} = await supabase.auth.getUser();
 
-  if (userError || !user) {
-    throw error(401, 'Nicht angemeldet. Bitte zuerst einloggen.');
-  }
+	if (userError || !user) {
+		throw error(401, 'Nicht angemeldet. Bitte zuerst einloggen.');
+	}
 
-  return user;
+	return user;
 }
 
 async function fetchDownloadSourceBuffer(
-  item: Pick<DownloadItemRecord, 'id' | 'original_url' | 'path_2048' | 'path_512'>,
-  options: DownloadExportOptions,
-  mode: 'estimate' | 'download'
+	item: Pick<DownloadItemRecord, 'id' | 'original_url' | 'path_2048' | 'path_512'>,
+	options: DownloadExportOptions,
+	mode: 'estimate' | 'download'
 ) {
-  const strictOriginalSource = mode === 'download' && options.metadataMode === 'original' && options.format === 'jpg';
+	const strictOriginalSource =
+		mode === 'download' && options.metadataMode === 'original' && options.format === 'jpg';
 
-  try {
-    return await fetchOriginalItemBuffer(item, {
-      allowPublicFallback: !strictOriginalSource
-    });
-  } catch (sourceError) {
-    if (!strictOriginalSource) {
-      throw sourceError;
-    }
+	try {
+		return await fetchOriginalItemBuffer(item, {
+			allowPublicFallback: !strictOriginalSource
+		});
+	} catch (sourceError) {
+		if (!strictOriginalSource) {
+			throw sourceError;
+		}
 
-    console.warn('Strict original download source unavailable, retrying with public variant fallback:', sourceError);
-    return fetchOriginalItemBuffer(item, { allowPublicFallback: true });
-  }
+		console.warn(
+			'Strict original download source unavailable, retrying with public variant fallback:',
+			sourceError
+		);
+		return fetchOriginalItemBuffer(item, { allowPublicFallback: true });
+	}
 }
 
 async function loadDownloadItem(supabase: ReturnType<typeof createAuthedSupabase>, itemId: string) {
-  const { data: item, error: itemError } = await supabase
-    .from('items')
-    .select(
-      `
+	const { data: item, error: itemError } = await supabase
+		.from('items')
+		.select(
+			`
         id,
         profile_id,
         user_id,
@@ -123,490 +142,504 @@ async function loadDownloadItem(supabase: ReturnType<typeof createAuthedSupabase
         lat,
         lon,
         profile:profile_id (
+          display_name_public,
+          legal_entity_name,
+          copyright_holder_name,
+          default_creator_name,
+          default_credit_text,
+          default_copyright_notice,
+          default_license_url,
+          default_author_meta,
+          organization_name,
+          use_exif_creator_override,
+          use_exif_credit_override,
+          use_exif_copyright_override,
+          photographer_label_mode,
+          public_contact_name,
           full_name,
           accountname
         )
       `
-    )
-    .eq('id', itemId)
-    .maybeSingle<DownloadItemRecord>();
+		)
+		.eq('id', itemId)
+		.maybeSingle<DownloadItemRecord>();
 
-  if (itemError || !item) {
-    throw error(404, 'Bild nicht gefunden');
-  }
+	if (itemError || !item) {
+		throw error(404, 'Bild nicht gefunden');
+	}
 
-  return item;
+	return item;
 }
 
 async function assertDownloadRights(
-  supabase: ReturnType<typeof createAuthedSupabase>,
-  itemId: string,
-  userId: string
+	supabase: ReturnType<typeof createAuthedSupabase>,
+	itemId: string,
+	userId: string
 ) {
-  const { data: unifiedRights, error: rightsError } = await supabase.rpc('get_unified_item_rights', {
-    p_item_id: itemId,
-    p_user_id: userId
-  });
+	const { data: unifiedRights, error: rightsError } = await supabase.rpc(
+		'get_unified_item_rights',
+		{
+			p_item_id: itemId,
+			p_user_id: userId
+		}
+	);
 
-  if (rightsError) {
-    throw error(500, 'Fehler beim Prüfen der Rechte');
-  }
+	if (rightsError) {
+		throw error(500, 'Fehler beim Prüfen der Rechte');
+	}
 
-  const hasDownloadRights = unifiedRights?.download || unifiedRights?.download_original;
-  if (!hasDownloadRights) {
-    throw error(403, 'Kein Download-Zugriff auf diese Datei');
-  }
+	const hasDownloadRights = unifiedRights?.download || unifiedRights?.download_original;
+	if (!hasDownloadRights) {
+		throw error(403, 'Kein Download-Zugriff auf diese Datei');
+	}
 
-  return unifiedRights;
+	return unifiedRights;
 }
 
 async function logDownload(
-  supabase: ReturnType<typeof createAuthedSupabase>,
-  item: DownloadItemRecord,
-  userId: string,
-  downloadType: string
+	supabase: ReturnType<typeof createAuthedSupabase>,
+	item: DownloadItemRecord,
+	userId: string,
+	downloadType: string
 ) {
-  try {
-    const downloadSource = userId === item.profile_id || userId === item.user_id ? 'owner' : 'rights';
-    await supabase.rpc('log_item_download', {
-      p_item_id: item.id,
-      p_user_id: userId,
-      p_download_type: downloadType,
-      p_download_source: downloadSource
-    });
-  } catch (logError) {
-    console.warn('Failed to log download:', logError);
-  }
+	try {
+		const downloadSource =
+			userId === item.profile_id || userId === item.user_id ? 'owner' : 'rights';
+		await supabase.rpc('log_item_download', {
+			p_item_id: item.id,
+			p_user_id: userId,
+			p_download_type: downloadType,
+			p_download_source: downloadSource
+		});
+	} catch (logError) {
+		console.warn('Failed to log download:', logError);
+	}
 }
 
 async function logDownloadEvent(
-  supabase: ReturnType<typeof createAuthedSupabase>,
-  item: DownloadItemRecord,
-  userId: string,
-  source: string,
-  downloadType: string,
-  options: Pick<
-    DownloadExportOptions,
-    'sizeMode' | 'width' | 'height' | 'cropEnabled' | 'format' | 'metadataMode' | 'filenameMode'
-  >
+	supabase: ReturnType<typeof createAuthedSupabase>,
+	item: DownloadItemRecord,
+	userId: string,
+	source: string,
+	downloadType: string,
+	options: Pick<
+		DownloadExportOptions,
+		'sizeMode' | 'width' | 'height' | 'cropEnabled' | 'format' | 'metadataMode' | 'filenameMode'
+	>
 ) {
-  try {
-    await supabase.from('item_events').insert({
-      item_id: item.id,
-      actor_user_id: userId,
-      owner_user_id: item.profile_id || item.user_id,
-      event_type: 'download',
-      source,
-      metadata: {
-        download_type: downloadType,
-        size_mode: options.sizeMode,
-        width: options.width ?? null,
-        height: options.height ?? null,
-        crop_enabled: options.cropEnabled,
-        format: options.format,
-        metadata_mode: options.metadataMode,
-        filename_mode: options.filenameMode
-      }
-    });
-  } catch (logError) {
-    console.warn('Failed to log item event for download:', logError);
-  }
+	try {
+		await supabase.from('item_events').insert({
+			item_id: item.id,
+			actor_user_id: userId,
+			owner_user_id: item.profile_id || item.user_id,
+			event_type: 'download',
+			source,
+			metadata: {
+				download_type: downloadType,
+				size_mode: options.sizeMode,
+				width: options.width ?? null,
+				height: options.height ?? null,
+				crop_enabled: options.cropEnabled,
+				format: options.format,
+				metadata_mode: options.metadataMode,
+				filename_mode: options.filenameMode
+			}
+		});
+	} catch (logError) {
+		console.warn('Failed to log item event for download:', logError);
+	}
 }
 
 async function createOwnerDownloadNotification(
-  supabase: ReturnType<typeof createAuthedSupabase>,
-  item: DownloadItemRecord,
-  userId: string,
-  downloadType: string,
-  options: Pick<
-    DownloadExportOptions,
-    'sizeMode' | 'width' | 'height' | 'cropEnabled' | 'format' | 'metadataMode' | 'filenameMode'
-  >
+	supabase: ReturnType<typeof createAuthedSupabase>,
+	item: DownloadItemRecord,
+	userId: string,
+	downloadType: string,
+	options: Pick<
+		DownloadExportOptions,
+		'sizeMode' | 'width' | 'height' | 'cropEnabled' | 'format' | 'metadataMode' | 'filenameMode'
+	>
 ) {
-  const ownerUserId = item.profile_id || item.user_id;
-  if (!ownerUserId || ownerUserId === userId) return;
+	const ownerUserId = item.profile_id || item.user_id;
+	if (!ownerUserId || ownerUserId === userId) return;
 
-  try {
-    await supabase.from('user_notifications').insert({
-      recipient_user_id: ownerUserId,
-      actor_user_id: userId,
-      item_id: item.id,
-      event_type: 'download',
-      payload: {
-        download_type: downloadType,
-        size_mode: options.sizeMode,
-        width: options.width ?? null,
-        height: options.height ?? null,
-        crop_enabled: options.cropEnabled,
-        format: options.format,
-        metadata_mode: options.metadataMode,
-        filename_mode: options.filenameMode
-      }
-    });
-  } catch (logError) {
-    console.warn('Failed to create download notification:', logError);
-  }
+	try {
+		await supabase.from('user_notifications').insert({
+			recipient_user_id: ownerUserId,
+			actor_user_id: userId,
+			item_id: item.id,
+			event_type: 'download',
+			payload: {
+				download_type: downloadType,
+				size_mode: options.sizeMode,
+				width: options.width ?? null,
+				height: options.height ?? null,
+				crop_enabled: options.cropEnabled,
+				format: options.format,
+				metadata_mode: options.metadataMode,
+				filename_mode: options.filenameMode
+			}
+		});
+	} catch (logError) {
+		console.warn('Failed to create download notification:', logError);
+	}
 }
 
-function getLegacyDownloadTypeForRights(unifiedRights: { download?: boolean; download_original?: boolean } | null | undefined) {
-  return unifiedRights?.download_original ? 'full_resolution' : 'preview';
+function getLegacyDownloadTypeForRights(
+	unifiedRights: { download?: boolean; download_original?: boolean } | null | undefined
+) {
+	return unifiedRights?.download_original ? 'full_resolution' : 'preview';
 }
 
 function getLegacyDownloadTypeForExport(options: DownloadExportOptions) {
-  return options.sizeMode === 'full' ? 'full_resolution' : 'preview';
+	return options.sizeMode === 'full' ? 'full_resolution' : 'preview';
 }
 
 function getDownloadEventSource(item: DownloadItemRecord, userId: string) {
-  return userId === item.profile_id || userId === item.user_id ? 'owner' : 'rights';
+	return userId === item.profile_id || userId === item.user_id ? 'owner' : 'rights';
 }
 
 function getLegacyFilename(item: DownloadItemRecord) {
-  const originalName = item.original_name?.trim() || `image-${item.id}.jpg`;
-  return originalName;
+	const originalName = item.original_name?.trim() || `image-${item.id}.jpg`;
+	return originalName;
 }
 
 function getLegacyContentType(filename: string) {
-  const lower = filename.toLowerCase();
-  if (lower.endsWith('.webp')) return 'image/webp';
-  if (lower.endsWith('.png')) return 'image/png';
-  return 'image/jpeg';
+	const lower = filename.toLowerCase();
+	if (lower.endsWith('.webp')) return 'image/webp';
+	if (lower.endsWith('.png')) return 'image/png';
+	return 'image/jpeg';
 }
 
 function estimateOutputDimensions(item: DownloadItemRecord, options: DownloadExportOptions) {
-  const baseWidth = item.width || 0;
-  const baseHeight = item.height || 0;
+	const baseWidth = item.width || 0;
+	const baseHeight = item.height || 0;
 
-  if (!baseWidth || !baseHeight) {
-    return {
-      width: options.width || null,
-      height: options.height || null
-    };
-  }
+	if (!baseWidth || !baseHeight) {
+		return {
+			width: options.width || null,
+			height: options.height || null
+		};
+	}
 
-  if (options.sizeMode !== 'custom') {
-    return { width: baseWidth, height: baseHeight };
-  }
+	if (options.sizeMode !== 'custom') {
+		return { width: baseWidth, height: baseHeight };
+	}
 
-  const requestedWidth = options.width || baseWidth;
-  const requestedHeight = options.height || baseHeight;
+	const requestedWidth = options.width || baseWidth;
+	const requestedHeight = options.height || baseHeight;
 
-  if (options.cropEnabled && options.crop) {
-    return {
-      width: requestedWidth,
-      height: requestedHeight
-    };
-  }
+	if (options.cropEnabled && options.crop) {
+		return {
+			width: requestedWidth,
+			height: requestedHeight
+		};
+	}
 
-  const ratio = Math.min(requestedWidth / baseWidth, requestedHeight / baseHeight);
-  return {
-    width: Math.max(1, Math.round(baseWidth * ratio)),
-    height: Math.max(1, Math.round(baseHeight * ratio))
-  };
+	const ratio = Math.min(requestedWidth / baseWidth, requestedHeight / baseHeight);
+	return {
+		width: Math.max(1, Math.round(baseWidth * ratio)),
+		height: Math.max(1, Math.round(baseHeight * ratio))
+	};
 }
 
 function isSharpRuntimeError(err: unknown) {
-  const message = err instanceof Error ? err.message : String(err ?? '');
-  return message.toLowerCase().includes('sharp');
+	const message = err instanceof Error ? err.message : String(err ?? '');
+	return message.toLowerCase().includes('sharp');
 }
 
 function getUserFacingDownloadErrorMessage(err: unknown, mode: 'download' | 'estimate') {
-  if (isSharpRuntimeError(err)) {
-    return mode === 'estimate'
-      ? 'Die Dateivorschau ist gerade nicht verfuegbar.'
-      : 'Die gewaehlte Exportvariante ist gerade nicht verfuegbar. Bitte versuche JPG in voller Aufloesung oder Original-Metadaten.';
-  }
+	if (isSharpRuntimeError(err)) {
+		return mode === 'estimate'
+			? 'Die Dateivorschau ist gerade nicht verfuegbar.'
+			: 'Die gewaehlte Exportvariante ist gerade nicht verfuegbar. Bitte versuche JPG in voller Aufloesung oder Original-Metadaten.';
+	}
 
-  return err instanceof Error ? err.message : 'Download fehlgeschlagen';
+	return err instanceof Error ? err.message : 'Download fehlgeschlagen';
 }
 
 export const GET: RequestHandler = async ({ params, request }) => {
-  const itemId = params.id;
-  if (!itemId) {
-    throw error(400, 'Item-ID fehlt');
-  }
-  const supabase = createAuthedSupabase(request);
-  const user = await getAuthenticatedUser(supabase);
-  const item = await loadDownloadItem(supabase, itemId);
-  const unifiedRights = await assertDownloadRights(supabase, itemId, user.id);
+	const itemId = params.id;
+	if (!itemId) {
+		throw error(400, 'Item-ID fehlt');
+	}
+	const supabase = createAuthedSupabase(request);
+	const user = await getAuthenticatedUser(supabase);
+	const item = await loadDownloadItem(supabase, itemId);
+	const unifiedRights = await assertDownloadRights(supabase, itemId, user.id);
 
-  try {
-    const buffer = await fetchDownloadSourceBuffer(item, {
-      sizeMode: 'full',
-      format: 'jpg',
-      metadataMode: 'original',
-      filenameMode: 'original'
-    }, 'download');
-    const filename = getLegacyFilename(item);
-    const contentType = getLegacyContentType(filename);
+	try {
+		const buffer = await fetchDownloadSourceBuffer(
+			item,
+			{
+				sizeMode: 'full',
+				format: 'jpg',
+				metadataMode: 'original',
+				filenameMode: 'original'
+			},
+			'download'
+		);
+		const filename = getLegacyFilename(item);
+		const contentType = getLegacyContentType(filename);
 
-    await logDownload(
-      supabase,
-      item,
-      user.id,
-      getLegacyDownloadTypeForRights(unifiedRights)
-    );
-    await createOwnerDownloadNotification(
-      supabase,
-      item,
-      user.id,
-      getLegacyDownloadTypeForRights(unifiedRights),
-      {
-        sizeMode: 'full',
-        width: item.width,
-        height: item.height,
-        cropEnabled: false,
-        format: 'jpg',
-        metadataMode: 'original',
-        filenameMode: 'original'
-      }
-    );
-    await logDownloadEvent(
-      supabase,
-      item,
-      user.id,
-      getDownloadEventSource(item, user.id),
-      getLegacyDownloadTypeForRights(unifiedRights),
-      {
-        sizeMode: 'full',
-        width: item.width,
-        height: item.height,
-        cropEnabled: false,
-        format: 'jpg',
-        metadataMode: 'original',
-        filenameMode: 'original'
-      }
-    );
+		await logDownload(supabase, item, user.id, getLegacyDownloadTypeForRights(unifiedRights));
+		await createOwnerDownloadNotification(
+			supabase,
+			item,
+			user.id,
+			getLegacyDownloadTypeForRights(unifiedRights),
+			{
+				sizeMode: 'full',
+				width: item.width,
+				height: item.height,
+				cropEnabled: false,
+				format: 'jpg',
+				metadataMode: 'original',
+				filenameMode: 'original'
+			}
+		);
+		await logDownloadEvent(
+			supabase,
+			item,
+			user.id,
+			getDownloadEventSource(item, user.id),
+			getLegacyDownloadTypeForRights(unifiedRights),
+			{
+				sizeMode: 'full',
+				width: item.width,
+				height: item.height,
+				cropEnabled: false,
+				format: 'jpg',
+				metadataMode: 'original',
+				filenameMode: 'original'
+			}
+		);
 
-    return new Response(buffer, {
-      status: 200,
-      headers: {
-        'Content-Type': contentType,
-        'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
-        'Cache-Control': 'private, max-age=0, must-revalidate'
-      }
-    });
-  } catch (err) {
-    console.error('Download GET failed:', err);
-    throw error(500, getUserFacingDownloadErrorMessage(err, 'download'));
-  }
+		return new Response(buffer, {
+			status: 200,
+			headers: {
+				'Content-Type': contentType,
+				'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
+				'Cache-Control': 'private, max-age=0, must-revalidate'
+			}
+		});
+	} catch (err) {
+		console.error('Download GET failed:', err);
+		throw error(500, getUserFacingDownloadErrorMessage(err, 'download'));
+	}
 };
 
 export const POST: RequestHandler = async ({ params, request }) => {
-  let requestMode: 'estimate' | 'download' = 'download';
+	let requestMode: 'estimate' | 'download' = 'download';
 
-  try {
-    const itemId = params.id;
-    if (!itemId) {
-      return json({ error: 'Item-ID fehlt' }, { status: 400 });
-    }
+	try {
+		const itemId = params.id;
+		if (!itemId) {
+			return json({ error: 'Item-ID fehlt' }, { status: 400 });
+		}
 
-    const supabase = createAuthedSupabase(request);
-    const user = await getAuthenticatedUser(supabase);
-    const item = await loadDownloadItem(supabase, itemId);
-    const unifiedRights = await assertDownloadRights(supabase, itemId, user.id);
+		const supabase = createAuthedSupabase(request);
+		const user = await getAuthenticatedUser(supabase);
+		const item = await loadDownloadItem(supabase, itemId);
+		const unifiedRights = await assertDownloadRights(supabase, itemId, user.id);
 
-    const body = await request.json().catch(() => ({}));
-    const mode = body?.mode === 'estimate' ? 'estimate' : 'download';
-    requestMode = mode;
-    const options = normalizeDownloadExportOptions(body?.options as DownloadExportOptions);
-    const originalBuffer = await fetchDownloadSourceBuffer(item, options, mode);
+		const body = await request.json().catch(() => ({}));
+		const mode = body?.mode === 'estimate' ? 'estimate' : 'download';
+		requestMode = mode;
+		const options = normalizeDownloadExportOptions(body?.options as DownloadExportOptions);
+		const originalBuffer = await fetchDownloadSourceBuffer(item, options, mode);
 
-    if (canBypassImageProcessing(options)) {
-      const filename = buildDownloadFilename(item, options);
+		if (canBypassImageProcessing(options)) {
+			const filename = buildDownloadFilename(item, options);
 
-      if (mode === 'estimate') {
-        return json({
-          ok: true,
-          sizeBytes: originalBuffer.byteLength,
-          width: item.width,
-          height: item.height,
-          filename,
-          contentType: 'image/jpeg'
-        });
-      }
+			if (mode === 'estimate') {
+				return json({
+					ok: true,
+					sizeBytes: originalBuffer.byteLength,
+					width: item.width,
+					height: item.height,
+					filename,
+					contentType: 'image/jpeg'
+				});
+			}
 
-      await logDownload(
-        supabase,
-        item,
-        user.id,
-        getLegacyDownloadTypeForExport(options)
-      );
-      await createOwnerDownloadNotification(
-        supabase,
-        item,
-        user.id,
-        getLegacyDownloadTypeForExport(options),
-        options
-      );
-      await logDownloadEvent(
-        supabase,
-        item,
-        user.id,
-        getDownloadEventSource(item, user.id),
-        getLegacyDownloadTypeForExport(options),
-        options
-      );
+			await logDownload(supabase, item, user.id, getLegacyDownloadTypeForExport(options));
+			await createOwnerDownloadNotification(
+				supabase,
+				item,
+				user.id,
+				getLegacyDownloadTypeForExport(options),
+				options
+			);
+			await logDownloadEvent(
+				supabase,
+				item,
+				user.id,
+				getDownloadEventSource(item, user.id),
+				getLegacyDownloadTypeForExport(options),
+				options
+			);
 
-      return new Response(originalBuffer, {
-        status: 200,
-        headers: {
-          'Content-Type': 'image/jpeg',
-          'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
-          'Cache-Control': 'private, max-age=0, must-revalidate'
-        }
-      });
-    }
+			return new Response(originalBuffer, {
+				status: 200,
+				headers: {
+					'Content-Type': 'image/jpeg',
+					'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
+					'Cache-Control': 'private, max-age=0, must-revalidate'
+				}
+			});
+		}
 
-    if (mode === 'estimate') {
-      try {
-        const rendered = await renderDownloadExport(originalBuffer, item, options);
-        return json({
-          ok: true,
-          sizeBytes: rendered.info.size,
-          width: rendered.outputWidth,
-          height: rendered.outputHeight,
-          filename: buildDownloadFilename(item, options),
-          contentType: rendered.contentType
-        });
-      } catch (estimateError) {
-        console.warn('Download estimate failed, returning degraded fallback estimate:', estimateError);
-        const fallbackDimensions = estimateOutputDimensions(item, options);
-        return json({
-          ok: true,
-          sizeBytes: originalBuffer.byteLength,
-          width: fallbackDimensions.width,
-          height: fallbackDimensions.height,
-          filename: buildDownloadFilename(item, options),
-          contentType: options.format === 'webp' ? 'image/webp' : 'image/jpeg',
-          degradedEstimate: true
-        });
-      }
-    }
+		if (mode === 'estimate') {
+			try {
+				const rendered = await renderDownloadExport(originalBuffer, item, options);
+				return json({
+					ok: true,
+					sizeBytes: rendered.info.size,
+					width: rendered.outputWidth,
+					height: rendered.outputHeight,
+					filename: buildDownloadFilename(item, options),
+					contentType: rendered.contentType
+				});
+			} catch (estimateError) {
+				console.warn(
+					'Download estimate failed, returning degraded fallback estimate:',
+					estimateError
+				);
+				const fallbackDimensions = estimateOutputDimensions(item, options);
+				return json({
+					ok: true,
+					sizeBytes: originalBuffer.byteLength,
+					width: fallbackDimensions.width,
+					height: fallbackDimensions.height,
+					filename: buildDownloadFilename(item, options),
+					contentType: options.format === 'webp' ? 'image/webp' : 'image/jpeg',
+					degradedEstimate: true
+				});
+			}
+		}
 
-    try {
-      const rendered = await renderDownloadExport(originalBuffer, item, options);
-      await logDownload(
-        supabase,
-        item,
-        user.id,
-        getLegacyDownloadTypeForExport(options)
-      );
-      await createOwnerDownloadNotification(
-        supabase,
-        item,
-        user.id,
-        getLegacyDownloadTypeForExport(options),
-        options
-      );
-      await logDownloadEvent(
-        supabase,
-        item,
-        user.id,
-        getDownloadEventSource(item, user.id),
-        getLegacyDownloadTypeForExport(options),
-        options
-      );
+		try {
+			const rendered = await renderDownloadExport(originalBuffer, item, options);
+			await logDownload(supabase, item, user.id, getLegacyDownloadTypeForExport(options));
+			await createOwnerDownloadNotification(
+				supabase,
+				item,
+				user.id,
+				getLegacyDownloadTypeForExport(options),
+				options
+			);
+			await logDownloadEvent(
+				supabase,
+				item,
+				user.id,
+				getDownloadEventSource(item, user.id),
+				getLegacyDownloadTypeForExport(options),
+				options
+			);
 
-      return new Response(rendered.buffer, {
-        status: 200,
-        headers: {
-          'Content-Type': rendered.contentType,
-          'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(rendered.filename)}`,
-          'Cache-Control': 'private, max-age=0, must-revalidate'
-        }
-      });
-    } catch (renderError) {
-      if (!isSharpRuntimeError(renderError)) {
-        throw renderError;
-      }
+			return new Response(rendered.buffer, {
+				status: 200,
+				headers: {
+					'Content-Type': rendered.contentType,
+					'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(rendered.filename)}`,
+					'Cache-Control': 'private, max-age=0, must-revalidate'
+				}
+			});
+		} catch (renderError) {
+			if (!isSharpRuntimeError(renderError)) {
+				throw renderError;
+			}
 
-      if (canRewriteMetadataWithoutSharp(originalBuffer, options)) {
-        console.warn('Download render failed due to sharp runtime issue, retrying with exiftool metadata rewrite:', renderError);
-        try {
-          const rewritten = await rewriteJpegMetadataWithoutSharp(originalBuffer, item, options);
+			if (canRewriteMetadataWithoutSharp(originalBuffer, options)) {
+				console.warn(
+					'Download render failed due to sharp runtime issue, retrying with exiftool metadata rewrite:',
+					renderError
+				);
+				try {
+					const rewritten = await rewriteJpegMetadataWithoutSharp(originalBuffer, item, options);
 
-          await logDownload(
-            supabase,
-            item,
-            user.id,
-            getLegacyDownloadTypeForExport(options)
-          );
-          await createOwnerDownloadNotification(
-            supabase,
-            item,
-            user.id,
-            getLegacyDownloadTypeForExport(options),
-            options
-          );
-          await logDownloadEvent(
-            supabase,
-            item,
-            user.id,
-            getDownloadEventSource(item, user.id),
-            getLegacyDownloadTypeForExport(options),
-            options
-          );
+					await logDownload(supabase, item, user.id, getLegacyDownloadTypeForExport(options));
+					await createOwnerDownloadNotification(
+						supabase,
+						item,
+						user.id,
+						getLegacyDownloadTypeForExport(options),
+						options
+					);
+					await logDownloadEvent(
+						supabase,
+						item,
+						user.id,
+						getDownloadEventSource(item, user.id),
+						getLegacyDownloadTypeForExport(options),
+						options
+					);
 
-          return new Response(rewritten.buffer, {
-            status: 200,
-            headers: {
-              'Content-Type': rewritten.contentType,
-              'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(rewritten.filename)}`,
-              'Cache-Control': 'private, max-age=0, must-revalidate',
-              'X-Culoca-Download-Fallback': 'exiftool-rewrite'
-            }
-          });
-        } catch (rewriteError) {
-          console.warn('Exiftool metadata rewrite failed, falling back to original JPG payload:', rewriteError);
-        }
-      }
+					return new Response(rewritten.buffer, {
+						status: 200,
+						headers: {
+							'Content-Type': rewritten.contentType,
+							'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(rewritten.filename)}`,
+							'Cache-Control': 'private, max-age=0, must-revalidate',
+							'X-Culoca-Download-Fallback': 'exiftool-rewrite'
+						}
+					});
+				} catch (rewriteError) {
+					console.warn(
+						'Exiftool metadata rewrite failed, falling back to original JPG payload:',
+						rewriteError
+					);
+				}
+			}
 
-      if (options.sizeMode !== 'full' || options.format !== 'jpg') {
-        throw renderError;
-      }
+			if (options.sizeMode !== 'full' || options.format !== 'jpg') {
+				throw renderError;
+			}
 
-      console.warn('Download render failed due to sharp runtime issue, falling back to original JPG payload:', renderError);
-      const filename = buildDownloadFilename(item, options);
+			console.warn(
+				'Download render failed due to sharp runtime issue, falling back to original JPG payload:',
+				renderError
+			);
+			const filename = buildDownloadFilename(item, options);
 
-      await logDownload(
-        supabase,
-        item,
-        user.id,
-        getLegacyDownloadTypeForExport(options)
-      );
-      await createOwnerDownloadNotification(
-        supabase,
-        item,
-        user.id,
-        getLegacyDownloadTypeForExport(options),
-        options
-      );
-      await logDownloadEvent(
-        supabase,
-        item,
-        user.id,
-        getDownloadEventSource(item, user.id),
-        getLegacyDownloadTypeForExport(options),
-        options
-      );
+			await logDownload(supabase, item, user.id, getLegacyDownloadTypeForExport(options));
+			await createOwnerDownloadNotification(
+				supabase,
+				item,
+				user.id,
+				getLegacyDownloadTypeForExport(options),
+				options
+			);
+			await logDownloadEvent(
+				supabase,
+				item,
+				user.id,
+				getDownloadEventSource(item, user.id),
+				getLegacyDownloadTypeForExport(options),
+				options
+			);
 
-      return new Response(originalBuffer, {
-        status: 200,
-        headers: {
-          'Content-Type': 'image/jpeg',
-          'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
-          'Cache-Control': 'private, max-age=0, must-revalidate',
-          'X-Culoca-Download-Fallback': 'sharp-runtime'
-        }
-      });
-    }
-  } catch (err) {
-    console.error('Download POST failed:', err);
-    const status =
-      err && typeof err === 'object' && 'status' in err && typeof (err as { status?: unknown }).status === 'number'
-        ? ((err as { status: number }).status as number)
-        : 500;
-    const message = getUserFacingDownloadErrorMessage(err, requestMode);
-    return json({ error: message }, { status });
-  }
+			return new Response(originalBuffer, {
+				status: 200,
+				headers: {
+					'Content-Type': 'image/jpeg',
+					'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
+					'Cache-Control': 'private, max-age=0, must-revalidate',
+					'X-Culoca-Download-Fallback': 'sharp-runtime'
+				}
+			});
+		}
+	} catch (err) {
+		console.error('Download POST failed:', err);
+		const status =
+			err &&
+			typeof err === 'object' &&
+			'status' in err &&
+			typeof (err as { status?: unknown }).status === 'number'
+				? ((err as { status: number }).status as number)
+				: 500;
+		const message = getUserFacingDownloadErrorMessage(err, requestMode);
+		return json({ error: message }, { status });
+	}
 };
