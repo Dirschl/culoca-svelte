@@ -4,6 +4,11 @@
   import SiteNav from '$lib/SiteNav.svelte';
   import SiteFooter from '$lib/SiteFooter.svelte';
   import { getSeoImageUrl, getSeoSimilarEmbedImageUrl } from '$lib/utils/seoImageUrl';
+  import {
+    IMAGE_PAGE_COPYRIGHT_ORG_NAME,
+    IMAGE_PAGE_CREATOR_PERSON_NAME
+  } from '$lib/seo/itemImageSeoConstants';
+  import { fixUtf8MojibakeIfNeeded } from '$lib/utils/utf8Mojibake';
   import { darkMode } from '$lib/darkMode';
   import { filterStore, getEffectiveGpsPosition } from '$lib/filterStore';
   import { goto } from '$app/navigation';
@@ -68,7 +73,6 @@
   }
 
   // Detail-Komponenten
-  import ImageDisplay from '$lib/detail/ImageDisplay.svelte';
   import ImageControlsSection from '$lib/detail/ImageControlsSection.svelte';
   import ImageMetaSection from '$lib/detail/ImageMetaSection.svelte';
   import FileDetails from '$lib/detail/FileDetails.svelte';
@@ -265,7 +269,31 @@ let showRightsManager = false;
   $: contextItem = data?.contextItem ?? image;
   $: groupItems = data?.groupItems ?? [];
   $: activeGroupItemId = data?.activeGroupItemId ?? image?.id ?? null;
-  $: canonicalUrl = canonicalPath ? `https://culoca.com${canonicalPath}` : (image?.slug ? `https://culoca.com/item/${image.slug}/` : 'https://culoca.com');
+  function canonicalPathWithTrailingSlash(path: string): string {
+    const p = path.startsWith('/') ? path : `/${path}`;
+    return p.endsWith('/') ? p : `${p}/`;
+  }
+
+  function buildMainImageAlt(
+    img: { title?: string | null; caption?: string | null; description?: string | null } | null | undefined
+  ): string {
+    if (!img) return '';
+    const title = (img.title || '').trim();
+    const extra = (img.caption || img.description || '').trim();
+    if (title && extra) {
+      const short = extra.length > 120 ? `${extra.slice(0, 120)}…` : extra;
+      return `${title} · ${short}`;
+    }
+    return title || extra || 'Foto';
+  }
+
+  $: mainImageAlt = buildMainImageAlt(image);
+
+  $: canonicalUrl = canonicalPath
+    ? `https://culoca.com${canonicalPathWithTrailingSlash(canonicalPath)}`
+    : image?.slug
+      ? `https://culoca.com/item/${image.slug}/`
+      : 'https://culoca.com/';
   $: effectiveContentHtml = sanitizeContentHtml(contextItem?.content || image?.content || '');
   $: hasVisibleGroupItems = Array.isArray(groupItems) && groupItems.length > 1;
   $: hasDateRange = !!(contentType?.show_date_range && (contextItem?.starts_at || contextItem?.ends_at));
@@ -501,7 +529,7 @@ let showRightsManager = false;
     
     let faviconUrl = '';
     if (image.path_64) {
-      faviconUrl = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/${image.path_64}`;
+      faviconUrl = `https://culoca.com/images/embed/images-64/${encodeURIComponent(image.path_64)}`;
     } else if (image.path_512) {
       faviconUrl = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${image.path_512}`;
     }
@@ -706,18 +734,16 @@ let showRightsManager = false;
       // Generate srcset with available sizes (512px and 2048px) using size suffixes
       // Use 512px for smaller screens, 2048px for larger screens
       const srcsetParts: string[] = [];
-      if (image.path_512) {
-        // For 512px images, we use them for screens up to 1024px wide
-        const sizedUrl512 = appendVersionParam(`${baseUrl}/${image.slug}-512${fileExtension}`, image);
-        if (sizedUrl512) {
-          srcsetParts.push(`${sizedUrl512} 512w`);
-        }
-      }
       if (image.path_2048) {
-        // For 2048px images, we use them for screens 1024px and wider
         const sizedUrl2048 = appendVersionParam(`${baseUrl}/${image.slug}-2048${fileExtension}`, image);
         if (sizedUrl2048) {
           srcsetParts.push(`${sizedUrl2048} 2048w`);
+        }
+      }
+      if (image.path_512) {
+        const sizedUrl512 = appendVersionParam(`${baseUrl}/${image.slug}-512${fileExtension}`, image);
+        if (sizedUrl512) {
+          srcsetParts.push(`${sizedUrl512} 512w`);
         }
       }
       
@@ -2730,6 +2756,11 @@ let showRightsManager = false;
     return appendVersionParam(`https://culoca.com/images/${image.slug}-${size}${fileExtension}`, image);
   }
 
+  /** Canonical share/JSON-LD URL (2048, sonst 512) inkl. Cache-Buster — identisch zu og/twitter. */
+  $: primaryImageAbsoluteUrl = image?.slug
+    ? buildSeoSizedImageUrl('2048') || buildSeoSizedImageUrl('512') || ''
+    : '';
+
   async function fetchRemoteFileSize(url: string | null) {
     if (!url) return null;
 
@@ -2988,11 +3019,11 @@ let showRightsManager = false;
   <meta name="description" content={trimText(image?.description || image?.caption || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.')}>
   
   <link rel="canonical" href={canonicalUrl}>
-  {#if seoLinks?.newer?.canonicalPath}
-    <link rel="prev" href={`https://culoca.com${seoLinks.newer.canonicalPath}`}>
-  {/if}
   {#if seoLinks?.older?.canonicalPath}
-    <link rel="next" href={`https://culoca.com${seoLinks.older.canonicalPath}`}>
+    <link rel="prev" href={`https://culoca.com${canonicalPathWithTrailingSlash(seoLinks.older.canonicalPath)}`}>
+  {/if}
+  {#if seoLinks?.newer?.canonicalPath}
+    <link rel="next" href={`https://culoca.com${canonicalPathWithTrailingSlash(seoLinks.newer.canonicalPath)}`}>
   {/if}
   
   <!-- Robots -->
@@ -3006,14 +3037,12 @@ let showRightsManager = false;
   <meta property="og:title" content={image?.title || `Item ${itemSlug} - culoca.com`}>
   <meta property="og:description" content={image?.description || image?.caption || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
   <meta property="og:url" content={canonicalUrl}> 
-  <!-- Open Graph Image: Use SEO-friendly URL with size suffix (no query parameters) -->
+  <!-- Open Graph: gleiche URL wie JSON-LD primary / Hauptbild (inkl. v= Cache-Buster). -->
   {#if image}
     {@const imagePathForExtension = image.path_2048 || image.path_512}
     {@const extensionMatch = imagePathForExtension ? imagePathForExtension.match(/\.(jpg|jpeg|webp|png)$/i) : null}
     {@const fileExtension = extensionMatch ? extensionMatch[0].toLowerCase() : '.jpg'}
-    {@const ogImageUrl = image.path_2048
-      ? `https://culoca.com/images/${image.slug}-2048${fileExtension}`
-      : (image.path_512 ? `https://culoca.com/images/${image.slug}-512${fileExtension}` : '')}
+    {@const ogImageUrl = primaryImageAbsoluteUrl}
     <!-- Calculate dimensions for 2048px version (proportional scaling) -->
     {@const originalWidth = image.width || 2048}
     {@const originalHeight = image.height || 1365}
@@ -3023,10 +3052,17 @@ let showRightsManager = false;
       : 1}
     {@const width2048 = Math.max(1, Math.min(Math.round(originalWidth * scale2048), maxDimension2048))}
     {@const height2048 = Math.max(1, Math.min(Math.round(originalHeight * scale2048), maxDimension2048))}
+    {#if ogImageUrl}
     <meta property="og:image" content={ogImageUrl}>
     <meta property="og:image:width" content={width2048.toString()}>
     <meta property="og:image:height" content={height2048.toString()}>
-    <meta property="og:image:alt" content={image.title || image.description || `Item ${itemSlug}`}>
+    <meta property="og:image:alt" content={mainImageAlt || image.title || `Item ${itemSlug}`}>
+    {:else}
+    <meta property="og:image" content={`https://culoca.com/api/og-image/${itemSlug}`}>
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content={mainImageAlt || image.title || `Item ${itemSlug}`}>
+    {/if}
   {:else}
     <meta property="og:image" content={`https://culoca.com/api/og-image/${itemSlug}`}>
     <meta property="og:image:width" content="1200">
@@ -3039,17 +3075,15 @@ let showRightsManager = false;
   <meta name="twitter:title" content={image?.title || `Item ${itemSlug} - culoca.com`}>
   <meta name="twitter:description" content={image?.description || image?.caption || 'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}>
   {#if image}
-    {@const imagePathForExtension = image.path_2048 || image.path_512}
-    {@const extensionMatch = imagePathForExtension ? imagePathForExtension.match(/\.(jpg|jpeg|webp|png)$/i) : null}
-    {@const fileExtension = extensionMatch ? extensionMatch[0].toLowerCase() : '.jpg'}
-    {@const twitterImageUrl = image.path_2048
-      ? `https://culoca.com/images/${image.slug}-2048${fileExtension}`
-      : (image.path_512 ? `https://culoca.com/images/${image.slug}-512${fileExtension}` : '')}
-    <meta name="twitter:image" content={twitterImageUrl}>
+    {#if primaryImageAbsoluteUrl}
+    <meta name="twitter:image" content={primaryImageAbsoluteUrl}>
+    {:else}
+    <meta name="twitter:image" content={`https://culoca.com/api/og-image/${itemSlug}`}>
+    {/if}
   {:else}
     <meta name="twitter:image" content={`https://culoca.com/api/og-image/${itemSlug}`}>
   {/if}
-  <meta name="twitter:image:alt" content={image?.title || `Item ${itemSlug}`}>
+  <meta name="twitter:image:alt" content={mainImageAlt || image?.title || `Item ${itemSlug}`}>
   
   <meta name="author" content={image?.full_name || 'culoca.com'}>
   
@@ -3067,11 +3101,14 @@ let showRightsManager = false;
     {@const extensionMatch = imagePathForExtension ? imagePathForExtension.match(/\.(jpg|jpeg|webp|png)$/i) : null}
     {@const fileExtension = extensionMatch ? extensionMatch[0].toLowerCase() : '.jpg'}
     
-    <!-- Generate SEO-friendly URLs with size suffixes (no query parameters) -->
-    <!-- contentUrl: Always use 2048px version if available, otherwise 512px -->
-    {@const imageUrl2048 = hasPath2048
-      ? `https://culoca.com/images/${image.slug}-2048${fileExtension}`
-      : (hasPath512 ? `https://culoca.com/images/${image.slug}-512${fileExtension}` : '')}
+    <!-- Primärbild-URL: identisch zu <img src>/og/twitter (inkl. v=), Fallback ohne v nur wenn nötig -->
+    {@const imageUrl2048 =
+      primaryImageAbsoluteUrl ||
+      (hasPath2048
+        ? `https://culoca.com/images/${image.slug}-2048${fileExtension}`
+        : hasPath512
+          ? `https://culoca.com/images/${image.slug}-512${fileExtension}`
+          : '')}
     
     <!-- Calculate dimensions for 2048px and 512px versions (proportional scaling) -->
     <!-- Note: image.width and image.height are original dimensions after EXIF orientation -->
@@ -3100,24 +3137,27 @@ let showRightsManager = false;
     <!-- Process keywords: limit to 8-15 precise keywords, convert to array -->
     {@const keywordsArray = normalizeKeywords(image.keywords)}
     
-    {@const rawCaption = image.exif_data?.Caption || image.title || itemName}
-    {@const exifCaption = image.exif_data?.Caption ? decodeURIComponent(escape(rawCaption)) : (image.title || itemName)}
+    {@const rawExifCaption = image.exif_data?.Caption != null ? String(image.exif_data.Caption) : ''}
+    {@const exifCaption = rawExifCaption
+      ? normalizeUtf8(fixUtf8MojibakeIfNeeded(rawExifCaption) ?? rawExifCaption)
+      : image.title || itemName}
     {@const caption = image.caption || exifCaption || image.description || ''}
     {@const sha256 = image.sha256 || undefined}
-    {@const creatorName = image.full_name || 'Culoca User'}
     {@const createdYear = image.created_at ? new Date(image.created_at).getFullYear() : new Date().getFullYear()}
-    {@const creditText = `Foto: ${creatorName}`}
-    {@const copyrightNotice = `© ${createdYear} ${creatorName} | culoca.com. Alle Rechte vorbehalten.`}
+    {@const creditText = `Foto: ${IMAGE_PAGE_CREATOR_PERSON_NAME}`}
+    {@const copyrightNotice = `© ${createdYear} ${IMAGE_PAGE_COPYRIGHT_ORG_NAME}. Alle Rechte vorbehalten.`}
     
     <!-- UTF-8 Normalization: Ensure NFC (not NFD) to prevent encoding issues like "SchoÃßbach" -->
     {@const normalizedItemName = normalizeUtf8(itemName)}
     {@const normalizedCaption = normalizeUtf8(caption)}
     {@const normalizedDescription = normalizeUtf8(image.description || caption || '')}
-    {@const normalizedCreatorName = normalizeUtf8(creatorName)}
     {@const normalizedCreditText = normalizeUtf8(creditText)}
     {@const normalizedCopyrightNotice = normalizeUtf8(copyrightNotice)}
+    {@const normalizedSchemaCreatorName = normalizeUtf8(IMAGE_PAGE_CREATOR_PERSON_NAME)}
+    {@const normalizedSchemaCopyrightOrgName = normalizeUtf8(IMAGE_PAGE_COPYRIGHT_ORG_NAME)}
     {@const normalizedContentLocationName = normalizeUtf8(geoPlaceGraph.currentPlaceName)}
     
+    {#if imageUrl2048}
     {@html `<script type="application/ld+json">
     ${JSON.stringify({
       "@context": "https://schema.org",
@@ -3142,11 +3182,11 @@ let showRightsManager = false;
           "acquireLicensePage": "https://culoca.com/web/license",
           "creator": {
             "@type": "Person",
-            "name": normalizedCreatorName
+            "name": normalizedSchemaCreatorName
           },
           "copyrightHolder": {
-            "@type": "Person",
-            "name": normalizedCreatorName
+            "@type": "Organization",
+            "name": normalizedSchemaCopyrightOrgName
           },
           "contentLocation": {
             "@id": geoPlaceGraph.currentPlaceId,
@@ -3175,6 +3215,7 @@ let showRightsManager = false;
       ]
     }, null, 2)}
     </script>`}
+    {/if}
   {/if}
 </svelte:head>
 
@@ -3192,22 +3233,19 @@ let showRightsManager = false;
     <div class="passepartout-container">
       {#if shouldShowMainImage}
         <figure>
-          <a href={imageBackHref} class="image-link">
-            <img
-              src={imageSource}
-              srcset={imageSrcset || undefined}
-              sizes={imageSizes || undefined}
-              alt={image.title && image.description 
-                ? `${image.title} - ${image.description}` 
-                : image.title || image.description || image.caption || `Bild von ${image.original_name || 'unbekannt'}`}
-              class="main-image"
-              width={imageWidth2048}
-              height={imageHeight2048}
-              loading="eager"
-              decoding="async"
-              fetchpriority="high"
-            />
-          </a>
+          <!-- Kein Link: vermeidet Startseiten-Signal; einziges starkes Bild für Google Bilder (s. itemPagePublic/publicImageGet). -->
+          <img
+            src={imageSource}
+            srcset={imageSrcset || undefined}
+            sizes={imageSizes || undefined}
+            alt={mainImageAlt}
+            class="main-image"
+            width={imageWidth2048}
+            height={imageHeight2048}
+            loading="eager"
+            decoding="async"
+            fetchpriority="high"
+          />
         </figure>
         {#if hasVariantStrip}
           <div class="variant-strip" data-nosnippet>
@@ -3223,7 +3261,8 @@ let showRightsManager = false;
                   <img
                     class:square={!$useJustifiedLayout}
                     src={getSeoSimilarEmbedImageUrl(groupItem.slug, groupItem.path_512, '512')}
-                    alt={groupItem.title || 'Variante'}
+                    alt=""
+                    role="presentation"
                     loading="lazy"
                     decoding="async"
                     fetchpriority="low"
@@ -3231,8 +3270,9 @@ let showRightsManager = false;
                 {:else if groupItem.path_64}
                   <img
                     class:square={!$useJustifiedLayout}
-                    src={`https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/${groupItem.path_64}`}
-                    alt={groupItem.title || 'Variante'}
+                    src={`https://culoca.com/images/embed/images-64/${encodeURIComponent(groupItem.path_64)}`}
+                    alt=""
+                    role="presentation"
                     loading="lazy"
                     decoding="async"
                     fetchpriority="low"
@@ -3666,7 +3706,7 @@ let showRightsManager = false;
             <article class="comment-item" class:is-hidden={comment.status === 'hidden'}>
               <div class="comment-avatar">
                 {#if getCommentAvatarUrl(comment)}
-                  <img src={getCommentAvatarUrl(comment)} alt={getCommentAuthor(comment)} loading="lazy" />
+                  <img src={getCommentAvatarUrl(comment)} alt="" role="presentation" loading="lazy" />
                 {:else}
                   <span>{getCommentAuthor(comment).slice(0, 1)}</span>
                 {/if}
@@ -3732,7 +3772,7 @@ let showRightsManager = false;
                   <article class="comment-item comment-item--reply" class:is-hidden={reply.status === 'hidden'}>
                     <div class="comment-avatar">
                       {#if getCommentAvatarUrl(reply)}
-                        <img src={getCommentAvatarUrl(reply)} alt={getCommentAuthor(reply)} loading="lazy" />
+                        <img src={getCommentAvatarUrl(reply)} alt="" role="presentation" loading="lazy" />
                       {:else}
                         <span>{getCommentAuthor(reply).slice(0, 1)}</span>
                       {/if}

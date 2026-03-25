@@ -17,6 +17,12 @@ import {
   getKeywordHubLinks,
   pickPlaceLabel
 } from '$lib/seo/hubs';
+import {
+  fixUtf8MojibakeIfNeeded,
+  ITEM_PAGE_PROFILE_SELECT,
+  sanitizeItemForItemPageClient,
+  scrubPublicProfileRow
+} from '$lib/server/itemPagePublic';
 
 type ItemRecord = ContentItemLike & {
   user_id?: string | null;
@@ -299,10 +305,15 @@ async function getProfile(
 ) {
   if (!profileId) return { profile: null, full_name: 'Culoca User' };
 
-  const { data } = await supabase.from('profiles').select('*').eq('id', profileId).maybeSingle();
+  const { data } = await supabase
+    .from('profiles')
+    .select(ITEM_PAGE_PROFILE_SELECT)
+    .eq('id', profileId)
+    .maybeSingle();
+  const row = data as Record<string, unknown> | null;
   return {
-    profile: data ?? null,
-    full_name: data?.full_name || 'Culoca User'
+    profile: scrubPublicProfileRow(row),
+    full_name: (fixUtf8MojibakeIfNeeded((row?.full_name as string) || '') as string) || 'Culoca User'
   };
 }
 
@@ -541,16 +552,26 @@ export async function loadContentPage(args: {
   const related = await getRelatedItems(supabase, imageWithProfile, rootItem, type);
   const typePath = type?.slug ? `/${type.slug}` : null;
 
+  const imageForClient = {
+    ...sanitizeItemForItemPageClient({ ...item }),
+    profile: profileData.profile,
+    full_name: profileData.full_name
+  };
+  const rootForClient =
+    rootItem.id === item.id ? imageForClient : sanitizeItemForItemPageClient({ ...rootItem });
+  const contextForClient =
+    contextItem.id === item.id ? imageForClient : sanitizeItemForItemPageClient({ ...contextItem });
+
   return {
-    image: imageWithProfile,
+    image: imageForClient,
     error: null,
     nearby: [],
     seoLinks,
     canonicalPath,
     type,
-    rootItem,
+    rootItem: rootForClient,
     rootCanonicalPath,
-    contextItem,
+    contextItem: contextForClient,
     groupItems: siblings,
     activeGroupItemId: item.id,
     availableTypes,

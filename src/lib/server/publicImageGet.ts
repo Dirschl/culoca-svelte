@@ -1,3 +1,16 @@
+/**
+ * Öffentliche Bild-Auslieferung (Supabase Storage → Browser)
+ *
+ * | Modus              | URL / Verwendung                    | X-Robots-Tag (Bild) |
+ * |--------------------|-------------------------------------|----------------------|
+ * | indexable          | /images/{slug}-2048|512…            | index, max-image-preview:large |
+ * | embed_noimageindex | /images/similar/…, ?context=similar | noimageindex (Nebenbilder) |
+ *
+ * HTML-Item-Links bleiben normal crawlbar; nur die Bild-Response trägt noimageindex.
+ * ETag enthält ix|ni, damit CDN/304 nicht die falsche Robot-Variante cacht.
+ *
+ * Mini-Thumbs (64px): Route /images/embed/images-64/… (separate Datei).
+ */
 import type { RequestEvent } from '@sveltejs/kit';
 import { supabase } from '$lib/supabaseClient';
 import { supabaseAdmin } from '$lib/supabaseAdmin';

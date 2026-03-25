@@ -104,6 +104,7 @@
 {#if isCreator && editMode}
   <div class="filename">ID: {image?.id}</div>
 {/if}
+{#if isCreator && editMode}
 <div class="filename">
   64px: {fileSizes && fileSizes.size64 ? formatFileSize(fileSizes.size64) : 'unbekannt'} |
   512px: {fileSizes && fileSizes.size512 ? formatFileSize(fileSizes.size512) : 'unbekannt'} |
@@ -133,6 +134,13 @@
     />
   {/if}
 </div>
+{:else if fileSizes && fileSizes.size64 != null && fileSizes.size512 != null && fileSizes.size2048 != null}
+<div class="filename">
+  64px: {formatFileSize(fileSizes.size64)} |
+  512px: {formatFileSize(fileSizes.size512)} |
+  2048px: {formatFileSize(fileSizes.size2048)}
+</div>
+{/if}
 
 <style>
   h2 {
