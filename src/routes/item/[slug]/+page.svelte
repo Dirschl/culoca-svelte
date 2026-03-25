@@ -12,7 +12,7 @@
 	import { sessionStore, sessionReady } from '$lib/sessionStore';
 	import type { PageData } from './$types';
 	import { authFetch } from '$lib/authFetch';
-	import { browser } from '$app/environment';
+	import { browser, dev } from '$app/environment';
 	import { supabase } from '$lib/supabaseClient';
 	import {
 		buildGeoHubPath,
@@ -53,32 +53,6 @@
 		if (!base?.trim()) return directUrl;
 		const trimmed = base.replace(/\/+$/, '');
 		return `${trimmed}/${encodeURIComponent(directUrl.trim())}`;
-	}
-
-	// Client-seitige Umleitung für bekannte Fälle (nur für User, nicht für Bots)
-	if (browser) {
-		const currentSlug = $page.params.slug;
-		console.log('🔍 [Client] Checking slug for redirect:', currentSlug);
-
-		// Prüfe, ob es sich um einen Bot handelt
-		const userAgent = navigator.userAgent.toLowerCase();
-		console.log('[Item Detail] User-Agent:', navigator.userAgent);
-		console.log('[Item Detail] User-Agent (lowercase):', userAgent);
-
-		const isBot =
-			userAgent.includes('bot') ||
-			userAgent.includes('crawler') ||
-			userAgent.includes('spider') ||
-			userAgent.includes('scraper') ||
-			userAgent.includes('googlebot') ||
-			userAgent.includes('bingbot') ||
-			userAgent.includes('slurp') ||
-			userAgent.includes('duckduckbot');
-
-		console.log('[Item Detail] Bot detection result:', isBot);
-
-		// Entfernt: Keine client-seitigen Slug-Übersetzungen mehr
-		// Alle Slugs werden direkt verwendet, keine Umleitungen
 	}
 
 	// Detail-Komponenten
@@ -133,6 +107,7 @@
 	let image = data?.image ?? null;
 	let error = data?.error ?? '';
 	let nearby: any[] = []; // Will be loaded client-side
+	let nearbyRequestSeq = 0;
 	let seoLinks = data?.seoLinks ?? { newer: null, older: null };
 	let canonicalPath = data?.canonicalPath ?? (image?.slug ? `/item/${image.slug}` : '');
 	let contentType = data?.type ?? null;
@@ -610,14 +585,20 @@
 	}
 
 	async function loadNearbyItems() {
+		if (!browser || !image?.slug) return;
+		const slug = image.slug;
+		const seq = ++nearbyRequestSeq;
 		try {
-			const response = await fetch(`/api/nearby/${image.slug}`);
+			const response = await fetch(`/api/nearby/${slug}`);
+			if (seq !== nearbyRequestSeq) return;
 			if (response.ok) {
 				const data = await response.json();
 				nearby = data.nearby || [];
 			}
 		} catch (error) {
-			console.error('Failed to load nearby items:', error);
+			if (seq === nearbyRequestSeq) {
+				console.error('Failed to load nearby items:', error);
+			}
 		}
 	}
 
@@ -685,8 +666,7 @@
 	// Prüfen ob ausgeblendete Items vom aktuellen Benutzer stammen
 	$: hasOwnHiddenItems = false;
 
-	// Debug: Log creator status
-	$: if (image && currentUser) {
+	$: if (dev && image && currentUser) {
 		console.log('[DetailPage] Creator Debug:', {
 			currentUserId: currentUser.id,
 			imageProfileId: image.profile_id,
@@ -814,7 +794,7 @@
 		const onStorageChange = (e: StorageEvent) => {
 			if (e.key === 'showImageCaptions' && e.newValue !== null) {
 				showImageCaptions = e.newValue === 'true';
-				console.log('[Item][Storage] showImageCaptions changed to:', showImageCaptions);
+				if (dev) console.log('[Item][Storage] showImageCaptions changed to:', showImageCaptions);
 			}
 		};
 		window.addEventListener('storage', onStorageChange);
@@ -912,15 +892,16 @@
 	// Funktion zum Zurücksetzen auf aktuelle GPS-Koordinaten
 	function clearLocationFilter() {
 		filterStore.clearLocationFilter();
-		console.log('[Item Detail] Location filter cleared, returning to current GPS coordinates');
+		if (dev) console.log('[Item Detail] Location filter cleared, returning to current GPS coordinates');
 	}
 
 	// Radius initial setzen - URL-Parameter haben Vorrang
 	let radius = 1000;
 	let radiusInitialized = false;
 
-	// Item view logging
-	let viewLogged = false;
+	// Item view logging (per item id; SPA navigation must log each item once)
+	let lastViewLoggedItemId = '';
+	let viewLogInflightItemId = '';
 	let isFavorited = false;
 	let favoriteLoading = false;
 	let favoriteStatus = '';
@@ -967,12 +948,11 @@
 		// Check if we have GPS position
 		const effectiveGps = getEffectiveGpsPosition();
 		if (effectiveGps) {
-			console.log('[Item Detail] GPS position available:', effectiveGps);
+			if (dev) console.log('[Item Detail] GPS position available:', effectiveGps);
 			return;
 		}
 
-		// Try to get GPS position from browser
-		console.log('[Item Detail] No GPS position available, requesting from browser...');
+		if (dev) console.log('[Item Detail] No GPS position available, requesting from browser...');
 		try {
 			const position = await new Promise<GeolocationPosition>((resolve, reject) => {
 				navigator.geolocation.getCurrentPosition(resolve, reject, {
@@ -984,7 +964,7 @@
 
 			const lat = position.coords.latitude;
 			const lon = position.coords.longitude;
-			console.log('[Item Detail] Got GPS position from browser:', { lat, lon });
+			if (dev) console.log('[Item Detail] Got GPS position from browser:', { lat, lon });
 
 			// Update filterStore with GPS position
 			filterStore.updateGpsStatus(true, { lat, lon });
@@ -1005,28 +985,22 @@
 				const radiusValue = parseInt(radiusParam);
 				if (!isNaN(radiusValue) && radiusValue > 0) {
 					radius = radiusValue;
-					console.log(`[Item Detail] Radius from URL parameter: ${radius}m`);
+					if (dev) console.log(`[Item Detail] Radius from URL parameter: ${radius}m`);
 				}
 			} else {
 				// Fallback to localStorage if no URL parameter
 				const storedRadius = Number(localStorage.getItem('radius'));
 				if (!isNaN(storedRadius) && storedRadius > 0) {
 					radius = storedRadius;
-					console.log(`[Item Detail] Radius from localStorage: ${radius}m`);
+					if (dev) console.log(`[Item Detail] Radius from localStorage: ${radius}m`);
 				}
 			}
 
-			// Initialize GPS if needed, then log item view
-			await initializeGpsIfNeeded();
-
-			// Log item view when page loads
-			if (image?.id && !viewLogged) {
-				logItemView();
-			}
+			// GPS can take up to ~10s; do not block favorites, comments, or view log
+			void initializeGpsIfNeeded();
 
 			if (image?.id) {
-				await loadFavoriteState();
-				await loadComments();
+				await Promise.all([loadFavoriteState(), loadComments()]);
 			}
 
 			// Initialize slider progress
@@ -1043,7 +1017,11 @@
 
 	// Function to log item view
 	async function logItemView() {
-		if (!image?.id || viewLogged) return;
+		if (!image?.id) return;
+		const itemId = image.id;
+		if (lastViewLoggedItemId === itemId) return;
+		if (viewLogInflightItemId === itemId) return;
+		viewLogInflightItemId = itemId;
 
 		try {
 			// Get current user session
@@ -1057,37 +1035,37 @@
 			const visitorLat = effectiveGps?.lat || null;
 			const visitorLon = effectiveGps?.lon || null;
 
-			// Debug: Log all available location information
-			console.log('[Item Detail] Debug location info:', {
-				effectiveGps,
-				filterStoreLocation: $filterStore.locationFilter,
-				lastGpsPosition: $filterStore.lastGpsPosition,
-				gpsAvailable: $filterStore.gpsAvailable,
-				visitorLat,
-				visitorLon,
-				imageLat: image?.lat,
-				imageLon: image?.lon
-			});
+			if (dev) {
+				console.log('[Item Detail] Debug location info:', {
+					effectiveGps,
+					filterStoreLocation: $filterStore.locationFilter,
+					lastGpsPosition: $filterStore.lastGpsPosition,
+					gpsAvailable: $filterStore.gpsAvailable,
+					visitorLat,
+					visitorLon,
+					imageLat: image?.lat,
+					imageLon: image?.lon
+				});
 
-			// Additional debug: Check localStorage
-			const storedFilters = localStorage.getItem('culoca-filters');
-			console.log('[Item Detail] Stored filters from localStorage:', storedFilters);
-			if (storedFilters) {
-				try {
-					const parsed = JSON.parse(storedFilters);
-					console.log('[Item Detail] Parsed stored filters:', parsed);
-				} catch (e: unknown) {
-					console.log('[Item Detail] Failed to parse stored filters:', e);
+				const storedFilters = localStorage.getItem('culoca-filters');
+				console.log('[Item Detail] Stored filters from localStorage:', storedFilters);
+				if (storedFilters) {
+					try {
+						const parsed = JSON.parse(storedFilters);
+						console.log('[Item Detail] Parsed stored filters:', parsed);
+					} catch (e: unknown) {
+						console.log('[Item Detail] Failed to parse stored filters:', e);
+					}
 				}
-			}
 
-			console.log(
-				'[Item Detail] Logging view with visitor ID:',
-				visitorId,
-				'GPS:',
-				visitorLat,
-				visitorLon
-			);
+				console.log(
+					'[Item Detail] Logging view with visitor ID:',
+					visitorId,
+					'GPS:',
+					visitorLat,
+					visitorLon
+				);
+			}
 
 			const response = await fetch('/api/log-item-view', {
 				method: 'POST',
@@ -1095,7 +1073,7 @@
 					'Content-Type': 'application/json'
 				},
 				body: JSON.stringify({
-					itemId: image.id,
+					itemId,
 					visitorId: visitorId,
 					visitorLat: visitorLat,
 					visitorLon: visitorLon,
@@ -1105,19 +1083,27 @@
 			});
 
 			if (response.ok) {
-				viewLogged = true;
+				lastViewLoggedItemId = itemId;
 				const responseData = await response.json();
-				console.log(
-					`[Item Detail] View logged for item: ${image.id} with visitor ID: ${visitorId}, distance: ${visitorLat && visitorLon ? 'calculated' : 'unknown'}`
-				);
-				console.log('[Item Detail] API response:', responseData);
+				if (dev) {
+					console.log(
+						`[Item Detail] View logged for item: ${itemId} with visitor ID: ${visitorId}, distance: ${visitorLat && visitorLon ? 'calculated' : 'unknown'}`
+					);
+					console.log('[Item Detail] API response:', responseData);
+				}
 			} else {
 				const errorData = await response.json();
 				console.error('[Item Detail] Failed to log item view:', errorData);
 			}
 		} catch (error) {
 			console.error('[Item Detail] Error logging item view:', error);
+		} finally {
+			if (viewLogInflightItemId === itemId) viewLogInflightItemId = '';
 		}
+	}
+
+	$: if (browser && image?.id) {
+		void logItemView();
 	}
 
 	$: if (image?.id && image.id !== lastCommentItemId) {

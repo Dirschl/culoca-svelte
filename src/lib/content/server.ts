@@ -353,7 +353,11 @@ async function getGroupItems(
 	return data ?? [];
 }
 
-async function getSeoLinks(supabase: ReturnType<typeof createServerSupabase>, item: ItemRecord) {
+async function getSeoLinks(
+	supabase: ReturnType<typeof createServerSupabase>,
+	item: ItemRecord,
+	typeMap: Map<number, Partial<ContentTypeDefinition>>
+) {
 	if (!item.created_at) {
 		return { newer: null, older: null };
 	}
@@ -361,7 +365,7 @@ async function getSeoLinks(supabase: ReturnType<typeof createServerSupabase>, it
 	const baseSelect =
 		'id, slug, title, created_at, type_id, group_root_item_id, group_slug, canonical_path, country_slug, district_slug, municipality_slug';
 
-	const [{ data: newerItem }, { data: olderItem }, typeMap] = await Promise.all([
+	const [{ data: newerItem }, { data: olderItem }] = await Promise.all([
 		supabase
 			.from('items')
 			.select(baseSelect)
@@ -381,8 +385,7 @@ async function getSeoLinks(supabase: ReturnType<typeof createServerSupabase>, it
 			.lt('created_at', item.created_at)
 			.order('created_at', { ascending: false })
 			.limit(1)
-			.maybeSingle<ContentItemLike & { title?: string | null }>(),
-		getTypeMap(supabase)
+			.maybeSingle<ContentItemLike & { title?: string | null }>()
 	]);
 
 	const withPath = (candidate: (ContentItemLike & { title?: string | null }) | null) => {
@@ -578,7 +581,7 @@ export async function loadContentPage(args: {
 	const [profileData, groupItems, seoLinks] = await Promise.all([
 		getProfile(supabase, item.profile_id),
 		getGroupItems(supabase, rootItem),
-		getSeoLinks(supabase, item)
+		getSeoLinks(supabase, item, typeMap)
 	]);
 
 	const countryNameResolved = resolveCountryNameForPayload(item);
