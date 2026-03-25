@@ -77,28 +77,16 @@ function isProbablyOrganizationName(value: string): boolean {
   return /(GmbH|AG|KG|OHG|e\.?V\.?|Stiftung|Verband|Ltd\.?|LLC|S\.?A\.?)/i.test(v);
 }
 
-function isProbablyUrlOrDomain(value: string): boolean {
-  const v = value.trim();
-  if (/^https?:\/\//i.test(v)) return true;
-  if (/^www\./i.test(v)) return true;
-  if (v.includes('/')) return true;
-  if (!v.includes(' ') && /\w+\.\w+/.test(v)) return true;
-  return false;
-}
-
-function isUnusableCopyrightHolderString(value: string): boolean {
-  const v = normalizeWhitespace(fixEncoding(value) ?? value);
-  if (!v) return true;
-  return isProbablyUrlOrDomain(v) && !isProbablyOrganizationName(v);
-}
-
-function sanitizeCopyrightHolderCandidate(exifValue: string): string | null {
-  let v = fixEncoding(exifValue) ?? exifValue;
+/**
+ * EXIF-/XMP-Copyright-Zeile für den Halter-Namen normalisieren.
+ * Domains und URLs sind gültige Halter (z. B. www.dirschl.com); nur Platzhalter wie „Unbekannt“ verwerfen.
+ */
+function normalizeCopyrightHolderFromExif(exifValue: string | null | undefined): string | null {
+  let v = fixEncoding(exifValue) ?? (exifValue != null ? String(exifValue) : '');
   v = v.replace(/\s*\|\s*culoca\.com\s*$/i, '').trim();
   if (v.includes('|')) v = v.split('|')[0].trim();
   v = normalizeWhitespace(v);
   if (!isMeaningfulAttributionValue(v)) return null;
-  if (isUnusableCopyrightHolderString(v)) return null;
   return v;
 }
 
@@ -107,7 +95,7 @@ function normalizePersonOrder(candidate: string, expected: string | null | undef
   if (!isMeaningfulAttributionValue(c)) return c;
   if (!isMeaningfulAttributionValue(expected)) return c;
 
-  const e = normalizeWhitespace(fixEncoding(expected) ?? expected);
+  const e = normalizeWhitespace((fixEncoding(expected) ?? expected) ?? '');
   const eTokens = splitTokens(e);
   const cTokens = splitTokens(c);
   if (c.includes(',')) {
@@ -196,25 +184,38 @@ export function resolveAttribution(params: {
       ? applySimpleTemplate(creditTextTemplate, { creator: creatorForCredit })
       : `Foto: ${creatorForCredit}`;
 
-  const profileHolder = firstMeaningfulString(
+  const profileHolderExplicit = firstMeaningfulString(
     profile?.copyright_holder_name,
     profile?.legal_entity_name,
     profile?.organization_name
   );
 
-  const rawCopyrightLine = firstMeaningfulString(extracted.copyright, extracted.copyrightNotice);
-  const sanitizedExifHolder = rawCopyrightLine ? sanitizeCopyrightHolderCandidate(rawCopyrightLine) : null;
+  const exifCopyrightNoticeHolder = normalizeCopyrightHolderFromExif(extracted.copyrightNotice);
+  const exifCopyrightTagHolder = normalizeCopyrightHolderFromExif(extracted.copyrightFromTag);
+
+  const profileHolderFallback = firstMeaningfulString(
+    profile?.display_name_public,
+    profile?.full_name,
+    profile?.accountname,
+    profile?.public_contact_name
+  );
 
   const useExifCopyright = !!profile?.use_exif_copyright_override;
   let copyrightHolderName: string;
-  if (useExifCopyright && sanitizedExifHolder) {
-    copyrightHolderName = sanitizedExifHolder;
-  } else if (profileHolder) {
-    copyrightHolderName = profileHolder;
-  } else if (sanitizedExifHolder) {
-    copyrightHolderName = sanitizedExifHolder;
+  if (useExifCopyright) {
+    copyrightHolderName =
+      exifCopyrightNoticeHolder ??
+      exifCopyrightTagHolder ??
+      profileHolderExplicit ??
+      profileHolderFallback ??
+      UNKNOWN;
   } else {
-    copyrightHolderName = UNKNOWN;
+    copyrightHolderName =
+      profileHolderExplicit ??
+      exifCopyrightNoticeHolder ??
+      exifCopyrightTagHolder ??
+      profileHolderFallback ??
+      UNKNOWN;
   }
 
   const copyrightNoticeTemplate = mode === 'culoca' ? profile?.default_copyright_notice : null;

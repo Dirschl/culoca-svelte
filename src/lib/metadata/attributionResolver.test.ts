@@ -74,4 +74,38 @@ describe('resolveAttribution', () => {
     expect(a.creatorName).toBe('Johann Dirschl'); // normalisiert gegen Profil-Vorname
     expect(a.copyrightHolderName).toBe('EXIF Only GmbH');
   });
+
+  it('uses EXIF domain as copyright holder (not Unbekannt)', () => {
+    const a = resolveAttribution({
+      exifData: {
+        Artist: 'Dirschl Johann',
+        Copyright: 'www.dirschl.com',
+        CopyrightNotice: 'www.dirschl.com'
+      },
+      profile: {
+        full_name: 'Johann Dirschl',
+        use_exif_creator_override: false,
+        use_exif_copyright_override: false
+      },
+      mode: 'culoca'
+    });
+    expect(a.copyrightHolderName).toBe('www.dirschl.com');
+    expect(a.copyrightNotice).toContain('www.dirschl.com');
+    expect(a.copyrightNotice).not.toContain('Unbekannt');
+  });
+
+  it('with EXIF copyright override, Copyright tag wins over empty CopyrightNotice', () => {
+    const a = resolveAttribution({
+      exifData: {
+        Copyright: 'Tag Only GmbH',
+        CopyrightNotice: ''
+      },
+      profile: {
+        copyright_holder_name: 'Profile GmbH',
+        use_exif_copyright_override: true
+      },
+      mode: 'culoca'
+    });
+    expect(a.copyrightHolderName).toBe('Tag Only GmbH');
+  });
 });

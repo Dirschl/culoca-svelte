@@ -20,6 +20,7 @@ describe('extractPhotoMetadataFields', () => {
     expect(result.creator).toBe('Dirschl Johann');
     expect(result.copyright).toBe('DIRSCHL.com GmbH');
     expect(result.copyrightNotice).toBe('DIRSCHL.com GmbH');
+    expect(result.copyrightFromTag).toBe('DIRSCHL.com GmbH');
   });
 });
 

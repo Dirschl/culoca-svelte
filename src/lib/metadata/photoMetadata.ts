@@ -9,6 +9,8 @@ export type PhotoMetadataFields = {
   copyright: string | null;
   /** IPTC/XMP CopyrightNotice (zusätzlich zu IFD0 Copyright) */
   copyrightNotice: string | null;
+  /** IFD0/XMP Copyright bzw. Rights — ohne Fallback auf CopyrightNotice (für Resolver-Priorität). */
+  copyrightFromTag: string | null;
   gps: {
     lat: number | null;
     lon: number | null;
@@ -172,6 +174,18 @@ export function extractPhotoMetadataFields(exifData: Record<string, unknown> | n
     ])
   );
 
+  const copyrightFromTag = firstText(
+    exif['XMP-dc:Rights'],
+    exif['dc:rights'],
+    exif.Copyright,
+    findNestedText(exif, [
+      (key) => key === 'copyright',
+      (key) => key.endsWith(':copyright'),
+      (key) => key === 'rights',
+      (key) => key.endsWith(':rights')
+    ])
+  );
+
   return {
     title,
     caption,
@@ -203,19 +217,9 @@ export function extractPhotoMetadataFields(exifData: Record<string, unknown> | n
         (key) => key.endsWith(':xpauthor')
       ])
     ),
-    copyright: firstText(
-      exif['XMP-dc:Rights'],
-      exif['dc:rights'],
-      exif.Copyright,
-      copyrightNotice,
-      findNestedText(exif, [
-        (key) => key === 'copyright',
-        (key) => key.endsWith(':copyright'),
-        (key) => key === 'rights',
-        (key) => key.endsWith(':rights')
-      ])
-    ),
+    copyright: firstText(copyrightFromTag, copyrightNotice),
     copyrightNotice,
+    copyrightFromTag,
     gps: {
       lat: firstNumber(exif.latitude, exif.Latitude),
       lon: firstNumber(exif.longitude, exif.Longitude)
