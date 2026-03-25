@@ -10,8 +10,50 @@
 
   const PAGE_SIZE = 12;
 
+  const DASHBOARD_SECTION_IDS = [
+    'recent',
+    'photos',
+    'events',
+    'favorites',
+    'likes',
+    'notifications',
+    'interactions',
+    'following',
+    'followers',
+    'shares',
+    'review'
+  ] as const;
+
+  type DashboardSectionId = (typeof DASHBOARD_SECTION_IDS)[number];
+
+  function isDashboardSectionId(v: string): v is DashboardSectionId {
+    return (DASHBOARD_SECTION_IDS as readonly string[]).includes(v);
+  }
+
+  type DashboardSecondaryKey =
+    | 'events'
+    | 'favorites'
+    | 'likes'
+    | 'network'
+    | 'shares'
+    | 'notifications'
+    | 'interactions'
+    | 'review';
+
+  const SECONDARY_KEY_ORDER: DashboardSecondaryKey[] = [
+    'events',
+    'favorites',
+    'likes',
+    'network',
+    'shares',
+    'notifications',
+    'interactions',
+    'review'
+  ];
+
   let currentUserId = '';
   let loading = true;
+  let restLoading = true;
   let loadingItems = false;
   let errorMessage = '';
   let recentItems: any[] = [];
@@ -21,7 +63,7 @@
   let currentPage = 1;
   let totalItems = 0;
   let historyBusy = false;
-  let activeSection: 'recent' | 'photos' | 'events' | 'favorites' | 'likes' | 'notifications' | 'interactions' | 'following' | 'followers' | 'shares' | 'review' = 'recent';
+  let activeSection: DashboardSectionId = 'recent';
   let unreadChats: any[] = [];
   let interactions: any[] = [];
   let reviewCount = 0;
@@ -709,6 +751,50 @@
     reviewCount = reviewItems.length;
   }
 
+  const secondaryTasks: Record<DashboardSecondaryKey, () => Promise<void>> = {
+    events: loadEventItems,
+    favorites: loadFavoriteItems,
+    likes: loadLikedItems,
+    network: loadNetworkProfiles,
+    shares: async () => {
+      await Promise.all([loadSharedItemRights(), loadGlobalProfileRights()]);
+    },
+    notifications: loadNotifications,
+    interactions: loadInteractions,
+    review: loadReviewCount
+  };
+
+  const sectionToSecondaryKeys: Record<DashboardSectionId, DashboardSecondaryKey[]> = {
+    recent: [],
+    photos: [],
+    events: ['events'],
+    favorites: ['favorites'],
+    likes: ['likes'],
+    notifications: ['notifications'],
+    interactions: ['interactions'],
+    following: ['network'],
+    followers: ['network'],
+    shares: ['shares'],
+    review: ['review']
+  };
+
+  let loadedSecondaryKeys = new Set<string>();
+  const secondaryInflight = new Map<string, Promise<void>>();
+
+  async function loadSecondaryKey(key: DashboardSecondaryKey) {
+    if (loadedSecondaryKeys.has(key)) return;
+    let p = secondaryInflight.get(key);
+    if (!p) {
+      p = (async () => {
+        await secondaryTasks[key]();
+        loadedSecondaryKeys.add(key);
+      })();
+      void p.finally(() => secondaryInflight.delete(key));
+      secondaryInflight.set(key, p);
+    }
+    await p;
+  }
+
   async function applySearch() {
     activeQuery = searchQuery.trim();
     await loadOwnItems(1, activeQuery);
@@ -725,8 +811,12 @@
     await loadOwnItems(page, activeQuery);
   }
 
-  function setActiveSection(section: typeof activeSection) {
+  function setActiveSection(section: DashboardSectionId) {
     activeSection = section;
+    const keys = sectionToSecondaryKeys[section];
+    if (browser && keys.length) {
+      void Promise.all(keys.map((k) => loadSecondaryKey(k))).catch(() => {});
+    }
     if (!browser) return;
     requestAnimationFrame(() => {
       contentSectionEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -735,32 +825,36 @@
 
   async function initDashboard() {
     loading = true;
+    restLoading = true;
+    loadedSecondaryKeys = new Set();
+    secondaryInflight.clear();
     errorMessage = '';
     try {
       const ok = await ensureAuthUser();
-      if (!ok) return;
+      if (!ok) {
+        restLoading = false;
+        return;
+      }
       const sectionParam = new URL(window.location.href).searchParams.get('section');
-      if (sectionParam === 'following' || sectionParam === 'followers' || sectionParam === 'shares') {
+      if (sectionParam && isDashboardSectionId(sectionParam)) {
         activeSection = sectionParam;
       }
+      const priorityKeys = sectionToSecondaryKeys[activeSection];
       await Promise.all([
         loadRecentItems(),
         loadOwnItems(1, ''),
-        loadEventItems(),
-        loadFavoriteItems(),
-        loadLikedItems(),
-        loadNetworkProfiles(),
-        loadSharedItemRights(),
-        loadGlobalProfileRights(),
-        loadNotifications(),
-        loadInteractions(),
-        loadReviewCount()
+        ...priorityKeys.map((k) => loadSecondaryKey(k))
       ]);
+      loading = false;
+      await Promise.all(
+        SECONDARY_KEY_ORDER.filter((k) => !loadedSecondaryKeys.has(k)).map((k) => loadSecondaryKey(k))
+      );
     } catch (error: any) {
       errorMessage = error?.message || 'Dashboard konnte nicht geladen werden.';
     } finally {
       loading = false;
       loadingItems = false;
+      restLoading = false;
     }
   }
 
@@ -831,7 +925,7 @@
               </svg>
               <span>Meine Events</span>
             </span>
-            <strong>{eventItems.length}</strong>
+            <strong>{restLoading ? '…' : eventItems.length}</strong>
           </button>
           <button
             type="button"
@@ -845,7 +939,7 @@
               </svg>
               <span>Gemerkte</span>
             </span>
-            <strong>{favoriteItems.length}</strong>
+            <strong>{restLoading ? '…' : favoriteItems.length}</strong>
           </button>
           <button
             type="button"
@@ -859,7 +953,7 @@
               </svg>
               <span>Likes</span>
             </span>
-            <strong>{likedItems.length}</strong>
+            <strong>{restLoading ? '…' : likedItems.length}</strong>
           </button>
           <button
             type="button"
@@ -873,7 +967,7 @@
               </svg>
               <span>Chat ungelesen</span>
             </span>
-            <strong>{unreadChats.length}</strong>
+            <strong>{restLoading ? '…' : unreadChats.length}</strong>
           </button>
           <button
             type="button"
@@ -887,7 +981,7 @@
               </svg>
               <span>Interaktionen</span>
             </span>
-            <strong>{interactions.length}</strong>
+            <strong>{restLoading ? '…' : interactions.length}</strong>
           </button>
           <button
             type="button"
@@ -901,7 +995,7 @@
               </svg>
               <span>Du folgst</span>
             </span>
-            <strong>{followedProfiles.length}</strong>
+            <strong>{restLoading ? '…' : followedProfiles.length}</strong>
           </button>
           <button
             type="button"
@@ -915,7 +1009,7 @@
               </svg>
               <span>Follower</span>
             </span>
-            <strong>{followerProfiles.length}</strong>
+            <strong>{restLoading ? '…' : followerProfiles.length}</strong>
           </button>
           <button
             type="button"
@@ -930,7 +1024,7 @@
               </svg>
               <span>Freigaben</span>
             </span>
-            <strong>{globalProfileRights.length} +{sharedItemRights.length}</strong>
+            <strong>{restLoading ? '…' : `${globalProfileRights.length} +${sharedItemRights.length}`}</strong>
           </button>
           <button
             type="button"
@@ -944,7 +1038,7 @@
               </svg>
               <span>Datenprüfung</span>
             </span>
-            <strong>{reviewCount}</strong>
+            <strong>{restLoading ? '…' : reviewCount}</strong>
           </button>
         </nav>
       </aside>
