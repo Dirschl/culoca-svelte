@@ -1,12 +1,49 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
+	import { browser } from '$app/environment';
 	import { page } from '$app/stores';
 	import SiteNav from '$lib/SiteNav.svelte';
 	import SiteFooter from '$lib/SiteFooter.svelte';
 	import AdminDashboardNav from '$lib/admin/AdminDashboardNav.svelte';
 	import { adminPanelTitle } from '$lib/admin/adminNav';
+	import { supabase } from '$lib/supabaseClient';
+	import { hasAdminPermission } from '$lib/sessionStore';
+	import { fetchAllReviewItems } from '$lib/profile/review';
 
 	$: panelTitle = adminPanelTitle($page.url.pathname);
 	$: pathname = $page.url.pathname;
+
+	let moderationPendingCount = 0;
+
+	async function refreshModerationPending() {
+		if (!$hasAdminPermission) {
+			moderationPendingCount = 0;
+			return;
+		}
+		const { data: auth } = await supabase.auth.getUser();
+		const uid = auth.user?.id;
+		if (!uid) {
+			moderationPendingCount = 0;
+			return;
+		}
+		try {
+			const all = await fetchAllReviewItems(supabase);
+			moderationPendingCount = all.filter(
+				(item) => item.profile_id && item.profile_id !== uid
+			).length;
+		} catch {
+			moderationPendingCount = 0;
+		}
+	}
+
+	$: if (browser && $hasAdminPermission) {
+		void refreshModerationPending();
+	}
+
+	onMount(() => {
+		const id = setInterval(() => void refreshModerationPending(), 45000);
+		return () => clearInterval(id);
+	});
 </script>
 
 <SiteNav />
@@ -23,7 +60,7 @@
 
 	<section class="dashboard-layout">
 		<aside class="dashboard-column dashboard-column--menu">
-			<AdminDashboardNav {pathname} />
+			<AdminDashboardNav {pathname} {moderationPendingCount} />
 		</aside>
 		<section class="dashboard-column dashboard-column--content">
 			<div class="panel-head">

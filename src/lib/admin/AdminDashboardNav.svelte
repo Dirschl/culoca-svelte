@@ -2,6 +2,7 @@
 	import { ADMIN_NAV_ITEMS } from './adminNav';
 
 	export let pathname: string;
+	export let moderationPendingCount = 0;
 </script>
 
 <nav class="dashboard-menu" aria-label="Administration Navigation">
@@ -46,6 +47,15 @@
 				{/if}
 				<span>{item.label}</span>
 			</span>
+			{#if item.id === 'moderation' && moderationPendingCount > 0}
+				<span
+					class="admin-nav-count"
+					aria-label={`${moderationPendingCount} offene Moderationen`}
+					title="Offene Moderation"
+				>
+					{moderationPendingCount}
+				</span>
+			{/if}
 		</a>
 	{/each}
 </nav>
@@ -83,5 +93,21 @@
 	.dashboard-menu__link.is-active {
 		border-color: color-mix(in srgb, var(--culoca-orange) 45%, var(--border-color) 55%);
 		background: color-mix(in srgb, var(--culoca-orange) 10%, var(--bg-primary) 90%);
+	}
+
+	.admin-nav-count {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		min-width: 1.35rem;
+		height: 1.35rem;
+		padding: 0 0.35rem;
+		border-radius: 999px;
+		background: #c1121f;
+		color: #fff;
+		font-size: 0.72rem;
+		font-weight: 700;
+		line-height: 1;
+		flex-shrink: 0;
 	}
 </style>

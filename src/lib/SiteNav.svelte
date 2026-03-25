@@ -5,13 +5,11 @@
   import { hasAdminPermission, isAuthenticated, customerBranding, currentUserId } from '$lib/sessionStore';
   import { supabase } from '$lib/supabaseClient';
   import { currentPathWithSearch, sanitizeReturnTo } from '$lib/returnTo';
-  import { fetchAllReviewItems, fetchProfileReviewItems } from '$lib/profile/review';
+  import { fetchProfileReviewItems } from '$lib/profile/review';
 
   let mobileOpen = false;
   let openDropdown: string | null = null;
   let reviewCount = 0;
-  let adminReviewCount = 0;
-  let inboxCount = 0;
   let inboxMessageCount = 0;
   let inboxActivityCount = 0;
   let followerAlertCount = 0;
@@ -57,6 +55,11 @@
     isActive('/profile/freigaben') ||
     ($hasAdminPermission && isAdminRouteActive());
   $: inheritedReturnTo = sanitizeReturnTo($page.url.searchParams.get('returnTo'), currentPathWithSearch($page.url));
+
+  /** Nachrichten + Aktivität (Benachrichtigungen, nicht Follower / nicht Daten-Review). */
+  $: dashboardInboxCount = inboxMessageCount + inboxActivityCount;
+  /** Ein Badge am Konto-Eintrag: Summe aller persönlichen To-dos (ohne Admin-Moderation). */
+  $: kontoNavBadgeCount = dashboardInboxCount + followerAlertCount + reviewCount;
   $: {
     const nextInboxKey = `${$isAuthenticated ? 'auth' : 'anon'}:${$currentUserId || 'none'}:${currentPath}`;
     if (nextInboxKey !== lastInboxRefreshKey) {
@@ -68,37 +71,26 @@
   async function refreshReviewCount() {
     if (!$isAuthenticated) {
       reviewCount = 0;
-      adminReviewCount = 0;
       return;
     }
 
     const { data } = await supabase.auth.getUser();
     if (!data.user) {
       reviewCount = 0;
-      adminReviewCount = 0;
       return;
     }
 
     try {
       const ownReviewItems = await fetchProfileReviewItems(supabase, data.user.id);
       reviewCount = ownReviewItems.length;
-
-      if ($hasAdminPermission) {
-        const allReviewItems = await fetchAllReviewItems(supabase);
-        adminReviewCount = allReviewItems.filter((item) => item.profile_id && item.profile_id !== data.user.id).length;
-      } else {
-        adminReviewCount = 0;
-      }
     } catch (error) {
       console.error('Failed to load review count:', error);
       reviewCount = 0;
-      adminReviewCount = 0;
     }
   }
 
   async function refreshInboxCount() {
     if (!$isAuthenticated || !$currentUserId) {
-      inboxCount = 0;
       inboxMessageCount = 0;
       inboxActivityCount = 0;
       followerAlertCount = 0;
@@ -134,10 +126,8 @@
       followerAlertCount = unreadNotifications.filter((entry: any) => entry.event_type === 'follow_create').length;
       inboxActivityCount = unreadNotifications.filter((entry: any) => entry.event_type !== 'follow_create').length;
       inboxMessageCount = unreadConversations;
-      inboxCount = inboxActivityCount + inboxMessageCount + followerAlertCount;
     } catch (error) {
       console.error('Failed to load inbox count:', error);
-      inboxCount = 0;
       inboxMessageCount = 0;
       inboxActivityCount = 0;
       followerAlertCount = 0;
@@ -284,18 +274,6 @@
     goto('/');
   }
 
-  function getReviewTargetHref() {
-    return getUserLinkHref('/profile/review');
-  }
-
-  function handleReviewBadgeClick(event: MouseEvent) {
-    event.preventDefault();
-    event.stopPropagation();
-    closeDropdowns();
-    closeMobile();
-    goto(getReviewTargetHref());
-  }
-
   onMount(() => {
     refreshReviewCount();
     refreshInboxCount();
@@ -373,24 +351,13 @@
         >
           <svg class="user-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
           {userMenuLabel}
-          {#if $isAuthenticated && reviewCount > 0}
-            <button
-              type="button"
-              class="review-badge review-badge--button"
-              aria-label={`${reviewCount} offene Daten`}
-              title={$hasAdminPermission ? 'Zur Moderationsliste' : 'Zur Review-Liste'}
-              on:click={handleReviewBadgeClick}
-            >
-              {reviewCount}
-            </button>
-          {/if}
-          {#if $isAuthenticated && inboxCount > 0}
+          {#if $isAuthenticated && kontoNavBadgeCount > 0}
             <span
               class="inbox-badge"
-              aria-label={`${inboxCount} ungelesene Benachrichtigungen oder Nachrichten`}
-              title={`${inboxCount} ungelesene Benachrichtigungen oder Nachrichten`}
+              aria-label={`${kontoNavBadgeCount} offene Punkte (Nachrichten, Aktivität, Profil)`}
+              title={`${kontoNavBadgeCount} offene Punkte im Konto`}
             >
-              {inboxCount}
+              {kontoNavBadgeCount}
             </span>
           {/if}
         </a>
@@ -407,36 +374,42 @@
         {/if}
         {#if $isAuthenticated && openDropdown === 'user'}
           <div class="dropdown-menu dropdown-menu--user">
-            {#if inboxCount > 0}
-              <div class="dropdown-status-row">
-                {#if inboxMessageCount > 0}
-                  <span class="mini-status-chip">Nachrichten {inboxMessageCount}</span>
-                {/if}
-                {#if inboxActivityCount > 0}
-                  <span class="mini-status-chip">Aktivität {inboxActivityCount}</span>
-                {/if}
-                {#if followerAlertCount > 0}
-                  <span class="mini-status-chip mini-status-chip--accent">Follower {followerAlertCount}</span>
-                {/if}
-              </div>
-            {/if}
             {#if userIdentityLabel}
               <span class="dropdown-label dropdown-label--identity">{userIdentityLabel}</span>
             {/if}
             {#each accountMenuLinks.filter((l) => !l.adminOnly || $hasAdminPermission) as link}
               <a
                 href={link.adminOnly ? link.href : getUserLinkHref(link.href)}
-                class="dropdown-item"
+                class="dropdown-item dropdown-item--account"
                 class:active={link.adminOnly ? isAdminRouteActive() : isActive(link.href)}
                 on:click={closeDropdowns}
               >
-                {link.label}
-                {#if link.href === '/profile' && followerAlertCount > 0}
-                  <span class="mini-status-chip mini-status-chip--inline mini-status-chip--accent">+{followerAlertCount} Follower</span>
-                {/if}
-                {#if link.adminOnly && adminReviewCount > 0}
-                  <span class="review-badge review-badge--inline">{adminReviewCount}</span>
-                {/if}
+                <span class="dropdown-item__leading">{link.label}</span>
+                <span class="dropdown-item__trail">
+                  {#if link.href === '/dashboard' && dashboardInboxCount > 0}
+                    <span
+                      class="menu-count-badge menu-count-badge--inbox"
+                      title="Ungelesene Nachrichten und Aktivitäten"
+                      aria-label={`${dashboardInboxCount} Nachrichten oder Aktivitäten`}
+                    >
+                      {dashboardInboxCount}
+                    </span>
+                  {/if}
+                  {#if link.href === '/profile'}
+                    {#if reviewCount > 0}
+                      <span
+                        class="menu-count-badge menu-count-badge--review"
+                        title="Daten prüfen"
+                        aria-label={`${reviewCount} offene Datenprüfungen`}
+                      >
+                        {reviewCount}
+                      </span>
+                    {/if}
+                    {#if followerAlertCount > 0}
+                      <span class="mini-status-chip mini-status-chip--menu">+{followerAlertCount} Follower</span>
+                    {/if}
+                  {/if}
+                </span>
               </a>
             {/each}
             <div class="dropdown-divider"></div>
@@ -463,13 +436,20 @@
                 class:active={link.adminOnly ? isAdminRouteActive() : isActive(link.href)}
                 on:click={closeMobile}
               >
-                {link.label}
-                {#if link.href === '/profile' && followerAlertCount > 0}
-                  <span class="mini-status-chip mini-status-chip--inline mini-status-chip--accent">+{followerAlertCount} Follower</span>
-                {/if}
-                {#if link.adminOnly && adminReviewCount > 0}
-                  <span class="review-badge review-badge--inline">{adminReviewCount}</span>
-                {/if}
+                <span class="nav-link__label">{link.label}</span>
+                <span class="nav-link__trail">
+                  {#if link.href === '/dashboard' && dashboardInboxCount > 0}
+                    <span class="menu-count-badge menu-count-badge--inbox">{dashboardInboxCount}</span>
+                  {/if}
+                  {#if link.href === '/profile'}
+                    {#if reviewCount > 0}
+                      <span class="menu-count-badge menu-count-badge--review">{reviewCount}</span>
+                    {/if}
+                    {#if followerAlertCount > 0}
+                      <span class="mini-status-chip mini-status-chip--menu">+{followerAlertCount}</span>
+                    {/if}
+                  {/if}
+                </span>
               </a>
             {/each}
             <button class="nav-link nav-link--sub nav-link--logout" on:click={handleLogout}>
@@ -754,14 +734,56 @@
   .dropdown-item:hover { background: var(--bg-tertiary); color: var(--text-primary); }
   .dropdown-item.active { color: var(--culoca-orange); }
 
-  .dropdown-menu--user { min-width: 190px; right: 0; left: auto; }
-
-  .dropdown-status-row {
+  .dropdown-item--account {
     display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
     flex-wrap: wrap;
-    gap: 0.45rem;
-    padding: 0.75rem 1rem 0.35rem;
   }
+
+  .dropdown-item__leading {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .dropdown-item__trail {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-left: auto;
+    justify-content: flex-end;
+  }
+
+  .menu-count-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.35rem;
+    height: 1.35rem;
+    padding: 0 0.35rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .menu-count-badge--inbox {
+    background: var(--accent-color);
+    color: #fff;
+  }
+
+  .menu-count-badge--review {
+    background: #c1121f;
+    color: #fff;
+  }
+
+  .mini-status-chip--menu {
+    margin-left: 0;
+  }
+
+  .dropdown-menu--user { min-width: 190px; right: 0; left: auto; }
 
   .dropdown-divider {
     height: 1px;
@@ -813,28 +835,6 @@
     padding-right: 0.55rem;
   }
   .user-icon { flex-shrink: 0; opacity: 0.7; }
-  .review-badge {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 1.35rem;
-    height: 1.35rem;
-    padding: 0 0.35rem;
-    border-radius: 999px;
-    background: #c1121f;
-    color: #fff;
-    font-size: 0.72rem;
-    font-weight: 700;
-    line-height: 1;
-  }
-  .review-badge--button {
-    border: none;
-    cursor: pointer;
-    font-family: inherit;
-  }
-  .review-badge--inline {
-    margin-left: auto;
-  }
   .inbox-badge {
     display: inline-flex;
     align-items: center;
@@ -848,9 +848,6 @@
     font-size: 0.72rem;
     font-weight: 700;
     line-height: 1;
-  }
-  .inbox-badge--inline {
-    margin-left: auto;
   }
 
   .mini-status-chip {
@@ -866,15 +863,6 @@
     font-weight: 700;
     line-height: 1;
     white-space: nowrap;
-  }
-
-  .mini-status-chip--accent {
-    background: color-mix(in srgb, var(--accent-color) 18%, var(--bg-tertiary) 82%);
-    color: var(--text-primary);
-  }
-
-  .mini-status-chip--inline {
-    margin-left: 0.45rem;
   }
 
   /* Mobile helpers */
@@ -981,12 +969,27 @@
     .nav-group .nav-link--sub {
       display: flex;
       align-items: center;
+      justify-content: space-between;
       flex-wrap: wrap;
       gap: 0.35rem;
       min-width: 0;
       padding: 0.65rem 0.75rem 0.65rem 0.45rem;
       font-size: 0.93rem;
       text-align: left;
+    }
+
+    .nav-link__label {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .nav-link__trail {
+      display: inline-flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.3rem;
+      margin-left: auto;
+      justify-content: flex-end;
     }
     .nav-group .nav-link--sub.active {
       color: var(--culoca-orange);
