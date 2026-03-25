@@ -27,6 +27,25 @@ export function getSeoImageUrl(
 }
 
 /**
+ * Thumbnails in „Ähnliche Motive“ (Vektoranalyse): eigener Pfad, immer X-Robots-Tag noimageindex.
+ * Verhindert, dass Google diese Bilder dem Host-Item in der Bildersuche zuordnet.
+ */
+export function getSeoSimilarEmbedImageUrl(
+  slug: string | undefined | null,
+  path: string | undefined | null,
+  size: '512' | '2048' = '512'
+): string {
+  if (!slug || !path) {
+    return '';
+  }
+
+  const extensionMatch = path.match(/\.(jpg|jpeg|webp|png)$/i);
+  const fileExtension = extensionMatch ? extensionMatch[0].toLowerCase() : '.jpg';
+
+  return `https://culoca.com/images/similar/${slug}-${size}${fileExtension}`;
+}
+
+/**
  * Get the file extension from a storage path
  * @param path - The storage path (e.g., "uuid.jpg")
  * @returns The extension including dot (e.g., ".jpg")

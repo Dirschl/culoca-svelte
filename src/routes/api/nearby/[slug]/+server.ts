@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { supabase } from '$lib/supabaseClient';
 import { safeFunctionCall } from '$lib/databaseConfig';
-import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
+import { getSeoSimilarEmbedImageUrl } from '$lib/utils/seoImageUrl';
 import { getPublicItemHref } from '$lib/content/routing';
 
 function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -126,9 +126,9 @@ export async function GET({ params }: any) {
               .filter((item: any) => item.id !== image.id && item.lat && item.lon)
               .map((item: any) => {
                 const distance = getDistanceInMeters(image.lat, image.lon, item.lat, item.lon);
-                // Use SEO-friendly URLs for better Google indexing
-                const seoSrc = getSeoImageUrl(item.slug, item.path_512, '512');
-                const seoSrcHD = getSeoImageUrl(item.slug, item.path_2048 || item.path_512, '2048');
+                // /images/similar/… → X-Robots-Tag noimageindex (nicht der Host-Item-Seite zuordnen)
+                const seoSrc = getSeoSimilarEmbedImageUrl(item.slug, item.path_512, '512');
+                const seoSrcHD = getSeoSimilarEmbedImageUrl(item.slug, item.path_2048 || item.path_512, '2048');
                 const fallbackSrc = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${item.path_512}`;
                 const fallbackSrcHD = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${item.path_2048}`;
                 return {
@@ -172,9 +172,8 @@ export async function GET({ params }: any) {
             .filter((item: any) => item.id !== image.id)
             .map((item: any) => {
               const geoItem = geoById.get(item.id) || item;
-              // Use SEO-friendly URLs for better Google indexing
-              const seoSrc = getSeoImageUrl(item.slug, item.path_512, '512');
-              const seoSrcHD = getSeoImageUrl(item.slug, item.path_2048 || item.path_512, '2048');
+              const seoSrc = getSeoSimilarEmbedImageUrl(item.slug, item.path_512, '512');
+              const seoSrcHD = getSeoSimilarEmbedImageUrl(item.slug, item.path_2048 || item.path_512, '2048');
               const fallbackSrc = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${item.path_512}`;
               const fallbackSrcHD = `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-2048/${item.path_2048}`;
               return {

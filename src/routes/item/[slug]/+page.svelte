@@ -3,7 +3,7 @@
   import { page } from '$app/stores';
   import SiteNav from '$lib/SiteNav.svelte';
   import SiteFooter from '$lib/SiteFooter.svelte';
-  import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
+  import { getSeoImageUrl, getSeoSimilarEmbedImageUrl } from '$lib/utils/seoImageUrl';
   import { darkMode } from '$lib/darkMode';
   import { filterStore, getEffectiveGpsPosition } from '$lib/filterStore';
   import { goto } from '$app/navigation';
@@ -103,8 +103,7 @@ let showRightsManager = false;
   }
 
   function relatedThumbUrl(item: { slug: string; path_512?: string | null }) {
-    const baseUrl = item.path_512 ? getSeoImageUrl(item.slug, item.path_512, '512') : '';
-    return baseUrl ? `${baseUrl}?context=similar` : '';
+    return item.path_512 ? getSeoSimilarEmbedImageUrl(item.slug, item.path_512, '512') : '';
   }
 
   export let data: any;
@@ -3073,10 +3072,6 @@ let showRightsManager = false;
     {@const imageUrl2048 = hasPath2048
       ? `https://culoca.com/images/${image.slug}-2048${fileExtension}`
       : (hasPath512 ? `https://culoca.com/images/${image.slug}-512${fileExtension}` : '')}
-    <!-- thumbnailUrl: Always use 512px version if available, otherwise 2048px (fallback) -->
-    {@const imageUrl512 = hasPath512
-      ? `https://culoca.com/images/${image.slug}-512${fileExtension}`
-      : (hasPath2048 ? `https://culoca.com/images/${image.slug}-2048${fileExtension}` : '')}
     
     <!-- Calculate dimensions for 2048px and 512px versions (proportional scaling) -->
     <!-- Note: image.width and image.height are original dimensions after EXIF orientation -->
@@ -3134,7 +3129,6 @@ let showRightsManager = false;
           "@id": imageUrl2048,
           "url": imageUrl2048,
           "contentUrl": imageUrl2048,
-          "thumbnailUrl": imageUrl512,
           "name": normalizedItemName,
           "caption": normalizedCaption,
           "description": normalizedDescription,
@@ -3225,12 +3219,23 @@ let showRightsManager = false;
                 title={groupItem.title || 'Variante'}
                 on:click|preventDefault={() => openVariantItem(groupItem.canonicalPath || `/item/${groupItem.slug}`)}
               >
-                {#if groupItem.path_64}
+                {#if groupItem.path_512 && groupItem.slug}
+                  <img
+                    class:square={!$useJustifiedLayout}
+                    src={getSeoSimilarEmbedImageUrl(groupItem.slug, groupItem.path_512, '512')}
+                    alt={groupItem.title || 'Variante'}
+                    loading="lazy"
+                    decoding="async"
+                    fetchpriority="low"
+                  />
+                {:else if groupItem.path_64}
                   <img
                     class:square={!$useJustifiedLayout}
                     src={`https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-64/${groupItem.path_64}`}
                     alt={groupItem.title || 'Variante'}
                     loading="lazy"
+                    decoding="async"
+                    fetchpriority="low"
                   />
                 {/if}
               </a>
@@ -4238,6 +4243,7 @@ let showRightsManager = false;
                       height="213"
                       loading="lazy"
                       decoding="async"
+                      fetchpriority="low"
                     />
                   </div>
                 {/if}

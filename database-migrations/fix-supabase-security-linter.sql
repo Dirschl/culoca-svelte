@@ -62,8 +62,8 @@ DROP POLICY IF EXISTS "Allow read types for all" ON public.types;
 CREATE POLICY "Allow read types for all" ON public.types
   FOR SELECT USING (true);
 
--- spatial_ref_sys: PostGIS-Systemtabelle – nicht änderbar (nicht Owner).
--- Der Linter-Hinweis kann ignoriert werden; die Tabelle ist read-only Referenzdaten.
+-- spatial_ref_sys: siehe database-migrations/2026-03-24_enable-rls-supabase-linter.sql
+-- (RLS + SELECT-Policy für Referenzdaten; Linter 0013).
 
 
 -- =============================================================================
