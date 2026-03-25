@@ -1,4 +1,5 @@
 <svelte:head>
+  <title>Admin – Benutzer</title>
   <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex" />
   <meta name="googlebot" content="noindex, nofollow" />
   <meta name="bingbot" content="noindex, nofollow" />
@@ -8,8 +9,6 @@
   import { onMount } from 'svelte';
   import { supabase } from '$lib/supabaseClient';
   import { goto } from '$app/navigation';
-  import InfoPageLayout from '$lib/InfoPageLayout.svelte';
-
   type ProfileUser = {
     id: string;
     full_name: string | null;
@@ -620,16 +619,11 @@
 {:else if !isAdmin}
   <div class="error">
     <h1>Zugriff verweigert</h1>
-    <p>Sie haben keine Berechtigung, auf das Admin-Dashboard zuzugreifen.</p>
+    <p>Sie haben keine Berechtigung, auf die Benutzerverwaltung zuzugreifen.</p>
     <a href="/" class="btn">Zurück zur Galerie</a>
   </div>
 {:else}
-  <InfoPageLayout 
-    currentPage="admin"
-    title="Benutzer-Management"
-    description="Alle Benutzer anzeigen und verwalten"
-  >
-    <div class="admin-content">
+  <div class="admin-content">
       <!-- Search -->
       <div class="admin-search-container">
         <div class="admin-search-header">
@@ -885,7 +879,6 @@
         </div>
       {/if}
     </div>
-  </InfoPageLayout>
 {/if}
 
 <!-- User Details Modal -->

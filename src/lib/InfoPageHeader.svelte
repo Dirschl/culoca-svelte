@@ -20,13 +20,13 @@
     ...($hasAdminPermission ? [{ 
       id: 'admin', 
       title: 'Admin', 
-      url: '/admin',
+      url: '/admin/roles',
       hasSubmenu: true,
       submenu: [
-        { id: 'admin-dashboard', title: 'Dashboard', url: '/admin' },
         { id: 'admin-roles', title: 'Rollen', url: '/admin/roles' },
         { id: 'admin-users', title: 'Benutzer', url: '/admin/users' },
         { id: 'admin-items', title: 'Items', url: '/admin/items' },
+        { id: 'admin-moderation', title: 'Moderation', url: '/admin/moderation' },
         { id: 'admin-analytics', title: 'Analytics', url: '/admin/analytics' }
       ]
     }] : [])

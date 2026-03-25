@@ -1,4 +1,5 @@
 <svelte:head>
+  <title>Admin – Benutzer erstellen</title>
   <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex" />
   <meta name="googlebot" content="noindex, nofollow" />
   <meta name="bingbot" content="noindex, nofollow" />
@@ -8,8 +9,6 @@
   import { onMount } from 'svelte';
   import { supabase } from '$lib/supabaseClient';
   import { goto } from '$app/navigation';
-  import { darkMode } from '$lib/darkMode';
-
   let isLoading = true;
   let isAdmin = false;
   let creating = false;
@@ -28,6 +27,7 @@
     
     if (!session) {
       console.log('No session found, redirecting to login');
+      isLoading = false;
       goto('/login');
       return;
     }
@@ -45,6 +45,7 @@
       message = 'Zugriff verweigert. Nur Administratoren können Benutzer erstellen.';
       messageType = 'error';
     }
+    isLoading = false;
   });
 
   async function createUser() {
@@ -102,46 +103,27 @@
       <div class="admin-empty">
         <div class="admin-empty-icon">🚫</div>
         <h2 class="admin-empty-title">Zugriff verweigert</h2>
-        <p class="admin-empty-description">Sie haben keine Berechtigung, auf das Admin-Dashboard zuzugreifen.</p>
+        <p class="admin-empty-description">Sie haben keine Berechtigung, Benutzer anzulegen.</p>
         <a href="/" class="admin-btn admin-btn-primary">Zurück zur Galerie</a>
       </div>
     </div>
   </div>
 {:else}
-  <div class="admin-container">
-    <!-- Header -->
-    <header class="admin-header">
-      <div class="admin-header-content">
-        <div>
-          <h1 class="admin-title">Benutzer erstellen</h1>
-          <p class="admin-subtitle">Neue Benutzerkonten manuell anlegen</p>
-        </div>
-        <nav class="admin-nav">
-          <a href="/admin" class="admin-btn admin-btn-secondary">← Zurück zum Dashboard</a>
-        </nav>
+  <div class="admin-content">
+    <p style="margin: 0 0 1rem;">
+      <a href="/admin/users" class="admin-btn admin-btn-secondary" style="display: inline-flex; text-decoration: none;">
+        ← Zurück zu Benutzern
+      </a>
+    </p>
+    <div class="admin-table-container">
+      <div class="admin-table-header">
+        <h3 class="admin-table-title">Neuen Benutzer erstellen</h3>
+        <p style="margin: 0.35rem 0 0; font-size: 0.875rem; color: var(--admin-text-light, var(--text-secondary));">
+          Neue Benutzerkonten manuell anlegen
+        </p>
       </div>
-    </header>
 
-    <!-- Navigation -->
-    <nav class="admin-navbar">
-      <div class="admin-navbar-content">
-        <div class="admin-navbar-links">
-          <a href="/admin" class="admin-nav-link">Dashboard</a>
-          <a href="/admin/users" class="admin-nav-link">Benutzer</a>
-          <a href="/admin/items" class="admin-nav-link">Items</a>
-          <a href="/admin/create-user" class="admin-nav-link active">Benutzer erstellen</a>
-        </div>
-      </div>
-    </nav>
-
-    <!-- Main Content -->
-    <main class="admin-main">
-      <div class="admin-table-container">
-        <div class="admin-table-header">
-          <h3 class="admin-table-title">Neuen Benutzer erstellen</h3>
-        </div>
-        
-        <div style="padding: 1.5rem;">
+      <div style="padding: 1.5rem;">
           {#if message}
             <div class="admin-btn {messageType === 'success' ? 'admin-btn-primary' : messageType === 'error' ? 'admin-btn-danger' : 'admin-btn-secondary'}" style="margin-bottom: 1rem; display: block; text-align: center;">
               {message}
@@ -220,7 +202,6 @@
             </ul>
           </div>
         </div>
-      </div>
-    </main>
+    </div>
   </div>
-{/if} 
+{/if}

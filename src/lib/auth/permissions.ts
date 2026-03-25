@@ -192,7 +192,7 @@ export function createPermissionGuard(permission: keyof UserPermissions) {
 </script>
 
 {#if $userPermissions.admin}
-  <a href="/admin">Admin Panel</a>
+  <a href="/admin/roles">Admin Panel</a>
 {/if}
 
 {#if $userPermissions.joystick}

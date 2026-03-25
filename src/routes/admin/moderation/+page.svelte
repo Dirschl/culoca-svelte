@@ -1,4 +1,5 @@
 <svelte:head>
+  <title>Admin – Moderation</title>
   <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex" />
   <meta name="googlebot" content="noindex, nofollow" />
   <meta name="bingbot" content="noindex, nofollow" />
@@ -9,7 +10,6 @@
   import { goto } from '$app/navigation';
   import { supabase } from '$lib/supabaseClient';
   import { authFetch } from '$lib/authFetch';
-  import InfoPageLayout from '$lib/InfoPageLayout.svelte';
   import { getIssueLabel, fetchAllReviewItems, type ProfileReviewItem } from '$lib/profile/review';
   import { getPublicItemHref } from '$lib/content/routing';
 
@@ -168,23 +168,22 @@
   });
 </script>
 
-<InfoPageLayout currentPage="admin" title="Moderation" description="Offene Review-Fälle anderer Nutzer zentral prüfen">
-  {#if loading}
-    <div class="state-card">Lade Moderationsliste...</div>
-  {:else if !hasAdminPermission}
-    <div class="state-card state-card--error">{errorMessage || 'Zugriff verweigert.'}</div>
-  {:else}
-    <div class="moderation-shell">
-      <div class="moderation-header">
-        <div>
-          <p class="eyebrow">Admin</p>
-          <h1>Moderation und Datenprüfung</h1>
-          <p class="intro">
-            Hier sehen Administratoren die offenen Fälle anderer Nutzer. Die eigenen Einträge bleiben unter `Daten prüfen`, damit beides sauber getrennt bleibt.
-          </p>
-        </div>
-        <div class="summary-chip">{items.length} offene Fälle</div>
+{#if loading}
+  <div class="state-card">Lade Moderationsliste...</div>
+{:else if !hasAdminPermission}
+  <div class="state-card state-card--error">{errorMessage || 'Zugriff verweigert.'}</div>
+{:else}
+  <div class="moderation-shell">
+    <div class="moderation-header">
+      <div>
+        <p class="eyebrow">Admin</p>
+        <h3 class="moderation-title">Moderation und Datenprüfung</h3>
+        <p class="intro">
+          Hier sehen Administratoren die offenen Fälle anderer Nutzer. Die eigenen Einträge bleiben unter `Daten prüfen`, damit beides sauber getrennt bleibt.
+        </p>
       </div>
+      <div class="summary-chip">{items.length} offene Fälle</div>
+    </div>
 
       {#if errorMessage}
         <div class="state-card state-card--error">{errorMessage}</div>
@@ -247,9 +246,8 @@
           {/each}
         </div>
       {/if}
-    </div>
-  {/if}
-</InfoPageLayout>
+  </div>
+{/if}
 
 <style>
   .moderation-shell {
@@ -272,9 +270,11 @@
     color: var(--text-secondary);
   }
 
-  h1 {
+  .moderation-title {
     margin: 0;
-    font-size: clamp(1.8rem, 3vw, 2.6rem);
+    font-size: clamp(1.35rem, 2.5vw, 1.85rem);
+    font-weight: 700;
+    color: var(--text-primary);
   }
 
   .intro {

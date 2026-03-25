@@ -1,4 +1,5 @@
 <svelte:head>
+  <title>Admin – Items</title>
   <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex" />
   <meta name="googlebot" content="noindex, nofollow" />
   <meta name="bingbot" content="noindex, nofollow" />
@@ -7,7 +8,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { supabase } from '$lib/supabaseClient';
-  import InfoPageLayout from '$lib/InfoPageLayout.svelte';
   import { getPublicItemHref } from '$lib/content/routing';
 
   let isLoading = true;
@@ -372,17 +372,16 @@
 
 {#if isLoading}
   <div style="padding: 2rem; text-align: center;">
-    <h2>Lade Admin-Bereich...</h2>
+    <h2>Lade Items…</h2>
   </div>
 {:else if !isAdmin}
   <div style="padding: 2rem; text-align: center;">
     <h2>Zugriff verweigert</h2>
-    <p>Sie haben keine Berechtigung, auf das Admin-Dashboard zuzugreifen.</p>
+    <p>Sie haben keine Berechtigung, auf die Item-Verwaltung zuzugreifen.</p>
     <a href="/" style="color: #f59e0b;">Zurück zur Galerie</a>
   </div>
 {:else}
-  <InfoPageLayout title="Admin Dashboard">
-    <div style="width: 100%;">
+  <div class="admin-items-wrap" style="width: 100%;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
         <h2 style="margin: 0; color: #f9fafb;">Admin Items</h2>
         {#if searchTerm}
@@ -665,7 +664,6 @@
         </div>
       {/if}
     </div>
-  </InfoPageLayout>
 {/if}
 
 <!-- Owner Change Modal -->

@@ -1,4 +1,5 @@
 <svelte:head>
+  <title>Admin – Analytics</title>
   <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex" />
   <meta name="googlebot" content="noindex, nofollow" />
   <meta name="bingbot" content="noindex, nofollow" />
@@ -9,7 +10,6 @@
   import { supabase } from '$lib/supabaseClient';
   import { goto } from '$app/navigation';
   import { darkMode } from '$lib/darkMode';
-  import InfoPageLayout from '$lib/InfoPageLayout.svelte';
   import DownloadStats from '$lib/DownloadStats.svelte';
   import { getPublicItemHref } from '$lib/content/routing';
 
@@ -312,14 +312,13 @@
       <div class="admin-empty">
         <div class="admin-empty-icon">🚫</div>
         <h2 class="admin-empty-title">Zugriff verweigert</h2>
-        <p class="admin-empty-description">Sie haben keine Berechtigung, auf das Admin-Dashboard zuzugreifen.</p>
+        <p class="admin-empty-description">Sie haben keine Berechtigung, auf die Analytics zu zugreifen.</p>
         <a href="/" class="admin-btn admin-btn-primary">Zurück zur Galerie</a>
       </div>
     </div>
   </div>
 {:else}
-  <InfoPageLayout title="Admin Analytics">
-    <div style="width: 100%;">
+  <div class="admin-analytics-wrap" style="width: 100%;">
       <!-- Header -->
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
         <div>
@@ -544,8 +543,7 @@
         <DownloadStats itemId={selectedItemId} />
       </div>
     </div>
-  </InfoPageLayout>
-{/if} 
+{/if}
 
 <style>
   /* Admin Analytics Styles */

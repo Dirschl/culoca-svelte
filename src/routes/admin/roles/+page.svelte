@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { supabase } from '$lib/supabaseClient';
-  import InfoPageLayout from '$lib/InfoPageLayout.svelte';
   
   let user: any = null;
   let hasAdminPermission = false;
@@ -106,49 +105,42 @@
     <a href="/" class="btn">Zurück zur Startseite</a>
   </div>
 {:else}
-  <InfoPageLayout 
-    currentPage="admin"
-    title="Rollen-Management"
-    description="Verwalte Rollen und deren Berechtigungen"
-  >
-    <div class="admin-content">
-      {#if error}
-        <div class="error-message">{error}</div>
-      {/if}
-      
-      <!-- Roles Management -->
-      <section class="roles-section">
-        <h2>Rollen und Berechtigungen</h2>
-        <div class="roles-grid">
-          {#each roles as role}
-            <div class="role-card">
-              <h3>{role.display_name}</h3>
-              <p class="role-description">{role.description}</p>
-              
-              <div class="permissions">
-                <h4>Berechtigungen:</h4>
-                {#each getRolePermissions(role) as [permission, value]}
-                  <label class="permission-item">
-                    <input 
-                      type="checkbox" 
-                      checked={value}
-                      on:change={(e) => handlePermissionChange(role, permission, e)}
-                    />
-                    <span>{permission}</span>
-                  </label>
-                {/each}
-              </div>
-              
-              <div class="role-stats">
-                <p>Rollen-ID: {role.id}</p>
-                <p>Name: {role.name}</p>
-              </div>
+  <div class="admin-content">
+    {#if error}
+      <div class="error-message">{error}</div>
+    {/if}
+
+    <section class="roles-section">
+      <h2>Rollen und Berechtigungen</h2>
+      <div class="roles-grid">
+        {#each roles as role}
+          <div class="role-card">
+            <h3>{role.display_name}</h3>
+            <p class="role-description">{role.description}</p>
+
+            <div class="permissions">
+              <h4>Berechtigungen:</h4>
+              {#each getRolePermissions(role) as [permission, value]}
+                <label class="permission-item">
+                  <input
+                    type="checkbox"
+                    checked={value}
+                    on:change={(e) => handlePermissionChange(role, permission, e)}
+                  />
+                  <span>{permission}</span>
+                </label>
+              {/each}
             </div>
-          {/each}
-        </div>
-      </section>
-    </div>
-  </InfoPageLayout>
+
+            <div class="role-stats">
+              <p>Rollen-ID: {role.id}</p>
+              <p>Name: {role.name}</p>
+            </div>
+          </div>
+        {/each}
+      </div>
+    </section>
+  </div>
 {/if}
 
 <style>

@@ -31,7 +31,6 @@
   ];
 
   const adminLinks = [
-    { href: '/admin', label: 'Dashboard' },
     { href: '/admin/roles', label: 'Rollen' },
     { href: '/admin/users', label: 'Benutzer' },
     { href: '/admin/items', label: 'Items' },
