@@ -1,15 +1,19 @@
 /**
  * Öffentliche Bild-Auslieferung (Supabase Storage → Browser)
  *
- * | Modus              | URL / Verwendung                    | X-Robots-Tag (Bild) |
- * |--------------------|-------------------------------------|----------------------|
- * | indexable          | /images/{slug}-2048|512…            | index, max-image-preview:large |
- * | embed_noimageindex | /images/similar/…, ?context=similar | noimageindex (Nebenbilder) |
+ * | Modus              | URL / Verwendung                         | X-Robots-Tag (Bild) |
+ * |--------------------|------------------------------------------|----------------------|
+ * | indexable          | /images/{slug}-2048… (Hauptbild)         | index, max-image-preview:large |
+ * | embed_noimageindex | /images/{slug}-512…, /images/similar/…   | noimageindex         |
+ * | (legacy)           | ?context=similar auf /images/…           | noimageindex         |
  *
  * HTML-Item-Links bleiben normal crawlbar; nur die Bild-Response trägt noimageindex.
  * ETag enthält ix|ni, damit CDN/304 nicht die falsche Robot-Variante cacht.
  *
- * Mini-Thumbs (64px): Route /images/embed/images-64/… (separate Datei).
+ * Mini-Thumbs: /images/embed/images-64/… und /images/embed/images-512/… (separate Datei, noimageindex).
+ *
+ * Fazit: Nur /images/{slug}-2048… bleibt explizit indexierbar; 512er, Similar und Embed-Proxys liefern
+ * noimageindex, damit Google Bilder ein klares Hauptmotiv pro Item-URL sieht — Zielseiten bleiben über <a href> crawlbar.
  */
 import type { RequestEvent } from '@sveltejs/kit';
 import { supabase } from '$lib/supabaseClient';
@@ -120,7 +124,6 @@ export async function respondPublicImage(
   robotMode: PublicImageRobotMode
 ): Promise<Response> {
   const { slug } = params;
-  const noImageIndex = robotMode === 'embed_noimageindex';
 
   if (!slug) {
     return new Response('Missing slug', {
@@ -140,10 +143,6 @@ export async function respondPublicImage(
   }
 
   console.log(`🔍 [Images] Request for slug path: ${slugPath} (robotMode=${robotMode})`);
-
-  const xRobotsTag = noImageIndex
-    ? 'noimageindex, noarchive, nosnippet'
-    : 'index, follow, max-image-preview:large';
 
   try {
     let actualSlug = slugPath;
@@ -202,6 +201,11 @@ export async function respondPublicImage(
     if (!requestedSize && (sizeParam === '512' || sizeParam === '2048')) {
       requestedSize = sizeParam;
     }
+
+    const noImageIndex = robotMode === 'embed_noimageindex' || requestedSize === '512';
+    const xRobotsTag = noImageIndex
+      ? 'noimageindex, noarchive, nosnippet'
+      : 'index, follow, max-image-preview:large';
 
     const plan = buildStorageFetchPlan(item.id, item.path_512, item.path_2048, requestedSize);
     const hit = await fetchFirstAvailableImage(plan);

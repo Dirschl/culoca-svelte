@@ -1,3 +1,5 @@
+import { fixTextEncodingIfNeeded } from '$lib/utils/utf8Mojibake';
+
 export type PhotoMetadataFields = {
   title: string | null;
   caption: string | null;
@@ -13,14 +15,7 @@ export type PhotoMetadataFields = {
 
 function fixMetadataEncoding(value: string | null | undefined) {
   if (!value) return null;
-  try {
-    if (/[ÃÂâ€žâ€œâ€“â€”]/.test(value)) {
-      return decodeURIComponent(escape(value));
-    }
-  } catch {
-    return value;
-  }
-  return value;
+  return fixTextEncodingIfNeeded(value) ?? value;
 }
 
 function firstText(...values: Array<unknown>) {

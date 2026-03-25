@@ -28,6 +28,31 @@ export function absoluteUrl(path: string): string {
   return path.startsWith('http') ? path : `${SITE_URL}${path.startsWith('/') ? path : `/${path}`}`;
 }
 
+/** Einheitlich Trailing Slash für Content-URLs (canonical / JSON-LD / Breadcrumbs). */
+export function withTrailingSlash(path: string): string {
+  if (!path) return '/';
+  const qIndex = path.indexOf('?');
+  const pathname = qIndex === -1 ? path : path.slice(0, qIndex);
+  const query = qIndex === -1 ? '' : path.slice(qIndex);
+  if (!pathname || pathname === '/') return `/${query}`;
+  if (pathname.endsWith('/')) return pathname + query;
+  return `${pathname}/${query}`;
+}
+
+export function toCanonicalAbsoluteUrl(pathOrUrl: string): string {
+  if (!pathOrUrl) return `${SITE_URL}/`;
+  try {
+    if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) {
+      const u = new URL(pathOrUrl);
+      u.pathname = withTrailingSlash(u.pathname);
+      return u.toString();
+    }
+  } catch {
+    /* use relative path below */
+  }
+  return absoluteUrl(withTrailingSlash(pathOrUrl));
+}
+
 export function normalizeRobots(value: string): string {
   return value
     .split(',')
@@ -44,7 +69,7 @@ export function buildBreadcrumbJsonLd(items: BreadcrumbEntry[]) {
       '@type': 'ListItem',
       position: index + 1,
       name: item.name,
-      item: absoluteUrl(item.path)
+      item: toCanonicalAbsoluteUrl(item.path)
     }))
   };
 }
@@ -61,11 +86,11 @@ function samePlaceValue(a: string | null | undefined, b: string | null | undefin
 }
 
 function placeNodeId(path: string, suffix: string): string {
-  return `${absoluteUrl(path)}#${suffix}`;
+  return `${toCanonicalAbsoluteUrl(path)}#${suffix}`;
 }
 
 export function buildGeoPlaceGraph(input: GeoPlaceJsonLdInput) {
-  const currentPath = input.currentPath.startsWith('http') ? input.currentPath : absoluteUrl(input.currentPath);
+  const currentPath = toCanonicalAbsoluteUrl(input.currentPath);
   const currentId = `${currentPath}#place`;
   const countryName = normalizePlaceValue(input.countryName);
   const stateName = normalizePlaceValue(input.stateName);
@@ -135,7 +160,7 @@ export function buildGeoPlaceGraph(input: GeoPlaceJsonLdInput) {
       '@type': 'Place',
       '@id': id,
       name: level.name,
-      url: absoluteUrl(level.path)
+      url: toCanonicalAbsoluteUrl(level.path)
     };
     if (parentId) {
       node.containedInPlace = { '@id': parentId };
@@ -189,14 +214,15 @@ export function buildGeoCollectionPageJsonLd(args: {
   breadcrumbPath?: string | null;
   placeId?: string | null;
 }) {
+  const pageUrl = toCanonicalAbsoluteUrl(args.path);
   return {
     '@type': 'CollectionPage',
-    '@id': absoluteUrl(args.path),
-    url: absoluteUrl(args.path),
+    '@id': pageUrl,
+    url: pageUrl,
     name: args.name,
     ...(args.description ? { description: args.description } : {}),
     ...(args.placeId ? { about: { '@id': args.placeId } } : {}),
-    ...(args.breadcrumbPath ? { breadcrumb: absoluteUrl(args.breadcrumbPath) } : {})
+    ...(args.breadcrumbPath ? { breadcrumb: toCanonicalAbsoluteUrl(args.breadcrumbPath) } : {})
   };
 }
 

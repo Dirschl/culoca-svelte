@@ -1,7 +1,7 @@
 /**
  * Utility function to generate SEO-friendly image URLs
  * Instead of: https://supabase.co/storage/.../uuid.jpg
- * Generate:   https://culoca.com/images/slug-512.jpg
+ * Generate:   https://culoca.com/images/slug-512.jpg (Response: X-Robots-Tag noimageindex)
  */
 
 /**

@@ -23,6 +23,7 @@ import {
   sanitizeItemForItemPageClient,
   scrubPublicProfileRow
 } from '$lib/server/itemPagePublic';
+import { fixDeepUtf8InObject } from '$lib/utils/utf8Mojibake';
 
 type ItemRecord = ContentItemLike & {
   user_id?: string | null;
@@ -442,17 +443,18 @@ async function getRelatedItems(
 
   const semanticSimilarRows = await getSemanticSimilarItems(supabase, item, rootItem, type, baseSelect);
 
-  const toPreview = (row: ItemRecord) => ({
-    id: row.id,
-    slug: row.slug,
-    title: row.title || row.original_name || 'Item',
-    description: row.description || row.caption || '',
-    caption: row.caption || row.description || '',
-    canonicalPath: getStoredOrComputedCanonicalPath({ item: row, type }),
-    path_512: row.path_512,
-    width: row.width,
-    height: row.height
-  });
+  const toPreview = (row: ItemRecord) =>
+    fixDeepUtf8InObject({
+      id: row.id,
+      slug: row.slug,
+      title: row.title || row.original_name || 'Item',
+      description: row.description || row.caption || '',
+      caption: row.caption || row.description || '',
+      canonicalPath: getStoredOrComputedCanonicalPath({ item: row, type }),
+      path_512: row.path_512,
+      width: row.width,
+      height: row.height
+    });
 
   return {
     sameType: [],
@@ -539,10 +541,12 @@ export async function loadContentPage(args: {
   const siblings = [rootItem, ...groupItems]
     .filter((candidate, index, list) => list.findIndex((other) => other.id === candidate.id) === index)
     .filter((candidate) => isPubliclyVisibleItem(candidate))
-    .map((candidate) => ({
-      ...makeGroupPreview(candidate, type, rootItem),
-      isActive: candidate.id === item.id
-    }));
+    .map((candidate) =>
+      fixDeepUtf8InObject({
+        ...makeGroupPreview(candidate, type, rootItem),
+        isActive: candidate.id === item.id
+      })
+    );
 
   const contextItem = rootItem.id === item.id ? item : rootItem;
   const availableTypes = Array.from(typeMap.values())

@@ -3,14 +3,14 @@ import type { RequestHandler } from '@sveltejs/kit';
 const SUPABASE_STORAGE_URL = 'https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public';
 
 /** Nur Buckets, die als Mini-Thumbnails ohne Bild-Index ausgeliefert werden. */
-const ALLOWED_BUCKETS = new Set(['images-64']);
+const ALLOWED_BUCKETS = new Set(['images-64', 'images-512']);
 
 function encodeStorageObjectPath(path: string): string {
   return path.split('/').map(encodeURIComponent).join('/');
 }
 
 /**
- * Proxy für kleine Storage-Objekte mit X-Robots-Tag: noimageindex.
+ * Proxy für Storage-Thumbnails (64px, 512px) mit X-Robots-Tag: noimageindex.
  * Verhindert, dass direkte Supabase-64px-URLs in Google Bilder mit der Host-Item-Seite verknüpft werden.
  */
 export const GET: RequestHandler = async ({ params }) => {

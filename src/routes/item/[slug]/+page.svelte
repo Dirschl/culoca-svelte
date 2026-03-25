@@ -8,7 +8,8 @@
     IMAGE_PAGE_COPYRIGHT_ORG_NAME,
     IMAGE_PAGE_CREATOR_PERSON_NAME
   } from '$lib/seo/itemImageSeoConstants';
-  import { fixUtf8MojibakeIfNeeded } from '$lib/utils/utf8Mojibake';
+  import { fixTextEncodingIfNeeded } from '$lib/utils/utf8Mojibake';
+  import { pickBestExifCaptureDateFormatted } from '$lib/metadata/exifDate';
   import { darkMode } from '$lib/darkMode';
   import { filterStore, getEffectiveGpsPosition } from '$lib/filterStore';
   import { goto } from '$app/navigation';
@@ -74,7 +75,6 @@
 
   // Detail-Komponenten
   import ImageControlsSection from '$lib/detail/ImageControlsSection.svelte';
-  import ImageMetaSection from '$lib/detail/ImageMetaSection.svelte';
   import FileDetails from '$lib/detail/FileDetails.svelte';
   import KeywordsSection from '$lib/detail/KeywordsSection.svelte';
   import CreatorCard from '$lib/detail/CreatorCard.svelte';
@@ -95,7 +95,8 @@ let showRightsManager = false;
 
   // Helper function for formatting time
   function formatTimeCreated(value: any): string {
-    if (!value) return '';
+    if (value == null || value === '') return '';
+    if (typeof value === 'object') return '';
     if (typeof value === 'string') {
       // Format: "150629" -> "15:06:29"
       if (value.length === 6 && /^\d{6}$/.test(value)) {
@@ -108,6 +109,16 @@ let showRightsManager = false;
 
   function relatedThumbUrl(item: { slug: string; path_512?: string | null }) {
     return item.path_512 ? getSeoSimilarEmbedImageUrl(item.slug, item.path_512, '512') : '';
+  }
+
+  function exifDisplayStr(v: unknown): string {
+    if (v == null) return '';
+    if (typeof v === 'string') {
+      const t = v.trim();
+      return t ? fixTextEncodingIfNeeded(t) ?? t : '';
+    }
+    if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+    return '';
   }
 
   export let data: any;
@@ -237,7 +248,7 @@ let showRightsManager = false;
   ]);
   $: itemBreadcrumbJsonLd = buildBreadcrumbJsonLd(geoBreadcrumbLinks);
   $: geoPlaceGraph = buildGeoPlaceGraph({
-    currentPath: canonicalPath || `/item/${itemSlug}`,
+    currentPath: canonicalPath ? canonicalPathWithTrailingSlash(canonicalPath) : `/item/${itemSlug}/`,
     currentName:
       normalizeAdminDisplayLabel(image?.locality_name) ||
       normalizeAdminDisplayLabel(image?.municipality_name) ||
@@ -288,6 +299,20 @@ let showRightsManager = false;
   }
 
   $: mainImageAlt = buildMainImageAlt(image);
+
+  $: metaAuthorFromExif =
+    image?.exif_data?.Artist != null && String(image.exif_data.Artist).trim()
+      ? fixTextEncodingIfNeeded(String(image.exif_data.Artist).trim()) ??
+        String(image.exif_data.Artist).trim()
+      : '';
+  $: metaAuthor = metaAuthorFromExif || image?.full_name || 'culoca.com';
+  $: metaCopyright =
+    image?.exif_data?.Copyright != null && String(image.exif_data.Copyright).trim()
+      ? fixTextEncodingIfNeeded(String(image.exif_data.Copyright).trim()) ??
+        String(image.exif_data.Copyright).trim()
+      : '';
+
+  $: itemCaptureDateLabel = pickBestExifCaptureDateFormatted(image?.exif_data);
 
   $: canonicalUrl = canonicalPath
     ? `https://culoca.com${canonicalPathWithTrailingSlash(canonicalPath)}`
@@ -1893,6 +1918,7 @@ let showRightsManager = false;
   }
   function formatExposureTime(value: string | number | null | undefined) {
     if (value === undefined || value === null) return '';
+    if (typeof value === 'object') return '';
     if (typeof value === 'string') {
       return value.includes('/') ? value + ' s' : value + ' s';
     }
@@ -3085,7 +3111,10 @@ let showRightsManager = false;
   {/if}
   <meta name="twitter:image:alt" content={mainImageAlt || image?.title || `Item ${itemSlug}`}>
   
-  <meta name="author" content={image?.full_name || 'culoca.com'}>
+  <meta name="author" content={metaAuthor}>
+  {#if metaCopyright}
+    <meta name="copyright" content={metaCopyright} />
+  {/if}
   
   <!-- Dynamisches Favicon für bessere SEO -->
   <link rel="icon" type="image/png" href={`/api/favicon/${itemSlug}`} sizes="32x32 48x48 96x96 192x192 512x512"> 
@@ -3139,7 +3168,7 @@ let showRightsManager = false;
     
     {@const rawExifCaption = image.exif_data?.Caption != null ? String(image.exif_data.Caption) : ''}
     {@const exifCaption = rawExifCaption
-      ? normalizeUtf8(fixUtf8MojibakeIfNeeded(rawExifCaption) ?? rawExifCaption)
+      ? normalizeUtf8(fixTextEncodingIfNeeded(rawExifCaption) ?? rawExifCaption)
       : image.title || itemName}
     {@const caption = image.caption || exifCaption || image.description || ''}
     {@const sha256 = image.sha256 || undefined}
@@ -3262,7 +3291,6 @@ let showRightsManager = false;
                     class:square={!$useJustifiedLayout}
                     src={getSeoSimilarEmbedImageUrl(groupItem.slug, groupItem.path_512, '512')}
                     alt=""
-                    role="presentation"
                     loading="lazy"
                     decoding="async"
                     fetchpriority="low"
@@ -3272,7 +3300,6 @@ let showRightsManager = false;
                     class:square={!$useJustifiedLayout}
                     src={`https://culoca.com/images/embed/images-64/${encodeURIComponent(groupItem.path_64)}`}
                     alt=""
-                    role="presentation"
                     loading="lazy"
                     decoding="async"
                     fetchpriority="low"
@@ -3706,7 +3733,7 @@ let showRightsManager = false;
             <article class="comment-item" class:is-hidden={comment.status === 'hidden'}>
               <div class="comment-avatar">
                 {#if getCommentAvatarUrl(comment)}
-                  <img src={getCommentAvatarUrl(comment)} alt="" role="presentation" loading="lazy" />
+                  <img src={getCommentAvatarUrl(comment)} alt="" loading="lazy" />
                 {:else}
                   <span>{getCommentAuthor(comment).slice(0, 1)}</span>
                 {/if}
@@ -3772,7 +3799,7 @@ let showRightsManager = false;
                   <article class="comment-item comment-item--reply" class:is-hidden={reply.status === 'hidden'}>
                     <div class="comment-avatar">
                       {#if getCommentAvatarUrl(reply)}
-                        <img src={getCommentAvatarUrl(reply)} alt="" role="presentation" loading="lazy" />
+                        <img src={getCommentAvatarUrl(reply)} alt="" loading="lazy" />
                       {:else}
                         <span>{getCommentAuthor(reply).slice(0, 1)}</span>
                       {/if}
@@ -4074,11 +4101,15 @@ let showRightsManager = false;
           {#if image.exif_data && image.exif_data.FileSize}
             <div class="meta-line">Dateigröße: {formatFileSize(image.exif_data.FileSize)}</div>
           {/if}
-          {#if image.exif_data && image.exif_data.Make}
-            <div class="meta-line">Kamera: {image.exif_data.Make} {image.exif_data.Model || ''}</div>
+          {#if image.exif_data && exifDisplayStr(image.exif_data.Make)}
+            <div class="meta-line">
+              Kamera: {exifDisplayStr(image.exif_data.Make)}{exifDisplayStr(image.exif_data.Model)
+                ? ` ${exifDisplayStr(image.exif_data.Model)}`
+                : ''}
+            </div>
           {/if}
-          {#if image.exif_data && image.exif_data.LensModel}
-            <div class="meta-line">Objektiv: {image.exif_data.LensModel}</div>
+          {#if image.exif_data && exifDisplayStr(image.exif_data.LensModel)}
+            <div class="meta-line">Objektiv: {exifDisplayStr(image.exif_data.LensModel)}</div>
           {/if}
           {#if image.exif_data && image.exif_data.FocalLength}
             <div class="meta-line">Brennweite: {image.exif_data.FocalLength} mm{#if image.exif_data.FocalLengthIn35mmFormat && image.exif_data.FocalLengthIn35mmFormat !== image.exif_data.FocalLength} (35mm: {image.exif_data.FocalLengthIn35mmFormat} mm){/if}</div>
@@ -4092,17 +4123,17 @@ let showRightsManager = false;
           {#if image.exif_data && image.exif_data.ExposureTime}
             <div class="meta-line">Verschlusszeit: {formatExposureTime(image.exif_data.ExposureTime)}</div>
           {/if}
-          {#if image.exif_data && image.exif_data.CreateDate}
-            <div class="meta-line">Aufgenommen: {new Date(image.exif_data.CreateDate).toLocaleDateString('de-DE')}</div>
+          {#if itemCaptureDateLabel}
+            <div class="meta-line">Aufgenommen: {itemCaptureDateLabel}</div>
           {/if}
           {#if image.lat && image.lon}
             <div class="meta-line">GPS: {image.lat.toFixed(5)}, {image.lon.toFixed(5)}</div>
           {/if}
-          {#if image.exif_data && image.exif_data.Artist}
-            <div class="meta-line">Fotograf: {image.exif_data.Artist}</div>
+          {#if image.exif_data && exifDisplayStr(image.exif_data.Artist)}
+            <div class="meta-line">Fotograf: {exifDisplayStr(image.exif_data.Artist)}</div>
           {/if}
-          {#if image.exif_data && image.exif_data.Copyright}
-            <div class="meta-line">Copyright: {image.exif_data.Copyright}</div>
+          {#if image.exif_data && exifDisplayStr(image.exif_data.Copyright)}
+            <div class="meta-line">Copyright: {exifDisplayStr(image.exif_data.Copyright)}</div>
           {/if}
           {#if image.created_at}
             <div class="meta-line">Veröffentlicht am: {new Date(image.created_at).toLocaleDateString('de-DE')}</div>
@@ -4112,13 +4143,13 @@ let showRightsManager = false;
             {#if image.exif_data.Orientation}
               <div class="meta-line">Ausrichtung: {image.exif_data.Orientation}</div>
             {/if}
-            {#if image.exif_data.Flash}
+            {#if image.exif_data.Flash != null && image.exif_data.Flash !== '' && typeof image.exif_data.Flash !== 'object'}
               <div class="meta-line">Blitz: {image.exif_data.Flash}</div>
             {/if}
-            {#if image.exif_data.Software}
-              <div class="meta-line">Software: {image.exif_data.Software}</div>
+            {#if exifDisplayStr(image.exif_data.Software)}
+              <div class="meta-line">Software: {exifDisplayStr(image.exif_data.Software)}</div>
             {/if}
-            {#if image.exif_data.TimeCreated}
+            {#if formatTimeCreated(image.exif_data.TimeCreated)}
               <div class="meta-line">Aufnahmezeit: {formatTimeCreated(image.exif_data.TimeCreated)}</div>
             {/if}
           {/if}
@@ -4278,7 +4309,7 @@ let showRightsManager = false;
                   <div class="similar-item-thumb" style={`--thumb-preview:url('${relatedThumbUrl(item)}')`}>
                     <img
                       src={relatedThumbUrl(item)}
-                      alt={item.title || 'Aehnliches Motiv'}
+                      alt=""
                       width="320"
                       height="213"
                       loading="lazy"

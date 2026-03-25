@@ -5,10 +5,8 @@
  * - Profil nur mit expliziter Whitelist (keine SFTP-/Secret-Spalten aus select('*'))
  *
  * Google Bilder / SEO (Bild-URLs, nicht HTML):
- * - Indexierbar: /images/{slug}-2048.* (und -512 als Fallback, gleiches Motiv) — Hauptmotiv
- * - noimageindex (X-Robots-Tag): /images/similar/… (Thumbs auf fremden Items)
- * - noimageindex: /images/embed/images-64/… (Mini-Thumbnails, Proxy)
- * - ?context=similar auf /images/… bleibt aus Kompatibilität embed_noimageindex
+ * - Indexierbar: /images/{slug}-2048.* (primäres Hauptbild)
+ * - noimageindex: /images/{slug}-512.*, /images/similar/…, ?context=similar, /images/embed/images-64|images-512/…
  *
  * HTML-Links (<a href>) bleiben überall follow/crawlbar; nur Bild-Responses tragen noimageindex.
  */
@@ -42,10 +40,10 @@ const ITEM_KEYS_STRIP = new Set([
   'adobe_stock_error'
 ]);
 
-import { fixUtf8MojibakeIfNeeded as fixUtf8MojibakeIfNeededUtil } from '$lib/utils/utf8Mojibake';
+import { fixTextEncodingIfNeeded } from '$lib/utils/utf8Mojibake';
 
 export function fixUtf8MojibakeIfNeeded(input: string | null | undefined): string | null | undefined {
-  return fixUtf8MojibakeIfNeededUtil(input);
+  return fixTextEncodingIfNeeded(input);
 }
 
 export function scrubPublicProfileRow(row: Record<string, unknown> | null): Record<string, unknown> | null {
@@ -55,7 +53,7 @@ export function scrubPublicProfileRow(row: Record<string, unknown> | null): Reco
 
 function fixStringsDeep(value: unknown): unknown {
   if (typeof value === 'string') {
-    return fixUtf8MojibakeIfNeeded(value) ?? value;
+    return fixTextEncodingIfNeeded(value) ?? value;
   }
   if (Array.isArray(value)) {
     return value.map((v) => fixStringsDeep(v));
