@@ -46,7 +46,7 @@ export const GET: RequestHandler = async ({ params }) => {
       headers: {
         'Content-Type': contentType,
         'Cache-Control': 'public, max-age=3600, stale-while-revalidate=86400',
-        'X-Robots-Tag': 'noimageindex, noarchive, nosnippet',
+        'X-Robots-Tag': 'noimageindex',
         'X-Content-Type-Options': 'nosniff',
         'Access-Control-Allow-Origin': '*'
       }

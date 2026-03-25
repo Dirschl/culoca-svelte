@@ -6,7 +6,7 @@
  *
  * Google Bilder / SEO (Bild-URLs, nicht HTML):
  * - Indexierbar: /images/{slug}-2048.* (primäres Hauptbild)
- * - noimageindex: /images/{slug}-512.*, /images/similar/…, ?context=similar, /images/embed/images-64|images-512/…
+ * - noimageindex (nur Token): /images/{slug}-512.*, /images/similar/…, ?context=similar, /images/embed/… (+ hooks)
  *
  * HTML-Links (<a href>) bleiben überall follow/crawlbar; nur Bild-Responses tragen noimageindex.
  */

@@ -15,8 +15,10 @@ import {
   buildPhotographerHubPath,
   buildPlaceHubPath,
   getKeywordHubLinks,
-  pickPlaceLabel
+  pickItemPlaceLabelForSeo
 } from '$lib/seo/hubs';
+import { getAdministrativeHierarchy } from '$lib/content/locationTaxonomy';
+import { getCulocaDownloadMetadataAttribution } from '$lib/metadata/photoMetadata';
 import {
   fixUtf8MojibakeIfNeeded,
   ITEM_PAGE_PROFILE_SELECT,
@@ -39,6 +41,7 @@ type ItemRecord = ContentItemLike & {
   district_code?: string | null;
   district_name?: string | null;
   municipality_name?: string | null;
+  locality_name?: string | null;
   location_source?: string | null;
   location_confidence?: number | null;
   location_needs_review?: boolean | null;
@@ -244,7 +247,8 @@ const ITEM_SELECT = `
   ends_at,
   external_url,
   video_url,
-  page_settings
+  page_settings,
+  locality_name
 `;
 
 async function getTypeMap(supabase: ReturnType<typeof createServerSupabase>) {
@@ -427,6 +431,20 @@ function makeGroupPreview(item: ItemRecord, type: Partial<ContentTypeDefinition>
   };
 }
 
+function enrichItemCountryName(item: ItemRecord): string | null {
+  const trimmed = item.country_name && String(item.country_name).trim();
+  if (trimmed) return trimmed;
+  const h = getAdministrativeHierarchy({
+    countryCode: item.country_code,
+    countrySlug: item.country_slug,
+    countryName: item.country_name,
+    districtCode: item.district_code,
+    districtSlug: item.district_slug,
+    districtName: item.district_name
+  });
+  return h.countryName;
+}
+
 async function getRelatedItems(
   supabase: ReturnType<typeof createServerSupabase>,
   item: ItemRecord,
@@ -436,10 +454,7 @@ async function getRelatedItems(
   const baseSelect =
     'id, slug, title, description, caption, canonical_path, path_512, width, height, created_at, profile_id, keywords, page_settings, country_slug, district_slug, municipality_slug, country_name, district_name, municipality_name';
 
-  const placeLabel = pickPlaceLabel(
-    (item.page_settings as Record<string, unknown> | null)?.location_name as string | null | undefined,
-    item.keywords || []
-  );
+  const placeLabel = pickItemPlaceLabelForSeo(item);
 
   const semanticSimilarRows = await getSemanticSimilarItems(supabase, item, rootItem, type, baseSelect);
 
@@ -537,6 +552,16 @@ export async function loadContentPage(args: {
     getSeoLinks(supabase, item)
   ]);
 
+  const countryNameResolved = enrichItemCountryName(item) ?? item.country_name;
+  const itemForPayload = { ...item, country_name: countryNameResolved };
+  const culocaAttribution = getCulocaDownloadMetadataAttribution(item.exif_data, profileData.profile);
+  const imageWithProfile = {
+    ...itemForPayload,
+    profile: profileData.profile,
+    full_name: culocaAttribution.creator
+  };
+  const related = await getRelatedItems(supabase, imageWithProfile, rootItem, type);
+
   const rootCanonicalPath = getStoredOrComputedCanonicalPath({ item: rootItem, rootItem, type });
   const siblings = [rootItem, ...groupItems]
     .filter((candidate, index, list) => list.findIndex((other) => other.id === candidate.id) === index)
@@ -552,19 +577,27 @@ export async function loadContentPage(args: {
   const availableTypes = Array.from(typeMap.values())
     .filter((candidate): candidate is Partial<ContentTypeDefinition> & { id: number } => typeof candidate?.id === 'number')
     .sort((a, b) => (a.id || 0) - (b.id || 0));
-  const imageWithProfile = { ...item, profile: profileData.profile, full_name: profileData.full_name };
-  const related = await getRelatedItems(supabase, imageWithProfile, rootItem, type);
   const typePath = type?.slug ? `/${type.slug}` : null;
 
   const imageForClient = {
-    ...sanitizeItemForItemPageClient({ ...item }),
+    ...sanitizeItemForItemPageClient({ ...itemForPayload }),
     profile: profileData.profile,
-    full_name: profileData.full_name
+    full_name: culocaAttribution.creator
   };
   const rootForClient =
-    rootItem.id === item.id ? imageForClient : sanitizeItemForItemPageClient({ ...rootItem });
+    rootItem.id === item.id
+      ? imageForClient
+      : sanitizeItemForItemPageClient({
+          ...rootItem,
+          country_name: enrichItemCountryName(rootItem) ?? rootItem.country_name
+        });
   const contextForClient =
-    contextItem.id === item.id ? imageForClient : sanitizeItemForItemPageClient({ ...contextItem });
+    contextItem.id === item.id
+      ? imageForClient
+      : sanitizeItemForItemPageClient({
+          ...contextItem,
+          country_name: enrichItemCountryName(contextItem) ?? contextItem.country_name
+        });
 
   return {
     image: imageForClient,

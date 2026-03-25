@@ -192,3 +192,35 @@ export function extractPhotoMetadataFields(exifData: Record<string, unknown> | n
     }
   };
 }
+
+/** Profil wie auf der Item-/Download-Seite (öffentliche Felder). */
+export type CulocaAttributionProfile = {
+  full_name?: string | null;
+  accountname?: string | null;
+} | null;
+
+/**
+ * Gleiche Logik wie Download-Vorschau „Culoca“: Ersteller + Copyright-Zeile für eingebettete Metadaten.
+ * Reihenfolge Ersteller: Profil → EXIF/XMP-Creator → „Unbekannt“.
+ * Copyright: EXIF-Rechtezeile + „ | culoca.com“, sonst Ersteller + „ | culoca.com“.
+ */
+export function getCulocaDownloadMetadataAttribution(
+  exifData: Record<string, unknown> | null | undefined,
+  profile: CulocaAttributionProfile
+): { creator: string; copyright: string } {
+  const extracted = extractPhotoMetadataFields(exifData || {});
+  const originalCreator = firstText(
+    extracted.creator,
+    profile?.full_name,
+    profile?.accountname
+  );
+  const originalCopyright = firstText(extracted.copyright);
+
+  const creator =
+    firstText(profile?.full_name, profile?.accountname, originalCreator, 'Unbekannt') || 'Unbekannt';
+  const copyright = originalCopyright
+    ? `${originalCopyright} | culoca.com`
+    : `${creator} | culoca.com`;
+
+  return { creator, copyright };
+}

@@ -10,7 +10,10 @@
   import { sessionStore } from '$lib/sessionStore';
   import { unifiedRightsStore } from '$lib/unifiedRightsStore';
   import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
-  import { extractPhotoMetadataFields } from '$lib/metadata/photoMetadata';
+  import {
+    extractPhotoMetadataFields,
+    getCulocaDownloadMetadataAttribution
+  } from '$lib/metadata/photoMetadata';
 
   export let data: any;
 
@@ -208,6 +211,9 @@
     fetchOriginalEstimate();
   }
 
+  $: downloadAttributionForKey = image
+    ? getCulocaDownloadMetadataAttribution(image.exif_data, image.profile ?? null)
+    : null;
   $: metadataPreviewKey = JSON.stringify({
     format: settings.format,
     metadataMode: settings.metadataMode,
@@ -215,8 +221,8 @@
     caption: image?.caption || null,
     description: image?.description || null,
     keywords: Array.isArray(image?.keywords) ? image.keywords.join(', ') : image?.keywords || null,
-    creator: image?.profile?.full_name || image?.profile?.accountname || null,
-    copyright: image?.exif_data?.Copyright || null,
+    creator: downloadAttributionForKey?.creator ?? null,
+    copyright: downloadAttributionForKey?.copyright ?? null,
     gpsLat: image?.lat || null,
     gpsLon: image?.lon || null
   });
@@ -597,8 +603,7 @@
 
   function getCulocaMetadataPreview(): MetadataPreview {
     const original = getOriginalMetadataPreview();
-    const creator = firstText(image?.profile?.full_name, image?.profile?.accountname, original.creator, 'Unbekannt');
-    const copyright = original.copyright ? `${original.copyright} | culoca.com` : `${creator} | culoca.com`;
+    const { creator, copyright } = getCulocaDownloadMetadataAttribution(image?.exif_data, image?.profile ?? null);
 
     return {
       title: firstText(image?.title),

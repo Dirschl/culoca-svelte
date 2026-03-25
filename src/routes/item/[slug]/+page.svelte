@@ -4,10 +4,7 @@
   import SiteNav from '$lib/SiteNav.svelte';
   import SiteFooter from '$lib/SiteFooter.svelte';
   import { getSeoImageUrl, getSeoSimilarEmbedImageUrl } from '$lib/utils/seoImageUrl';
-  import {
-    IMAGE_PAGE_COPYRIGHT_ORG_NAME,
-    IMAGE_PAGE_CREATOR_PERSON_NAME
-  } from '$lib/seo/itemImageSeoConstants';
+  import { getCulocaDownloadMetadataAttribution } from '$lib/metadata/photoMetadata';
   import { fixTextEncodingIfNeeded } from '$lib/utils/utf8Mojibake';
   import { pickBestExifCaptureDateFormatted } from '$lib/metadata/exifDate';
   import { darkMode } from '$lib/darkMode';
@@ -300,17 +297,12 @@ let showRightsManager = false;
 
   $: mainImageAlt = buildMainImageAlt(image);
 
-  $: metaAuthorFromExif =
-    image?.exif_data?.Artist != null && String(image.exif_data.Artist).trim()
-      ? fixTextEncodingIfNeeded(String(image.exif_data.Artist).trim()) ??
-        String(image.exif_data.Artist).trim()
-      : '';
-  $: metaAuthor = metaAuthorFromExif || image?.full_name || 'culoca.com';
-  $: metaCopyright =
-    image?.exif_data?.Copyright != null && String(image.exif_data.Copyright).trim()
-      ? fixTextEncodingIfNeeded(String(image.exif_data.Copyright).trim()) ??
-        String(image.exif_data.Copyright).trim()
-      : '';
+  /** Wie Download „Culoca“: Ersteller + Copyright-Zeile (nicht rohes Profil-full_name). */
+  $: culocaAttribution = image
+    ? getCulocaDownloadMetadataAttribution(image.exif_data, image.profile ?? null)
+    : { creator: 'culoca.com', copyright: 'culoca.com | culoca.com' };
+  $: metaAuthor = culocaAttribution.creator;
+  $: metaCopyright = culocaAttribution.copyright;
 
   $: itemCaptureDateLabel = pickBestExifCaptureDateFormatted(image?.exif_data);
 
@@ -3172,9 +3164,8 @@ let showRightsManager = false;
       : image.title || itemName}
     {@const caption = image.caption || exifCaption || image.description || ''}
     {@const sha256 = image.sha256 || undefined}
-    {@const createdYear = image.created_at ? new Date(image.created_at).getFullYear() : new Date().getFullYear()}
-    {@const creditText = `Foto: ${IMAGE_PAGE_CREATOR_PERSON_NAME}`}
-    {@const copyrightNotice = `© ${createdYear} ${IMAGE_PAGE_COPYRIGHT_ORG_NAME}. Alle Rechte vorbehalten.`}
+    {@const creditText = `Foto: ${culocaAttribution.creator}`}
+    {@const copyrightNotice = culocaAttribution.copyright}
     
     <!-- UTF-8 Normalization: Ensure NFC (not NFD) to prevent encoding issues like "SchoÃßbach" -->
     {@const normalizedItemName = normalizeUtf8(itemName)}
@@ -3182,8 +3173,8 @@ let showRightsManager = false;
     {@const normalizedDescription = normalizeUtf8(image.description || caption || '')}
     {@const normalizedCreditText = normalizeUtf8(creditText)}
     {@const normalizedCopyrightNotice = normalizeUtf8(copyrightNotice)}
-    {@const normalizedSchemaCreatorName = normalizeUtf8(IMAGE_PAGE_CREATOR_PERSON_NAME)}
-    {@const normalizedSchemaCopyrightOrgName = normalizeUtf8(IMAGE_PAGE_COPYRIGHT_ORG_NAME)}
+    {@const normalizedSchemaCreatorName = normalizeUtf8(culocaAttribution.creator)}
+    {@const normalizedSchemaCopyrightOrgName = normalizeUtf8('culoca.com')}
     {@const normalizedContentLocationName = normalizeUtf8(geoPlaceGraph.currentPlaceName)}
     
     {#if imageUrl2048}

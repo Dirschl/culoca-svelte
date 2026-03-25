@@ -4,7 +4,7 @@
  * | Modus              | URL / Verwendung                         | X-Robots-Tag (Bild) |
  * |--------------------|------------------------------------------|----------------------|
  * | indexable          | /images/{slug}-2048… (Hauptbild)         | index, max-image-preview:large |
- * | embed_noimageindex | /images/{slug}-512…, /images/similar/…   | noimageindex         |
+ * | embed_noimageindex | /images/{slug}-512…, /images/similar/…   | noimageindex (nur dieses Token) |
  * | (legacy)           | ?context=similar auf /images/…           | noimageindex         |
  *
  * HTML-Item-Links bleiben normal crawlbar; nur die Bild-Response trägt noimageindex.
@@ -203,9 +203,7 @@ export async function respondPublicImage(
     }
 
     const noImageIndex = robotMode === 'embed_noimageindex' || requestedSize === '512';
-    const xRobotsTag = noImageIndex
-      ? 'noimageindex, noarchive, nosnippet'
-      : 'index, follow, max-image-preview:large';
+    const xRobotsTag = noImageIndex ? 'noimageindex' : 'index, follow, max-image-preview:large';
 
     const plan = buildStorageFetchPlan(item.id, item.path_512, item.path_2048, requestedSize);
     const hit = await fetchFirstAvailableImage(plan);

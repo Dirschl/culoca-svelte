@@ -1,4 +1,5 @@
 import type { PageLoad } from './$types';
+import { getCulocaDownloadMetadataAttribution } from '$lib/metadata/photoMetadata';
 
 export const load: PageLoad = async ({ data, url }) => {
   const image = data?.image;
@@ -31,7 +32,7 @@ export const load: PageLoad = async ({ data, url }) => {
       })(),
       imageAlt: image.description || image.caption || `Bild von ${image.title || image.original_name || 'unbekannt'}`,
       url: url.toString().replace(/\/$/, '') + '/', // Ensure trailing slash
-      author: image.full_name || 'Johann Dirschl',
+      author: getCulocaDownloadMetadataAttribution(image.exif_data, image.profile ?? null).creator,
       publishedTime: image.created_at || '',
       width: width2048, // Use 2048px dimensions, not original
       height: height2048 // Use 2048px dimensions, not original

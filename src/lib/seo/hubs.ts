@@ -1,3 +1,4 @@
+import { normalizeAdminDisplayLabel } from '$lib/content/locationTaxonomy';
 import { slugifySegment } from '$lib/content/routing';
 
 export type HubLink = {
@@ -79,4 +80,21 @@ export function pickPlaceLabel(
   });
 
   return locationLike?.trim() || null;
+}
+
+/** SEO-Ortslabel: bevorzugt Gemeinde, sonst Landkreis, sonst Event-Ort/Keywords. */
+export function pickItemPlaceLabelForSeo(item: {
+  municipality_name?: string | null;
+  district_name?: string | null;
+  page_settings?: unknown;
+  keywords?: string[] | null;
+}): string | null {
+  const muni = normalizeAdminDisplayLabel(item.municipality_name);
+  if (muni) return muni;
+  const district = normalizeAdminDisplayLabel(item.district_name);
+  if (district) return district;
+  return pickPlaceLabel(
+    (item.page_settings as Record<string, unknown> | null)?.location_name as string | null | undefined,
+    item.keywords || []
+  );
 }
