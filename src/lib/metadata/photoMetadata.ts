@@ -7,6 +7,8 @@ export type PhotoMetadataFields = {
   keywords: string | null;
   creator: string | null;
   copyright: string | null;
+  /** IPTC/XMP CopyrightNotice (zusätzlich zu IFD0 Copyright) */
+  copyrightNotice: string | null;
   gps: {
     lat: number | null;
     lon: number | null;
@@ -158,27 +160,54 @@ export function extractPhotoMetadataFields(exifData: Record<string, unknown> | n
     ])
   );
 
+  const copyrightNotice = firstText(
+    exif.CopyrightNotice,
+    exif['Copyright Notice'],
+    exif['XMP:CopyrightNotice'],
+    exif['XMP-photoshop:Copyright'],
+    iptc.CopyrightNotice,
+    findNestedText(exif, [
+      (key) => key === 'copyrightnotice',
+      (key) => key.endsWith(':copyrightnotice')
+    ])
+  );
+
   return {
     title,
     caption,
     description,
     keywords,
     creator: firstText(
+      joinedKeywords(exif['XMP-dc:Creator']),
+      joinedKeywords(exif['dc:creator']),
       exif['XMP-dc:Creator'],
       exif['dc:creator'],
+      exif.Byline,
+      iptc.Byline,
+      exif['IPTC:By-line'],
+      iptc['By-line'],
+      exif['IPTC:Byline'],
+      exif.XPAuthor,
       exif.Artist,
       exif.Creator,
       findNestedText(exif, [
         (key) => key === 'creator',
         (key) => key.endsWith(':creator'),
         (key) => key === 'artist',
-        (key) => key.endsWith(':artist')
+        (key) => key.endsWith(':artist'),
+        (key) => key === 'byline',
+        (key) => key.endsWith(':byline'),
+        (key) => key === 'by-line',
+        (key) => key.endsWith(':by-line'),
+        (key) => key === 'xpauthor',
+        (key) => key.endsWith(':xpauthor')
       ])
     ),
     copyright: firstText(
       exif['XMP-dc:Rights'],
       exif['dc:rights'],
       exif.Copyright,
+      copyrightNotice,
       findNestedText(exif, [
         (key) => key === 'copyright',
         (key) => key.endsWith(':copyright'),
@@ -186,6 +215,7 @@ export function extractPhotoMetadataFields(exifData: Record<string, unknown> | n
         (key) => key.endsWith(':rights')
       ])
     ),
+    copyrightNotice,
     gps: {
       lat: firstNumber(exif.latitude, exif.Latitude),
       lon: firstNumber(exif.longitude, exif.Longitude)

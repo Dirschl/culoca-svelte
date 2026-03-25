@@ -16,7 +16,6 @@ export type AttributionProfileSettings = {
   use_exif_copyright_override?: boolean | null;
   photographer_label_mode?: string | null;
   public_contact_name?: string | null;
-  // Legacy fallbacks (bereits vorhanden)
   full_name?: string | null;
   accountname?: string | null;
 } | null;
@@ -34,15 +33,30 @@ export type ResolvedAttribution = {
   licenseUrl: string;
 };
 
+const UNKNOWN = 'Unbekannt';
+
+/** Werte, die nicht als echte Attribution-Quelle gelten (auch nicht statt EXIF). */
+export function isMeaningfulAttributionValue(value: unknown): boolean {
+  if (value == null) return false;
+  const s = typeof value === 'string' ? value.trim() : String(value).trim();
+  if (!s) return false;
+  const lower = s.toLowerCase();
+  if (lower === UNKNOWN.toLowerCase()) return false;
+  if (lower === 'unknown') return false;
+  if (lower === 'n/a' || lower === 'n.a.' || lower === 'na') return false;
+  if (lower === '-' || lower === '—' || lower === 'tbd') return false;
+  return true;
+}
+
 function fixEncoding(value: string | null | undefined): string | null {
   if (!value) return null;
   return fixTextEncodingIfNeeded(value) ?? value;
 }
 
-function firstNonEmpty(...values: Array<string | null | undefined>): string | null {
+function firstMeaningfulString(...values: Array<string | null | undefined>): string | null {
   for (const v of values) {
     const fixed = fixEncoding(v);
-    if (fixed && fixed.trim()) return fixed.trim();
+    if (isMeaningfulAttributionValue(fixed)) return normalizeWhitespace(fixed!);
   }
   return null;
 }
@@ -60,7 +74,6 @@ function splitTokens(value: string): string[] {
 
 function isProbablyOrganizationName(value: string): boolean {
   const v = value.trim();
-  // Heuristik: typische Rechtsformen
   return /(GmbH|AG|KG|OHG|e\.?V\.?|Stiftung|Verband|Ltd\.?|LLC|S\.?A\.?)/i.test(v);
 }
 
@@ -69,33 +82,35 @@ function isProbablyUrlOrDomain(value: string): boolean {
   if (/^https?:\/\//i.test(v)) return true;
   if (/^www\./i.test(v)) return true;
   if (v.includes('/')) return true;
-  // Domain ohne Leerzeichen ist sehr wahrscheinlich „URL-only“ (nicht Firmenname)
   if (!v.includes(' ') && /\w+\.\w+/.test(v)) return true;
   return false;
 }
 
-function sanitizeCopyrightHolderCandidate(exifValue: string, fallback: string): string {
+function isUnusableCopyrightHolderString(value: string): boolean {
+  const v = normalizeWhitespace(fixEncoding(value) ?? value);
+  if (!v) return true;
+  return isProbablyUrlOrDomain(v) && !isProbablyOrganizationName(v);
+}
+
+function sanitizeCopyrightHolderCandidate(exifValue: string): string | null {
   let v = fixEncoding(exifValue) ?? exifValue;
   v = v.replace(/\s*\|\s*culoca\.com\s*$/i, '').trim();
-  // Falls noch immer „… | …“ drin ist: ersten Block nutzen (Domain-Müll vermeiden)
   if (v.includes('|')) v = v.split('|')[0].trim();
   v = normalizeWhitespace(v);
-  if (!v) return fallback;
-
-  // Domain/URL-like Strings verwerfen, sofern es kein offensichtlicher Rechtsform-Titel ist
-  if (isProbablyUrlOrDomain(v) && !isProbablyOrganizationName(v)) return fallback;
+  if (!isMeaningfulAttributionValue(v)) return null;
+  if (isUnusableCopyrightHolderString(v)) return null;
   return v;
 }
 
 function normalizePersonOrder(candidate: string, expected: string | null | undefined): string {
   const c = normalizeWhitespace(fixEncoding(candidate) ?? candidate);
-  if (!expected) return c;
+  if (!isMeaningfulAttributionValue(c)) return c;
+  if (!isMeaningfulAttributionValue(expected)) return c;
 
   const e = normalizeWhitespace(fixEncoding(expected) ?? expected);
   const eTokens = splitTokens(e);
   const cTokens = splitTokens(c);
   if (c.includes(',')) {
-    // „Last, First“ -> „First Last“
     const [lastPart, firstPart] = c.split(',', 2);
     const last = normalizeWhitespace(lastPart || '');
     const first = normalizeWhitespace(firstPart || '');
@@ -126,80 +141,110 @@ function computeDefaultCopyrightNotice(holderName: string): string {
   return `© ${year} ${holderName}. Alle Rechte vorbehalten.`;
 }
 
-/**
- * Public Attribution-Resolver für Item-Seiten.
- * - mode='culoca' nutzt Profil-Defaults und optionale EXIF-Overrides (per Booleans).
- * - mode='original' nutzt hauptsächlich EXIF (keine Culoca-„| culoca.com“-Strings), bleibt aber robust gegen Encoding/Müll.
- */
 export function resolveAttribution(params: {
   exifData: Record<string, unknown> | null | undefined;
   profile: AttributionProfileSettings;
   mode: AttributionMode;
+  itemFullNameFallback?: string | null;
 }): ResolvedAttribution {
-  const { exifData, profile, mode } = params;
+  const { exifData, profile, mode, itemFullNameFallback } = params;
   const extracted = extractPhotoMetadataFields(exifData || {});
 
-  const profileCreatorDefault =
-    firstNonEmpty(profile?.default_creator_name, profile?.display_name_public, profile?.full_name, profile?.accountname) ||
-    'Unbekannt';
+  const profileCreator = firstMeaningfulString(
+    profile?.default_creator_name,
+    profile?.display_name_public,
+    profile?.public_contact_name,
+    profile?.full_name,
+    profile?.accountname
+  );
 
-  const profileHolderDefault =
-    firstNonEmpty(profile?.copyright_holder_name, profile?.legal_entity_name, profile?.organization_name) ||
-    profileCreatorDefault;
+  const exifCreatorRaw = firstMeaningfulString(extracted.creator);
 
-  const expectedName = firstNonEmpty(profileCreatorDefault, profile?.display_name_public, profile?.full_name, profile?.accountname);
+  const expectedForOrder = firstMeaningfulString(
+    profile?.default_creator_name,
+    profile?.display_name_public,
+    profile?.full_name
+  );
 
-  const exifCreatorRaw = extracted.creator ?? null;
-  const exifCreatorNorm = exifCreatorRaw
-    ? normalizePersonOrder(exifCreatorRaw, expectedName)
+  const exifCreatorNormalized = exifCreatorRaw
+    ? normalizePersonOrder(exifCreatorRaw, expectedForOrder)
     : null;
 
-  const exifCopyrightRaw = extracted.copyright ?? null;
+  const itemFallback = firstMeaningfulString(itemFullNameFallback);
 
-  const creatorFromProfile = profileCreatorDefault;
-  const creatorFromExif = exifCreatorNorm ?? creatorFromProfile;
+  const useExifCreator = !!profile?.use_exif_creator_override;
+  let creatorName: string;
+  if (useExifCreator && exifCreatorNormalized) {
+    creatorName = exifCreatorNormalized;
+  } else if (profileCreator) {
+    creatorName = profileCreator;
+  } else if (exifCreatorNormalized) {
+    creatorName = exifCreatorNormalized;
+  } else if (itemFallback) {
+    creatorName = itemFallback;
+  } else {
+    creatorName = UNKNOWN;
+  }
 
-  const useExifCreator = mode === 'culoca' && !!profile?.use_exif_creator_override && !!exifCreatorRaw;
-  const creatorName = useExifCreator ? creatorFromExif : creatorFromProfile;
-
-  const useExifCredit = mode === 'culoca' && !!profile?.use_exif_credit_override && !!exifCreatorRaw;
-  const creatorForCredit = useExifCredit ? creatorFromExif : creatorName;
+  const useExifCredit = !!profile?.use_exif_credit_override;
+  const creatorForCredit =
+    useExifCredit && exifCreatorNormalized ? exifCreatorNormalized : creatorName;
 
   const creditTextTemplate = mode === 'culoca' ? profile?.default_credit_text : null;
   const creditText =
-    (creditTextTemplate && creditTextTemplate.trim().length > 0
+    creditTextTemplate && creditTextTemplate.trim().length > 0
       ? applySimpleTemplate(creditTextTemplate, { creator: creatorForCredit })
-      : `Foto: ${creatorForCredit}`) || `Foto: ${creatorForCredit}`;
+      : `Foto: ${creatorForCredit}`;
 
-  const useExifCopyright = mode === 'culoca' && !!profile?.use_exif_copyright_override && !!exifCopyrightRaw;
-  const copyrightHolderName = useExifCopyright && exifCopyrightRaw
-    ? sanitizeCopyrightHolderCandidate(exifCopyrightRaw, profileHolderDefault)
-    : profileHolderDefault;
+  const profileHolder = firstMeaningfulString(
+    profile?.copyright_holder_name,
+    profile?.legal_entity_name,
+    profile?.organization_name
+  );
+
+  const rawCopyrightLine = firstMeaningfulString(extracted.copyright, extracted.copyrightNotice);
+  const sanitizedExifHolder = rawCopyrightLine ? sanitizeCopyrightHolderCandidate(rawCopyrightLine) : null;
+
+  const useExifCopyright = !!profile?.use_exif_copyright_override;
+  let copyrightHolderName: string;
+  if (useExifCopyright && sanitizedExifHolder) {
+    copyrightHolderName = sanitizedExifHolder;
+  } else if (profileHolder) {
+    copyrightHolderName = profileHolder;
+  } else if (sanitizedExifHolder) {
+    copyrightHolderName = sanitizedExifHolder;
+  } else {
+    copyrightHolderName = UNKNOWN;
+  }
 
   const copyrightNoticeTemplate = mode === 'culoca' ? profile?.default_copyright_notice : null;
   const copyrightNotice =
-    (copyrightNoticeTemplate && copyrightNoticeTemplate.trim().length > 0
-      ? applySimpleTemplate(copyrightNoticeTemplate, { year: String(new Date().getFullYear()), copyrightHolder: copyrightHolderName, holder: copyrightHolderName, creator: creatorName })
-      : computeDefaultCopyrightNotice(copyrightHolderName)) || computeDefaultCopyrightNotice(copyrightHolderName);
+    copyrightNoticeTemplate && copyrightNoticeTemplate.trim().length > 0
+      ? applySimpleTemplate(copyrightNoticeTemplate, {
+          year: String(new Date().getFullYear()),
+          copyrightHolder: copyrightHolderName,
+          holder: copyrightHolderName,
+          creator: creatorName
+        })
+      : computeDefaultCopyrightNotice(copyrightHolderName);
 
   const authorMetaTemplate = mode === 'culoca' ? profile?.default_author_meta : null;
   const authorMeta =
-    (authorMetaTemplate && authorMetaTemplate.trim().length > 0
+    authorMetaTemplate && authorMetaTemplate.trim().length > 0
       ? applySimpleTemplate(authorMetaTemplate, { creator: creatorName, copyrightHolder: copyrightHolderName })
-      : creatorName) || creatorName;
+      : creatorName;
 
   const licenseUrl =
-    firstNonEmpty(profile?.default_license_url) || 'https://culoca.com/web/license';
+    firstMeaningfulString(profile?.default_license_url) || 'https://culoca.com/web/license';
 
   return {
     creatorName,
     photographerName: creatorName,
     creatorIsOrganization: isProbablyOrganizationName(creatorName),
-    creditText: creditText,
+    creditText,
     authorMeta,
     copyrightHolderName,
     copyrightNotice,
     licenseUrl
   };
 }
-

@@ -11,4 +11,15 @@ describe('extractPhotoMetadataFields', () => {
     expect(result.caption).toBe('Morgenstimmung am See');
     expect(result.description).toBe('Leichter Nebel ueber dem Wasser.');
   });
+  it('reads IPTC Byline and CopyrightNotice as creator/copyright fallbacks', () => {
+    const result = extractPhotoMetadataFields({
+      Byline: 'Dirschl Johann',
+      Copyright: 'DIRSCHL.com GmbH',
+      CopyrightNotice: 'DIRSCHL.com GmbH'
+    });
+    expect(result.creator).toBe('Dirschl Johann');
+    expect(result.copyright).toBe('DIRSCHL.com GmbH');
+    expect(result.copyrightNotice).toBe('DIRSCHL.com GmbH');
+  });
 });
+

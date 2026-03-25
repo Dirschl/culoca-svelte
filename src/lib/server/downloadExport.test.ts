@@ -135,7 +135,7 @@ describe('downloadExport', () => {
 			const tags = await exiftool.read(tempFile);
 
 			const expectedYear = new Date().getFullYear();
-			expect(tags.Copyright).toBe(`© ${expectedYear} Test Creator. Alle Rechte vorbehalten.`);
+			expect(tags.Copyright).toBe(`© ${expectedYear} Johann Dirschl. Alle Rechte vorbehalten.`);
 			expect(tags.Headline).toBe('Abendlicht am Weiher');
 			expect(tags.Title).toBe('Ein stiller Moment im Abendlicht.');
 			// exiftool typings in this project don't expose UsageTerms; assert via runtime value.
