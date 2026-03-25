@@ -7,6 +7,16 @@
 	import { getPublicItemHref } from '$lib/content/routing';
 	import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
 	import { sanitizeReturnTo } from '$lib/returnTo';
+	import { browser } from '$app/environment';
+	import SiteFooter from '$lib/SiteFooter.svelte';
+	import ProfileDashboardNav from '$lib/profile/ProfileDashboardNav.svelte';
+	import ProfileSectionAttribution from '$lib/profile/sections/ProfileSectionAttribution.svelte';
+	import ProfileSectionPrivacy from '$lib/profile/sections/ProfileSectionPrivacy.svelte';
+	import ProfileSectionGps from '$lib/profile/sections/ProfileSectionGps.svelte';
+	import ProfileSectionContact from '$lib/profile/sections/ProfileSectionContact.svelte';
+	import ProfileSectionSocial from '$lib/profile/sections/ProfileSectionSocial.svelte';
+	import type { ProfileSection } from '$lib/profile/profileSection';
+	import { isProfileSection } from '$lib/profile/profileSection';
 
 	let user: any = null;
 	let profile: any = null;
@@ -176,6 +186,50 @@
 	];
 
 	$: isReservedAccountname = reservedAccountnames.includes(accountname.toLowerCase());
+
+	let activeProfileSection: ProfileSection = 'basics';
+
+	function profileSectionTitle(section: ProfileSection): string {
+		switch (section) {
+			case 'basics':
+				return 'Profil & Konto';
+			case 'attribution':
+				return 'Attribution & Rechte';
+			case 'privacy':
+				return 'Privatsphäre';
+			case 'gps':
+				return 'GPS & Home Base';
+			case 'contact':
+				return 'Kontakt & Info';
+			case 'social':
+				return 'Social Media';
+			case 'errorlog':
+				return 'Fehlerprotokoll';
+			default:
+				return 'Profil';
+		}
+	}
+
+	function setProfileSection(section: ProfileSection) {
+		if (section === 'errorlog' && !errorLogExists) return;
+		activeProfileSection = section;
+		if (!browser) return;
+		const u = new URL(window.location.href);
+		u.searchParams.set('section', section);
+		const q = u.searchParams.toString();
+		void goto(`${u.pathname}?${q}`, { replaceState: true, noScroll: true, keepFocus: true });
+	}
+
+	$: if (browser && !loading) {
+		const param = $page.url.searchParams.get('section');
+		if (isProfileSection(param)) {
+			if (param === 'errorlog' && !errorLogExists) {
+				activeProfileSection = 'basics';
+			} else {
+				activeProfileSection = param;
+			}
+		}
+	}
 
 	onMount(async () => {
 		returnTo = sanitizeReturnTo($page.url.searchParams.get('returnTo'), getReferrerFallback());
@@ -1186,8 +1240,9 @@
   </script>`}
 </svelte:head>
 
-<div class="profile-page">
-	<SiteNav />
+<SiteNav />
+
+<main class="dashboard-page profile-dashboard-page">
 
 	{#if loading}
 		<div class="loading-container">
@@ -1195,10 +1250,13 @@
 			<span>Lade Profil...</span>
 		</div>
 	{:else}
-		<div class="profile-container">
-			<div class="profile-header">
-				<h1 class="page-title">Mein Profil</h1>
-				<button class="signout-btn" on:click={signOut}>
+		<section class="dashboard-page__hero profile-dashboard__hero">
+			<div class="profile-dashboard__hero-row">
+				<div>
+					<h1 class="profile-dashboard__title">Mein Profil</h1>
+					<p class="profile-dashboard__sub">Persönliche Daten, Attribution und Sichtbarkeit.</p>
+				</div>
+				<button type="button" class="signout-btn" on:click={signOut}>
 					<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
 						<path
 							d="M10.09 15.59L11.5 17l5-5-5-5-1.41 1.41L12.67 11H3v2h9.67l-2.58 2.59zM19 3H5c-1.11 0-2 .9-2 2v4h2V5h14v14H5v-4H3v4c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"
@@ -1207,10 +1265,30 @@
 					Abmelden
 				</button>
 			</div>
+		</section>
 
-			<!-- Hauptinhalt -->
-			<div class="profile-content">
+		<section class="dashboard-layout">
+			<aside class="dashboard-column dashboard-column--menu">
+				<ProfileDashboardNav
+					active={activeProfileSection}
+					showErrorLog={errorLogExists}
+					on:select={(e) => setProfileSection(e.detail)}
+				/>
+			</aside>
+			<section class="dashboard-column dashboard-column--content">
+				<div class="panel-head">
+					<h2>{profileSectionTitle(activeProfileSection)}</h2>
+					{#if activeProfileSection !== 'errorlog'}
+						<span class="panel-head__hint">Änderungen unten mit „Profil speichern“ sichern.</span>
+					{/if}
+				</div>
+
+				<div class="profile-content profile-dashboard__inner">
 				<!-- Avatar-Sektion -->
+				<div
+					class="profile-section"
+					class:profile-section--hidden={activeProfileSection !== 'basics'}
+				>
 				<div class="avatar-section">
 					<div class="avatar-container">
 						{#if getProfileAvatarUrl()}
@@ -1259,10 +1337,19 @@
 						<p class="user-email">{user.email}</p>
 					</div>
 				</div>
+				</div>
 
 				<!-- Profil-Formular -->
-				<form class="profile-form" on:submit|preventDefault={saveProfile}>
+				<form
+					class="profile-form"
+					class:profile-section--hidden={activeProfileSection === 'errorlog'}
+					on:submit|preventDefault={saveProfile}
+				>
 					<!-- Persönliche Informationen -->
+					<div
+						class="profile-section"
+						class:profile-section--hidden={activeProfileSection !== 'basics'}
+					>
 					<div class="card">
 						<h3 class="section-title">
 							<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
@@ -1344,449 +1431,93 @@
 							{/if}
 						</div>
 					</div>
+					</div>
 
 					<!-- Attribution & Rechte -->
-					<div class="card">
-						<h3 class="section-title">
-							<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-								<path d="M12 2l3 7h7l-5.5 4.1L18 22l-6-4-6 4 1.5-8.9L2 9h7l3-7z" />
-							</svg>
-							Attribution & Rechte
-						</h3>
-
-						<p class="help-text">
-							Für Google Bilder und die eingebetteten Structured Data müssen „Ersteller“ und
-							„Copyright“ eindeutig und konsistent sein. Jedes Foto kann abweichende
-							EXIF-Rechte/Creator enthalten – ihr könnt per Checkbox steuern, wann EXIF
-							überschreiben darf.
-						</p>
-
-						<div class="form-group">
-							<label for="displayNamePublic">Öffentlicher Name (Backup für Attribution)</label>
-							<input
-								id="displayNamePublic"
-								type="text"
-								bind:value={display_name_public}
-								placeholder="z.B. Johann Dirschl"
-							/>
-						</div>
-
-						<div class="form-group">
-							<label for="defaultCreatorName">Creator/Photographer Default</label>
-							<input
-								id="defaultCreatorName"
-								type="text"
-								bind:value={default_creator_name}
-								placeholder="z.B. Johann Dirschl oder Firmenname"
-							/>
-						</div>
-
-						<div class="form-group">
-							<label for="legalEntityName">Legal Entity / Organisation (optional)</label>
-							<input
-								id="legalEntityName"
-								type="text"
-								bind:value={legal_entity_name}
-								placeholder="z.B. DIRSCHL.com GmbH"
-							/>
-						</div>
-
-						<div class="form-group">
-							<label for="copyrightHolderName">Copyright Holder (Organisation)</label>
-							<input
-								id="copyrightHolderName"
-								type="text"
-								bind:value={copyright_holder_name}
-								placeholder="z.B. DIRSCHL.com GmbH"
-							/>
-						</div>
-
-						<div class="form-group">
-							<label for="organizationName">Organisation (Fallback)</label>
-							<input
-								id="organizationName"
-								type="text"
-								bind:value={organization_name}
-								placeholder="z.B. DIRSCHL.com GmbH"
-							/>
-						</div>
-
-						<div class="form-group">
-							<label for="publicContactName">Öffentlicher Kontaktname (optional)</label>
-							<input
-								id="publicContactName"
-								type="text"
-								bind:value={public_contact_name}
-								placeholder="z.B. Ansprechpartner / Team"
-							/>
-						</div>
-
-						<div class="form-group">
-							<label for="defaultCreditText">Default CreditText</label>
-							<input
-								id="defaultCreditText"
-								type="text"
-								bind:value={default_credit_text}
-								placeholder="Foto: &lcub;creator&rcub;"
-							/>
-							<span class="help-text">Platzhalter: <code>&lcub;creator&rcub;</code></span>
-						</div>
-
-						<div class="form-group">
-							<label for="defaultCopyrightNotice">Default CopyrightNotice</label>
-							<input
-								id="defaultCopyrightNotice"
-								type="text"
-								bind:value={default_copyright_notice}
-								placeholder="© &lcub;year&rcub; &lcub;copyrightHolder&rcub;. Alle Rechte vorbehalten."
-							/>
-							<span class="help-text"
-								>Platzhalter: <code>&lcub;year&rcub;</code>,
-								<code>&lcub;copyrightHolder&rcub;</code>, <code>&lcub;holder&rcub;</code>,
-								<code>&lcub;creator&rcub;</code></span
-							>
-						</div>
-
-						<div class="form-group">
-							<label for="defaultAuthorMeta"
-								>Default Autor-Text für &lt;meta name=&quot;author&quot;&gt;</label
-							>
-							<input
-								id="defaultAuthorMeta"
-								type="text"
-								bind:value={default_author_meta}
-								placeholder="z.B. Johann Dirschl"
-							/>
-						</div>
-
-						<div class="form-group">
-							<label for="defaultLicenseUrl">License URL (für JSON-LD)</label>
-							<input
-								id="defaultLicenseUrl"
-								type="text"
-								bind:value={default_license_url}
-								placeholder="https://culoca.com/web/license"
-							/>
-						</div>
-
-						<div class="form-group">
-							<label class="toggle-label">
-								<input type="checkbox" bind:checked={use_exif_creator_override} />
-								<span class="toggle-switch"></span>
-								<span class="toggle-text">EXIF Creator/Photographer darf überschreiben</span>
-							</label>
-						</div>
-
-						<div class="form-group">
-							<label class="toggle-label">
-								<input type="checkbox" bind:checked={use_exif_credit_override} />
-								<span class="toggle-switch"></span>
-								<span class="toggle-text">EXIF Creator darf auch CreditText beeinflussen</span>
-							</label>
-						</div>
-
-						<div class="form-group">
-							<label class="toggle-label">
-								<input type="checkbox" bind:checked={use_exif_copyright_override} />
-								<span class="toggle-switch"></span>
-								<span class="toggle-text"
-									>EXIF Copyright darf CopyrightHolder/CopyrightNotice überschreiben</span
-								>
-							</label>
-						</div>
+					<div
+						class="profile-section"
+						class:profile-section--hidden={activeProfileSection !== 'attribution'}
+					>
+						<ProfileSectionAttribution
+							bind:display_name_public
+							bind:default_creator_name
+							bind:legal_entity_name
+							bind:copyright_holder_name
+							bind:organization_name
+							bind:public_contact_name
+							bind:default_credit_text
+							bind:default_copyright_notice
+							bind:default_author_meta
+							bind:default_license_url
+							bind:use_exif_creator_override
+							bind:use_exif_credit_override
+							bind:use_exif_copyright_override
+						/>
 					</div>
 
 					<!-- Privatsphäre-Einstellungen -->
-					<div class="card">
-						<h3 class="section-title">
-							<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-								<path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z" />
-							</svg>
-							Privatsphäre-Einstellungen
-						</h3>
-						<div class="form-group">
-							<label for="privacy-mode">Permalink-Verhalten</label>
-							<select id="privacy-mode" bind:value={privacy_mode}>
-								<option value="public"
-									>Public - Jeder kann dein Profil sehen und Filter entfernen</option
-								>
-								<option value="closed">Closed - User können nur dein Profil sehen</option>
-								<option value="private">Private - Nur du kannst dein Profil sehen</option>
-								<option value="all">All - Besucher sehen alle Inhalte ohne Filter</option>
-							</select>
-							<div class="privacy-explanation">
-								{#if privacy_mode === 'public'}
-									<p class="help-text">
-										<strong>Public:</strong> Dein Permalink zeigt nur deine Bilder an. Besucher können
-										den Filter entfernen, um alle Bilder zu sehen.
-									</p>
-								{:else if privacy_mode === 'closed'}
-									<p class="help-text">
-										<strong>Closed:</strong> Dein Permalink zeigt nur deine Bilder an. Besucher können
-										den Filter nicht entfernen - sie sehen nur deine Inhalte.
-									</p>
-								{:else if privacy_mode === 'private'}
-									<p class="help-text">
-										<strong>Private:</strong> So nimmst du sofort alle Bilder aus der Sichtbarkeit, Detailseite
-										wird umgeleitet.
-									</p>
-								{:else if privacy_mode === 'all'}
-									<p class="help-text">
-										<strong>All:</strong> Dein Permalink zeigt alle Bilder der Plattform an. Besucher
-										sehen die komplette Culoca-Galerie.
-									</p>
-								{/if}
-							</div>
-						</div>
+					<div
+						class="profile-section"
+						class:profile-section--hidden={activeProfileSection !== 'privacy'}
+					>
+						<ProfileSectionPrivacy bind:privacy_mode />
 					</div>
 
 					<!-- GPS-Tracking-Einstellungen -->
-					<div class="card">
-						<h3 class="section-title">
-							<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-								<path
-									d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"
-								/>
-							</svg>
-							GPS-Tracking & Home Base
-						</h3>
-
-						<div class="form-group">
-							<label for="home-lat">Home Base - Breitengrad</label>
-							<input
-								id="home-lat"
-								type="number"
-								step="0.000001"
-								bind:value={homeLat}
-								placeholder="48.31934"
-							/>
-							<span class="help-text">Deine Standard-Position für GPS-basierte Funktionen</span>
-						</div>
-
-						<div class="form-group">
-							<label for="home-lon">Home Base - Längengrad</label>
-							<input
-								id="home-lon"
-								type="number"
-								step="0.000001"
-								bind:value={homeLon}
-								placeholder="12.71849"
-							/>
-							<span class="help-text">Deine Standard-Position für GPS-basierte Funktionen</span>
-						</div>
-
-						<div class="form-group">
-							<label for="gps-email">GPS-Email für Track-Export</label>
-							<input
-								id="gps-email"
-								type="email"
-								bind:value={gpsEmail}
-								placeholder="deine-email@example.com"
-							/>
-							<span class="help-text">Email-Adresse für automatischen Track-Versand</span>
-						</div>
-
-						<div class="gps-settings">
-							<h4>GPS-Tracking Einstellungen</h4>
-
-							<label class="toggle-label">
-								<input type="checkbox" bind:checked={gpsTrackingEnabled} />
-								<span class="toggle-switch"></span>
-								<span class="toggle-text">GPS-Tracking aktivieren</span>
-							</label>
-							<span class="help-text">Erlaubt die Aufzeichnung von GPS-Tracks für Touren</span>
-
-							<label class="toggle-label">
-								<input type="checkbox" bind:checked={gpxExportEnabled} />
-								<span class="toggle-switch"></span>
-								<span class="toggle-text">GPX-Export per Email aktivieren</span>
-							</label>
-							<span class="help-text">Erlaubt das Senden von GPS-Tracks per Email</span>
-
-							<label class="toggle-label">
-								<input type="checkbox" bind:checked={lastDataShareEnabled} />
-								<span class="toggle-switch"></span>
-								<span class="toggle-text">Letzte GPS-Daten teilen</span>
-							</label>
-							<span class="help-text"
-								>Teilt deine letzte bekannte Position für bessere Navigation</span
-							>
-						</div>
-
-						<div class="gps-explanation">
-							<p class="help-text">
-								<strong>Home Base:</strong> Diese Koordinaten werden als Fallback verwendet, wenn keine
-								aktuelle GPS-Position verfügbar ist. Sie verbessern die Performance der Galerie und Navigation.
-							</p>
-							<p class="help-text">
-								<strong>GPS-Tracking:</strong> Ermöglicht die Aufzeichnung von Touren und Routen direkt
-								in der App. Alle Daten werden lokal gespeichert und können exportiert werden.
-							</p>
-						</div>
+					<div
+						class="profile-section"
+						class:profile-section--hidden={activeProfileSection !== 'gps'}
+					>
+						<ProfileSectionGps
+							bind:homeLat
+							bind:homeLon
+							bind:gpsEmail
+							bind:gpsTrackingEnabled
+							bind:gpxExportEnabled
+							bind:lastDataShareEnabled
+						/>
 					</div>
 
 					<!-- Kontakt & Info -->
-					<div class="card">
-						<h3 class="section-title">
-							<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-								<path
-									d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"
-								/>
-							</svg>
-							Kontakt & Info
-						</h3>
-
-						<div class="form-group">
-							<label for="address">Adresse</label>
-							<textarea id="address" bind:value={address} placeholder="Deine Adresse" rows="2"
-							></textarea>
-							<label class="toggle-label">
-								<input type="checkbox" bind:checked={show_address} />
-								<span class="toggle-switch"></span>
-								<span class="toggle-text">Adresse öffentlich anzeigen</span>
-							</label>
-						</div>
-
-						<div class="form-group">
-							<label for="phone">Telefonnummer</label>
-							<input
-								id="phone"
-								type="tel"
-								bind:value={phone}
-								placeholder="Deine Telefonnummer"
-								class:valid={phoneValid}
-								class:invalid={phone.length > 0 && !phoneValid}
-							/>
-							{#if phone.length > 0 && !phoneValid}
-								<span class="error-text">Ungültige Telefonnummer</span>
-							{/if}
-							<label class="toggle-label">
-								<input type="checkbox" bind:checked={show_phone} />
-								<span class="toggle-switch"></span>
-								<span class="toggle-text">Telefonnummer öffentlich anzeigen</span>
-							</label>
-						</div>
-
-						<div class="form-group">
-							<label for="email">E-Mail</label>
-							<input
-								id="email"
-								type="email"
-								bind:value={email}
-								placeholder="Deine E-Mail-Adresse"
-							/>
-							<label class="toggle-label">
-								<input type="checkbox" bind:checked={show_email} />
-								<span class="toggle-switch"></span>
-								<span class="toggle-text">E-Mail öffentlich anzeigen</span>
-							</label>
-						</div>
-
-						<div class="form-group">
-							<label for="website">Webseite</label>
-							<input
-								id="website"
-								type="url"
-								bind:value={website}
-								placeholder="https://deine-website.de"
-								class:valid={websiteValid}
-								class:invalid={website.length > 0 && !websiteValid}
-							/>
-							{#if website.length > 0 && !websiteValid}
-								<span class="error-text">URL muss mit http:// oder https:// beginnen</span>
-							{/if}
-							<label class="toggle-label">
-								<input type="checkbox" bind:checked={show_website} />
-								<span class="toggle-switch"></span>
-								<span class="toggle-text">Webseite öffentlich anzeigen</span>
-							</label>
-						</div>
+					<div
+						class="profile-section"
+						class:profile-section--hidden={activeProfileSection !== 'contact'}
+					>
+						<ProfileSectionContact
+							phoneValid={phoneValid}
+							websiteValid={websiteValid}
+							bind:address
+							bind:show_address
+							bind:phone
+							bind:show_phone
+							bind:email
+							bind:show_email
+							bind:website
+							bind:show_website
+						/>
 					</div>
 
 					<!-- Social Media -->
-					<div class="card">
-						<h3 class="section-title">
-							<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-								<path
-									d="M12 2.04C6.5 2.04 2 6.53 2 12.06C2 17.06 5.66 21.21 10.44 21.96V14.96H7.9V12.06H10.44V9.85C10.44 7.34 11.93 5.96 14.22 5.96C15.31 5.96 16.45 6.15 16.45 6.15V8.62H15.19C13.95 8.62 13.56 9.39 13.56 10.18V12.06H16.34L15.89 14.96H13.56V21.96A10 10 0 0 0 22 12.06C22 6.53 17.5 2.04 12 2.04Z"
-								/>
-							</svg>
-							Social Media
-						</h3>
-
-						<div class="form-group">
-							<label for="facebook">Facebook</label>
-							<input
-								id="facebook"
-								type="url"
-								bind:value={facebook}
-								placeholder="https://facebook.com/dein-profil"
-								class:valid={facebookValid}
-								class:invalid={facebook.length > 0 && !facebookValid}
-							/>
-							{#if facebook.length > 0 && !facebookValid}
-								<span class="error-text">URL muss mit https:// beginnen</span>
-							{/if}
-						</div>
-
-						<div class="form-group">
-							<label for="instagram">Instagram</label>
-							<input
-								id="instagram"
-								type="url"
-								bind:value={instagram}
-								placeholder="https://instagram.com/dein-profil"
-								class:valid={instagramValid}
-								class:invalid={instagram.length > 0 && !instagramValid}
-							/>
-							{#if instagram.length > 0 && !instagramValid}
-								<span class="error-text">URL muss mit https:// beginnen</span>
-							{/if}
-						</div>
-
-						<div class="form-group">
-							<label for="twitter">Twitter/X</label>
-							<input
-								id="twitter"
-								type="url"
-								bind:value={twitter}
-								placeholder="https://twitter.com/dein-profil"
-								class:valid={twitterValid}
-								class:invalid={twitter.length > 0 && !twitterValid}
-							/>
-							{#if twitter.length > 0 && !twitterValid}
-								<span class="error-text">URL muss mit https:// beginnen</span>
-							{/if}
-						</div>
-
-						<label class="toggle-label">
-							<input type="checkbox" bind:checked={show_social} />
-							<span class="toggle-switch"></span>
-							<span class="toggle-text">Social Media Links öffentlich anzeigen</span>
-						</label>
-					</div>
-
-					<div class="card">
-						<h3 class="section-title">
-							<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-								<path
-									d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"
-								/>
-							</svg>
-							Freigaben
-						</h3>
-						<p class="help-text">
-							Freigaben werden auf einer eigenen Seite verwaltet. Dort legst du fest, welche
-							Benutzer deine Bilder herunterladen, bearbeiten oder loeschen duerfen.
-						</p>
-						<a
-							class="inline-link-btn"
-							href={`/profile/freigaben?returnTo=${encodeURIComponent(returnTo)}`}
-							>Freigaben verwalten</a
-						>
+					<div
+						class="profile-section"
+						class:profile-section--hidden={activeProfileSection !== 'social'}
+					>
+						<ProfileSectionSocial
+							facebookValid={facebookValid}
+							instagramValid={instagramValid}
+							twitterValid={twitterValid}
+							bind:facebook
+							bind:instagram
+							bind:twitter
+							bind:show_social
+						/>
 					</div>
 
 					<!-- Actions -->
+					<div
+						class="profile-section profile-section--actions"
+						class:profile-section--hidden={activeProfileSection === 'errorlog'}
+					>
 					<div class="actions">
 						<button type="submit" class="save-btn" disabled={saving}>
 							{#if saving}
@@ -1810,10 +1541,15 @@
 							{message}
 						</div>
 					{/if}
+					</div>
 				</form>
 
 				<!-- Error Log Sektion -->
 				{#if errorLogExists}
+					<div
+						class="profile-section"
+						class:profile-section--hidden={activeProfileSection !== 'errorlog'}
+					>
 					<div class="card errorlog-section">
 						<h3 class="section-title">
 							<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
@@ -1841,17 +1577,111 @@
 							</button>
 						</div>
 					</div>
+					</div>
 				{/if}
 			</div>
-		</div>
+			</section>
+		</section>
 	{/if}
-</div>
+</main>
+
+<SiteFooter />
 
 <style>
-	.profile-page {
+	.profile-dashboard-page {
 		min-height: 100vh;
 		background: var(--bg-primary);
 		color: var(--text-primary);
+		padding: 1.4rem 2rem 2.2rem;
+		box-sizing: border-box;
+	}
+
+	.profile-dashboard__hero {
+		margin-bottom: 0;
+	}
+
+	.profile-dashboard__hero-row {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 1rem;
+		flex-wrap: wrap;
+	}
+
+	.profile-dashboard__title {
+		margin: 0;
+		font-size: clamp(1.8rem, 3vw, 2.4rem);
+		font-weight: 700;
+		color: var(--text-primary);
+	}
+
+	.profile-dashboard__sub {
+		margin: 0.45rem 0 0;
+		color: var(--text-secondary);
+		max-width: 42rem;
+	}
+
+	.dashboard-layout {
+		margin-top: 1.2rem;
+		display: grid;
+		gap: 1rem;
+		grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
+		align-items: start;
+	}
+
+	.dashboard-column--menu {
+		position: sticky;
+		top: 4.6rem;
+	}
+
+	.dashboard-column {
+		border: 1px solid var(--border-color);
+		border-radius: 16px;
+		background: var(--bg-secondary);
+		padding: 1rem;
+	}
+
+	.panel-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		margin-bottom: 0.8rem;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+	}
+
+	.panel-head h2 {
+		margin: 0;
+		font-size: 1.1rem;
+	}
+
+	.panel-head__hint {
+		color: var(--text-secondary);
+		font-size: 0.88rem;
+	}
+
+	.profile-dashboard__inner {
+		border: none;
+		padding: 0;
+		background: transparent;
+	}
+
+	.profile-section--hidden {
+		display: none !important;
+	}
+
+	@media (max-width: 980px) {
+		.profile-dashboard-page {
+			padding: 1rem;
+		}
+
+		.dashboard-layout {
+			grid-template-columns: 1fr;
+		}
+
+		.dashboard-column--menu {
+			position: static;
+		}
 	}
 
 	.loading-container {
@@ -1882,27 +1712,6 @@
 		}
 	}
 
-	.profile-container {
-		max-width: 800px;
-		margin: 0 auto;
-		padding: 2rem 1rem;
-	}
-
-	.profile-header {
-		display: flex;
-		align-items: center;
-		gap: 1rem;
-		margin-bottom: 2rem;
-	}
-
-	.page-title {
-		font-size: 1.875rem;
-		font-weight: 700;
-		margin: 0;
-		color: var(--text-primary);
-		flex: 1;
-	}
-
 	.signout-btn {
 		display: flex;
 		align-items: center;
@@ -1921,23 +1730,6 @@
 	.signout-btn:hover {
 		background: #dc2626;
 		transform: translateY(-1px);
-	}
-
-	.inline-link-btn {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		margin-top: 1rem;
-		padding: 0.75rem 1rem;
-		background: var(--accent-color);
-		color: white;
-		border-radius: 8px;
-		text-decoration: none;
-		font-weight: 600;
-	}
-
-	.inline-link-btn:hover {
-		background: var(--accent-hover);
 	}
 
 	.profile-content {
@@ -2051,128 +1843,6 @@
 		box-shadow: 0 2px 8px var(--shadow);
 	}
 
-	.interaction-grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-		gap: 1rem;
-	}
-
-	.interaction-card {
-		display: grid;
-		gap: 0.55rem;
-		text-decoration: none;
-		color: inherit;
-		padding: 0.8rem;
-		border-radius: 12px;
-		background: var(--bg-tertiary);
-		border: 1px solid var(--border-color);
-		transition:
-			transform 0.2s ease,
-			border-color 0.2s ease,
-			box-shadow 0.2s ease;
-	}
-
-	.interaction-card:hover {
-		transform: translateY(-2px);
-		border-color: var(--accent-color);
-		box-shadow: 0 10px 24px var(--shadow);
-	}
-
-	.interaction-card img {
-		width: 100%;
-		aspect-ratio: 4 / 3;
-		object-fit: cover;
-		border-radius: 10px;
-		background: var(--bg-primary);
-	}
-
-	.interaction-card strong {
-		font-size: 0.96rem;
-		line-height: 1.35;
-	}
-
-	.interaction-card span {
-		font-size: 0.85rem;
-		color: var(--text-secondary);
-	}
-
-	.activity-list {
-		display: grid;
-		gap: 0.7rem;
-	}
-
-	.notification-header {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 1rem;
-		flex-wrap: wrap;
-	}
-
-	.notification-header .section-title {
-		margin-bottom: 0;
-		border-bottom: none;
-		padding-bottom: 0;
-	}
-
-	.mark-read-btn {
-		border: 1px solid var(--border-color);
-		background: var(--bg-tertiary);
-		color: var(--text-primary);
-		border-radius: 999px;
-		padding: 0.5rem 0.9rem;
-		font: inherit;
-		cursor: pointer;
-	}
-
-	.mark-read-btn:hover {
-		border-color: var(--accent-color);
-		color: var(--accent-color);
-	}
-
-	.activity-item {
-		display: grid;
-		grid-template-columns: minmax(0, 1fr) auto;
-		gap: 1rem;
-		align-items: center;
-		text-decoration: none;
-		color: inherit;
-		padding: 0.9rem 1rem;
-		border-radius: 12px;
-		border: 1px solid var(--border-color);
-		background: var(--bg-tertiary);
-		transition:
-			border-color 0.2s ease,
-			transform 0.2s ease;
-	}
-
-	.activity-item:hover {
-		border-color: var(--accent-color);
-		transform: translateY(-1px);
-	}
-
-	.activity-item.is-unread {
-		border-color: color-mix(in srgb, var(--accent-color) 38%, var(--border-color));
-		box-shadow: inset 3px 0 0 var(--accent-color);
-	}
-
-	.activity-copy {
-		display: grid;
-		gap: 0.2rem;
-		min-width: 0;
-	}
-
-	.activity-copy span,
-	.activity-copy em,
-	.activity-item time {
-		color: var(--text-secondary);
-		font-size: 0.9rem;
-	}
-
-	.activity-copy em {
-		font-style: normal;
-	}
-
 	.section-title {
 		display: flex;
 		align-items: center;
@@ -2196,11 +1866,7 @@
 		color: var(--text-primary);
 	}
 
-	input[type='text'],
-	input[type='tel'],
-	input[type='url'],
-	input[type='email'],
-	textarea {
+	input[type='text'] {
 		width: 100%;
 		padding: 0.75rem 1rem;
 		border: 2px solid var(--border-color);
@@ -2213,19 +1879,16 @@
 		box-sizing: border-box;
 	}
 
-	input:focus,
-	textarea:focus {
+	input:focus {
 		border-color: var(--accent-color);
 		box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
 	}
 
-	input.valid,
-	textarea.valid {
+	input.valid {
 		border-color: var(--success-color);
 	}
 
-	input.invalid,
-	textarea.invalid {
+	input.invalid {
 		border-color: var(--error-color);
 	}
 
@@ -2233,60 +1896,6 @@
 		font-size: 0.875rem;
 		color: var(--error-color);
 		margin-top: 0.25rem;
-	}
-
-	.toggle-label {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		margin-top: 0.75rem;
-		cursor: pointer;
-		padding: 0.5rem;
-		border-radius: 6px;
-		transition: background 0.2s;
-	}
-
-	.toggle-label:hover {
-		background: var(--bg-tertiary);
-	}
-
-	.toggle-label input[type='checkbox'] {
-		display: none;
-	}
-
-	.toggle-switch {
-		position: relative;
-		width: 44px;
-		height: 24px;
-		background: var(--border-color);
-		border-radius: 12px;
-		transition: all 0.2s ease;
-	}
-
-	.toggle-switch::after {
-		content: '';
-		position: absolute;
-		top: 2px;
-		left: 2px;
-		width: 20px;
-		height: 20px;
-		background: white;
-		border-radius: 50%;
-		transition: all 0.2s ease;
-	}
-
-	.toggle-label input:checked + .toggle-switch {
-		background: var(--accent-color);
-	}
-
-	.toggle-label input:checked + .toggle-switch::after {
-		transform: translateX(20px);
-	}
-
-	.toggle-text {
-		font-size: 0.875rem;
-		font-weight: 500;
-		color: var(--text-secondary);
 	}
 
 	.actions {
@@ -2324,34 +1933,6 @@
 	}
 
 	.save-btn:disabled {
-		opacity: 0.7;
-		cursor: not-allowed;
-	}
-
-	.btn {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		padding: 1rem 2rem;
-		background: var(--accent-color);
-		color: white;
-		border: none;
-		border-radius: 8px;
-		font-weight: 600;
-		font-size: 1rem;
-		cursor: pointer;
-		transition: all 0.2s ease;
-		min-width: 200px;
-		justify-content: center;
-	}
-
-	.btn:hover:not(:disabled) {
-		background: var(--accent-hover);
-		transform: translateY(-2px);
-		box-shadow: 0 4px 12px var(--shadow);
-	}
-
-	.btn:disabled {
 		opacity: 0.7;
 		cursor: not-allowed;
 	}
@@ -2509,99 +2090,8 @@
 		font-weight: 500;
 	}
 
-	/* Privacy Settings Styles */
-	.privacy-explanation {
-		margin-top: 0.75rem;
-		padding: 0.75rem;
-		background: var(--bg-tertiary);
-		border-radius: 6px;
-		border-left: 4px solid var(--accent-color);
-	}
-
-	.privacy-explanation .help-text {
-		margin: 0;
-		font-style: normal;
-		line-height: 1.5;
-	}
-
-	.privacy-explanation strong {
-		color: var(--text-primary);
-	}
-
-	/* GPS Settings Styles */
-	.gps-settings {
-		margin-top: 1.5rem;
-		padding-top: 1.5rem;
-		border-top: 1px solid var(--border-color);
-	}
-
-	.gps-settings h4 {
-		margin: 0 0 1rem 0;
-		font-size: 1.1rem;
-		color: var(--text-primary);
-	}
-
-	.gps-settings .toggle-label {
-		margin-bottom: 0.5rem;
-	}
-
-	.gps-settings .help-text {
-		margin-bottom: 1rem;
-		font-size: 0.875rem;
-		color: var(--text-secondary);
-	}
-
-	.gps-explanation {
-		margin-top: 1.5rem;
-		padding: 1rem;
-		background: var(--bg-tertiary);
-		border-radius: 6px;
-		border-left: 4px solid var(--accent-color);
-	}
-
-	.gps-explanation .help-text {
-		margin: 0 0 0.75rem 0;
-		font-style: normal;
-		line-height: 1.5;
-	}
-
-	.gps-explanation .help-text:last-child {
-		margin-bottom: 0;
-	}
-
-	.gps-explanation strong {
-		color: var(--text-primary);
-	}
-
-	select {
-		width: 100%;
-		padding: 0.75rem;
-		border: 1px solid var(--border-color);
-		border-radius: 6px;
-		background: var(--bg-primary);
-		color: var(--text-primary);
-		font-size: 1rem;
-		transition: all 0.2s ease;
-	}
-
-	select:focus {
-		outline: none;
-		border-color: var(--accent-color);
-		box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-	}
-
-	select option {
-		background: var(--bg-primary);
-		color: var(--text-primary);
-		padding: 0.5rem;
-	}
-
 	/* Responsive Design */
 	@media (max-width: 768px) {
-		.profile-container {
-			padding: 1rem 0.5rem;
-		}
-
 		.avatar-section {
 			flex-direction: column;
 			text-align: center;
@@ -2642,17 +2132,6 @@
 	}
 
 	@media (max-width: 480px) {
-		.profile-header {
-			flex-direction: column;
-			align-items: stretch;
-			gap: 1rem;
-		}
-
-		.page-title {
-			font-size: 1.5rem;
-			order: -1;
-		}
-
 		.signout-btn {
 			align-self: flex-end;
 			margin-top: 0.5rem;
@@ -2660,11 +2139,6 @@
 
 		.card {
 			padding: 1rem;
-		}
-
-		.btn {
-			width: 100%;
-			min-width: auto;
 		}
 	}
 </style>
