@@ -30,23 +30,22 @@
     { href: '/seo', label: 'SEO' },
   ];
 
-  const adminLinks = [
-    { href: '/admin/roles', label: 'Rollen' },
-    { href: '/admin/users', label: 'Benutzer' },
-    { href: '/admin/items', label: 'Items' },
-    { href: '/admin/moderation', label: 'Moderation' },
-    { href: '/admin/analytics', label: 'Analytics' },
+  /** Konto-Untermenü: vier Bereiche (+ Abmelden), Admin verweist auf die Admin-Oberfläche. */
+  const accountMenuLinks: { href: string; label: string; adminOnly?: boolean }[] = [
+    { href: '/dashboard', label: 'Dashboard' },
+    { href: '/profile', label: 'Profil' },
+    { href: '/settings', label: 'Einstellungen' },
+    { href: '/admin/roles', label: 'Admin', adminOnly: true },
   ];
 
-  const userLinks = [
-    { href: '/profile', label: 'Profil' },
-    { href: '/settings', label: 'Settings' },
-  ];
+  function isAdminRouteActive(): boolean {
+    return currentPath.startsWith('/admin');
+  }
 
   $: currentPath = $page.url?.pathname || '/';
   $: isChatRoute = isActive('/chat');
   $: userIdentityLabel = $customerBranding?.accountName || $customerBranding?.fullName || '';
-  $: userMenuLabel = $isAuthenticated ? userIdentityLabel || 'Dashboard' : 'Login';
+  $: userMenuLabel = $isAuthenticated ? 'Konto' : 'Login';
   $: userEntryHref = $isAuthenticated ? getUserLinkHref('/dashboard') : '/login';
   $: userMenuActive =
     isActive('/login') ||
@@ -56,7 +55,7 @@
     isActive('/standort') ||
     isActive('/profile') ||
     isActive('/profile/freigaben') ||
-    ($hasAdminPermission && adminLinks.some((l) => isActive(l.href)));
+    ($hasAdminPermission && isAdminRouteActive());
   $: inheritedReturnTo = sanitizeReturnTo($page.url.searchParams.get('returnTo'), currentPathWithSearch($page.url));
   $: {
     const nextInboxKey = `${$isAuthenticated ? 'auth' : 'anon'}:${$currentUserId || 'none'}:${currentPath}`;
@@ -421,26 +420,25 @@
                 {/if}
               </div>
             {/if}
-            {#each userLinks as link}
-              <a href={getUserLinkHref(link.href)} class="dropdown-item" class:active={isActive(link.href)} on:click={closeDropdowns}>
+            {#if userIdentityLabel}
+              <span class="dropdown-label dropdown-label--identity">{userIdentityLabel}</span>
+            {/if}
+            {#each accountMenuLinks.filter((l) => !l.adminOnly || $hasAdminPermission) as link}
+              <a
+                href={link.adminOnly ? link.href : getUserLinkHref(link.href)}
+                class="dropdown-item"
+                class:active={link.adminOnly ? isAdminRouteActive() : isActive(link.href)}
+                on:click={closeDropdowns}
+              >
                 {link.label}
                 {#if link.href === '/profile' && followerAlertCount > 0}
                   <span class="mini-status-chip mini-status-chip--inline mini-status-chip--accent">+{followerAlertCount} Follower</span>
                 {/if}
+                {#if link.adminOnly && adminReviewCount > 0}
+                  <span class="review-badge review-badge--inline">{adminReviewCount}</span>
+                {/if}
               </a>
             {/each}
-            {#if $hasAdminPermission}
-              <div class="dropdown-divider"></div>
-              <span class="dropdown-label">Admin</span>
-              {#each adminLinks as link}
-                <a href={link.href} class="dropdown-item" class:active={isActive(link.href)} on:click={closeDropdowns}>
-                  {link.label}
-                  {#if link.href === '/admin/moderation' && adminReviewCount > 0}
-                    <span class="review-badge review-badge--inline">{adminReviewCount}</span>
-                  {/if}
-                </a>
-              {/each}
-            {/if}
             <div class="dropdown-divider"></div>
             <button class="dropdown-item dropdown-item--logout" on:click={handleLogout}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M10.09 15.59L11.5 17l5-5-5-5-1.41 1.41L12.67 11H3v2h9.67l-2.58 2.59zM19 3H5c-1.11 0-2 .9-2 2v4h2V5h14v14H5v-4H3v4c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg>
@@ -454,31 +452,26 @@
       <div class="mobile-only nav-group">
         {#if $isAuthenticated}
           <span class="nav-group-label">{userMenuLabel}</span>
+          {#if userIdentityLabel}
+            <span class="nav-group-sublabel">{userIdentityLabel}</span>
+          {/if}
           <div class="nav-group__branch">
-            <a href={getUserLinkHref('/dashboard')} class="nav-link nav-link--sub" class:active={isActive('/dashboard')} on:click={closeMobile}>
-              Dashboard
-            </a>
-            {#each userLinks as link}
-              <a href={getUserLinkHref(link.href)} class="nav-link nav-link--sub" class:active={isActive(link.href)} on:click={closeMobile}>
+            {#each accountMenuLinks.filter((l) => !l.adminOnly || $hasAdminPermission) as link}
+              <a
+                href={link.adminOnly ? link.href : getUserLinkHref(link.href)}
+                class="nav-link nav-link--sub"
+                class:active={link.adminOnly ? isAdminRouteActive() : isActive(link.href)}
+                on:click={closeMobile}
+              >
                 {link.label}
                 {#if link.href === '/profile' && followerAlertCount > 0}
                   <span class="mini-status-chip mini-status-chip--inline mini-status-chip--accent">+{followerAlertCount} Follower</span>
                 {/if}
+                {#if link.adminOnly && adminReviewCount > 0}
+                  <span class="review-badge review-badge--inline">{adminReviewCount}</span>
+                {/if}
               </a>
             {/each}
-            {#if $hasAdminPermission}
-              <div class="nav-group__nest" role="group" aria-label="Administration">
-                <span class="nav-group-label nav-group-label--nested">Admin</span>
-                {#each adminLinks as link}
-                  <a href={link.href} class="nav-link nav-link--sub nav-link--sub-nested" class:active={isActive(link.href)} on:click={closeMobile}>
-                    {link.label}
-                    {#if link.href === '/admin/moderation' && adminReviewCount > 0}
-                      <span class="review-badge review-badge--inline">{adminReviewCount}</span>
-                    {/if}
-                  </a>
-                {/each}
-              </div>
-            {/if}
             <button class="nav-link nav-link--sub nav-link--logout" on:click={handleLogout}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M10.09 15.59L11.5 17l5-5-5-5-1.41 1.41L12.67 11H3v2h9.67l-2.58 2.59zM19 3H5c-1.11 0-2 .9-2 2v4h2V5h14v14H5v-4H3v4c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg>
               Abmelden
@@ -786,6 +779,16 @@
     color: var(--text-muted);
   }
 
+  .dropdown-label--identity {
+    text-transform: none;
+    letter-spacing: normal;
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    padding-top: 0.15rem;
+    padding-bottom: 0.35rem;
+  }
+
   .dropdown-item--logout {
     display: flex;
     align-items: center;
@@ -885,11 +888,15 @@
     letter-spacing: 0.06em;
     color: var(--text-muted);
   }
+
+  .nav-group-sublabel {
+    display: block;
+    padding: 0 1rem 0.35rem;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+  }
   /* Sub-indent only used inside mobile .nav-group__branch (desktop: block hidden) */
   .nav-link--sub { padding-left: 1.5rem; }
-  .nav-link--sub-nested {
-    font-weight: 500;
-  }
 
   /* Hamburger */
   .nav-burger {
@@ -967,27 +974,11 @@
       border-left: 3px solid color-mix(in srgb, var(--culoca-orange) 40%, var(--border-color) 60%);
       border-radius: 0 10px 10px 0;
     }
-    .nav-group__nest {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-      margin-top: 0.35rem;
-      padding: 0.35rem 0 0.3rem 0.55rem;
-      margin-left: 0.1rem;
-      border-left: 2px solid var(--border-color);
-      background: color-mix(in srgb, var(--bg-secondary) 52%, transparent 48%);
-      border-radius: 0 8px 8px 0;
-    }
     .nav-group .nav-group-label {
       padding-left: 0.25rem;
       padding-right: 0.75rem;
     }
-    .nav-group__nest .nav-group-label--nested {
-      margin-top: 0;
-      padding: 0.3rem 0.35rem 0.15rem 0.35rem;
-    }
-    .nav-group .nav-link--sub,
-    .nav-group .nav-link--sub-nested {
+    .nav-group .nav-link--sub {
       display: flex;
       align-items: center;
       flex-wrap: wrap;
@@ -997,12 +988,7 @@
       font-size: 0.93rem;
       text-align: left;
     }
-    .nav-group .nav-link--sub-nested {
-      font-size: 0.875rem;
-      color: var(--text-secondary);
-    }
-    .nav-group .nav-link--sub.active,
-    .nav-group .nav-link--sub-nested.active {
+    .nav-group .nav-link--sub.active {
       color: var(--culoca-orange);
     }
 
