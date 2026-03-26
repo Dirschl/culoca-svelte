@@ -3,6 +3,7 @@
   import { browser } from '$app/environment';
   import { appendReturnTo } from '$lib/content/routing';
   import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
+  import { formatEventHubRange, formatHubEventPlace } from '$lib/content/eventHubFormat';
 
   type DiscoverListItem = {
     id: string;
@@ -18,6 +19,13 @@
     ends_at: string | null;
     lat: number | null;
     lon: number | null;
+    country_slug?: string | null;
+    district_slug?: string | null;
+    municipality_slug?: string | null;
+    country_name?: string | null;
+    district_name?: string | null;
+    municipality_name?: string | null;
+    locality_name?: string | null;
     variants?: Array<{ slug: string; path_512: string | null; path_2048: string | null }>;
     child_count?: number;
   };
@@ -192,6 +200,8 @@
         {#each upcomingEvents as item (item.id)}
           {@const previewUrl = currentThumbUrl(item)}
           {@const dist = distanceForItem(item)}
+          {@const eventRange = formatEventHubRange(item.starts_at, item.ends_at)}
+          {@const eventPlace = formatHubEventPlace(item)}
           <article class="item-card">
             <a href={itemHref(item)} class="item-link">
               {#if pickPath(item)}
@@ -223,16 +233,15 @@
               {/if}
               <div class="item-body">
                 <h3>{item.title || item.slug}</h3>
+                {#if eventRange}
+                  <p class="item-event-range">{eventRange}</p>
+                {/if}
+                {#if eventPlace}
+                  <p class="item-event-place">{eventPlace}</p>
+                {/if}
                 {#if item.description || item.caption}
                   <p class="item-desc">{truncate(item.description || item.caption, 100)}</p>
                 {/if}
-                <div class="item-meta">
-                  {#if item.starts_at}
-                    <time datetime={item.starts_at}>{formatDate(item.starts_at)}</time>
-                  {:else if item.created_at}
-                    <time datetime={item.created_at}>{formatDate(item.created_at)}</time>
-                  {/if}
-                </div>
               </div>
             </a>
           </article>
@@ -528,6 +537,23 @@
     line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
+  }
+
+  .item-event-range {
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.35;
+    margin: 0.2rem 0 0;
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
+  }
+
+  .item-event-place {
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.4;
+    margin: 0.15rem 0 0;
+    color: var(--text-secondary);
   }
 
   .item-desc {

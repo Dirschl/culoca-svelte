@@ -1919,7 +1919,7 @@
         </div>
       </section>
 
-      <HomeTypeSectionsFeed sections={data.sections} />
+      <HomeTypeSectionsFeed sections={data.sections} referenceCoords={discoverDistanceCoords} />
     {/if}
   </main>
 

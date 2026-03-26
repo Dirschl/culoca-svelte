@@ -1,6 +1,7 @@
 <script lang="ts">
   import { appendReturnTo } from '$lib/content/routing';
   import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
+  import { formatEventHubRange, formatHubEventPlace } from '$lib/content/eventHubFormat';
 
   type SectionItem = {
     id: string;
@@ -10,8 +11,19 @@
     caption: string | null;
     canonical_path: string | null;
     path_512: string | null;
+    path_2048: string | null;
     created_at: string | null;
     starts_at: string | null;
+    ends_at: string | null;
+    lat: number | null;
+    lon: number | null;
+    country_slug?: string | null;
+    district_slug?: string | null;
+    municipality_slug?: string | null;
+    country_name?: string | null;
+    district_name?: string | null;
+    municipality_name?: string | null;
+    locality_name?: string | null;
   };
 
   type Section = {
@@ -31,6 +43,8 @@
   export let variant: 'full' | 'discover' = 'full';
   /** Pro Typ maximal so viele Karten (Server liefert bis zu 8) */
   export let maxItemsPerSection = 8;
+  /** Wie Dashboard-Entdecken: Entfernung auf Foto-/Event-Kacheln bei bekannter Position */
+  export let referenceCoords: { lat: number; lon: number } | null = null;
 
   const TYPE_ICONS: Record<string, string> = {
     foto: '📷',
@@ -47,8 +61,43 @@
     return appendReturnTo(item.canonical_path || `/item/${item.slug}`, '/');
   }
 
-  function thumbUrl(item: { slug: string; path_512: string | null }): string {
-    return getSeoImageUrl(item.slug, item.path_512, '512');
+  function pickPath(item: { path_512?: string | null; path_2048?: string | null }): string | null {
+    return item.path_512 || item.path_2048 || null;
+  }
+
+  function thumbUrl(item: { slug: string; path_512?: string | null; path_2048?: string | null }): string {
+    return getSeoImageUrl(item.slug, pickPath(item), '512');
+  }
+
+  function hubVisualThumb(slug: string): boolean {
+    return slug === 'foto' || slug === 'event';
+  }
+
+  function getDistanceInMeters(userLat: number, userLon: number, itemLat: number, itemLon: number) {
+    const earthRadius = 6371000;
+    const lat1 = (userLat * Math.PI) / 180;
+    const lat2 = (itemLat * Math.PI) / 180;
+    const dLat = ((itemLat - userLat) * Math.PI) / 180;
+    const dLon = ((itemLon - userLon) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return earthRadius * c;
+  }
+
+  function formatDistance(distance: number | null | undefined): string {
+    if (distance == null || Number.isNaN(distance)) return '';
+    if (distance < 1000) return `${Math.round(distance)}m`;
+    return `${(distance / 1000).toFixed(1)}km`;
+  }
+
+  function distanceForItem(item: SectionItem): number | null {
+    if (!referenceCoords) return null;
+    const lat = Number(item.lat);
+    const lon = Number(item.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+    return getDistanceInMeters(referenceCoords.lat, referenceCoords.lon, lat, lon);
   }
 
   function truncate(text: string | null | undefined, max: number): string {
@@ -100,12 +149,27 @@
 
         <div class="items-grid">
           {#each section.items.slice(0, maxItemsPerSection) as item (item.id)}
+            {@const visualThumb = hubVisualThumb(section.slug)}
+            {@const previewUrl = thumbUrl(item)}
+            {@const dist = distanceForItem(item)}
+            {@const showDistBadge = visualThumb && dist != null}
+            {@const eventRange = section.slug === 'event' ? formatEventHubRange(item.starts_at, item.ends_at) : ''}
+            {@const eventPlace = section.slug === 'event' ? formatHubEventPlace(item) : ''}
             <article class="item-card">
               <a href={itemHref(item)} class="item-link">
-                {#if item.path_512}
-                  <div class="item-thumb">
+                {#if pickPath(item)}
+                  <div
+                    class="item-thumb"
+                    class:item-thumb--foto={visualThumb}
+                    style={visualThumb
+                      ? `--thumb-preview:url('${previewUrl.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}')`
+                      : undefined}
+                  >
+                    {#if showDistBadge}
+                      <div class="item-distance-badge">{formatDistance(dist)}</div>
+                    {/if}
                     <img
-                      src={thumbUrl(item)}
+                      src={previewUrl}
                       alt={item.title || item.slug}
                       width="320"
                       height="213"
@@ -120,13 +184,23 @@
                 {/if}
                 <div class="item-body">
                   <h3>{item.title || item.slug}</h3>
+                  {#if section.slug === 'event'}
+                    {#if eventRange}
+                      <p class="item-event-range">{eventRange}</p>
+                    {/if}
+                    {#if eventPlace}
+                      <p class="item-event-place">{eventPlace}</p>
+                    {/if}
+                  {/if}
                   {#if !isDiscover && (item.description || item.caption)}
                     <p class="item-desc">{truncate(item.description || item.caption, descMax)}</p>
                   {/if}
-                  {#if item.starts_at}
-                    <time class="item-date" datetime={item.starts_at}>{formatDate(item.starts_at)}</time>
-                  {:else if item.created_at}
-                    <time class="item-date" datetime={item.created_at}>{formatDate(item.created_at)}</time>
+                  {#if section.slug !== 'foto' && section.slug !== 'event'}
+                    {#if item.starts_at}
+                      <time class="item-date" datetime={item.starts_at}>{formatDate(item.starts_at)}</time>
+                    {:else if item.created_at}
+                      <time class="item-date" datetime={item.created_at}>{formatDate(item.created_at)}</time>
+                    {/if}
                   {/if}
                 </div>
               </a>
@@ -180,7 +254,7 @@
 
   .home-sections-feed--discover .section-head h2 {
     font-size: 1.05rem;
-    font-weight: 650;
+    font-weight: 600;
   }
 
   .section-head h2 a {
@@ -265,17 +339,52 @@
     aspect-ratio: 3 / 2;
     overflow: hidden;
     background: var(--bg-tertiary);
+    position: relative;
   }
 
   .home-sections-feed--discover .item-thumb {
     aspect-ratio: 1 / 1;
   }
 
+  .item-thumb--foto::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: var(--thumb-preview);
+    background-size: cover;
+    background-position: center;
+    transform: scale(1.08);
+    filter: blur(14px) saturate(0.9);
+    opacity: 0.5;
+  }
+
+  .item-distance-badge {
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 2;
+    background: var(--bg-overlay);
+    color: var(--text-overlay);
+    padding: 0 4px;
+    font-size: 12.5px;
+    font-weight: 600;
+    line-height: 1.35;
+    pointer-events: none;
+    -webkit-backdrop-filter: blur(var(--overlay-blur));
+    backdrop-filter: blur(var(--overlay-blur));
+  }
+
   .item-thumb img {
+    position: relative;
+    z-index: 1;
     width: 100%;
     height: 100%;
     object-fit: cover;
     transition: transform 0.3s;
+  }
+
+  .item-thumb--foto img {
+    object-fit: contain;
   }
 
   .item-card:hover .item-thumb img {
@@ -326,6 +435,33 @@
     line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
+  }
+
+  .item-event-range {
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.35;
+    margin: 0.2rem 0 0;
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
+  }
+
+  .home-sections-feed--discover .item-event-range {
+    font-size: 0.78rem;
+    margin: 0.12rem 0 0;
+  }
+
+  .item-event-place {
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.4;
+    margin: 0.15rem 0 0;
+    color: var(--text-secondary);
+  }
+
+  .home-sections-feed--discover .item-event-place {
+    font-size: 0.68rem;
+    margin: 0.08rem 0 0;
   }
 
   .home-sections-feed--discover .item-body h3 {

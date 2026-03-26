@@ -8,7 +8,7 @@ export const ssr = true;
 const ITEMS_PER_SECTION = 8;
 
 const DISCOVER_SELECT =
-  'id, slug, title, description, caption, canonical_path, country_slug, district_slug, municipality_slug, path_512, path_2048, width, height, created_at, starts_at, ends_at, lat, lon';
+  'id, slug, title, description, caption, canonical_path, country_slug, district_slug, municipality_slug, country_name, district_name, municipality_name, locality_name, path_512, path_2048, width, height, created_at, starts_at, ends_at, lat, lon';
 
 type DiscoverRow = {
   id: string;
@@ -29,6 +29,10 @@ type DiscoverRow = {
   country_slug?: string | null;
   district_slug?: string | null;
   municipality_slug?: string | null;
+  country_name?: string | null;
+  district_name?: string | null;
+  municipality_name?: string | null;
+  locality_name?: string | null;
 };
 
 /** Server client ohne generiertes Database-Schema */
@@ -192,14 +196,21 @@ export const load: PageServerLoad = async () => {
     caption: string | null;
     canonical_path: string | null;
     path_512: string | null;
+    path_2048: string | null;
     width: number | null;
     height: number | null;
     created_at: string | null;
     starts_at: string | null;
     ends_at: string | null;
+    lat: number | null;
+    lon: number | null;
     country_slug?: string | null;
     district_slug?: string | null;
     municipality_slug?: string | null;
+    country_name?: string | null;
+    district_name?: string | null;
+    municipality_name?: string | null;
+    locality_name?: string | null;
   };
 
   type Section = {
@@ -228,7 +239,9 @@ export const load: PageServerLoad = async () => {
 
       const { data, error } = await supabase
         .from('items')
-        .select('id, slug, title, description, caption, canonical_path, country_slug, district_slug, municipality_slug, path_512, width, height, created_at, starts_at, ends_at')
+        .select(
+          'id, slug, title, description, caption, canonical_path, country_slug, district_slug, municipality_slug, country_name, district_name, municipality_name, locality_name, path_512, path_2048, width, height, created_at, starts_at, ends_at, lat, lon'
+        )
         .eq('type_id', type.id)
         .eq('is_private', false)
         .eq('admin_hidden', false)
