@@ -67,19 +67,22 @@
   let lastSearchValue = activeSearchTerm;
   let suppressNextEmptySubmit = false;
   let _lastDataKey = '';
-  $: _dataKey = `${data.page}-${data.search ?? ''}`;
+  $: _dataKey = `${data.typeDef.slug}-${data.page}-${data.search ?? ''}`;
   $: if (typeof window !== 'undefined' && _dataKey !== _lastDataKey) {
     _lastDataKey = _dataKey;
     clientItems = null;
     clientTotalCount = null;
     clientPage = data.page;
+    clientSideFotoVariantsItems = null;
     activeSearchTerm = data.search || '';
     searchQuery = data.search || '';
     lastSearchValue = data.search || '';
   }
+  $: fotoItemsForHub =
+    !isFotoType ? data.items : clientSideFotoVariantsItems !== null ? clientSideFotoVariantsItems : data.items;
   $: shouldPreferGpsSorting = isFotoType && currentGpsPosition != null;
   $: serverItemsWithDistance = shouldPreferGpsSorting
-    ? data.items.map((item: any) => {
+    ? fotoItemsForHub.map((item: any) => {
         const lat = Number(item.lat);
         const lon = Number(item.lon);
         const hasCoordinates = Number.isFinite(lat) && Number.isFinite(lon);
@@ -90,10 +93,11 @@
           distance: hasCoordinates ? getDistanceInMeters(currentGpsPosition!.lat, currentGpsPosition!.lon, lat, lon) : null
         };
       })
-    : data.items;
+    : fotoItemsForHub;
   $: useGpsApi = shouldPreferGpsSorting && clientItems != null;
   $: effectivePage = useGpsApi ? clientPage : data.page;
-  $: displayedItems = useGpsApi ? clientItems! : shouldPreferGpsSorting ? [] : serverItemsWithDistance;
+  /** Mit GPS: SSR-Liste sofort zeigen (chronologisch + Entfernung), bis Client-Sort fertig ist — nicht leer lassen. */
+  $: displayedItems = useGpsApi ? clientItems! : serverItemsWithDistance;
   $: displayedTotalCount = (useGpsApi ? clientTotalCount : null) ?? data.totalCount;
   $: displayedTotalPages = Math.max(1, Math.ceil(displayedTotalCount / data.pageSize));
   $: hasDistanceData = displayedItems.some((item: any) => item?.distance !== undefined && item?.distance !== null);
@@ -116,6 +120,10 @@
       }
     ]
   };
+  /** Foto: Varianten/Batch-Thumbs erst clientseitig (SSR spart eine items-Query). */
+  let clientSideFotoVariantsItems: FotoListItem[] | null = null;
+  let fotoVariantsLoadSeq = 0;
+
   let animatedPreviewUrls: Record<string, string> = {};
   let variantImageIndexes: Record<string, number> = {};
   let variantTimer: ReturnType<typeof setInterval> | null = null;
@@ -353,6 +361,28 @@
       variants: variantsByRoot.get(item.id) || [],
       child_count: item.child_count ?? (variantsByRoot.get(item.id) || []).length
     }));
+  }
+
+  async function loadClientSideFotoVariants() {
+    if (!browser || !isFotoType) return;
+    const items = data.items;
+    if (!items?.length) {
+      clientSideFotoVariantsItems = items;
+      return;
+    }
+    const seq = ++fotoVariantsLoadSeq;
+    try {
+      const enriched = await attachVariants(items);
+      if (seq !== fotoVariantsLoadSeq) return;
+      if (data.typeDef.slug !== 'foto') return;
+      clientSideFotoVariantsItems = enriched.map((item: any) => ({
+        ...item,
+        caption: item.caption ?? item.description ?? null
+      }));
+    } catch (err) {
+      console.error('[foto-hub] variant load failed:', err);
+      if (seq === fotoVariantsLoadSeq && data.typeDef.slug === 'foto') clientSideFotoVariantsItems = items;
+    }
   }
 
   async function loadFotoPageFromGps(pageIndex0Based: number) {
@@ -593,6 +623,10 @@
     refreshVariantRotation();
   }
 
+  $: if (browser && isFotoType && clientSideFotoVariantsItems === null && data.items?.length) {
+    void loadClientSideFotoVariants();
+  }
+
   onMount(() => {
     if (!isFotoType) return;
     console.log(
@@ -708,12 +742,12 @@
                   on:input={handleFotoSearchInput}
                 />
               </form>
-              {#if shouldPreferGpsSorting && !useGpsApi}
-                <p class="foto-search-hint">Sortiere nach aktuellem Standort ...</p>
-              {:else if isClientLoading}
-                <p class="foto-search-hint">Sortiere nach aktuellem Standort ...</p>
-              {:else if currentGpsPosition}
+              {#if shouldPreferGpsSorting && isClientLoading}
+                <p class="foto-search-hint">Liste ist sichtbar; vollständige Sortierung nach Entfernung wird geladen …</p>
+              {:else if shouldPreferGpsSorting && useGpsApi}
                 <p class="foto-search-hint">Sortierung wie Galerie, nach Entfernung ab deinem aktuellen Standort.</p>
+              {:else if currentGpsPosition}
+                <p class="foto-search-hint">Entfernung angezeigt; neueste Fotos zuerst, bis die Standort-Sortierung bereit ist.</p>
               {:else}
                 <p class="foto-search-hint">Ohne GPS werden die neuesten Fotos zuerst gezeigt.</p>
               {/if}

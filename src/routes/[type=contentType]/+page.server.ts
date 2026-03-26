@@ -201,53 +201,8 @@ export const load: PageServerLoad = async ({ params, url }) => {
     child_count: 0
   }));
 
+  /** Foto: Varianten (+N-Thumbnails) erst im Browser nachladen — spart eine blockierende items-Query im SSR. */
   let items = baseItems;
-
-  if (typeDef.slug === 'foto' && baseItems.length > 0) {
-    const rootIds = baseItems.map((item) => item.id);
-    const { data: variantRows } = await supabase
-      .from('items')
-      .select('id, slug, path_512, path_2048, width, height, group_root_item_id, created_at')
-      .in('group_root_item_id', rootIds)
-      .eq('is_private', false)
-      .eq('admin_hidden', false)
-      .not('slug', 'is', null)
-      .order('created_at', { ascending: false });
-
-    const variantsByRoot = new Map<string, Array<{
-      id: string;
-      slug: string;
-      path_512: string | null;
-      path_2048: string | null;
-      width: number | null;
-      height: number | null;
-    }>>();
-
-    for (const row of variantRows || []) {
-      const rootId = row.group_root_item_id as string | null;
-      if (!rootId) continue;
-      const p512 = (row.path_512 || null) as string | null;
-      const p2048 = (row.path_2048 || null) as string | null;
-      if (!p512 && !p2048) continue;
-      const current = variantsByRoot.get(rootId) || [];
-      if (current.length >= 8) continue;
-      current.push({
-        id: row.id as string,
-        slug: row.slug as string,
-        path_512: p512,
-        path_2048: p2048,
-        width: (row.width || null) as number | null,
-        height: (row.height || null) as number | null
-      });
-      variantsByRoot.set(rootId, current);
-    }
-
-    items = baseItems.map((item) => ({
-      ...item,
-      variants: variantsByRoot.get(item.id) || [],
-      child_count: (variantsByRoot.get(item.id) || []).length
-    }));
-  }
 
   items = items.map((item) => ({
     ...item,
