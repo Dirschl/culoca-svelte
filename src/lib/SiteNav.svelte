@@ -60,6 +60,16 @@
   $: dashboardInboxCount = inboxMessageCount + inboxActivityCount;
   /** Ein Badge am Konto-Eintrag: Summe aller persönlichen To-dos (ohne Admin-Moderation). */
   $: kontoNavBadgeCount = dashboardInboxCount + followerAlertCount + reviewCount;
+  /** Für Screenreader: Aufschlüsselung statt nur eine Gesamtzahl. */
+  $: kontoNavBadgeAriaLabel = [
+    dashboardInboxCount > 0
+      ? `${dashboardInboxCount} ungelesene Chats oder Aktivitäten (Dashboard)`
+      : '',
+    reviewCount > 0 ? `${reviewCount} offene Datenprüfungen (Profil)` : '',
+    followerAlertCount > 0 ? `${followerAlertCount} neue Follower (Profil)` : ''
+  ]
+    .filter(Boolean)
+    .join('. ');
   $: {
     const nextInboxKey = `${$isAuthenticated ? 'auth' : 'anon'}:${$currentUserId || 'none'}:${currentPath}`;
     if (nextInboxKey !== lastInboxRefreshKey) {
@@ -352,12 +362,16 @@
           <svg class="user-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
           {userMenuLabel}
           {#if $isAuthenticated && kontoNavBadgeCount > 0}
-            <span
-              class="inbox-badge"
-              aria-label={`${kontoNavBadgeCount} offene Punkte (Nachrichten, Aktivität, Profil)`}
-              title={`${kontoNavBadgeCount} offene Punkte im Konto`}
-            >
-              {kontoNavBadgeCount}
+            <span class="konto-badge-stack" title={kontoNavBadgeAriaLabel} aria-label={kontoNavBadgeAriaLabel}>
+              {#if dashboardInboxCount > 0}
+                <span class="menu-count-badge menu-count-badge--inbox menu-count-badge--nav-tight" aria-hidden="true">{dashboardInboxCount}</span>
+              {/if}
+              {#if reviewCount > 0}
+                <span class="menu-count-badge menu-count-badge--review menu-count-badge--nav-tight" aria-hidden="true">{reviewCount}</span>
+              {/if}
+              {#if followerAlertCount > 0}
+                <span class="menu-count-badge menu-count-badge--follower menu-count-badge--nav-tight" aria-hidden="true">{followerAlertCount}</span>
+              {/if}
             </span>
           {/if}
         </a>
@@ -406,7 +420,13 @@
                       </span>
                     {/if}
                     {#if followerAlertCount > 0}
-                      <span class="mini-status-chip mini-status-chip--menu">+{followerAlertCount} Follower</span>
+                      <span
+                        class="menu-count-badge menu-count-badge--follower"
+                        title="Neue Follower"
+                        aria-label={`${followerAlertCount} neue Follower`}
+                      >
+                        {followerAlertCount}
+                      </span>
                     {/if}
                   {/if}
                 </span>
@@ -424,7 +444,22 @@
       <!-- User menu (mobile): section header + indented branch (Admin nested) -->
       <div class="mobile-only nav-group">
         {#if $isAuthenticated}
-          <span class="nav-group-label">{userMenuLabel}</span>
+          <div class="nav-group-label-row">
+            <span class="nav-group-label">{userMenuLabel}</span>
+            {#if kontoNavBadgeCount > 0}
+              <span class="konto-badge-stack" title={kontoNavBadgeAriaLabel} aria-label={kontoNavBadgeAriaLabel}>
+                {#if dashboardInboxCount > 0}
+                  <span class="menu-count-badge menu-count-badge--inbox menu-count-badge--nav-tight" aria-hidden="true">{dashboardInboxCount}</span>
+                {/if}
+                {#if reviewCount > 0}
+                  <span class="menu-count-badge menu-count-badge--review menu-count-badge--nav-tight" aria-hidden="true">{reviewCount}</span>
+                {/if}
+                {#if followerAlertCount > 0}
+                  <span class="menu-count-badge menu-count-badge--follower menu-count-badge--nav-tight" aria-hidden="true">{followerAlertCount}</span>
+                {/if}
+              </span>
+            {/if}
+          </div>
           {#if userIdentityLabel}
             <span class="nav-group-sublabel">{userIdentityLabel}</span>
           {/if}
@@ -446,7 +481,13 @@
                       <span class="menu-count-badge menu-count-badge--review">{reviewCount}</span>
                     {/if}
                     {#if followerAlertCount > 0}
-                      <span class="mini-status-chip mini-status-chip--menu">+{followerAlertCount}</span>
+                      <span
+                        class="menu-count-badge menu-count-badge--follower"
+                        title="Neue Follower"
+                        aria-label={`${followerAlertCount} neue Follower`}
+                      >
+                        {followerAlertCount}
+                      </span>
                     {/if}
                   {/if}
                 </span>
@@ -779,8 +820,23 @@
     color: #fff;
   }
 
-  .mini-status-chip--menu {
-    margin-left: 0;
+  .menu-count-badge--follower {
+    background: #5b4a9e;
+    color: #fff;
+  }
+
+  .menu-count-badge--nav-tight {
+    min-width: 1.2rem;
+    height: 1.2rem;
+    padding: 0 0.28rem;
+    font-size: 0.68rem;
+  }
+
+  .konto-badge-stack {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.22rem;
   }
 
   .dropdown-menu--user { min-width: 190px; right: 0; left: auto; }
@@ -835,35 +891,6 @@
     padding-right: 0.55rem;
   }
   .user-icon { flex-shrink: 0; opacity: 0.7; }
-  .inbox-badge {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 1.35rem;
-    height: 1.35rem;
-    padding: 0 0.35rem;
-    border-radius: 999px;
-    background: var(--accent-color);
-    color: #fff;
-    font-size: 0.72rem;
-    font-weight: 700;
-    line-height: 1;
-  }
-
-  .mini-status-chip {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 1.5rem;
-    padding: 0.15rem 0.55rem;
-    border-radius: 999px;
-    background: var(--bg-tertiary);
-    color: var(--text-secondary);
-    font-size: 0.72rem;
-    font-weight: 700;
-    line-height: 1;
-    white-space: nowrap;
-  }
 
   /* Mobile helpers */
   .mobile-only { display: none; }
@@ -962,9 +989,18 @@
       border-left: 3px solid color-mix(in srgb, var(--culoca-orange) 40%, var(--border-color) 60%);
       border-radius: 0 10px 10px 0;
     }
-    .nav-group .nav-group-label {
+    .nav-group-label-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.45rem;
+      flex-wrap: wrap;
       padding-left: 0.25rem;
       padding-right: 0.75rem;
+    }
+    .nav-group .nav-group-label {
+      padding-left: 0;
+      padding-right: 0;
     }
     .nav-group .nav-link--sub {
       display: flex;
