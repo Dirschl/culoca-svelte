@@ -106,7 +106,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
   const buildBaseQuery = () => {
     let query = supabase
       .from('items')
-      .select('id, slug, title, description, caption, canonical_path, country_slug, district_slug, municipality_slug, path_512, path_2048, width, height, created_at, starts_at, ends_at, external_url, lat, lon, original_name')
+      .select('id, slug, title, description, caption, canonical_path, country_slug, district_slug, municipality_slug, country_name, district_name, municipality_name, locality_name, path_512, path_2048, width, height, created_at, starts_at, ends_at, external_url, lat, lon, original_name')
       .eq('type_id', typeDef.id)
       .eq('is_private', false)
       .eq('admin_hidden', false)
@@ -198,6 +198,10 @@ export const load: PageServerLoad = async ({ params, url }) => {
     country_slug: (item.country_slug || null) as string | null,
     district_slug: (item.district_slug || null) as string | null,
     municipality_slug: (item.municipality_slug || null) as string | null,
+    country_name: (item.country_name || null) as string | null,
+    district_name: (item.district_name || null) as string | null,
+    municipality_name: (item.municipality_name || null) as string | null,
+    locality_name: (item.locality_name || null) as string | null,
     child_count: 0
   }));
 

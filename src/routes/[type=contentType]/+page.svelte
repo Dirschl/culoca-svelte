@@ -33,6 +33,13 @@
     child_count?: number;
     variants?: Array<{ slug: string; path_512: string | null; path_2048?: string | null }>;
     distance?: number | null;
+    country_name?: string | null;
+    district_name?: string | null;
+    municipality_name?: string | null;
+    locality_name?: string | null;
+    country_slug?: string | null;
+    district_slug?: string | null;
+    municipality_slug?: string | null;
   };
 
   export let data: PageData;
@@ -49,6 +56,9 @@
   };
   $: icon = TYPE_ICONS[data.typeDef.slug] || '';
   $: isFotoType = data.typeDef.slug === 'foto';
+  $: isEventType = data.typeDef.slug === 'event';
+  /** Foto + Event: gleiche Kachel-Optik (Blur-Hintergrund, Bild enthalten). */
+  $: hubVisualThumb = isFotoType || isEventType;
   $: pageTitle = data.page > 1
     ? `${data.typeDef.name}: Seite ${data.page} | Culoca`
     : `${data.typeDef.name}: Inhalte, Motive und Übersichten | Culoca`;
@@ -81,8 +91,12 @@
   $: fotoItemsForHub =
     !isFotoType ? data.items : clientSideFotoVariantsItems !== null ? clientSideFotoVariantsItems : data.items;
   $: shouldPreferGpsSorting = isFotoType && currentGpsPosition != null;
-  $: serverItemsWithDistance = shouldPreferGpsSorting
-    ? fotoItemsForHub.map((item: any) => {
+  $: hubListSource = isFotoType ? fotoItemsForHub : data.items;
+  /** Events: Entfernung wie bei Fotos, wenn GPS bekannt (ohne Client-Nachsortierung). */
+  $: shouldAddHubDistance =
+    (isFotoType && shouldPreferGpsSorting) || (isEventType && currentGpsPosition != null);
+  $: serverItemsWithDistance = shouldAddHubDistance
+    ? hubListSource.map((item: any) => {
         const lat = Number(item.lat);
         const lon = Number(item.lon);
         const hasCoordinates = Number.isFinite(lat) && Number.isFinite(lon);
@@ -90,10 +104,12 @@
           ...item,
           lat: hasCoordinates ? lat : item.lat,
           lon: hasCoordinates ? lon : item.lon,
-          distance: hasCoordinates ? getDistanceInMeters(currentGpsPosition!.lat, currentGpsPosition!.lon, lat, lon) : null
+          distance: hasCoordinates
+            ? getDistanceInMeters(currentGpsPosition!.lat, currentGpsPosition!.lon, lat, lon)
+            : null
         };
       })
-    : fotoItemsForHub;
+    : hubListSource;
   $: useGpsApi = shouldPreferGpsSorting && clientItems != null;
   $: effectivePage = useGpsApi ? clientPage : data.page;
   /** Mit GPS: SSR-Liste sofort zeigen (chronologisch + Entfernung), bis Client-Sort fertig ist — nicht leer lassen. */
@@ -157,6 +173,85 @@
     } catch {
       return '';
     }
+  }
+
+  function slugToTitleCaseHub(slug: string): string {
+    return String(slug)
+      .split(/[-_]/g)
+      .filter(Boolean)
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ');
+  }
+
+  function formatHubEventPlace(item: {
+    locality_name?: string | null;
+    municipality_name?: string | null;
+    district_name?: string | null;
+    country_name?: string | null;
+    municipality_slug?: string | null;
+    district_slug?: string | null;
+    country_slug?: string | null;
+  }): string {
+    const named = [item.locality_name, item.municipality_name, item.district_name, item.country_name]
+      .map((x) => (x && String(x).trim()) || '')
+      .filter(Boolean);
+    const uniqNames: string[] = [];
+    for (const p of named) {
+      if (!uniqNames.includes(p)) uniqNames.push(p);
+    }
+    if (uniqNames.length) return uniqNames.join(', ');
+    const slugParts = [item.municipality_slug, item.district_slug, item.country_slug]
+      .filter((s): s is string => !!s && String(s).trim().length > 0)
+      .map((s) => slugToTitleCaseHub(String(s)));
+    const uniqSlugs: string[] = [];
+    for (const p of slugParts) {
+      if (!uniqSlugs.includes(p)) uniqSlugs.push(p);
+    }
+    return uniqSlugs.length ? uniqSlugs.join(', ') : '';
+  }
+
+  /** Hub-Kachel: großes „von – bis“ (ein Tag mit Uhrzeit vs. mehrtägig). */
+  function formatEventHubRange(
+    startsAt: string | null | undefined,
+    endsAt: string | null | undefined
+  ): string {
+    if (!startsAt && !endsAt) return '';
+    const fmtDate = (iso: string) => {
+      try {
+        return new Intl.DateTimeFormat('de-DE', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric'
+        }).format(new Date(iso));
+      } catch {
+        return '';
+      }
+    };
+    const fmtTime = (iso: string) => {
+      try {
+        return new Intl.DateTimeFormat('de-DE', { hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
+      } catch {
+        return '';
+      }
+    };
+    if (startsAt && endsAt) {
+      const s = new Date(startsAt);
+      const e = new Date(endsAt);
+      const sameDay =
+        s.getFullYear() === e.getFullYear() &&
+        s.getMonth() === e.getMonth() &&
+        s.getDate() === e.getDate();
+      if (sameDay) {
+        const d = fmtDate(startsAt);
+        const t1 = fmtTime(startsAt);
+        const t2 = fmtTime(endsAt);
+        if (t1 && t2) return `${d} · ${t1} – ${t2}`;
+        return d || fmtDate(endsAt);
+      }
+      return `${fmtDate(startsAt)} – ${fmtDate(endsAt)}`;
+    }
+    if (startsAt) return fmtDate(startsAt);
+    return fmtDate(endsAt!);
   }
 
   function pageUrl(p: number): string {
@@ -777,14 +872,14 @@
                     {@const previewUrl = currentThumbUrl(item)}
                     <div
                       class="item-thumb"
-                      class:item-thumb--foto={isFotoType}
-                      style={isFotoType ? `--thumb-preview:url('${previewUrl}')` : undefined}
+                      class:item-thumb--foto={hubVisualThumb}
+                      style={hubVisualThumb ? `--thumb-preview:url('${previewUrl}')` : undefined}
                       bind:this={previewThumbElements[item.id]}
                     >
                       {#if isFotoType && (item.child_count || 0) > 0}
                         <div class="item-variant-count">+{(item.child_count || 0) + 1}</div>
                       {/if}
-                      {#if isFotoType && hasDistanceData && item.distance !== undefined && item.distance !== null}
+                      {#if hubVisualThumb && hasDistanceData && item.distance !== undefined && item.distance !== null}
                         <div class="item-distance-badge">{formatDistance(item.distance)}</div>
                       {/if}
                       <img
@@ -804,10 +899,16 @@
                   {/if}
                   <div class="item-body">
                     <h3>{item.title || item.slug}</h3>
-                    {#if item.description || item.caption}
-                      <p class="item-desc">{truncate(item.description || item.caption, 120)}</p>
-                    {/if}
-                    {#if !isFotoType}
+                    {#if isEventType}
+                      {@const eventRange = formatEventHubRange(item.starts_at, item.ends_at)}
+                      {@const eventPlace = formatHubEventPlace(item)}
+                      {#if eventRange}
+                        <p class="item-event-range">{eventRange}</p>
+                      {/if}
+                      {#if eventPlace}
+                        <p class="item-event-place">{eventPlace}</p>
+                      {/if}
+                    {:else if !isFotoType}
                       <div class="item-meta">
                         {#if item.starts_at}
                           <time datetime={item.starts_at}>{formatDate(item.starts_at)}</time>
@@ -815,6 +916,9 @@
                           <time datetime={item.created_at}>{formatDate(item.created_at)}</time>
                         {/if}
                       </div>
+                    {/if}
+                    {#if item.description || item.caption}
+                      <p class="item-desc">{truncate(item.description || item.caption, 120)}</p>
                     {/if}
                   </div>
                 </a>
@@ -1175,6 +1279,21 @@
     line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
+  }
+  .item-event-range {
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.35;
+    margin: 0.2rem 0 0;
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
+  }
+  .item-event-place {
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.4;
+    margin: 0.15rem 0 0;
+    color: var(--text-secondary);
   }
   .item-desc {
     font-size: 0.8rem;
