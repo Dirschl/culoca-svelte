@@ -120,10 +120,14 @@ export const load: PageServerLoad = async ({ params, url }) => {
     return query;
   };
 
-  const buildCountQuery = () => {
+  /**
+   * Ohne Suche: geschätzte Gesamtanzahl (PostgREST `count=estimated`, reltuples — sehr schnell).
+   * Vermeidet `count=exact` über tausende Zeilen, was /foto & Co. spürbar verlangsamt.
+   */
+  const buildHubTotalCountQuery = () => {
     let query = supabase
       .from('items')
-      .select('*', { count: 'exact', head: true })
+      .select('id', { count: 'estimated', head: true })
       .eq('type_id', typeDef.id)
       .eq('is_private', false)
       .eq('admin_hidden', false)
@@ -163,13 +167,13 @@ export const load: PageServerLoad = async ({ params, url }) => {
     rows = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   } else {
     const [countResult, dataResult] = await Promise.all([
-      buildCountQuery(),
+      buildHubTotalCountQuery(),
       buildBaseQuery()
         .order('created_at', { ascending: false })
         .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1)
     ]);
 
-    totalCount = countResult.count || 0;
+    totalCount = Math.max(0, countResult.count ?? 0);
     rows = dataResult.data || [];
   }
 
