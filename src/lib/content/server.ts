@@ -465,26 +465,15 @@ function resolveCountryNameForPayload(item: ItemRecord): string {
 	);
 }
 
-async function getRelatedItems(
-	supabase: ReturnType<typeof createServerSupabase>,
-	item: ItemRecord,
-	rootItem: ItemRecord,
+/** Select für semantisch ähnliche Items (RPC + Nachladen) — identisch zu früherem getRelatedItems-Pfad. */
+const SIMILAR_MOTIF_RELATED_SELECT =
+	'id, slug, title, description, caption, canonical_path, path_512, width, height, created_at, profile_id, keywords, page_settings, country_slug, district_slug, municipality_slug, country_name, district_name, municipality_name';
+
+function mapSemanticSimilarRowsToPublicPreviews(
+	rows: ItemRecord[],
 	type: Partial<ContentTypeDefinition> | null
 ) {
-	const baseSelect =
-		'id, slug, title, description, caption, canonical_path, path_512, width, height, created_at, profile_id, keywords, page_settings, country_slug, district_slug, municipality_slug, country_name, district_name, municipality_name';
-
-	const placeLabel = pickItemPlaceLabelForSeo(item);
-
-	const semanticSimilarRows = await getSemanticSimilarItems(
-		supabase,
-		item,
-		rootItem,
-		type,
-		baseSelect
-	);
-
-	const toPreview = (row: ItemRecord) =>
+	return rows.map((row: ItemRecord) =>
 		fixDeepUtf8InObject({
 			id: row.id,
 			slug: row.slug,
@@ -495,14 +484,54 @@ async function getRelatedItems(
 			path_512: row.path_512,
 			width: row.width,
 			height: row.height
-		});
+		})
+	);
+}
+
+/**
+ * Öffentliche Vorschau-Liste „ähnliche Motive“ (nur Foto-Typ). Für Lazy-Load via API, nicht im Item-SSR.
+ */
+export async function loadSimilarMotifPreviewsForPublicSlug(slug: string) {
+	const supabase = createServerSupabase();
+	const item = await getItemBySlug(supabase, slug);
+	if (!item) throw error(404, 'Not found');
+	if (!isPubliclyVisibleItem(item)) throw error(404, 'Not found');
+
+	const typeMap = await getTypeMap(supabase);
+	let type: Partial<ContentTypeDefinition> | null = item.type_id
+		? (typeMap.get(item.type_id) ?? DEFAULT_CONTENT_TYPE_BY_ID.get(item.type_id) ?? null)
+		: null;
+
+	const rootItem = await getRootItem(supabase, item);
+	if (rootItem?.type_id) {
+		type = typeMap.get(rootItem.type_id) ?? type ?? null;
+	}
+
+	if (type?.slug !== 'foto') {
+		return [];
+	}
+
+	const countryNameResolved = resolveCountryNameForPayload(item);
+	const itemForSearch = { ...item, country_name: countryNameResolved } as ItemRecord;
+
+	const semanticSimilarRows = await getSemanticSimilarItems(
+		supabase,
+		itemForSearch,
+		rootItem,
+		type,
+		SIMILAR_MOTIF_RELATED_SELECT
+	);
+
+	return mapSemanticSimilarRowsToPublicPreviews((semanticSimilarRows || []) as ItemRecord[], type);
+}
+
+async function getRelatedItems(item: ItemRecord) {
+	const placeLabel = pickItemPlaceLabelForSeo(item);
 
 	return {
 		sameType: [],
 		sameCreator: [],
-		sameKeyword: ((semanticSimilarRows || []) as ItemRecord[]).map((row: ItemRecord) =>
-			toPreview(row)
-		),
+		sameKeyword: [],
 		samePlace: [],
 		keywordLinks: getKeywordHubLinks(item.keywords || []),
 		placeLabel,
@@ -596,7 +625,7 @@ export async function loadContentPage(args: {
 		profile: profileData.profile,
 		full_name: attribution.creatorName
 	};
-	const related = await getRelatedItems(supabase, imageWithProfile, rootItem, type);
+	const related = await getRelatedItems(imageWithProfile);
 
 	const rootCanonicalPath = getStoredOrComputedCanonicalPath({ item: rootItem, rootItem, type });
 	const siblings = [rootItem, ...groupItems]

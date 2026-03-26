@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { get } from 'svelte/store';
 	import { page } from '$app/stores';
 	import SiteNav from '$lib/SiteNav.svelte';
 	import SiteFooter from '$lib/SiteFooter.svelte';
@@ -151,6 +152,11 @@
 	let autoEditAppliedFor = '';
 	let similarMotifPage = 1;
 	const SIMILAR_MOTIFS_PAGE_SIZE = 20;
+	let similarMotifsSeq = 0;
+	let similarMotifsStatus: 'idle' | 'loading' | 'ready' = 'idle';
+	let clientSimilarMotifs: any[] = [];
+	let prevSimilarMotifsWasFoto = false;
+	let lastSuccessfulSimilarMotifsSlug = '';
 	const TYPE_ICONS: Record<string, string> = {
 		foto: '📷',
 		event: '📅',
@@ -306,7 +312,23 @@
 		latitude: image?.lat ?? null,
 		longitude: image?.lon ?? null
 	});
-	$: similarMotifItems = relatedContent?.sameKeyword || [];
+	$: similarMotifItems =
+		contentType?.slug === 'foto' ? clientSimilarMotifs : relatedContent?.sameKeyword || [];
+
+	$: if (browser && contentType?.slug) {
+		const isFoto = contentType.slug === 'foto';
+		if (prevSimilarMotifsWasFoto && !isFoto) {
+			similarMotifsSeq++;
+			clientSimilarMotifs = [];
+			similarMotifsStatus = 'idle';
+			lastSuccessfulSimilarMotifsSlug = '';
+		}
+		prevSimilarMotifsWasFoto = isFoto;
+	}
+
+	$: if (browser && contentType?.slug === 'foto' && image?.slug) {
+		void fetchSimilarMotifs(image.slug);
+	}
 	$: similarMotifTotalPages = Math.max(
 		1,
 		Math.ceil(similarMotifItems.length / SIMILAR_MOTIFS_PAGE_SIZE)
@@ -599,6 +621,37 @@
 			if (seq === nearbyRequestSeq) {
 				console.error('Failed to load nearby items:', error);
 			}
+		}
+	}
+
+	async function fetchSimilarMotifs(slug: string) {
+		if (!browser || !slug) return;
+		if (slug === lastSuccessfulSimilarMotifsSlug) return;
+		const seq = ++similarMotifsSeq;
+		const forSlug = slug;
+		similarMotifsStatus = 'loading';
+		clientSimilarMotifs = [];
+		try {
+			const r = await fetch(`/api/similar-motifs/${encodeURIComponent(slug)}`);
+			if (seq !== similarMotifsSeq) return;
+			if (get(page).params.slug !== forSlug) return;
+			if (r.ok) {
+				const j = await r.json();
+				if (seq !== similarMotifsSeq) return;
+				if (get(page).params.slug !== forSlug) return;
+				clientSimilarMotifs = Array.isArray(j.items) ? j.items : [];
+				lastSuccessfulSimilarMotifsSlug = forSlug;
+			} else {
+				clientSimilarMotifs = [];
+			}
+		} catch {
+			if (seq !== similarMotifsSeq) return;
+			if (get(page).params.slug !== forSlug) return;
+			clientSimilarMotifs = [];
+		} finally {
+			if (seq !== similarMotifsSeq) return;
+			if (get(page).params.slug !== forSlug) return;
+			similarMotifsStatus = 'ready';
 		}
 	}
 
@@ -4901,18 +4954,25 @@
 					}
 				}}
 			/>
-			{#if similarMotifItems.length}
+			{#if contentType?.slug === 'foto' && (similarMotifsStatus === 'loading' || similarMotifItems.length > 0)}
 				<section class="similar-motifs-panel" data-nosnippet>
 					<div class="similar-motifs-head">
 						<div>
 							<h2>Ähnliche Motive aus Vektoranalyse</h2>
 							<p>
-								{similarMotifItems.length.toLocaleString('de-DE')} thematisch passende Fotos, semantisch
-								gruppiert statt zufällig über Keywords.
+								{#if similarMotifsStatus === 'loading'}
+									Semantisch ähnliche Fotos werden geladen …
+								{:else}
+									{similarMotifItems.length.toLocaleString('de-DE')} thematisch passende Fotos, semantisch
+									gruppiert statt zufällig über Keywords.
+								{/if}
 							</p>
 						</div>
 					</div>
 
+					{#if similarMotifsStatus === 'loading'}
+						<p class="dashboard-empty similar-motifs-loading">Bitte kurz warten …</p>
+					{:else}
 					<div class="similar-motifs-grid">
 						{#each visibleSimilarMotifItems as item (item.id)}
 							<article class="similar-item-card">
@@ -4984,6 +5044,7 @@
 								Weiter
 							</button>
 						</nav>
+					{/if}
 					{/if}
 				</section>
 			{/if}
