@@ -22,8 +22,17 @@ export type GeoHierarchyLevel = {
 
 const GEO_LEVEL_ORDER: GeoLevelKey[] = ['country', 'state', 'region', 'district', 'municipality'];
 
-function normalizeGeoSlug(value: string | null | undefined): string {
-  return (value || '')
+function stripGeoDecorators(value: string, key: GeoLevelKey): string {
+  if (key !== 'district') return value;
+  return value
+    .replace(/\b(Landkreis|Kreis|Bezirk|Region)\b/giu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function normalizeGeoSlug(value: string | null | undefined, key?: GeoLevelKey): string {
+  const normalizedValue = key ? stripGeoDecorators(value || '', key) : value || '';
+  return normalizedValue
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/ß/g, 'ss')
@@ -48,8 +57,11 @@ function labelFallback(key: GeoLevelKey, slug: string): string {
   }
 }
 
-function normalizeGeoLabel(value: string | null | undefined): string | null {
-  const normalized = value?.normalize('NFC').replace(/\s+/g, ' ').trim();
+function normalizeGeoLabel(value: string | null | undefined, key?: GeoLevelKey): string | null {
+  const normalized = (key ? stripGeoDecorators(value || '', key) : value || '')
+    .normalize('NFC')
+    .replace(/\s+/g, ' ')
+    .trim();
   return normalized || null;
 }
 
@@ -58,10 +70,10 @@ function buildLevelDescriptor(
   slug: string | null | undefined,
   label: string | null | undefined
 ) {
-  const normalizedSlug = normalizeGeoSlug(slug);
+  const normalizedSlug = normalizeGeoSlug(slug, key);
   if (!normalizedSlug) return null;
 
-  const normalizedLabel = normalizeGeoLabel(label) || labelFallback(key, normalizedSlug);
+  const normalizedLabel = normalizeGeoLabel(label, key) || labelFallback(key, normalizedSlug);
   return {
     key,
     slug: normalizedSlug,
@@ -125,7 +137,7 @@ export function buildGeoItemPath(
   if (!itemSlug) return null;
 
   const countrySlug = normalizeGeoSlug(input.countrySlug);
-  const districtSlug = normalizeGeoSlug(input.districtSlug);
+  const districtSlug = normalizeGeoSlug(input.districtSlug, 'district');
   const municipalitySlug = normalizeGeoSlug(input.municipalitySlug);
 
   if (!countrySlug || !districtSlug || !municipalitySlug) return null;
@@ -136,7 +148,7 @@ export function buildGeoItemPath(
 export function hasGeoItemHierarchy(input: GeoHierarchyInput): boolean {
   return !!(
     normalizeGeoSlug(input.countrySlug) &&
-    normalizeGeoSlug(input.districtSlug) &&
+    normalizeGeoSlug(input.districtSlug, 'district') &&
     normalizeGeoSlug(input.municipalitySlug)
   );
 }
