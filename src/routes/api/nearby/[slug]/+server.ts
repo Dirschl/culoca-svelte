@@ -109,7 +109,7 @@ export async function GET({ params }: any) {
           
           const { data: fallbackData, error: fallbackError } = await supabase
             .from('items')
-            .select('id, slug, canonical_path, country_slug, district_slug, municipality_slug, path_512, path_2048, path_64, original_name, title, description, caption, lat, lon, width, height, is_private, gallery, group_root_item_id, profile_id')
+            .select('id, slug, canonical_path, country_slug, state_slug, region_slug, district_slug, municipality_slug, path_512, path_2048, path_64, original_name, title, description, caption, lat, lon, width, height, is_private, gallery, group_root_item_id, profile_id')
             .not('lat', 'is', null)
             .not('lon', 'is', null)
             .not('path_512', 'is', null)
@@ -136,6 +136,8 @@ export async function GET({ params }: any) {
                   slug: item.slug,
                   canonical_path: getPublicItemHref(item),
                   country_slug: item.country_slug ?? null,
+                  state_slug: item.state_slug ?? null,
+                  region_slug: item.region_slug ?? null,
                   district_slug: item.district_slug ?? null,
                   municipality_slug: item.municipality_slug ?? null,
                   lat: item.lat,
@@ -163,7 +165,7 @@ export async function GET({ params }: any) {
           const { data: geoData } = nearbyIds.length
             ? await supabase
                 .from('items')
-                .select('id, slug, canonical_path, country_slug, district_slug, municipality_slug')
+                .select('id, slug, canonical_path, country_slug, state_slug, region_slug, district_slug, municipality_slug')
                 .in('id', nearbyIds)
             : { data: [] as any[] };
           const geoById = new Map((geoData || []).map((item: any) => [item.id, item]));
@@ -181,6 +183,8 @@ export async function GET({ params }: any) {
                 slug: item.slug,
                 canonical_path: getPublicItemHref(geoItem),
                 country_slug: geoItem.country_slug ?? null,
+                state_slug: geoItem.state_slug ?? null,
+                region_slug: geoItem.region_slug ?? null,
                 district_slug: geoItem.district_slug ?? null,
                 municipality_slug: geoItem.municipality_slug ?? null,
                 lat: item.lat,
