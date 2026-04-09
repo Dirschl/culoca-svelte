@@ -857,16 +857,12 @@
 	let mainImageProgressive = false;
 	let mainFigureBackgroundUrl = '';
 	let mainImageSrc = '';
-	let mainImageRevealed = false;
-	let mainImageElement: HTMLImageElement | null = null;
-
 	$: if (image) {
 		const imagePath = image.path_2048 || image.path_512;
 		if (!imagePath || !image.slug) {
 			mainImageProgressive = false;
 			mainFigureBackgroundUrl = '';
 			mainImageSrc = '';
-			mainImageRevealed = false;
 		} else {
 			const extensionMatch = imagePath.match(/\.(jpg|jpeg|webp|png)$/i);
 			const fileExtension = extensionMatch ? extensionMatch[0].toLowerCase() : '.jpg';
@@ -882,16 +878,7 @@
 			mainImageProgressive = !!(url512 && url2048);
 			mainFigureBackgroundUrl = mainImageProgressive ? url512 : '';
 			mainImageSrc = url2048 || url512;
-			mainImageRevealed = !mainImageProgressive;
 		}
-	}
-
-	function onMainImageLoad() {
-		mainImageRevealed = true;
-	}
-
-	$: if (mainImageProgressive && mainImageElement?.complete) {
-		mainImageRevealed = true;
 	}
 
 	// Beispiel: Handler für Location-Filter
@@ -3360,14 +3347,9 @@
 </script>
 
 <svelte:head>
-	<!-- LCP zuerst: großes Bild (HTTP Link-Header ergänzt das serverseitig), 512 nur bei Progressive und niedriger Priorität -->
-	{#if shouldShowMainImage && image?.slug && (image.path_2048 || image.path_512)}
-		{#if mainImageSrc}
-			<link rel="preload" as="image" href={mainImageSrc} fetchpriority="high" />
-		{/if}
-		{#if mainFigureBackgroundUrl}
-			<link rel="preload" as="image" href={mainFigureBackgroundUrl} fetchpriority="low" />
-		{/if}
+	<!-- Nur LCP-Hauptbild (512 lädt per CSS background, kein zweiter Preload-Wettbewerb) -->
+	{#if shouldShowMainImage && image?.slug && (image.path_2048 || image.path_512) && mainImageSrc}
+		<link rel="preload" as="image" href={mainImageSrc} fetchpriority="high" />
 	{/if}
 
 	<title>{image?.title || `Item ${itemSlug} - culoca.com`}</title>
@@ -3646,45 +3628,48 @@
 	{/if}
 </svelte:head>
 
-<div class="page">
-	<SiteNav />
-	{#key itemSlug}
-		{#if loading}
-			<div class="loading">
-				<div class="spinner"></div>
-				<span>Lade Bild...</span>
-			</div>
-		{:else if error}
-			<div class="error">❌ Fehler: {error}</div>
-		{:else if image}
-			<div class="passepartout-container">
-				{#if shouldShowMainImage}
-					<!-- 512 als Figure-Hintergrund (oft gecacht), 2048 als img — vermeidet Sprung & sofortiges Nur-2048 durch srcset -->
-					{#key image.id}
-						<figure
-							class="main-figure"
-							class:main-figure--progressive={mainImageProgressive}
-							style={mainFigureBackgroundUrl
-								? `background-image: url(${JSON.stringify(mainFigureBackgroundUrl)});`
-								: ''}
-						>
-							<img
-								bind:this={mainImageElement}
-								src={mainImageSrc}
-								alt={mainImageAlt}
-								class="main-image"
-								class:main-image--progressive={mainImageProgressive}
-								class:main-image--revealed={mainImageRevealed}
-								width={image.width && image.height ? image.width : undefined}
-								height={image.width && image.height ? image.height : undefined}
-								loading="eager"
-								decoding="sync"
-								fetchpriority="high"
-								on:load={onMainImageLoad}
-							/>
-						</figure>
-					{/key}
-					{#if hasVariantStrip}
+<div class="page item-page">
+	<!-- LCP: <img> steht im Dokument vor Navigation & Rest — Parser/Priorität früher; sichtbar bleibt Nav oben (flex order) -->
+	{#if !loading && !error && image && shouldShowMainImage && mainImageSrc}
+		<div class="item-page__lcp">
+			{#key image.id}
+				<figure
+					class="main-figure"
+					class:main-figure--progressive={mainImageProgressive}
+					style={mainFigureBackgroundUrl
+						? `background-image: url(${JSON.stringify(mainFigureBackgroundUrl)});`
+						: ''}
+				>
+					<img
+						src={mainImageSrc}
+						alt={mainImageAlt}
+						class="main-image"
+						width={image.width && image.height ? image.width : undefined}
+						height={image.width && image.height ? image.height : undefined}
+						loading="eager"
+						decoding="sync"
+						fetchpriority="high"
+					/>
+				</figure>
+			{/key}
+		</div>
+	{/if}
+	<div class="item-page__nav">
+		<SiteNav />
+	</div>
+	<div class="item-page__main">
+		{#key itemSlug}
+			{#if loading}
+				<div class="loading">
+					<div class="spinner"></div>
+					<span>Lade Bild...</span>
+				</div>
+			{:else if error}
+				<div class="error">❌ Fehler: {error}</div>
+			{:else if image}
+				<div class="passepartout-container">
+					{#if shouldShowMainImage}
+						{#if hasVariantStrip}
 						<div class="variant-strip" data-nosnippet>
 							{#each variantStripItems as groupItem}
 								<a
@@ -5233,10 +5218,50 @@
 			</button>
 		{/if}
 	{/key}
-	<SiteFooter />
+	</div>
+	<div class="item-page__footer">
+		<SiteFooter />
+	</div>
 </div>
 
 <style>
+	/* Parser/LCP: Hero-IMG steht im DOM zuerst; sichtbare Reihenfolge: Nav → Bild → Inhalt → Footer */
+	.item-page {
+		display: flex;
+		flex-direction: column;
+		min-height: 100vh;
+		min-height: 100dvh;
+	}
+	.item-page__nav {
+		order: 1;
+	}
+	.item-page__lcp {
+		order: 2;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		width: 100%;
+		padding: 12px 12px 0;
+		margin: 0 auto;
+		background: var(--passepartout-bg);
+		overflow: hidden;
+	}
+	.item-page__main {
+		order: 3;
+		flex: 1 1 auto;
+		display: flex;
+		flex-direction: column;
+		min-width: 0;
+	}
+	.item-page__footer {
+		order: 4;
+		width: 100%;
+		margin-top: auto;
+	}
+	.item-page:has(.item-page__lcp) .passepartout-container {
+		padding-top: 0;
+	}
+
 	.title-text:hover,
 	.description-text:hover {
 		color: var(--culoca-orange, #ee7221);
@@ -5280,18 +5305,6 @@
 		border: 1px solid #ffffff;
 		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 		background: transparent;
-	}
-	.main-image--progressive {
-		opacity: 0;
-		transition: opacity 0.2s ease-out;
-	}
-	/* Bis das große Bild da ist: kein weißer 1px-Rand (border wirkte als „Platzhalter-Streifen“) */
-	.main-image--progressive:not(.main-image--revealed) {
-		border-color: transparent;
-		box-shadow: none;
-	}
-	.main-image--progressive.main-image--revealed {
-		opacity: 1;
 	}
 	.variant-strip {
 		display: flex;
