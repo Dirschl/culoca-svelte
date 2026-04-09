@@ -104,6 +104,27 @@
 		return '';
 	}
 
+	/**
+	 * PATCH-/Rerender-Antworten liefern nur die items-Zeile. Enthält die Payload
+	 * explizit `profile: null` (z. B. Spalte/View), würde ein naiver Spread das
+	 * für die Seite angereicherte Profil entfernen — die Ersteller-Box bliebe leer.
+	 */
+	function mergeItemFromApiPatch<C extends Record<string, unknown>>(
+		current: C,
+		patch: Record<string, unknown> | null | undefined
+	): C {
+		if (!patch || typeof patch !== 'object') return current;
+		const merged = { ...current, ...patch } as Record<string, unknown>;
+		const p = patch as Record<string, unknown>;
+		if (!('profile' in p) || p.profile == null) {
+			merged.profile = current.profile;
+		}
+		if (!('full_name' in p) || p.full_name == null) {
+			merged.full_name = current.full_name;
+		}
+		return merged as C;
+	}
+
 	export let data: any;
 	let image = data?.image ?? null;
 	let error = data?.error ?? '';
@@ -1998,7 +2019,6 @@
 	let latestRootSearchToken = 0;
 	let latestGroupSlugToken = 0;
 
-	let showFullExif = false;
 	let showHiddenItems = false;
 	function toggleHiddenItems() {
 		showHiddenItems = false;
@@ -2204,7 +2224,7 @@
 			if (!res.ok) return;
 			const result = await res.json();
 			if (result?.item) {
-				image = { ...image, ...result.item };
+				image = mergeItemFromApiPatch(image, result.item);
 			}
 			editingGeoFields = false;
 
@@ -2514,11 +2534,14 @@
 			}
 
 			const result = await res.json();
-			image = { ...image, ...result.item };
+			image = mergeItemFromApiPatch(image, result.item);
 			const nextRootItem =
 				(result.item?.group_root_item_id
 					? selectedRootItem || rootItem
-					: { ...rootItem, ...result.item, group_slug: result.item?.group_slug ?? null }) ||
+					: {
+							...mergeItemFromApiPatch(rootItem || {}, result.item),
+							group_slug: result.item?.group_slug ?? null
+						}) ||
 				rootItem;
 			const nextType =
 				availableTypes.find((type) => type.id === result.item?.type_id) || contentType;
@@ -2826,7 +2849,7 @@
 			if (!res.ok) return;
 			const result = await res.json();
 			if (result?.item) {
-				image = { ...image, ...result.item };
+				image = mergeItemFromApiPatch(image, result.item);
 			} else {
 				image.original_name = newFilename;
 			}
@@ -3139,7 +3162,7 @@
 			}
 
 			if (result.item) {
-				image = { ...image, ...result.item };
+				image = mergeItemFromApiPatch(image, result.item);
 			}
 
 			fileSizes = { size64: null, size512: null, size2048: null };
@@ -3179,7 +3202,7 @@
 			}
 
 			if (result.item) {
-				image = { ...image, ...result.item };
+				image = mergeItemFromApiPatch(image, result.item);
 			}
 
 			fileSizes = { size64: null, size512: null, size2048: null };
@@ -3283,7 +3306,7 @@
 
 			const data = await res.json();
 			if (data?.item) {
-				image = { ...image, ...data.item };
+				image = mergeItemFromApiPatch(image, data.item);
 			} else {
 				image = {
 					...image,
@@ -3318,7 +3341,7 @@
 			}
 
 			if (data?.item) {
-				image = { ...image, ...data.item };
+				image = mergeItemFromApiPatch(image, data.item);
 				adobeStockUrlEdit = data.item.adobe_stock_url || adobeStockUrlEdit;
 				adobeStockAssetIdEdit = data.item.adobe_stock_asset_id || adobeStockAssetIdEdit;
 			}
@@ -4646,12 +4669,8 @@
 				</div>
 				<!-- Column 2: All EXIF/Meta -->
 				<div class="meta-column">
-					<button type="button" class="exif-toggle" on:click={() => (showFullExif = true)}
-						>Aufnahmedaten</button
-					>
-					<!-- Immer die Basisdaten anzeigen -->
-					{#if true}
-						<!-- Essential EXIF data -->
+					<h2>Aufnahmedaten</h2>
+					<!-- Essential EXIF data -->
 						{#if image.width && image.height}
 							<div class="meta-line">Auflösung: {image.width}×{image.height} px</div>
 						{/if}
@@ -4702,8 +4721,7 @@
 								Veröffentlicht am: {new Date(image.created_at).toLocaleDateString('de-DE')}
 							</div>
 						{/if}
-						<!-- Wenn showFullExif aktiviert wurde, zeige zusätzliche Felder -->
-						{#if showFullExif && image.exif_data}
+						{#if image.exif_data}
 							{#if image.exif_data.Orientation}
 								<div class="meta-line">Ausrichtung: {image.exif_data.Orientation}</div>
 							{/if}
@@ -4719,7 +4737,6 @@
 								</div>
 							{/if}
 						{/if}
-					{/if}
 				</div>
 				<!-- Column 3: Creator Card (if available) -->
 				<div class="column-card">
@@ -4877,6 +4894,26 @@
 									</button>
 								{/if}
 							</div>
+						</div>
+					{:else if image.profile_id && (attribution?.creatorName || image.full_name)}
+						<div class="creator-details creator-fallback">
+							<div class="creator-name">{attribution?.creatorName ?? image.full_name}</div>
+							{#if seoHubs?.photographerPath}
+								<p class="meta-line">
+									<a href={seoHubs.photographerPath}>Motiv-Übersicht dieses Erstellers</a>
+								</p>
+							{/if}
+							{#if currentUser?.id !== image.profile_id}
+								<div class="creator-actions">
+									<FollowButton
+										targetUserId={image.profile_id}
+										targetLabel={attribution?.creatorName ?? image.full_name ?? 'Profil'}
+									/>
+									<button type="button" class="creator-chat-btn" on:click={startCreatorChat}>
+										Nachricht an den Ersteller
+									</button>
+								</div>
+							{/if}
 						</div>
 					{/if}
 				</div>
@@ -5698,18 +5735,6 @@
 		color: var(--text-primary);
 		margin: 0 0 1rem 0;
 		padding: 0;
-	}
-	.exif-toggle {
-		cursor: pointer;
-		transition: color 0.2s ease;
-		border: none;
-		background: transparent;
-		font: inherit;
-		text-align: left;
-		padding: 0;
-	}
-	.exif-toggle:hover {
-		color: var(--culoca-orange);
 	}
 	.filename {
 		color: var(--text-secondary);
