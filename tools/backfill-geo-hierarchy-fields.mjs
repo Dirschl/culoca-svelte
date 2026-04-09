@@ -44,7 +44,7 @@ const DISTRICT_METADATA = {
   M: { name: 'München', slug: 'muenchen', state_name: 'Bayern', state_slug: 'bayern', region_name: 'Oberbayern', region_slug: 'oberbayern' },
   R: { name: 'Landkreis Regensburg', slug: 'regensburg', state_name: 'Bayern', state_slug: 'bayern', region_name: 'Oberpfalz', region_slug: 'oberpfalz' },
   BRAUNAU: { name: 'Bezirk Braunau am Inn', slug: 'braunau', state_name: 'Oberösterreich', state_slug: 'oberoesterreich', region_name: 'Innviertel', region_slug: 'innviertel' },
-  BR: { name: 'Bezirk Braunau am Inn', slug: 'braunau-am-inn', state_name: 'Oberösterreich', state_slug: 'oberoesterreich', region_name: 'Innviertel', region_slug: 'innviertel' },
+  BR: { name: 'Bezirk Braunau am Inn', slug: 'braunau', state_name: 'Oberösterreich', state_slug: 'oberoesterreich', region_name: 'Innviertel', region_slug: 'innviertel' },
   RI: { name: 'Bezirk Ried im Innkreis', slug: 'ried-im-innkreis', state_name: 'Oberösterreich', state_slug: 'oberoesterreich', region_name: 'Innviertel', region_slug: 'innviertel' },
   JO: { name: 'Bezirk St. Johann im Pongau', slug: 'st-johann-im-pongau', state_name: 'Salzburg', state_slug: 'salzburg', region_name: 'Pongau', region_slug: 'pongau' },
   KB: { name: 'Bezirk Kitzbühel', slug: 'kitzbuehel', state_name: 'Tirol', state_slug: 'tirol', region_name: 'Unterland', region_slug: 'unterland' },
@@ -128,12 +128,11 @@ function deriveUpdate(row) {
     region_name: row.region_name || districtMeta?.region_name || null,
     region_slug: row.region_slug || districtMeta?.region_slug || null,
     district_name: row.district_name || districtMeta?.name || null,
-    district_slug: row.district_slug || districtMeta?.slug || null,
+    district_slug: districtMeta?.slug || row.district_slug || null,
     taxonomy_slug_suffix:
-      row.taxonomy_slug_suffix ||
-      [row.country_slug || countryMeta?.slug, row.district_slug || districtMeta?.slug, row.municipality_slug]
+      [row.country_slug || countryMeta?.slug, districtMeta?.slug || row.district_slug, row.municipality_slug]
         .filter(Boolean)
-        .join('-'),
+        .join('-') || null,
     location_needs_review:
       row.country_slug && (row.district_slug || districtMeta?.slug) && row.municipality_slug
         ? false
@@ -164,7 +163,7 @@ async function loadItems(limit) {
       )
       .not('district_slug', 'is', null)
       .not('municipality_slug', 'is', null)
-      .or('state_slug.is.null,region_slug.is.null')
+      .or('state_slug.is.null,region_slug.is.null,district_slug.eq.braunau-am-inn')
       .order('created_at', { ascending: false })
       .range(from, from + batchSize - 1);
 

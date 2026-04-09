@@ -1,7 +1,12 @@
 import { redirect, error } from '@sveltejs/kit';
 import { loadContentPage } from '$lib/content/server';
 import { toCanonicalAbsoluteUrl } from '$lib/seo/site';
-import { buildGeoHubPageData, loadGeoHubBySegments, loadGeoHomeOverview } from '$lib/seo/hubServer';
+import {
+  buildGeoHubPageData,
+  loadGeoHubBySegments,
+  loadGeoHomeOverview,
+  resolveLegacyPlaceSlug
+} from '$lib/seo/hubServer';
 import { getHubSeoPolicy } from '$lib/seo/policy';
 
 const PAGE_SIZE = 24;
@@ -48,6 +53,11 @@ export const load = async ({
 
   if (!segments.length) {
     throw error(404, 'Not found');
+  }
+
+  const legacyGeoMatch = await resolveLegacyPlaceSlug(segments[segments.length - 1]);
+  if (legacyGeoMatch && legacyGeoMatch.path !== url.pathname) {
+    throw redirect(301, legacyGeoMatch.path);
   }
 
   const slug = segments[segments.length - 1];

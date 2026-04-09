@@ -13,7 +13,7 @@ import {
   resolveLocationFieldsFromOriginalName
 } from '$lib/server/itemProcessing';
 import { sanitizeKeywords } from '$lib/content/keywords';
-import { getAdministrativeHierarchy } from '$lib/content/locationTaxonomy';
+import { normalizeGeoDraft } from '$lib/content/locationTaxonomy';
 import { extractPhotoMetadataFields } from '$lib/metadata/photoMetadata';
 dotenv.config();
 
@@ -699,28 +699,43 @@ export const POST = async ({ request }) => {
           dbRecord.location_needs_review = true;
         }
 
-        if (dbRecord.country_slug && dbRecord.district_slug && (!dbRecord.state_slug || !dbRecord.region_slug)) {
-          const administrativeHierarchy = getAdministrativeHierarchy({
-            countryCode: dbRecord.country_code || null,
-            countrySlug: dbRecord.country_slug || null,
-            countryName: dbRecord.country_name || null,
-            districtCode: dbRecord.district_code || null,
-            districtSlug: dbRecord.district_slug || null,
-            districtName: dbRecord.district_name || null
-          });
+        const normalizedGeo = normalizeGeoDraft({
+          countryCode: dbRecord.country_code || null,
+          countryName: dbRecord.country_name || null,
+          countrySlug: dbRecord.country_slug || null,
+          districtCode: dbRecord.district_code || null,
+          districtName: dbRecord.district_name || null,
+          districtSlug: dbRecord.district_slug || null,
+          municipalityName: dbRecord.municipality_name || null,
+          municipalitySlug: dbRecord.municipality_slug || null,
+          localityName: dbRecord.locality_name || null
+        });
 
-          dbRecord.country_name = dbRecord.country_name || administrativeHierarchy.countryName;
-          dbRecord.country_slug = dbRecord.country_slug || administrativeHierarchy.countrySlug;
-          dbRecord.state_name = dbRecord.state_name || administrativeHierarchy.stateName;
-          dbRecord.state_slug = dbRecord.state_slug || administrativeHierarchy.stateSlug;
-          dbRecord.region_name = dbRecord.region_name || administrativeHierarchy.regionName;
-          dbRecord.region_slug = dbRecord.region_slug || administrativeHierarchy.regionSlug;
-          dbRecord.district_name = dbRecord.district_name || administrativeHierarchy.districtName;
-          dbRecord.district_slug = dbRecord.district_slug || administrativeHierarchy.districtSlug;
-        }
+        if (normalizedGeo) {
+          dbRecord.country_code = dbRecord.country_code || normalizedGeo.countryCode;
+          dbRecord.country_name = normalizedGeo.countryName;
+          dbRecord.country_slug = normalizedGeo.countrySlug;
+          dbRecord.state_name = normalizedGeo.stateName;
+          dbRecord.state_slug = normalizedGeo.stateSlug;
+          dbRecord.region_name = normalizedGeo.regionName;
+          dbRecord.region_slug = normalizedGeo.regionSlug;
+          dbRecord.district_code = dbRecord.district_code || normalizedGeo.districtCode;
+          dbRecord.district_name = normalizedGeo.districtName;
+          dbRecord.district_slug = normalizedGeo.districtSlug;
+          dbRecord.municipality_name = normalizedGeo.municipalityName;
+          dbRecord.municipality_slug = normalizedGeo.municipalitySlug;
+          dbRecord.locality_name = normalizedGeo.localityName;
+          dbRecord.taxonomy_slug_suffix =
+            normalizedGeo.taxonomySlugSuffix || dbRecord.taxonomy_slug_suffix || null;
 
-        if (hasCompleteGeoFields(dbRecord)) {
-          dbRecord.location_needs_review = false;
+          if (!dbRecord.location_source && hasCompleteGeoFields(dbRecord)) {
+            dbRecord.location_source = 'manual';
+          }
+          if (dbRecord.location_source === 'manual' && dbRecord.location_confidence == null) {
+            dbRecord.location_confidence = normalizedGeo.hasKnownAdministrativeHierarchy ? 1 : 0.35;
+          }
+
+          dbRecord.location_needs_review = normalizedGeo.locationNeedsReview;
         }
 
         if (keywordsArray) {

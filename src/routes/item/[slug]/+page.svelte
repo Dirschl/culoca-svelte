@@ -4547,6 +4547,10 @@
 										</div>
 									{/if}
 								</div>
+								<div class="geo-edit-note">
+									Freitext bleibt moeglich. Beim Speichern werden die Geo-Angaben serverseitig
+									normalisiert; unklare Orte bleiben markiert und muessen geprueft werden.
+								</div>
 							{/if}
 							<div class="geo-field">
 								<span class="geo-label">Land</span>
@@ -5620,6 +5624,15 @@
 		grid-column: 1 / -1;
 		display: grid;
 		gap: 0.45rem;
+	}
+	.geo-edit-note {
+		grid-column: 1 / -1;
+		padding: 0.75rem 0.9rem;
+		border-radius: 10px;
+		background: color-mix(in srgb, var(--culoca-orange) 10%, var(--bg-primary));
+		color: var(--text-secondary);
+		font-size: 0.93rem;
+		line-height: 1.45;
 	}
 	.geo-field {
 		display: grid;

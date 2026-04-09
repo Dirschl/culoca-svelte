@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import { createClient } from '@supabase/supabase-js';
 import { createClient as createWebdavClient } from 'webdav';
 import { resizeJPG, getImageQualitySettings } from '$lib/image';
+import { normalizeGeoDraft } from '$lib/content/locationTaxonomy';
 import {
   analyzeImageModeration,
   refreshSimilarityVectorForItem,
@@ -367,7 +368,42 @@ export async function POST({ params, request }: any) {
       }
     }
 
-    const mergedGeo = {
+    const normalizedGeo = normalizeGeoDraft({
+      countryName:
+        typeof updatePayload.country_name === 'string' ? (updatePayload.country_name as string) : item.country_name,
+      countrySlug:
+        typeof updatePayload.country_slug === 'string' ? (updatePayload.country_slug as string) : item.country_slug,
+      districtName:
+        typeof updatePayload.district_name === 'string' ? (updatePayload.district_name as string) : item.district_name,
+      districtSlug:
+        typeof updatePayload.district_slug === 'string' ? (updatePayload.district_slug as string) : item.district_slug,
+      municipalityName:
+        typeof updatePayload.municipality_name === 'string'
+          ? (updatePayload.municipality_name as string)
+          : item.municipality_name,
+      municipalitySlug:
+        typeof updatePayload.municipality_slug === 'string'
+          ? (updatePayload.municipality_slug as string)
+          : item.municipality_slug,
+      localityName:
+        typeof updatePayload.locality_name === 'string' ? (updatePayload.locality_name as string) : item.locality_name
+    });
+
+    if (normalizedGeo) {
+      updatePayload.country_name = updatePayload.country_name ?? normalizedGeo.countryName;
+      updatePayload.country_slug = updatePayload.country_slug ?? normalizedGeo.countrySlug;
+      updatePayload.state_name = updatePayload.state_name ?? normalizedGeo.stateName;
+      updatePayload.state_slug = updatePayload.state_slug ?? normalizedGeo.stateSlug;
+      updatePayload.region_name = updatePayload.region_name ?? normalizedGeo.regionName;
+      updatePayload.region_slug = updatePayload.region_slug ?? normalizedGeo.regionSlug;
+      updatePayload.district_name = updatePayload.district_name ?? normalizedGeo.districtName;
+      updatePayload.district_slug = updatePayload.district_slug ?? normalizedGeo.districtSlug;
+      updatePayload.municipality_name = updatePayload.municipality_name ?? normalizedGeo.municipalityName;
+      updatePayload.municipality_slug = updatePayload.municipality_slug ?? normalizedGeo.municipalitySlug;
+      updatePayload.taxonomy_slug_suffix =
+        updatePayload.taxonomy_slug_suffix ?? normalizedGeo.taxonomySlugSuffix;
+      updatePayload.location_needs_review = normalizedGeo.locationNeedsReview;
+    } else if (hasCompleteGeoFields({
       country_slug:
         typeof updatePayload.country_slug === 'string' ? (updatePayload.country_slug as string) : item.country_slug,
       district_slug:
@@ -376,9 +412,7 @@ export async function POST({ params, request }: any) {
         typeof updatePayload.municipality_slug === 'string'
           ? (updatePayload.municipality_slug as string)
           : item.municipality_slug
-    };
-
-    if (hasCompleteGeoFields(mergedGeo)) {
+    })) {
       updatePayload.location_needs_review = false;
     }
 

@@ -62,7 +62,7 @@ const DISTRICT_METADATA: Record<string, DistrictMetadata> = {
   M: { name: 'München', slug: 'muenchen', stateName: 'Bayern', stateSlug: 'bayern', regionName: 'Oberbayern', regionSlug: 'oberbayern' },
   R: { name: 'Landkreis Regensburg', slug: 'regensburg', stateName: 'Bayern', stateSlug: 'bayern', regionName: 'Oberpfalz', regionSlug: 'oberpfalz' },
   BRAUNAU: { name: 'Bezirk Braunau am Inn', slug: 'braunau', stateName: 'Oberösterreich', stateSlug: 'oberoesterreich', regionName: 'Innviertel', regionSlug: 'innviertel' },
-  BR: { name: 'Bezirk Braunau am Inn', slug: 'braunau-am-inn', stateName: 'Oberösterreich', stateSlug: 'oberoesterreich', regionName: 'Innviertel', regionSlug: 'innviertel' },
+  BR: { name: 'Bezirk Braunau am Inn', slug: 'braunau', stateName: 'Oberösterreich', stateSlug: 'oberoesterreich', regionName: 'Innviertel', regionSlug: 'innviertel' },
   RI: { name: 'Bezirk Ried im Innkreis', slug: 'ried-im-innkreis', stateName: 'Oberösterreich', stateSlug: 'oberoesterreich', regionName: 'Innviertel', regionSlug: 'innviertel' },
   JO: { name: 'Bezirk St. Johann im Pongau', slug: 'st-johann-im-pongau', stateName: 'Salzburg', stateSlug: 'salzburg', regionName: 'Pongau', regionSlug: 'pongau' },
   KB: { name: 'Bezirk Kitzbühel', slug: 'kitzbuehel', stateName: 'Tirol', stateSlug: 'tirol', regionName: 'Unterland', regionSlug: 'unterland' },
@@ -74,12 +74,49 @@ const DISTRICT_METADATA: Record<string, DistrictMetadata> = {
 export type AdministrativeHierarchy = {
   countryName: string | null;
   countrySlug: string | null;
+  countryResolved: boolean;
   stateName: string | null;
   stateSlug: string | null;
   regionName: string | null;
   regionSlug: string | null;
   districtName: string | null;
   districtSlug: string | null;
+  districtResolved: boolean;
+};
+
+export type NormalizedCountryInput = {
+  slug: string;
+  code: string;
+  name: string;
+};
+
+export type NormalizedGeoDraft = {
+  countryCode: string | null;
+  countryName: string | null;
+  countrySlug: string | null;
+  stateName: string | null;
+  stateSlug: string | null;
+  regionName: string | null;
+  regionSlug: string | null;
+  districtCode: string | null;
+  districtName: string | null;
+  districtSlug: string | null;
+  municipalityName: string | null;
+  municipalitySlug: string | null;
+  localityName: string | null;
+  taxonomySlugSuffix: string | null;
+  locationNeedsReview: boolean;
+  hasKnownAdministrativeHierarchy: boolean;
+};
+
+const COUNTRY_INPUT_METADATA: Record<string, NormalizedCountryInput> = {
+  deutschland: { slug: 'de', code: 'D', name: 'Deutschland' },
+  de: { slug: 'de', code: 'D', name: 'Deutschland' },
+  oesterreich: { slug: 'at', code: 'A', name: 'Österreich' },
+  österreich: { slug: 'at', code: 'A', name: 'Österreich' },
+  at: { slug: 'at', code: 'A', name: 'Österreich' },
+  schweiz: { slug: 'ch', code: 'CH', name: 'Schweiz' },
+  ch: { slug: 'ch', code: 'CH', name: 'Schweiz' }
 };
 
 const DISPLAY_LABEL_REPLACEMENTS: Array<[RegExp, string]> = [
@@ -112,7 +149,11 @@ export function getAdministrativeHierarchy(args: {
 }): AdministrativeHierarchy {
   const countryMeta =
     (args.countryCode ? COUNTRY_METADATA[args.countryCode] : null) ||
-    Object.values(COUNTRY_METADATA).find((entry) => entry.slug === args.countrySlug) ||
+    Object.values(COUNTRY_METADATA).find(
+      (entry) =>
+        entry.slug === args.countrySlug ||
+        normalizeComparableSlug(entry.name) === normalizeComparableSlug(args.countryName || '')
+    ) ||
     null;
   const districtMeta =
     (args.districtCode ? DISTRICT_METADATA[args.districtCode] : null) ||
@@ -124,12 +165,113 @@ export function getAdministrativeHierarchy(args: {
   return {
     countryName: normalizeAdminDisplayLabel(args.countryName || countryMeta?.name || null),
     countrySlug: args.countrySlug || countryMeta?.slug || null,
+    countryResolved: !!countryMeta,
     stateName: normalizeAdminDisplayLabel(districtMeta?.stateName || null),
     stateSlug: districtMeta?.stateSlug || null,
     regionName: normalizeAdminDisplayLabel(districtMeta?.regionName || null),
     regionSlug: districtMeta?.regionSlug || null,
     districtName: normalizeAdminDisplayLabel(args.districtName || districtMeta?.name || null),
-    districtSlug: args.districtSlug || districtMeta?.slug || null
+    districtSlug: args.districtSlug || districtMeta?.slug || null,
+    districtResolved: !!districtMeta
+  };
+}
+
+export function normalizeCountryInputValue(value: unknown): NormalizedCountryInput | null {
+  const text = typeof value === 'string' ? value.trim() : '';
+  if (!text) return null;
+
+  const directMatch = COUNTRY_INPUT_METADATA[slugifySegment(text)];
+  if (directMatch) return directMatch;
+
+  const countryEntry = Object.entries(COUNTRY_METADATA).find(
+    ([code, entry]) =>
+      code === text.toUpperCase() ||
+      entry.slug === slugifySegment(text) ||
+      normalizeComparableSlug(entry.name) === normalizeComparableSlug(text)
+  );
+
+  if (countryEntry) {
+    const [code, entry] = countryEntry;
+    return {
+      slug: entry.slug,
+      code,
+      name: entry.name
+    };
+  }
+
+  return {
+    slug: slugifySegment(text),
+    code: text.toUpperCase(),
+    name: text
+  };
+}
+
+export function normalizeGeoDraft(args: {
+  countryCode?: string | null;
+  countryName?: string | null;
+  countrySlug?: string | null;
+  districtCode?: string | null;
+  districtName?: string | null;
+  districtSlug?: string | null;
+  municipalityName?: string | null;
+  municipalitySlug?: string | null;
+  localityName?: string | null;
+}): NormalizedGeoDraft | null {
+  const normalizedCountry = normalizeCountryInputValue(
+    args.countryName || args.countrySlug || args.countryCode
+  );
+  const districtName = normalizeAdminDisplayLabel(args.districtName) || null;
+  const districtSlug = args.districtSlug ? slugifySegment(args.districtSlug) : slugifySegment(districtName || '');
+  const municipalityName = normalizeAdminDisplayLabel(args.municipalityName) || null;
+  const municipalitySlug = args.municipalitySlug
+    ? slugifySegment(args.municipalitySlug)
+    : slugifySegment(municipalityName || '');
+  const localityName = normalizeAdminDisplayLabel(args.localityName) || null;
+
+  if (!normalizedCountry && !districtName && !districtSlug && !municipalityName && !municipalitySlug) {
+    return null;
+  }
+
+  const administrativeHierarchy = getAdministrativeHierarchy({
+    countryCode: normalizedCountry?.code || args.countryCode || null,
+    countrySlug: normalizedCountry?.slug || args.countrySlug || null,
+    countryName: normalizedCountry?.name || args.countryName || null,
+    districtCode: args.districtCode || null,
+    districtSlug: districtSlug || null,
+    districtName
+  });
+
+  const resolvedCountrySlug = normalizedCountry?.slug || administrativeHierarchy.countrySlug || null;
+  const resolvedDistrictSlug = administrativeHierarchy.districtSlug || districtSlug || null;
+  const resolvedMunicipalitySlug = municipalitySlug || null;
+  const hasKnownAdministrativeHierarchy = administrativeHierarchy.districtResolved;
+  const locationNeedsReview = !!(
+    !resolvedCountrySlug ||
+    !resolvedDistrictSlug ||
+    !resolvedMunicipalitySlug ||
+    !hasKnownAdministrativeHierarchy
+  );
+
+  return {
+    countryCode: normalizedCountry?.code || args.countryCode || null,
+    countryName:
+      normalizeAdminDisplayLabel(normalizedCountry?.name || administrativeHierarchy.countryName || args.countryName) ||
+      null,
+    countrySlug: resolvedCountrySlug,
+    stateName: administrativeHierarchy.stateName,
+    stateSlug: administrativeHierarchy.stateSlug,
+    regionName: administrativeHierarchy.regionName,
+    regionSlug: administrativeHierarchy.regionSlug,
+    districtCode: args.districtCode || null,
+    districtName: normalizeAdminDisplayLabel(administrativeHierarchy.districtName || districtName) || null,
+    districtSlug: resolvedDistrictSlug,
+    municipalityName,
+    municipalitySlug: resolvedMunicipalitySlug,
+    localityName,
+    taxonomySlugSuffix:
+      [resolvedCountrySlug, resolvedDistrictSlug, resolvedMunicipalitySlug].filter(Boolean).join('-') || null,
+    locationNeedsReview,
+    hasKnownAdministrativeHierarchy
   };
 }
 

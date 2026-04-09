@@ -4,9 +4,7 @@ import { createClient } from 'webdav';
 import { slugifySegment } from '$lib/content/routing';
 import { sanitizeContentHtml } from '$lib/content/html';
 import { sanitizeKeywords } from '$lib/content/keywords';
-import {
-  getAdministrativeHierarchy
-} from '$lib/content/locationTaxonomy';
+import { normalizeGeoDraft } from '$lib/content/locationTaxonomy';
 import {
   refreshSimilarityVectorForItem,
   resolveLocationFieldsFromOriginalName
@@ -98,7 +96,11 @@ type ItemRecord = {
   group_slug?: string | null;
   page_settings?: Record<string, unknown> | null;
   content?: string | null;
+  country_code?: string | null;
   country_slug?: string | null;
+  state_slug?: string | null;
+  region_slug?: string | null;
+  district_code?: string | null;
   district_slug?: string | null;
   municipality_slug?: string | null;
   country_name?: string | null;
@@ -108,27 +110,6 @@ type ItemRecord = {
   municipality_name?: string | null;
   locality_name?: string | null;
 };
-
-const COUNTRY_SLUG_BY_LABEL: Record<string, { slug: string; code: string; name: string }> = {
-  deutschland: { slug: 'de', code: 'D', name: 'Deutschland' },
-  de: { slug: 'de', code: 'D', name: 'Deutschland' },
-  oesterreich: { slug: 'at', code: 'A', name: 'Österreich' },
-  österreich: { slug: 'at', code: 'A', name: 'Österreich' },
-  at: { slug: 'at', code: 'A', name: 'Österreich' },
-  schweiz: { slug: 'ch', code: 'CH', name: 'Schweiz' },
-  ch: { slug: 'ch', code: 'CH', name: 'Schweiz' }
-};
-
-function normalizeCountryInput(value: unknown) {
-  const text = typeof value === 'string' ? value.trim() : '';
-  if (!text) return null;
-  const key = slugifySegment(text);
-  return COUNTRY_SLUG_BY_LABEL[key] || {
-    slug: slugifySegment(text),
-    code: text.toUpperCase(),
-    name: text
-  };
-}
 
 function hasCompleteGeoFields(source: Record<string, unknown> | ItemRecord | null | undefined) {
   return !!(
@@ -255,7 +236,7 @@ export const PATCH = async ({ params, request }) => {
 
   const { data: existingItem, error: existingItemError } = await supabase
     .from('items')
-    .select('group_slug, page_settings, content, country_slug, district_slug, municipality_slug, country_name, state_name, region_name, district_name, municipality_name, locality_name')
+    .select('group_slug, page_settings, content, country_code, country_slug, state_slug, region_slug, district_code, district_slug, municipality_slug, country_name, state_name, region_name, district_name, municipality_name, locality_name')
     .eq('id', id)
     .single<ItemRecord>();
 
@@ -307,77 +288,95 @@ export const PATCH = async ({ params, request }) => {
   ].some((key) => body[key] !== undefined);
 
   if (geoFieldsTouched) {
-    const normalizedCountry = normalizeCountryInput(updateData.country_name ?? updateData.country_slug);
-    if (normalizedCountry) {
-      updateData.country_name = normalizedCountry.name;
-      updateData.country_slug = normalizedCountry.slug;
-      updateData.country_code = normalizedCountry.code;
-    }
-
-    if (typeof updateData.district_name === 'string' && !updateData.district_slug) {
-      updateData.district_slug = slugifySegment(updateData.district_name);
-    }
-
-    const administrativeHierarchy = getAdministrativeHierarchy({
-      countryCode: typeof updateData.country_code === 'string' ? updateData.country_code : null,
-      countrySlug: typeof updateData.country_slug === 'string' ? updateData.country_slug : null,
-      countryName: typeof updateData.country_name === 'string' ? updateData.country_name : null,
-      districtCode: typeof updateData.district_code === 'string' ? updateData.district_code : null,
-      districtSlug: typeof updateData.district_slug === 'string' ? updateData.district_slug : null,
-      districtName: typeof updateData.district_name === 'string' ? updateData.district_name : null
+    const normalizedGeo = normalizeGeoDraft({
+      countryCode: typeof updateData.country_code === 'string' ? updateData.country_code : existingItem.country_code,
+      countryName: typeof updateData.country_name === 'string' ? updateData.country_name : existingItem.country_name,
+      countrySlug: typeof updateData.country_slug === 'string' ? updateData.country_slug : existingItem.country_slug,
+      districtCode: typeof updateData.district_code === 'string' ? updateData.district_code : existingItem.district_code,
+      districtName: typeof updateData.district_name === 'string' ? updateData.district_name : existingItem.district_name,
+      districtSlug: typeof updateData.district_slug === 'string' ? updateData.district_slug : existingItem.district_slug,
+      municipalityName:
+        typeof updateData.municipality_name === 'string'
+          ? updateData.municipality_name
+          : existingItem.municipality_name,
+      municipalitySlug:
+        typeof updateData.municipality_slug === 'string'
+          ? updateData.municipality_slug
+          : existingItem.municipality_slug,
+      localityName:
+        typeof updateData.locality_name === 'string' ? updateData.locality_name : existingItem.locality_name
     });
 
-    updateData.state_name = administrativeHierarchy.stateName;
-    updateData.state_slug = administrativeHierarchy.stateSlug;
-    updateData.region_name = administrativeHierarchy.regionName;
-    updateData.region_slug = administrativeHierarchy.regionSlug;
-
-    if (typeof updateData.municipality_name === 'string' && !updateData.municipality_slug) {
-      updateData.municipality_slug = slugifySegment(updateData.municipality_name);
+    if (normalizedGeo) {
+      updateData.country_code = normalizedGeo.countryCode;
+      updateData.country_name = normalizedGeo.countryName;
+      updateData.country_slug = normalizedGeo.countrySlug;
+      updateData.state_name = normalizedGeo.stateName;
+      updateData.state_slug = normalizedGeo.stateSlug;
+      updateData.region_name = normalizedGeo.regionName;
+      updateData.region_slug = normalizedGeo.regionSlug;
+      updateData.district_code = normalizedGeo.districtCode;
+      updateData.district_name = normalizedGeo.districtName;
+      updateData.district_slug = normalizedGeo.districtSlug;
+      updateData.municipality_name = normalizedGeo.municipalityName;
+      updateData.municipality_slug = normalizedGeo.municipalitySlug;
+      updateData.locality_name = normalizedGeo.localityName;
+      updateData.location_source = 'manual';
+      updateData.location_confidence = normalizedGeo.hasKnownAdministrativeHierarchy ? 1 : 0.35;
+      updateData.location_needs_review = normalizedGeo.locationNeedsReview;
+      updateData.taxonomy_slug_suffix = normalizedGeo.taxonomySlugSuffix;
     }
-
-    updateData.location_source = 'manual';
-    updateData.location_confidence = 1;
-    updateData.location_needs_review = false;
-    updateData.taxonomy_slug_suffix = [
-      updateData.country_slug,
-      updateData.district_slug,
-      updateData.municipality_slug
-    ]
-      .filter((value) => typeof value === 'string' && value.length > 0)
-      .join('-');
   }
 
   const mergedGeoState = {
-    country_code: typeof updateData.country_code === 'string' ? updateData.country_code : null,
+    country_code:
+      typeof updateData.country_code === 'string' ? updateData.country_code : existingItem.country_code ?? null,
     country_name: typeof updateData.country_name === 'string' ? updateData.country_name : existingItem.country_name,
     country_slug: typeof updateData.country_slug === 'string' ? updateData.country_slug : existingItem.country_slug,
     state_name: typeof updateData.state_name === 'string' ? updateData.state_name : existingItem.state_name,
-    state_slug: typeof updateData.state_slug === 'string' ? updateData.state_slug : null,
+    state_slug: typeof updateData.state_slug === 'string' ? updateData.state_slug : existingItem.state_slug ?? null,
     region_name: typeof updateData.region_name === 'string' ? updateData.region_name : existingItem.region_name,
-    region_slug: typeof updateData.region_slug === 'string' ? updateData.region_slug : null,
-    district_slug: typeof updateData.district_slug === 'string' ? updateData.district_slug : existingItem.district_slug,
+    region_slug:
+      typeof updateData.region_slug === 'string' ? updateData.region_slug : existingItem.region_slug ?? null,
+    district_code:
+      typeof updateData.district_code === 'string' ? updateData.district_code : existingItem.district_code ?? null,
+    district_slug:
+      typeof updateData.district_slug === 'string' ? updateData.district_slug : existingItem.district_slug,
     district_name: typeof updateData.district_name === 'string' ? updateData.district_name : existingItem.district_name,
+    municipality_name:
+      typeof updateData.municipality_name === 'string' ? updateData.municipality_name : existingItem.municipality_name,
     municipality_slug:
       typeof updateData.municipality_slug === 'string' ? updateData.municipality_slug : existingItem.municipality_slug
   };
 
-  if (mergedGeoState.country_slug && mergedGeoState.district_slug && (!mergedGeoState.state_slug || !mergedGeoState.region_slug)) {
-    const administrativeHierarchy = getAdministrativeHierarchy({
-      countryCode: mergedGeoState.country_code,
-      countrySlug: mergedGeoState.country_slug,
-      countryName: mergedGeoState.country_name,
-      districtSlug: mergedGeoState.district_slug,
-      districtName: mergedGeoState.district_name
-    });
+  const normalizedMergedGeo = normalizeGeoDraft({
+    countryCode: mergedGeoState.country_code,
+    countryName: mergedGeoState.country_name,
+    countrySlug: mergedGeoState.country_slug,
+    districtCode: mergedGeoState.district_code,
+    districtName: mergedGeoState.district_name,
+    districtSlug: mergedGeoState.district_slug,
+    municipalityName: mergedGeoState.municipality_name,
+    municipalitySlug: mergedGeoState.municipality_slug,
+    localityName:
+      typeof updateData.locality_name === 'string' ? updateData.locality_name : existingItem.locality_name
+  });
 
-    updateData.state_name = updateData.state_name ?? administrativeHierarchy.stateName;
-    updateData.state_slug = updateData.state_slug ?? administrativeHierarchy.stateSlug;
-    updateData.region_name = updateData.region_name ?? administrativeHierarchy.regionName;
-    updateData.region_slug = updateData.region_slug ?? administrativeHierarchy.regionSlug;
-  }
-
-  if (hasCompleteGeoFields(mergedGeoState)) {
+  if (normalizedMergedGeo) {
+    updateData.country_code = updateData.country_code ?? normalizedMergedGeo.countryCode;
+    updateData.country_name = updateData.country_name ?? normalizedMergedGeo.countryName;
+    updateData.country_slug = updateData.country_slug ?? normalizedMergedGeo.countrySlug;
+    updateData.state_name = updateData.state_name ?? normalizedMergedGeo.stateName;
+    updateData.state_slug = updateData.state_slug ?? normalizedMergedGeo.stateSlug;
+    updateData.region_name = updateData.region_name ?? normalizedMergedGeo.regionName;
+    updateData.region_slug = updateData.region_slug ?? normalizedMergedGeo.regionSlug;
+    updateData.district_name = updateData.district_name ?? normalizedMergedGeo.districtName;
+    updateData.district_slug = updateData.district_slug ?? normalizedMergedGeo.districtSlug;
+    updateData.municipality_name = updateData.municipality_name ?? normalizedMergedGeo.municipalityName;
+    updateData.municipality_slug = updateData.municipality_slug ?? normalizedMergedGeo.municipalitySlug;
+    updateData.taxonomy_slug_suffix = updateData.taxonomy_slug_suffix ?? normalizedMergedGeo.taxonomySlugSuffix;
+    updateData.location_needs_review = normalizedMergedGeo.locationNeedsReview;
+  } else if (hasCompleteGeoFields(mergedGeoState)) {
     updateData.location_needs_review = false;
   }
 
