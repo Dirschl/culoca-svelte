@@ -857,8 +857,6 @@
 	let mainImageProgressive = false;
 	let mainFigureBackgroundUrl = '';
 	let mainImageSrc = '';
-	let mainImageSrcset = '';
-	let mainImageSizes = '';
 	let mainImageRevealed = false;
 	let mainImageElement: HTMLImageElement | null = null;
 
@@ -868,8 +866,6 @@
 			mainImageProgressive = false;
 			mainFigureBackgroundUrl = '';
 			mainImageSrc = '';
-			mainImageSrcset = '';
-			mainImageSizes = '';
 			mainImageRevealed = false;
 		} else {
 			const extensionMatch = imagePath.match(/\.(jpg|jpeg|webp|png)$/i);
@@ -886,8 +882,6 @@
 			mainImageProgressive = !!(url512 && url2048);
 			mainFigureBackgroundUrl = mainImageProgressive ? url512 : '';
 			mainImageSrc = url2048 || url512;
-			mainImageSrcset = url2048 ? `${url2048} 2048w` : '';
-			mainImageSizes = url2048 ? '(max-width: 900px) 100vw, min(2048px, 96vw)' : '';
 			mainImageRevealed = !mainImageProgressive;
 		}
 	}
@@ -3377,6 +3371,15 @@
 	/>
 
 	<link rel="canonical" href={canonicalUrl} />
+	<!-- LCP-Hauptbild früh starten; 512 vor 2048 bei Progressive (Hintergrund sichtbar) -->
+	{#if shouldShowMainImage && image?.slug && (image.path_2048 || image.path_512)}
+		{#if mainFigureBackgroundUrl}
+			<link rel="preload" as="image" href={mainFigureBackgroundUrl} fetchpriority="high" />
+		{/if}
+		{#if mainImageSrc}
+			<link rel="preload" as="image" href={mainImageSrc} fetchpriority="high" />
+		{/if}
+	{/if}
 	{#if seoLinks?.older?.canonicalPath}
 		<link
 			rel="prev"
@@ -3667,14 +3670,14 @@
 							<img
 								bind:this={mainImageElement}
 								src={mainImageSrc}
-								srcset={mainImageSrcset || undefined}
-								sizes={mainImageSizes || undefined}
 								alt={mainImageAlt}
 								class="main-image"
 								class:main-image--progressive={mainImageProgressive}
 								class:main-image--revealed={mainImageRevealed}
+								width={image.width && image.height ? image.width : undefined}
+								height={image.width && image.height ? image.height : undefined}
 								loading="eager"
-								decoding="async"
+								decoding="sync"
 								fetchpriority="high"
 								on:load={onMainImageLoad}
 							/>
@@ -5280,6 +5283,11 @@
 	.main-image--progressive {
 		opacity: 0;
 		transition: opacity 0.2s ease-out;
+	}
+	/* Bis das große Bild da ist: kein weißer 1px-Rand (border wirkte als „Platzhalter-Streifen“) */
+	.main-image--progressive:not(.main-image--revealed) {
+		border-color: transparent;
+		box-shadow: none;
 	}
 	.main-image--progressive.main-image--revealed {
 		opacity: 1;
