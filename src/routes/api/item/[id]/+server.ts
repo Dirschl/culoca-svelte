@@ -349,11 +349,33 @@ export const PATCH = async ({ params, request }) => {
   }
 
   const mergedGeoState = {
+    country_code: typeof updateData.country_code === 'string' ? updateData.country_code : null,
+    country_name: typeof updateData.country_name === 'string' ? updateData.country_name : existingItem.country_name,
     country_slug: typeof updateData.country_slug === 'string' ? updateData.country_slug : existingItem.country_slug,
+    state_name: typeof updateData.state_name === 'string' ? updateData.state_name : existingItem.state_name,
+    state_slug: typeof updateData.state_slug === 'string' ? updateData.state_slug : null,
+    region_name: typeof updateData.region_name === 'string' ? updateData.region_name : existingItem.region_name,
+    region_slug: typeof updateData.region_slug === 'string' ? updateData.region_slug : null,
     district_slug: typeof updateData.district_slug === 'string' ? updateData.district_slug : existingItem.district_slug,
+    district_name: typeof updateData.district_name === 'string' ? updateData.district_name : existingItem.district_name,
     municipality_slug:
       typeof updateData.municipality_slug === 'string' ? updateData.municipality_slug : existingItem.municipality_slug
   };
+
+  if (mergedGeoState.country_slug && mergedGeoState.district_slug && (!mergedGeoState.state_slug || !mergedGeoState.region_slug)) {
+    const administrativeHierarchy = getAdministrativeHierarchy({
+      countryCode: mergedGeoState.country_code,
+      countrySlug: mergedGeoState.country_slug,
+      countryName: mergedGeoState.country_name,
+      districtSlug: mergedGeoState.district_slug,
+      districtName: mergedGeoState.district_name
+    });
+
+    updateData.state_name = updateData.state_name ?? administrativeHierarchy.stateName;
+    updateData.state_slug = updateData.state_slug ?? administrativeHierarchy.stateSlug;
+    updateData.region_name = updateData.region_name ?? administrativeHierarchy.regionName;
+    updateData.region_slug = updateData.region_slug ?? administrativeHierarchy.regionSlug;
+  }
 
   if (hasCompleteGeoFields(mergedGeoState)) {
     updateData.location_needs_review = false;

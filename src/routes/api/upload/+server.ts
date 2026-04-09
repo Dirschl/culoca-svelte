@@ -13,6 +13,7 @@ import {
   resolveLocationFieldsFromOriginalName
 } from '$lib/server/itemProcessing';
 import { sanitizeKeywords } from '$lib/content/keywords';
+import { getAdministrativeHierarchy } from '$lib/content/locationTaxonomy';
 import { extractPhotoMetadataFields } from '$lib/metadata/photoMetadata';
 dotenv.config();
 
@@ -696,6 +697,26 @@ export const POST = async ({ request }) => {
           }
         } else {
           dbRecord.location_needs_review = true;
+        }
+
+        if (dbRecord.country_slug && dbRecord.district_slug && (!dbRecord.state_slug || !dbRecord.region_slug)) {
+          const administrativeHierarchy = getAdministrativeHierarchy({
+            countryCode: dbRecord.country_code || null,
+            countrySlug: dbRecord.country_slug || null,
+            countryName: dbRecord.country_name || null,
+            districtCode: dbRecord.district_code || null,
+            districtSlug: dbRecord.district_slug || null,
+            districtName: dbRecord.district_name || null
+          });
+
+          dbRecord.country_name = dbRecord.country_name || administrativeHierarchy.countryName;
+          dbRecord.country_slug = dbRecord.country_slug || administrativeHierarchy.countrySlug;
+          dbRecord.state_name = dbRecord.state_name || administrativeHierarchy.stateName;
+          dbRecord.state_slug = dbRecord.state_slug || administrativeHierarchy.stateSlug;
+          dbRecord.region_name = dbRecord.region_name || administrativeHierarchy.regionName;
+          dbRecord.region_slug = dbRecord.region_slug || administrativeHierarchy.regionSlug;
+          dbRecord.district_name = dbRecord.district_name || administrativeHierarchy.districtName;
+          dbRecord.district_slug = dbRecord.district_slug || administrativeHierarchy.districtSlug;
         }
 
         if (hasCompleteGeoFields(dbRecord)) {

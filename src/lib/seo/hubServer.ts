@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { error } from '@sveltejs/kit';
 import { getPublicItemHref } from '$lib/content/routing';
-import { normalizeAdminDisplayLabel } from '$lib/content/locationTaxonomy';
+import { getAdministrativeHierarchy, normalizeAdminDisplayLabel } from '$lib/content/locationTaxonomy';
 import { decodeHubSlug, normalizeHubToken } from '$lib/seo/hubs';
 import {
   buildGeoHierarchy,
@@ -69,6 +69,27 @@ function getCountryLabel(countrySlug: string | null | undefined, countryName: st
   const normalizedName = normalizeAdminDisplayLabel(countryName || undefined);
   if (normalizedName) return normalizedName;
   return COUNTRY_LABELS[normalizedSlug] || normalizedSlug.toUpperCase();
+}
+
+function enrichGeoInput<T extends GeoHierarchyInput>(input: T): T {
+  const administrativeHierarchy = getAdministrativeHierarchy({
+    countrySlug: input.countrySlug,
+    countryName: input.countryName,
+    districtSlug: input.districtSlug,
+    districtName: input.districtName
+  });
+
+  return {
+    ...input,
+    countryName: input.countryName || administrativeHierarchy.countryName,
+    countrySlug: input.countrySlug || administrativeHierarchy.countrySlug,
+    stateName: input.stateName || administrativeHierarchy.stateName,
+    stateSlug: input.stateSlug || administrativeHierarchy.stateSlug,
+    regionName: input.regionName || administrativeHierarchy.regionName,
+    regionSlug: input.regionSlug || administrativeHierarchy.regionSlug,
+    districtName: input.districtName || administrativeHierarchy.districtName,
+    districtSlug: input.districtSlug || administrativeHierarchy.districtSlug
+  };
 }
 
 function createServerSupabase() {
@@ -170,7 +191,7 @@ export async function loadGeoHomeOverview() {
   >();
 
   for (const item of items) {
-    const hierarchy = buildGeoHierarchy({
+    const hierarchy = buildGeoHierarchy(enrichGeoInput({
       countrySlug: item.country_slug,
       countryName: item.country_name,
       stateSlug: item.state_slug,
@@ -181,7 +202,7 @@ export async function loadGeoHomeOverview() {
       districtName: item.district_name,
       municipalitySlug: item.municipality_slug,
       municipalityName: item.municipality_name
-    });
+    }));
     const countryLevel = getGeoLevel(hierarchy, 'country');
     if (!countryLevel) continue;
     const current = countryMap.get(countryLevel.path);
@@ -200,7 +221,7 @@ export async function loadGeoHomeOverview() {
 }
 
 function getRowLevelSlug(row: GeoHierarchyInput, key: GeoLevelKey): string | null {
-  const hierarchy = buildGeoHierarchy(row);
+  const hierarchy = buildGeoHierarchy(enrichGeoInput(row));
   return getGeoLevel(hierarchy, key)?.slug || null;
 }
 
@@ -488,7 +509,7 @@ async function fetchGeoHub(args: {
 
   if (navError) throw error(500, navError.message);
   const geoMeta = meta as HubItem;
-  const fullHierarchy = buildGeoHierarchy({
+  const fullHierarchy = buildGeoHierarchy(enrichGeoInput({
     countrySlug: geoMeta.country_slug || args.countrySlug,
     countryName: geoMeta.country_name,
     stateSlug: geoMeta.state_slug || args.stateSlug,
@@ -499,7 +520,7 @@ async function fetchGeoHub(args: {
     districtName: geoMeta.district_name,
     municipalitySlug: geoMeta.municipality_slug || args.municipalitySlug,
     municipalityName: geoMeta.municipality_name
-  });
+  }));
   const currentLevel = getGeoLevel(fullHierarchy, currentLevelKey) || getDeepestGeoLevel(fullHierarchy);
   const hierarchy = currentLevel
     ? fullHierarchy.slice(0, fullHierarchy.findIndex((level) => level.key === currentLevel.key) + 1)
@@ -559,7 +580,7 @@ async function fetchGeoHub(args: {
   const countryLinks = sortGeoChildLinks(
     Array.from(
       geoRows.reduce((map, row) => {
-        const rowHierarchy = buildGeoHierarchy(row);
+        const rowHierarchy = buildGeoHierarchy(enrichGeoInput(row));
         const countryLevel = getGeoLevel(rowHierarchy, 'country');
         if (!countryLevel) return map;
         const entry = map.get(countryLevel.path);
@@ -581,7 +602,7 @@ async function fetchGeoHub(args: {
 
   if (childLevelKey) {
     for (const row of geoRows) {
-      const rowHierarchy = buildGeoHierarchy(row);
+      const rowHierarchy = buildGeoHierarchy(enrichGeoInput(row));
       const childLevel = getGeoLevel(rowHierarchy, childLevelKey);
       if (!childLevel) continue;
 
@@ -767,7 +788,7 @@ export async function resolveLegacyPlaceSlug(placeSlug: string) {
     municipalityMatch.district_slug &&
     municipalityMatch.municipality_slug
   ) {
-    const hierarchy = buildGeoHierarchy({
+    const hierarchy = buildGeoHierarchy(enrichGeoInput({
       countrySlug: municipalityMatch.country_slug,
       countryName: municipalityMatch.country_name,
       stateSlug: municipalityMatch.state_slug,
@@ -778,7 +799,7 @@ export async function resolveLegacyPlaceSlug(placeSlug: string) {
       districtName: municipalityMatch.district_name,
       municipalitySlug: municipalityMatch.municipality_slug,
       municipalityName: municipalityMatch.municipality_name
-    });
+    }));
     return {
       path: getGeoLevel(hierarchy, 'municipality')?.path || `/${municipalityMatch.country_slug}/${municipalityMatch.district_slug}/${municipalityMatch.municipality_slug}`,
       level: 'municipality' as const,
@@ -790,7 +811,7 @@ export async function resolveLegacyPlaceSlug(placeSlug: string) {
 
   const districtMatch = await findMatch('district_slug');
   if (districtMatch?.country_slug && districtMatch.district_slug) {
-    const hierarchy = buildGeoHierarchy({
+    const hierarchy = buildGeoHierarchy(enrichGeoInput({
       countrySlug: districtMatch.country_slug,
       countryName: districtMatch.country_name,
       stateSlug: districtMatch.state_slug,
@@ -799,7 +820,7 @@ export async function resolveLegacyPlaceSlug(placeSlug: string) {
       regionName: districtMatch.region_name,
       districtSlug: districtMatch.district_slug,
       districtName: districtMatch.district_name
-    });
+    }));
     return {
       path: getGeoLevel(hierarchy, 'district')?.path || `/${districtMatch.country_slug}/${districtMatch.district_slug}`,
       level: 'district' as const,
