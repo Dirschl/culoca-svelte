@@ -26,6 +26,7 @@ import {
 	scrubPublicProfileRow
 } from '$lib/server/itemPagePublic';
 import { fixDeepUtf8InObject } from '$lib/utils/utf8Mojibake';
+import { supabaseAdmin } from '$lib/supabaseAdmin.js';
 
 type ItemRecord = ContentItemLike & {
 	user_id?: string | null;
@@ -306,11 +307,18 @@ async function getProfile(
 ) {
 	if (!profileId) return { profile: null, full_name: 'Culoca User' };
 
-	const { data } = await supabase
+	/** Service-Role umgeht RLS — sonst liefert Anon bei „privatem“ Profil oft keine Zeile (nur Name/Attribution). */
+	const client = supabaseAdmin ?? supabase;
+	const { data, error: profileError } = await client
 		.from('profiles')
 		.select(ITEM_PAGE_PROFILE_SELECT)
 		.eq('id', profileId)
 		.maybeSingle();
+
+	if (profileError) {
+		console.warn('[loadContentPage] getProfile', profileId, profileError.message);
+	}
+
 	const row = data as Record<string, unknown> | null;
 	return {
 		profile: scrubPublicProfileRow(row),

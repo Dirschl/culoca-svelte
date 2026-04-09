@@ -201,6 +201,18 @@
 		attribution = data?.attribution ?? attribution;
 		loading = false;
 	}
+	/** SSR liefert Profil; nach PATCH kann es fehlen. Nach Invalidate: data.profile wieder da, image gleiche ID → nachziehen. */
+	$: if (
+		data?.image?.id &&
+		image?.id === data.image.id &&
+		data.image?.profile &&
+		!image?.profile
+	) {
+		image = mergeItemFromApiPatch(image, {
+			profile: data.image.profile,
+			full_name: data.image.full_name ?? image.full_name
+		});
+	}
 	$: canonicalPath = data?.canonicalPath ?? canonicalPath;
 	$: contentType = data?.type ?? contentType;
 	$: availableTypes = data?.availableTypes ?? availableTypes;
