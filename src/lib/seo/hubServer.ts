@@ -378,7 +378,7 @@ export function buildGeoHubPageData(hub: GeoHubResult, page: number, pageSize: n
   const breadcrumbs = [{ name: 'Culoca', path: '/' }].concat(
     hub.hierarchy.map((level) => ({ name: level.label, path: level.path }))
   );
-  const hasItemFeed = deepestLevel.key === 'municipality';
+  const hasItemFeed = !hub.childLevelKey;
   const visibleCount = hasItemFeed ? hub.totalCount : hub.childLinks.length;
   const visibleCountLabel = hasItemFeed
     ? hub.totalCount === 1
@@ -475,29 +475,6 @@ async function fetchGeoHub(args: {
 
   const totalPages = Math.max(1, Math.ceil(totalCount / args.pageSize));
   const page = Math.min(Math.max(1, args.page), totalPages);
-  const shouldLoadItems = currentLevelKey === 'municipality';
-  let items: HubItem[] = [];
-
-  if (shouldLoadItems) {
-    const itemsQuery = applyGeoFilters(
-      supabase
-        .from('items')
-        .select(HUB_SELECT)
-        .eq('admin_hidden', false)
-        .is('group_root_item_id', null)
-        .not('slug', 'is', null)
-        .or('is_private.eq.false,is_private.is.null'),
-      args
-    );
-
-    const { data: itemRows, error: itemsError } = await itemsQuery
-      .order('created_at', { ascending: false })
-      .range((page - 1) * args.pageSize, page * args.pageSize - 1);
-
-    if (itemsError) throw error(500, itemsError.message);
-    items = (itemRows || []) as HubItem[];
-  }
-
   const { data: navRows, error: navError } = await applyGeoFilters(
     supabase
       .from('items')
@@ -542,6 +519,28 @@ async function fetchGeoHub(args: {
     municipalityName: row.municipality_name
   }));
   const childLevelKey = currentLevel ? getGeoChildLevelKey(geoRows, currentLevel.key) : null;
+  const shouldLoadItems = !childLevelKey;
+  let items: HubItem[] = [];
+
+  if (shouldLoadItems) {
+    const itemsQuery = applyGeoFilters(
+      supabase
+        .from('items')
+        .select(HUB_SELECT)
+        .eq('admin_hidden', false)
+        .is('group_root_item_id', null)
+        .not('slug', 'is', null)
+        .or('is_private.eq.false,is_private.is.null'),
+      args
+    );
+
+    const { data: itemRows, error: itemsError } = await itemsQuery
+      .order('created_at', { ascending: false })
+      .range((page - 1) * args.pageSize, page * args.pageSize - 1);
+
+    if (itemsError) throw error(500, itemsError.message);
+    items = (itemRows || []) as HubItem[];
+  }
   const countryLinks = sortGeoChildLinks(
     Array.from(
       geoRows.reduce((map, row) => {
