@@ -2,6 +2,10 @@
 -- This script will create functions that support pagination to return more than 1000 images
 
 -- 1. Drop existing functions to avoid conflicts
+-- WICHTIG: Bei geändertem RETURNS TABLE reicht CREATE OR REPLACE nicht – die Variante mit
+-- exakt gleicher Argumentliste muss vorher per DROP entfernt werden (Fehler 42P13).
+DROP FUNCTION IF EXISTS map_images_postgis(DOUBLE PRECISION, DOUBLE PRECISION, TEXT, TEXT, DOUBLE PRECISION, DOUBLE PRECISION, INTEGER, INTEGER);
+DROP FUNCTION IF EXISTS map_images_postgis_simple(DOUBLE PRECISION, DOUBLE PRECISION, TEXT, INTEGER, INTEGER);
 DROP FUNCTION IF EXISTS map_images_postgis(DOUBLE PRECISION, DOUBLE PRECISION, UUID);
 DROP FUNCTION IF EXISTS map_images_postgis(DOUBLE PRECISION, DOUBLE PRECISION, TEXT);
 DROP FUNCTION IF EXISTS map_images_postgis(DOUBLE PRECISION, DOUBLE PRECISION, TEXT, TEXT, DOUBLE PRECISION, DOUBLE PRECISION);
@@ -106,7 +110,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- 3. Create the simple fallback function with pagination support
+-- 3. Simple-Funktion (Pagination): oben bereits per DROP entfernt falls vorhanden
 CREATE OR REPLACE FUNCTION map_images_postgis_simple(
   user_lat DOUBLE PRECISION DEFAULT 0,
   user_lon DOUBLE PRECISION DEFAULT 0,
