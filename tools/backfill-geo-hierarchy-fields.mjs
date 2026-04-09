@@ -43,6 +43,7 @@ const DISTRICT_METADATA = {
   'RÜG': { name: 'Landkreis Vorpommern-Rügen', slug: 'vorpommern-ruegen', state_name: 'Mecklenburg-Vorpommern', state_slug: 'mecklenburg-vorpommern', region_name: null, region_slug: null },
   M: { name: 'München', slug: 'muenchen', state_name: 'Bayern', state_slug: 'bayern', region_name: 'Oberbayern', region_slug: 'oberbayern' },
   R: { name: 'Landkreis Regensburg', slug: 'regensburg', state_name: 'Bayern', state_slug: 'bayern', region_name: 'Oberpfalz', region_slug: 'oberpfalz' },
+  BRAUNAU: { name: 'Bezirk Braunau am Inn', slug: 'braunau', state_name: 'Oberösterreich', state_slug: 'oberoesterreich', region_name: 'Innviertel', region_slug: 'innviertel' },
   BR: { name: 'Bezirk Braunau am Inn', slug: 'braunau-am-inn', state_name: 'Oberösterreich', state_slug: 'oberoesterreich', region_name: 'Innviertel', region_slug: 'innviertel' },
   RI: { name: 'Bezirk Ried im Innkreis', slug: 'ried-im-innkreis', state_name: 'Oberösterreich', state_slug: 'oberoesterreich', region_name: 'Innviertel', region_slug: 'innviertel' },
   JO: { name: 'Bezirk St. Johann im Pongau', slug: 'st-johann-im-pongau', state_name: 'Salzburg', state_slug: 'salzburg', region_name: 'Pongau', region_slug: 'pongau' },

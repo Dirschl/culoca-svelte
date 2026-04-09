@@ -61,6 +61,7 @@ const DISTRICT_METADATA: Record<string, DistrictMetadata> = {
   'RÜG': { name: 'Landkreis Vorpommern-Rügen', slug: 'vorpommern-ruegen', stateName: 'Mecklenburg-Vorpommern', stateSlug: 'mecklenburg-vorpommern', regionName: null, regionSlug: null },
   M: { name: 'München', slug: 'muenchen', stateName: 'Bayern', stateSlug: 'bayern', regionName: 'Oberbayern', regionSlug: 'oberbayern' },
   R: { name: 'Landkreis Regensburg', slug: 'regensburg', stateName: 'Bayern', stateSlug: 'bayern', regionName: 'Oberpfalz', regionSlug: 'oberpfalz' },
+  BRAUNAU: { name: 'Bezirk Braunau am Inn', slug: 'braunau', stateName: 'Oberösterreich', stateSlug: 'oberoesterreich', regionName: 'Innviertel', regionSlug: 'innviertel' },
   BR: { name: 'Bezirk Braunau am Inn', slug: 'braunau-am-inn', stateName: 'Oberösterreich', stateSlug: 'oberoesterreich', regionName: 'Innviertel', regionSlug: 'innviertel' },
   RI: { name: 'Bezirk Ried im Innkreis', slug: 'ried-im-innkreis', stateName: 'Oberösterreich', stateSlug: 'oberoesterreich', regionName: 'Innviertel', regionSlug: 'innviertel' },
   JO: { name: 'Bezirk St. Johann im Pongau', slug: 'st-johann-im-pongau', stateName: 'Salzburg', stateSlug: 'salzburg', regionName: 'Pongau', regionSlug: 'pongau' },
