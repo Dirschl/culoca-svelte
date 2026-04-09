@@ -79,18 +79,18 @@
   
   // Import supabase client and PostGIS loader for loading all images
   import { supabase } from './supabaseClient';
-  import { loadAllMapImages } from './postgisLoader';
-  
-  // Internal images array for clustering
+  import { loadMapViewportImages } from './postgisLoader';
+
+  /** Viewport: padded bounds, one capped RPC (see map_images_postgis_bbox) */
+  const MAP_VIEWPORT_PAD = 0.18;
+  const MAP_VIEWPORT_DEBOUNCE_MS = 320;
+  const MAP_VIEWPORT_MAX_RESULTS = 12000;
+
+  // Internal images array for clustering (current viewport only)
   let allImages: any[] = [];
-  
-  // Always load all images directly from database, ignore images prop
-  $: {
-    // Load all images when component mounts or when needed
-    if (mapInitialized && !allImages.length) {
-      loadAllImagesForMap();
-    }
-  }
+  let viewportLoadGeneration = 0;
+  let viewportReloadTimer: ReturnType<typeof setTimeout> | null = null;
+  let filterStoreUnsub: (() => void) | null = null;
   
     // Reaktive Zentrierung basierend auf Mobile Mode
   $: if (isManual3x3Mode) {
@@ -533,11 +533,11 @@
       userMarker = leaflet.marker([userLat, userLon], { icon: userIcon }).addTo(map);
     }
     
-    // Add image markers
-    addImageMarkers();
-    
-    // Save map state on zoom/move
-    map.on('zoomend moveend', saveMapState);
+    // Save map state + reload markers for visible area (debounced)
+    map.on('zoomend moveend', () => {
+      saveMapState();
+      scheduleViewportReload();
+    });
     
     // Handle map clicks for location selection
     map.on('click', function(e: any) {
@@ -555,20 +555,18 @@
     });
     
     mapInitialized = true;
-    
-    // Load all images for clustering
-    loadAllImagesForMap();
+
+    scheduleViewportReload();
   }
   
   function addImageMarkers() {
-    const filteredImages = getFilteredImages();
-    if (!map || !markerClusterGroup || !filteredImages.length) {
-      return;
-    }
-    
-    // Clear existing markers from cluster group
+    if (!map || !markerClusterGroup) return;
+
     markerClusterGroup.clearLayers();
     imageMarkers = [];
+
+    const filteredImages = getFilteredImages();
+    if (!filteredImages.length) return;
     
     filteredImages.forEach((image, index) => {
       
@@ -1166,44 +1164,36 @@
   
   // Update marker labels based on current display mode
   function updateMarkerLabels() {
-    if (!map || !mapInitialized || !allImages.length) return;
-    
-    // Updating marker labels (debug removed)
-    
-    // Clear existing markers and recreate them with new labels
-    imageMarkers.forEach(marker => {
-      map.removeLayer(marker);
-    });
-    imageMarkers = [];
-    
-    // Recreate markers with updated labels
+    if (!map || !mapInitialized) return;
     addImageMarkers();
   }
   
   onMount(() => {
     loadMapState();
     initMap();
-    
-    // Load all images for map after map is initialized
-    setTimeout(() => {
-      if (mapInitialized) {
-        // Loading all images for map (debug removed)
-        loadAllImagesForMap();
-      }
-    }, 1000); // Wait for map to be fully initialized
-    
-    // Subscribe to track store changes for real-time track updates
-    const unsubscribe = trackStore.subscribe((state: any) => {
+
+    filterStoreUnsub = filterStore.subscribe(() => {
+      if (mapInitialized) scheduleViewportReload();
+    });
+
+    const unsubscribeTrack = trackStore.subscribe((state: any) => {
       if (mapInitialized && map) {
         updateCurrentTrack();
       }
     });
-    
-    // Clean up subscription on component destroy
-    return unsubscribe;
+
+    return () => {
+      unsubscribeTrack();
+      filterStoreUnsub?.();
+      filterStoreUnsub = null;
+    };
   });
   
   onDestroy(() => {
+    if (viewportReloadTimer) {
+      clearTimeout(viewportReloadTimer);
+      viewportReloadTimer = null;
+    }
     if (placeSearchTimeout) {
       clearTimeout(placeSearchTimeout);
     }
@@ -1230,17 +1220,12 @@
   });
   
   // Reactive updates
-  $: if (mapInitialized && allImages.length > 0) {
-          // Reactive update triggered (debug removed)
-    const leaflet = (window as any).L;
-    if (leaflet) {
-              // Leaflet available, calling addImageMarkers (debug removed)
-      addImageMarkers();
-    } else {
-              // Leaflet not available yet (debug removed)
-    }
+  $: if (mapInitialized && map) {
+    userLat;
+    userLon;
+    scheduleViewportReload();
   }
-  
+
   $: if (mapInitialized && (userLat || userLon || deviceHeading !== null)) {
     updateUserMarker();
   }
@@ -1452,12 +1437,6 @@
 
   // Removed: loadMapImagesDirectFromDB function - now using images prop only
   
-  // Reactive statement to update markers when allImages changes
-  $: if (mapInitialized && markerClusterGroup && allImages.length > 0) {
-    // Reactive update (debug removed)
-    addImageMarkers();
-  }
-  
   // Reactive statement to update current track when trackStore changes
   $: if (mapInitialized && map) {
     updateCurrentTrack();
@@ -1474,50 +1453,50 @@
     window.open(`mailto:?subject=${subject}&body=${body}`);
   }
 
-  // Load all images for the map using robust PostGIS pagination
-  async function loadAllImagesForMap() {
+  function scheduleViewportReload() {
+    if (!mapInitialized || !map) return;
+    if (viewportReloadTimer) clearTimeout(viewportReloadTimer);
+    viewportReloadTimer = setTimeout(() => {
+      viewportReloadTimer = null;
+      void loadImagesForCurrentViewport();
+    }, MAP_VIEWPORT_DEBOUNCE_MS);
+  }
+
+  async function loadImagesForCurrentViewport() {
+    if (!map || !mapInitialized) return;
+
+    const gen = ++viewportLoadGeneration;
+    const b = map.getBounds().pad(MAP_VIEWPORT_PAD);
+    const sw = b.getSouthWest();
+    const ne = b.getNorthEast();
+
     try {
-      // Loading all images for map (debug removed)
-      
-      // Get current user for privacy filtering
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user }
+      } = await supabase.auth.getUser();
       const currentUserId = user?.id || null;
-      
-      // Get current filters for PostGIS function
       const currentFilters = get(filterStore);
-      
-      // Prepare filter parameters
-      const userFilterId = currentFilters.userFilter?.userId || null;
-      const locationFilterLat = currentFilters.locationFilter?.lat || null;
-      const locationFilterLon = currentFilters.locationFilter?.lon || null;
-      
-      // Filter parameters (debug removed)
-      
-      // Use the robust PostGIS loader with pagination
-      const mapImagesData = await loadAllMapImages(
-        userLat,
-        userLon,
+
+      const mapImagesData = await loadMapViewportImages({
+        userLat: userLat ?? 0,
+        userLon: userLon ?? 0,
         currentUserId,
-        userFilterId,
-        locationFilterLat,
-        locationFilterLon
-      );
-      
-      if (!mapImagesData || mapImagesData.length === 0) {
-        // No images loaded from PostGIS functions (debug removed)
-        return;
-      }
-      
-              // PostGIS loaded images (debug removed)
-      allImages = mapImagesData;
-      
-      // Re-add markers if map is already initialized
-      if (mapInitialized && map) {
-        addImageMarkers();
-      }
-      
+        userFilterId: currentFilters.userFilter?.userId ?? null,
+        locationFilterLat: currentFilters.locationFilter?.lat ?? null,
+        locationFilterLon: currentFilters.locationFilter?.lon ?? null,
+        minLat: sw.lat,
+        maxLat: ne.lat,
+        minLon: sw.lng,
+        maxLon: ne.lng,
+        maxResults: MAP_VIEWPORT_MAX_RESULTS
+      });
+
+      if (gen !== viewportLoadGeneration) return;
+
+      allImages = mapImagesData || [];
+      addImageMarkers();
     } catch (err) {
-      console.error('[FullscreenMap] Error in loadAllImagesForMap:', err);
+      console.error('[FullscreenMap] Viewport load failed:', err);
     }
   }
 </script>

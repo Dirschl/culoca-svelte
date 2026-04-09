@@ -93,6 +93,62 @@ export async function loadAllPostgisImages(
   return allImages;
 }
 
+export type MapViewportParams = {
+  userLat: number;
+  userLon: number;
+  currentUserId: string | null;
+  userFilterId: string | null;
+  locationFilterLat: number | null;
+  locationFilterLon: number | null;
+  minLat: number;
+  maxLat: number;
+  minLon: number;
+  maxLon: number;
+  /** Hard cap per request (default 10000); keeps map fast at world zoom */
+  maxResults?: number;
+};
+
+/**
+ * Load map markers for the current viewport (single RPC). Falls back to legacy
+ * full paged load if map_images_postgis_bbox is not installed yet.
+ */
+export async function loadMapViewportImages(params: MapViewportParams): Promise<any[]> {
+  const maxResults = params.maxResults ?? 10000;
+  const rpcParams = {
+    user_lat: params.userLat || 0,
+    user_lon: params.userLon || 0,
+    current_user_id: params.currentUserId,
+    user_filter_id: params.userFilterId,
+    location_filter_lat: params.locationFilterLat,
+    location_filter_lon: params.locationFilterLon,
+    min_lat: params.minLat,
+    max_lat: params.maxLat,
+    min_lon: params.minLon,
+    max_lon: params.maxLon,
+    max_results: maxResults
+  };
+
+  const { data, error } = await supabase.rpc('map_images_postgis_bbox', rpcParams);
+
+  if (!error) {
+    return data || [];
+  }
+
+  console.warn(
+    '[postgisLoader] map_images_postgis_bbox failed; falling back to full map load. Deploy tools/sql/map-images-postgis-bbox.sql for scalable maps.',
+    error
+  );
+
+  return loadAllMapImages(
+    params.userLat || null,
+    params.userLon || null,
+    params.currentUserId,
+    params.userFilterId,
+    params.locationFilterLat,
+    params.locationFilterLon
+  );
+}
+
 /**
  * Load all images for map with privacy filtering
  */
