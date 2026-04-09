@@ -1,6 +1,4 @@
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { error } from '@sveltejs/kit';
-import { env } from '$env/dynamic/private';
 import {
 	buildGeoHubPath,
 	computeCanonicalPath,
@@ -20,13 +18,9 @@ import {
 } from '$lib/seo/hubs';
 import { getAdministrativeHierarchy } from '$lib/content/locationTaxonomy';
 import { resolveAttribution } from '$lib/metadata/attributionResolver';
-import {
-	fixUtf8MojibakeIfNeeded,
-	ITEM_PAGE_PROFILE_SELECT,
-	ITEM_PAGE_PROFILE_SELECT_CORE,
-	sanitizeItemForItemPageClient,
-	scrubPublicProfileRow
-} from '$lib/server/itemPagePublic';
+import { fetchItemPageProfileRow } from '$lib/server/fetchItemPageProfile';
+import { fixUtf8MojibakeIfNeeded, sanitizeItemForItemPageClient } from '$lib/server/itemPagePublic';
+import { createSupabaseServerClient } from '$lib/server/supabaseServer';
 import { fixDeepUtf8InObject } from '$lib/utils/utf8Mojibake';
 
 type ItemRecord = ContentItemLike & {
@@ -88,41 +82,8 @@ const MIN_SIMILARITY_SCORE = 0.72;
 const PREFERRED_SIMILARITY_COUNT = 60;
 const MATCH_RPC_FETCH_COUNT = 80;
 
-function createServerSupabase() {
-	const supabaseUrl = (process.env.PUBLIC_SUPABASE_URL ||
-		process.env.VITE_SUPABASE_URL ||
-		import.meta.env.PUBLIC_SUPABASE_URL ||
-		import.meta.env.VITE_SUPABASE_URL) as string;
-	const supabaseKey = (process.env.SUPABASE_SERVICE_ROLE_KEY ||
-		process.env.PUBLIC_SUPABASE_ANON_KEY ||
-		process.env.VITE_SUPABASE_ANON_KEY ||
-		import.meta.env.PUBLIC_SUPABASE_ANON_KEY ||
-		import.meta.env.VITE_SUPABASE_ANON_KEY) as string;
-
-	return createClient(supabaseUrl, supabaseKey, {
-		auth: { persistSession: false }
-	});
-}
-
-/** Service-Role für Profil-Lesevorgänge: `$env/dynamic/private` (z. B. Vercel) statt nur Build-Zeit-Import. */
-function createServiceRoleSupabaseForProfiles(): SupabaseClient | null {
-	const supabaseUrl = (env.PUBLIC_SUPABASE_URL ||
-		env.VITE_SUPABASE_URL ||
-		process.env.PUBLIC_SUPABASE_URL ||
-		process.env.VITE_SUPABASE_URL ||
-		import.meta.env.PUBLIC_SUPABASE_URL ||
-		import.meta.env.VITE_SUPABASE_URL) as string | undefined;
-	const key =
-		env.SUPABASE_SERVICE_ROLE_KEY ||
-		(typeof process !== 'undefined' ? process.env.SUPABASE_SERVICE_ROLE_KEY : undefined);
-	if (!supabaseUrl || !key?.trim()) return null;
-	return createClient(supabaseUrl, key, {
-		auth: { persistSession: false }
-	});
-}
-
 async function getSemanticSimilarItems(
-	supabase: ReturnType<typeof createServerSupabase>,
+	supabase: ReturnType<typeof createSupabaseServerClient>,
 	item: ItemRecord,
 	rootItem: ItemRecord,
 	type: Partial<ContentTypeDefinition> | null,
@@ -266,7 +227,7 @@ const ITEM_SELECT = `
   locality_name
 `;
 
-async function getTypeMap(supabase: ReturnType<typeof createServerSupabase>) {
+async function getTypeMap(supabase: ReturnType<typeof createSupabaseServerClient>) {
 	const { data } = await supabase.from('types').select('*');
 	const map = new Map<number, Partial<ContentTypeDefinition>>();
 
@@ -283,7 +244,7 @@ async function getTypeMap(supabase: ReturnType<typeof createServerSupabase>) {
 	return map;
 }
 
-async function getItemBySlug(supabase: ReturnType<typeof createServerSupabase>, slug: string) {
+async function getItemBySlug(supabase: ReturnType<typeof createSupabaseServerClient>, slug: string) {
 	const { data, error: itemError } = await supabase
 		.from('items')
 		.select(ITEM_SELECT)
@@ -299,7 +260,7 @@ async function getItemBySlug(supabase: ReturnType<typeof createServerSupabase>, 
 }
 
 async function getNamedRootByGroupSlug(
-	supabase: ReturnType<typeof createServerSupabase>,
+	supabase: ReturnType<typeof createSupabaseServerClient>,
 	typeId: number,
 	groupSlug: string
 ) {
@@ -320,41 +281,20 @@ async function getNamedRootByGroupSlug(
 }
 
 async function getProfile(
-	supabase: ReturnType<typeof createServerSupabase>,
+	supabase: ReturnType<typeof createSupabaseServerClient>,
 	profileId: string | null | undefined
 ) {
 	if (!profileId) return { profile: null, full_name: 'Culoca User' };
 
-	const client = createServiceRoleSupabaseForProfiles() ?? supabase;
-
-	let { data, error: profileError } = await client
-		.from('profiles')
-		.select(ITEM_PAGE_PROFILE_SELECT)
-		.eq('id', profileId)
-		.maybeSingle();
-
-	if (profileError) {
-		console.warn('[loadContentPage] getProfile (voller Select)', profileId, profileError.message);
-		const second = await client
-			.from('profiles')
-			.select(ITEM_PAGE_PROFILE_SELECT_CORE)
-			.eq('id', profileId)
-			.maybeSingle();
-		if (second.error) {
-			console.warn('[loadContentPage] getProfile (Kern-Select)', profileId, second.error.message);
-		}
-		data = second.data;
-	}
-
-	const row = data as Record<string, unknown> | null;
+	const row = await fetchItemPageProfileRow(supabase, profileId);
 	return {
-		profile: scrubPublicProfileRow(row),
+		profile: row,
 		full_name:
 			(fixUtf8MojibakeIfNeeded((row?.full_name as string) || '') as string) || 'Culoca User'
 	};
 }
 
-async function getRootItem(supabase: ReturnType<typeof createServerSupabase>, item: ItemRecord) {
+async function getRootItem(supabase: ReturnType<typeof createSupabaseServerClient>, item: ItemRecord) {
 	if (!item.group_root_item_id) return item;
 
 	const { data, error: rootError } = await supabase
@@ -371,7 +311,7 @@ async function getRootItem(supabase: ReturnType<typeof createServerSupabase>, it
 }
 
 async function getGroupItems(
-	supabase: ReturnType<typeof createServerSupabase>,
+	supabase: ReturnType<typeof createSupabaseServerClient>,
 	rootItem: ItemRecord
 ) {
 	const { data, error: groupError } = await supabase
@@ -389,7 +329,7 @@ async function getGroupItems(
 }
 
 async function getSeoLinks(
-	supabase: ReturnType<typeof createServerSupabase>,
+	supabase: ReturnType<typeof createSupabaseServerClient>,
 	item: ItemRecord,
 	typeMap: Map<number, Partial<ContentTypeDefinition>>
 ) {
@@ -527,7 +467,7 @@ function mapSemanticSimilarRowsToPublicPreviews(
  * Öffentliche Vorschau-Liste „ähnliche Motive“ (nur Foto-Typ). Für Lazy-Load via API, nicht im Item-SSR.
  */
 export async function loadSimilarMotifPreviewsForPublicSlug(slug: string) {
-	const supabase = createServerSupabase();
+	const supabase = createSupabaseServerClient();
 	const item = await getItemBySlug(supabase, slug);
 	if (!item) throw error(404, 'Not found');
 	if (!isPubliclyVisibleItem(item)) throw error(404, 'Not found');
@@ -594,7 +534,7 @@ export async function loadContentPage(args: {
 	groupSlugHint?: string;
 	skipCanonicalRedirect?: boolean;
 }) {
-	const supabase = createServerSupabase();
+	const supabase = createSupabaseServerClient();
 	const typeMap = await getTypeMap(supabase);
 	const requestedPath = normalizePath(args.requestedPath);
 	let item: ItemRecord | null = null;
