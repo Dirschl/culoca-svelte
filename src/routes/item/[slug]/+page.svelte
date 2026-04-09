@@ -3360,6 +3360,16 @@
 </script>
 
 <svelte:head>
+	<!-- LCP zuerst: großes Bild (HTTP Link-Header ergänzt das serverseitig), 512 nur bei Progressive und niedriger Priorität -->
+	{#if shouldShowMainImage && image?.slug && (image.path_2048 || image.path_512)}
+		{#if mainImageSrc}
+			<link rel="preload" as="image" href={mainImageSrc} fetchpriority="high" />
+		{/if}
+		{#if mainFigureBackgroundUrl}
+			<link rel="preload" as="image" href={mainFigureBackgroundUrl} fetchpriority="low" />
+		{/if}
+	{/if}
+
 	<title>{image?.title || `Item ${itemSlug} - culoca.com`}</title>
 	<meta
 		name="description"
@@ -3371,15 +3381,6 @@
 	/>
 
 	<link rel="canonical" href={canonicalUrl} />
-	<!-- LCP-Hauptbild früh starten; 512 vor 2048 bei Progressive (Hintergrund sichtbar) -->
-	{#if shouldShowMainImage && image?.slug && (image.path_2048 || image.path_512)}
-		{#if mainFigureBackgroundUrl}
-			<link rel="preload" as="image" href={mainFigureBackgroundUrl} fetchpriority="high" />
-		{/if}
-		{#if mainImageSrc}
-			<link rel="preload" as="image" href={mainImageSrc} fetchpriority="high" />
-		{/if}
-	{/if}
 	{#if seoLinks?.older?.canonicalPath}
 		<link
 			rel="prev"

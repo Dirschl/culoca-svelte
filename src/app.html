@@ -17,12 +17,12 @@
 			})();
 		</script>
 
-		<!-- Fallback Favicons - werden von Item-spezifischen Icons überschrieben -->
+		%sveltekit.head%
+
+		<!-- Fallback Favicons (nach Route-Head, damit z. B. LCP-Preload zuerst im Dokument steht) -->
 		<link rel="icon" type="image/svg+xml" href="/culoca-icon.svg">
 		<link rel="icon" type="image/png" href="/culoca-icon.png" sizes="32x32">
 		<link rel="apple-touch-icon" href="/culoca-icon.png" sizes="180x180">
-		
-		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">
 		<div style="display: contents">%sveltekit.body%</div>
