@@ -124,10 +124,13 @@ export function buildGeoItemPath(
   const itemSlug = normalizeGeoSlug(input.itemSlug);
   if (!itemSlug) return null;
 
-  const hubPath = buildGeoHubPath(input, 'municipality');
-  if (!hubPath) return null;
+  const countrySlug = normalizeGeoSlug(input.countrySlug);
+  const districtSlug = normalizeGeoSlug(input.districtSlug);
+  const municipalitySlug = normalizeGeoSlug(input.municipalitySlug);
 
-  return `${hubPath}/${itemSlug}`;
+  if (!countrySlug || !districtSlug || !municipalitySlug) return null;
+
+  return `/${countrySlug}/${districtSlug}/${municipalitySlug}/${itemSlug}`;
 }
 
 export function hasGeoItemHierarchy(input: GeoHierarchyInput): boolean {

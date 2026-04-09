@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { browser } from '$app/environment';
+  import { goto } from '$app/navigation';
   import SiteNav from '$lib/SiteNav.svelte';
   import SiteFooter from '$lib/SiteFooter.svelte';
   import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
@@ -82,6 +83,7 @@
   }
 
   const geoTrail = (data.breadcrumbs || []).filter((crumb: { path: string }) => crumb.path !== '/');
+  let selectedGeoChildPath = '';
 
   let currentGpsPosition: { lat: number; lon: number } | null = browser ? getStoredGpsPosition() : null;
   let variantImageIndexes: Record<string, number> = {};
@@ -90,6 +92,21 @@
   let lastRotationKey = '';
   let previewImageElements: Record<string, HTMLImageElement | null> = {};
   let previewThumbElements: Record<string, HTMLDivElement | null> = {};
+
+  $: {
+    const validPaths = new Set((data.geoChildren || []).map((child: { path: string }) => child.path));
+    if (!validPaths.has(selectedGeoChildPath)) {
+      selectedGeoChildPath = '';
+    }
+  }
+
+  async function handleGeoChildChange(event: Event) {
+    const value = (event.currentTarget as HTMLSelectElement | null)?.value || '';
+    if (!value) return;
+
+    selectedGeoChildPath = value;
+    await goto(value);
+  }
 
   function getStoredGpsPosition(): { lat: number; lon: number } | null {
     if (typeof window === 'undefined') return null;
@@ -322,7 +339,25 @@
           <section class="geo-children" aria-labelledby="geo-children-heading">
             <div class="geo-children__header">
               <h2 id="geo-children-heading">{data.geoChildLevelLabel || 'Weitere Ebenen'}</h2>
-              <p>Klicke dich tiefer durch die regionale Struktur.</p>
+              <p>Wähle die nächste Ebene per Dropdown oder nutze die direkten Hub-Links darunter.</p>
+            </div>
+            <div class="geo-children__selector">
+              <label class="geo-children__label" for="geo-children-select">
+                {data.geoChildLevelLabel || 'Weitere Ebenen'} auswählen
+              </label>
+              <select
+                id="geo-children-select"
+                class="geo-children__select"
+                bind:value={selectedGeoChildPath}
+                on:change={handleGeoChildChange}
+              >
+                <option value="">{data.geoChildLevelLabel || 'Ebene'} wählen ...</option>
+                {#each data.geoChildren as child}
+                  <option value={child.path}>
+                    {child.label} ({child.count.toLocaleString('de-DE')})
+                  </option>
+                {/each}
+              </select>
             </div>
             <div class="geo-children__grid">
               {#each data.geoChildren as child}
@@ -541,6 +576,30 @@
     margin-top: 1.5rem;
     padding-top: 1.25rem;
     border-top: 1px solid var(--border-color);
+  }
+  .geo-children__selector {
+    margin-top: 1rem;
+    max-width: 32rem;
+  }
+  .geo-children__label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 700;
+  }
+  .geo-children__select {
+    width: 100%;
+    min-height: 52px;
+    padding: 0.85rem 1rem;
+    border-radius: 1rem;
+    border: 1px solid rgba(238, 114, 33, 0.25);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font: inherit;
+  }
+  .geo-children__select:focus {
+    outline: none;
+    border-color: rgba(238, 114, 33, 0.7);
+    box-shadow: 0 0 0 4px rgba(238, 114, 33, 0.12);
   }
   .geo-children__header h2 {
     margin: 0;
