@@ -15,7 +15,7 @@
 </script>
 
 {#if countries.length > 0}
-  <section class="geo-explorer" aria-labelledby="geo-explorer-heading">
+  <section id="geo-explorer" class="geo-explorer" aria-labelledby="geo-explorer-heading">
     <div class="geo-explorer__header">
       <p class="geo-explorer__kicker">Geo-Navigation</p>
       <h2 id="geo-explorer-heading">Nach Land starten und Schritt fuer Schritt vertiefen</h2>

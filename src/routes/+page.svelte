@@ -1191,7 +1191,7 @@
                     <h2>Profile finden</h2>
                   </div>
                   <span class="dashboard-network-links">
-                    <a href="#geo-explorer-heading">Orte finden</a>
+                    <a href="/#geo-explorer">Orte finden</a>
                     <a href="/chat">Zum Chat</a>
                   </span>
                 </div>

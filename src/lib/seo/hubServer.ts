@@ -8,6 +8,7 @@ import {
   getDeepestGeoLevel,
   getGeoChildLevelKey,
   getGeoLevel,
+  type GeoHierarchyInput,
   type GeoHierarchyLevel,
   type GeoLevelKey
 } from '$lib/geo/hierarchy';
@@ -53,6 +54,21 @@ const HUB_SELECT =
 
 const GEO_FILTER_SELECT =
   'country_slug, country_name, state_slug, state_name, region_slug, region_name, district_slug, district_name, municipality_slug, municipality_name';
+
+const COUNTRY_LABELS: Record<string, string> = {
+  de: 'Deutschland',
+  at: 'Oesterreich',
+  ch: 'Schweiz',
+  lu: 'Luxemburg',
+  mc: 'Monaco'
+};
+
+function getCountryLabel(countrySlug: string | null | undefined, countryName: string | null | undefined): string {
+  const normalizedSlug = String(countrySlug || '').trim().toLowerCase();
+  const normalizedName = normalizeAdminDisplayLabel(countryName || undefined);
+  if (normalizedName) return normalizedName;
+  return COUNTRY_LABELS[normalizedSlug] || normalizedSlug.toUpperCase();
+}
 
 function createServerSupabase() {
   const supabaseUrl = (
@@ -172,7 +188,7 @@ export async function loadGeoHomeOverview() {
       current.count += 1;
     } else {
       countryMap.set(countryLevel.path, {
-        label: countryLevel.label,
+        label: getCountryLabel(item.country_slug, item.country_name),
         path: countryLevel.path,
         count: 1
       });
