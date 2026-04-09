@@ -27,6 +27,7 @@ export type HubItem = {
   keywords?: string[] | null;
   profile_id?: string | null;
   page_settings?: Record<string, unknown> | null;
+  group_root_item_id?: string | null;
   country_slug?: string | null;
   country_name?: string | null;
   state_slug?: string | null;
@@ -50,7 +51,7 @@ export type HubItem = {
 };
 
 const HUB_SELECT =
-  'id, slug, title, description, caption, canonical_path, path_512, width, height, created_at, keywords, profile_id, page_settings, country_slug, country_name, state_slug, state_name, region_slug, region_name, district_slug, district_name, municipality_slug, municipality_name, lat, lon';
+  'id, slug, title, description, caption, canonical_path, path_512, width, height, created_at, keywords, profile_id, page_settings, group_root_item_id, country_slug, country_name, state_slug, state_name, region_slug, region_name, district_slug, district_name, municipality_slug, municipality_name, lat, lon';
 
 const GEO_FILTER_SELECT =
   'country_slug, country_name, state_slug, state_name, region_slug, region_name, district_slug, district_name, municipality_slug, municipality_name';
@@ -374,11 +375,13 @@ export function buildGeoHubPageData(hub: GeoHubResult, page: number, pageSize: n
     throw error(404, 'Geo-Hub nicht gefunden');
   }
 
-  const seoText = buildGeoHubSeoText(hub, page);
+  const hasItemFeed = !hub.childLevelKey;
+  const totalPages = hasItemFeed ? Math.max(1, Math.ceil(hub.totalCount / pageSize)) : 1;
+  const resolvedPage = Math.min(Math.max(1, page), totalPages);
+  const seoText = buildGeoHubSeoText(hub, resolvedPage);
   const breadcrumbs = [{ name: 'Culoca', path: '/' }].concat(
     hub.hierarchy.map((level) => ({ name: level.label, path: level.path }))
   );
-  const hasItemFeed = !hub.childLevelKey;
   const visibleCount = hasItemFeed ? hub.totalCount : hub.childLinks.length;
   const visibleCountLabel = hasItemFeed
     ? hub.totalCount === 1
@@ -410,8 +413,8 @@ export function buildGeoHubPageData(hub: GeoHubResult, page: number, pageSize: n
     totalCount: hub.totalCount,
     visibleCount,
     visibleCountLabel,
-    page,
-    totalPages: hasItemFeed ? Math.max(1, Math.ceil(hub.totalCount / pageSize)) : 1,
+    page: resolvedPage,
+    totalPages,
     breadcrumbs,
     countryLinks: hub.countryLinks,
     geoChildren: hub.childLinks,
@@ -435,7 +438,7 @@ async function fetchGeoHub(args: {
 }): Promise<GeoHubResult> {
   const supabase = createServerSupabase();
   const currentLevelKey = getCurrentGeoLevelKey(args);
-  const countQuery = applyGeoFilters(
+  const rootCountQuery = applyGeoFilters(
     supabase
       .from('items')
       .select('*', { count: 'exact', head: true })
@@ -458,23 +461,20 @@ async function fetchGeoHub(args: {
     args
   );
 
-  const [{ count, error: countError }, { data: metaItems, error: metaError }] = await Promise.all([
-    countQuery,
+  const [{ count: rootCount, error: countError }, { data: metaItems, error: metaError }] = await Promise.all([
+    rootCountQuery,
     metaQuery
   ]);
 
   if (countError) throw error(500, countError.message);
   if (metaError) throw error(500, metaError.message);
 
-  const totalCount = count || 0;
+  const totalRootCount = rootCount || 0;
   const meta = (metaItems?.[0] || null) as HubItem | null;
 
-  if (!totalCount || !meta) {
+  if (!totalRootCount || !meta) {
     throw error(404, 'Geo-Hub nicht gefunden');
   }
-
-  const totalPages = Math.max(1, Math.ceil(totalCount / args.pageSize));
-  const page = Math.min(Math.max(1, args.page), totalPages);
   const { data: navRows, error: navError } = await applyGeoFilters(
     supabase
       .from('items')
@@ -487,8 +487,6 @@ async function fetchGeoHub(args: {
   );
 
   if (navError) throw error(500, navError.message);
-
-  const baseItems = (items || []) as HubItem[];
   const geoMeta = meta as HubItem;
   const fullHierarchy = buildGeoHierarchy({
     countrySlug: geoMeta.country_slug || args.countrySlug,
@@ -520,15 +518,32 @@ async function fetchGeoHub(args: {
   }));
   const childLevelKey = currentLevel ? getGeoChildLevelKey(geoRows, currentLevel.key) : null;
   const shouldLoadItems = !childLevelKey;
+  let totalCount = totalRootCount;
   let items: HubItem[] = [];
 
   if (shouldLoadItems) {
+    const itemCountQuery = applyGeoFilters(
+      supabase
+        .from('items')
+        .select('*', { count: 'exact', head: true })
+        .eq('admin_hidden', false)
+        .not('slug', 'is', null)
+        .or('is_private.eq.false,is_private.is.null'),
+      args
+    );
+
+    const { count: itemCount, error: itemCountError } = await itemCountQuery;
+    if (itemCountError) throw error(500, itemCountError.message);
+
+    totalCount = itemCount || 0;
+    const totalPages = Math.max(1, Math.ceil(totalCount / args.pageSize));
+    const page = Math.min(Math.max(1, args.page), totalPages);
+
     const itemsQuery = applyGeoFilters(
       supabase
         .from('items')
         .select(HUB_SELECT)
         .eq('admin_hidden', false)
-        .is('group_root_item_id', null)
         .not('slug', 'is', null)
         .or('is_private.eq.false,is_private.is.null'),
       args
@@ -584,53 +599,10 @@ async function fetchGeoHub(args: {
     }
   }
 
-  const rootIds = shouldLoadItems ? baseItems.map((item) => item.id) : [];
-  const variantsByRoot = new Map<
-    string,
-    Array<{
-      id: string;
-      slug: string;
-      path_512: string | null;
-      width: number | null;
-      height: number | null;
-    }>
-  >();
-
-  if (rootIds.length) {
-    const { data: variantRows, error: variantsError } = await supabase
-      .from('items')
-      .select('id, slug, path_512, width, height, group_root_item_id')
-      .in('group_root_item_id', rootIds)
-      .eq('admin_hidden', false)
-      .or('is_private.eq.false,is_private.is.null')
-      .not('slug', 'is', null)
-      .not('path_512', 'is', null)
-      .order('created_at', { ascending: false });
-
-    if (variantsError) throw error(500, variantsError.message);
-
-    for (const row of variantRows || []) {
-      const rootId = row.group_root_item_id as string | null;
-      if (!rootId) continue;
-      const current = variantsByRoot.get(rootId) || [];
-      if (current.length >= 5) continue;
-      current.push({
-        id: row.id as string,
-        slug: row.slug as string,
-        path_512: (row.path_512 || null) as string | null,
-        width: (row.width || null) as number | null,
-        height: (row.height || null) as number | null
-      });
-      variantsByRoot.set(rootId, current);
-    }
-  }
-
   return {
-    items: baseItems.map((item) => ({
+    items: items.map((item) => ({
       ...item,
-      canonical_path: getPublicItemHref(item),
-      variants: variantsByRoot.get(item.id) || [],
-      child_count: (variantsByRoot.get(item.id) || []).length
+      canonical_path: getPublicItemHref(item)
     })),
     totalCount,
     countrySlug: hierarchy[0]?.slug || args.countrySlug,

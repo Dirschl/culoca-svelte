@@ -23,6 +23,7 @@
     caption: string | null;
     canonical_path: string | null;
     path_512: string | null;
+    group_root_item_id?: string | null;
     lat?: number | null;
     lon?: number | null;
     child_count?: number;
@@ -399,6 +400,9 @@
                   {/if}
 
                   <div class="item-body">
+                    {#if item.group_root_item_id}
+                      <p class="item-badge">Variante</p>
+                    {/if}
                     <h2>{item.title || item.slug}</h2>
                     <p class="item-desc">
                       {truncate(item.description || item.caption || data.fallbackDescription || `Mehr Inhalte aus ${data.hubLabel}.`, 120)}
@@ -717,6 +721,14 @@
     flex-direction: column;
     gap: 0.25rem;
     flex: 1;
+  }
+  .item-badge {
+    margin: 0;
+    color: var(--culoca-orange);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
   }
   .item-body h2 {
     margin: 0;
