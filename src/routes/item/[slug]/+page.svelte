@@ -45,7 +45,7 @@
 	import { KEYWORDS_MAX, sanitizeKeywords } from '$lib/content/keywords';
 	import { env as publicEnv } from '$env/dynamic/public';
 	import { saveDashboardHeroVisitFromItem } from '$lib/dashboardHeroVisit';
-	import { buildGeoHierarchy, getGeoLevel } from '$lib/geo/hierarchy';
+	import { buildGeoHierarchy, formatGeoDistrictDisplayName, getGeoLevel } from '$lib/geo/hierarchy';
 
 	/** Wenn PUBLIC_ADOBE_AFFILIATE_REDIRECT_BASE gesetzt ist (z. B. Partnerize), wird der Adobe-Link darüber geleitet. */
 	function getAdobeAffiliateUrl(directUrl: string | null | undefined): string | null {
@@ -272,9 +272,15 @@
 		image?.region_name || geoAdminHierarchy.regionName || null
 	);
 	$: geoDistrictLabel =
-		normalizeAdminDisplayLabel(
-			image?.district_name || image?.district_slug || image?.district_code
-		) || 'Landkreis';
+		formatGeoDistrictDisplayName(
+			normalizeAdminDisplayLabel(
+				image?.district_name || image?.district_slug || image?.district_code
+			) || undefined
+		) ||
+		formatGeoDistrictDisplayName(
+			normalizeAdminDisplayLabel(image?.district_slug || image?.district_code) || undefined
+		) ||
+		'Landkreis';
 	$: geoMunicipalityLabel =
 		normalizeAdminDisplayLabel(image?.municipality_name || image?.municipality_slug) || 'Gemeinde';
 	$: geoNeedsAttention = !!(
@@ -737,6 +743,7 @@
 	$: isCreator =
 		!!currentUser &&
 		(currentUser.id === image?.profile_id ||
+			currentUser.id === image?.user_id ||
 			currentUser.id === '0ceb2320-0553-463b-971a-a0eef5ecdf09');
 	$: canEditItem = !!(isCreator || $unifiedRightsStore.rights?.edit);
 
@@ -3366,9 +3373,10 @@
 	}
 
 	async function hydrateCreatorProfileIfNeeded() {
-		if (!browser || !image?.profile_id || image?.profile) return;
+		const ownerId = image?.profile_id || image?.user_id;
+		if (!browser || !ownerId || image?.profile) return;
 		try {
-			const res = await fetch(`/api/item-creator-profile/${encodeURIComponent(image.profile_id)}`);
+			const res = await fetch(`/api/item-creator-profile/${encodeURIComponent(ownerId)}`);
 			if (!res.ok) return;
 			const data = await res.json().catch(() => null);
 			if (data?.profile) {
@@ -4599,7 +4607,7 @@
 									<input
 										bind:value={districtNameEditValue}
 										class="geo-input"
-										placeholder="Landkreis Altötting"
+										placeholder="Altötting"
 									/>
 								{:else}
 									<span class="geo-value">{geoDistrictLabel}</span>
@@ -4922,7 +4930,7 @@
 								{/if}
 							</div>
 						</div>
-					{:else if image.profile_id && (attribution?.creatorName || image.full_name)}
+					{:else if creatorUserId && (attribution?.creatorName || image.full_name)}
 						<div class="creator-details creator-fallback">
 							<div class="creator-name">{attribution?.creatorName ?? image.full_name}</div>
 							{#if seoHubs?.photographerPath}
@@ -4930,10 +4938,10 @@
 									<a href={seoHubs.photographerPath}>Motiv-Übersicht dieses Erstellers</a>
 								</p>
 							{/if}
-							{#if currentUser?.id !== image.profile_id}
+							{#if currentUser?.id !== creatorUserId}
 								<div class="creator-actions">
 									<FollowButton
-										targetUserId={image.profile_id}
+										targetUserId={creatorUserId}
 										targetLabel={attribution?.creatorName ?? image.full_name ?? 'Profil'}
 									/>
 									<button type="button" class="creator-chat-btn" on:click={startCreatorChat}>

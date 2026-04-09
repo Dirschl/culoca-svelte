@@ -642,8 +642,9 @@ export async function loadContentPage(args: {
 		};
 	}
 
+	const ownerProfileId = item.profile_id ?? item.user_id ?? null;
 	const [profileData, groupItems, seoLinks] = await Promise.all([
-		getProfile(supabase, item.profile_id),
+		getProfile(supabase, ownerProfileId),
 		getGroupItems(supabase, rootItem),
 		getSeoLinks(supabase, item, typeMap)
 	]);

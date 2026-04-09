@@ -104,6 +104,11 @@ function normalizeGeoLabel(value: string | null | undefined, key?: GeoLevelKey):
   return normalized || null;
 }
 
+/** Anzeigename ohne „Landkreis/Kreis/Bezirk/Region“ im Namen (wie in {@link buildGeoHierarchy}). */
+export function formatGeoDistrictDisplayName(value: string | null | undefined): string | null {
+  return normalizeGeoLabel(value, 'district');
+}
+
 function buildLevelDescriptor(
   key: GeoLevelKey,
   slug: string | null | undefined,
