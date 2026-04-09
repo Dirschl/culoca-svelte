@@ -21,6 +21,7 @@ import { resolveAttribution } from '$lib/metadata/attributionResolver';
 import { fetchItemPageProfileRow } from '$lib/server/fetchItemPageProfile';
 import { fixUtf8MojibakeIfNeeded, sanitizeItemForItemPageClient } from '$lib/server/itemPagePublic';
 import { createSupabaseServerClient } from '$lib/server/supabaseServer';
+import { enrichItemWithResolvedAdobeStock } from '$lib/stock/itemStockSettings';
 import { fixDeepUtf8InObject } from '$lib/utils/utf8Mojibake';
 
 type ItemRecord = ContentItemLike & {
@@ -66,6 +67,7 @@ type ItemRecord = ContentItemLike & {
 	external_url?: string | null;
 	video_url?: string | null;
 	page_settings?: Record<string, unknown> | null;
+	stock_settings?: Record<string, unknown> | null;
 	adobe_stock_status?: string | null;
 	adobe_stock_uploaded_at?: string | null;
 	adobe_stock_asset_id?: string | null;
@@ -224,6 +226,7 @@ const ITEM_SELECT = `
   external_url,
   video_url,
   page_settings,
+  stock_settings,
   locality_name
 `;
 
@@ -625,25 +628,32 @@ export async function loadContentPage(args: {
 		.sort((a, b) => (a.id || 0) - (b.id || 0));
 	const typePath = type?.slug ? `/${type.slug}` : null;
 
-	const imageForClient = {
+	const imageForClient = enrichItemWithResolvedAdobeStock({
 		...sanitizeItemForItemPageClient({ ...itemForPayload }),
 		profile: profileData.profile,
 		full_name: attribution.creatorName
+	} as Record<string, unknown>) as typeof itemForPayload & {
+		profile: unknown;
+		full_name: string;
 	};
 	const rootForClient =
 		rootItem.id === item.id
 			? imageForClient
-			: sanitizeItemForItemPageClient({
-					...rootItem,
-					country_name: resolveCountryNameForPayload(rootItem)
-				});
+			: enrichItemWithResolvedAdobeStock(
+					sanitizeItemForItemPageClient({
+						...rootItem,
+						country_name: resolveCountryNameForPayload(rootItem)
+					}) as Record<string, unknown>
+				);
 	const contextForClient =
 		contextItem.id === item.id
 			? imageForClient
-			: sanitizeItemForItemPageClient({
-					...contextItem,
-					country_name: resolveCountryNameForPayload(contextItem)
-				});
+			: enrichItemWithResolvedAdobeStock(
+					sanitizeItemForItemPageClient({
+						...contextItem,
+						country_name: resolveCountryNameForPayload(contextItem)
+					}) as Record<string, unknown>
+				);
 
 	return {
 		image: imageForClient,

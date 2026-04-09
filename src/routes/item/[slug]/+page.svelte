@@ -122,6 +122,9 @@
 		if (!('full_name' in p) || p.full_name == null) {
 			merged.full_name = current.full_name;
 		}
+		if (!('stock_settings' in p) || p.stock_settings == null) {
+			merged.stock_settings = current.stock_settings;
+		}
 		return merged as C;
 	}
 

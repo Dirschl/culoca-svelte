@@ -9,6 +9,11 @@ import {
   refreshSimilarityVectorForItem,
   resolveLocationFieldsFromOriginalName
 } from '$lib/server/itemProcessing';
+import {
+  buildAdobeDualWrite,
+  enrichItemWithResolvedAdobeStock,
+  getAdobeStockStateFromItem
+} from '$lib/stock/itemStockSettings';
 
 export const DELETE = async ({ params }) => {
   const { id } = params;
@@ -95,6 +100,12 @@ export const DELETE = async ({ params }) => {
 type ItemRecord = {
   group_slug?: string | null;
   page_settings?: Record<string, unknown> | null;
+  stock_settings?: Record<string, unknown> | null;
+  adobe_stock_status?: string | null;
+  adobe_stock_uploaded_at?: string | null;
+  adobe_stock_asset_id?: string | null;
+  adobe_stock_url?: string | null;
+  adobe_stock_error?: string | null;
   content?: string | null;
   country_code?: string | null;
   country_slug?: string | null;
@@ -236,7 +247,9 @@ export const PATCH = async ({ params, request }) => {
 
   const { data: existingItem, error: existingItemError } = await supabase
     .from('items')
-    .select('group_slug, page_settings, content, country_code, country_slug, state_slug, region_slug, district_code, district_slug, municipality_slug, country_name, state_name, region_name, district_name, municipality_name, locality_name')
+    .select(
+      'group_slug, page_settings, stock_settings, content, country_code, country_slug, state_slug, region_slug, district_code, district_slug, municipality_slug, country_name, state_name, region_name, district_name, municipality_name, locality_name, adobe_stock_status, adobe_stock_uploaded_at, adobe_stock_asset_id, adobe_stock_url, adobe_stock_error'
+    )
     .eq('id', id)
     .single<ItemRecord>();
 
@@ -380,6 +393,20 @@ export const PATCH = async ({ params, request }) => {
     updateData.location_needs_review = false;
   }
 
+  const adobePatchKeys = [
+    'adobe_stock_status',
+    'adobe_stock_uploaded_at',
+    'adobe_stock_asset_id',
+    'adobe_stock_url',
+    'adobe_stock_error'
+  ] as const;
+  if (adobePatchKeys.some((k) => updateData[k] !== undefined)) {
+    const mergedPreview = { ...existingItem, ...updateData } as Record<string, unknown>;
+    const next = getAdobeStockStateFromItem(mergedPreview);
+    const dual = buildAdobeDualWrite(existingItem.stock_settings, next);
+    Object.assign(updateData, dual);
+  }
+
   // Optional: Authentifizierung und Besitz prüfen (hier nur als Beispiel, ggf. anpassen)
   // const user = locals.user; // oder aus JWT, falls vorhanden
   // const { data: item } = await supabase.from('items').select('profile_id').eq('id', id).single();
@@ -414,5 +441,8 @@ export const PATCH = async ({ params, request }) => {
     console.warn('Failed to refresh similarity vector after item update:', vectorError);
   }
 
-  return json({ success: true, item: data });
+  return json({
+    success: true,
+    item: enrichItemWithResolvedAdobeStock(data as Record<string, unknown>)
+  });
 }; 

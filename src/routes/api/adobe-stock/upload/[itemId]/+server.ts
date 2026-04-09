@@ -1,6 +1,11 @@
 import { json } from '@sveltejs/kit';
 import { createClient } from '@supabase/supabase-js';
 import type { RequestHandler } from './$types';
+import {
+	buildAdobeDualWrite,
+	enrichItemWithResolvedAdobeStock,
+	getAdobeStockStateFromItem
+} from '$lib/stock/itemStockSettings';
 import { promises as fs } from 'fs';
 import os from 'os';
 import path from 'path';
@@ -42,7 +47,9 @@ export const POST: RequestHandler = async ({ params, request }) => {
 
     const { data: item, error: itemError } = await supabase
       .from('items')
-      .select('id, profile_id, original_url, original_name, adobe_stock_url')
+      .select(
+        'id, profile_id, original_url, original_name, adobe_stock_url, stock_settings, adobe_stock_status, adobe_stock_uploaded_at, adobe_stock_asset_id, adobe_stock_error'
+      )
       .eq('id', itemId)
       .single();
 
@@ -185,16 +192,22 @@ export const POST: RequestHandler = async ({ params, request }) => {
       }
 
       const fallbackUrl = item.adobe_stock_url || profile.adobe_stock_profile_url || null;
+      const cur = getAdobeStockStateFromItem(item as Record<string, unknown>);
+      const next = {
+        ...cur,
+        status: 'uploaded' as const,
+        uploadedAt: new Date().toISOString(),
+        publicUrl: fallbackUrl,
+        error: null
+      };
+      const dual = buildAdobeDualWrite((item as { stock_settings?: unknown }).stock_settings, next);
       const { data: updatedItem, error: updateError } = await supabase
         .from('items')
-        .update({
-          adobe_stock_status: 'uploaded',
-          adobe_stock_uploaded_at: new Date().toISOString(),
-          adobe_stock_error: null,
-          adobe_stock_url: fallbackUrl
-        })
+        .update(dual)
         .eq('id', item.id)
-        .select('id, adobe_stock_status, adobe_stock_uploaded_at, adobe_stock_url, adobe_stock_asset_id, adobe_stock_error')
+        .select(
+          'id, adobe_stock_status, adobe_stock_uploaded_at, adobe_stock_url, adobe_stock_asset_id, adobe_stock_error, stock_settings'
+        )
         .single();
 
       if (updateError) {
@@ -204,16 +217,16 @@ export const POST: RequestHandler = async ({ params, request }) => {
       return json({
         success: true,
         message: 'Original erfolgreich zu Adobe Stock SFTP hochgeladen',
-        item: updatedItem
+        item: enrichItemWithResolvedAdobeStock(updatedItem as Record<string, unknown>)
       });
     } catch (uploadError: any) {
-      await supabase
-        .from('items')
-        .update({
-          adobe_stock_status: 'error',
-          adobe_stock_error: uploadError?.message || 'Unbekannter SFTP-Fehler'
-        })
-        .eq('id', item.id);
+      const curErr = getAdobeStockStateFromItem(item as Record<string, unknown>);
+      const dualErr = buildAdobeDualWrite((item as { stock_settings?: unknown }).stock_settings, {
+        ...curErr,
+        status: 'error',
+        error: uploadError?.message || 'Unbekannter SFTP-Fehler'
+      });
+      await supabase.from('items').update(dualErr).eq('id', item.id);
 
       return json({
         error: 'SFTP-Upload fehlgeschlagen',
