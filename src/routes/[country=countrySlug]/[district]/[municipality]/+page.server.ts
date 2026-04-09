@@ -1,6 +1,6 @@
 import { redirect } from '@sveltejs/kit';
 import { buildGeoHubPath } from '$lib/geo/hierarchy';
-import { loadGeoMunicipalityHub, buildGeoHubPageData } from '$lib/seo/hubServer';
+import { loadGeoMunicipalityHub, buildGeoHubPageData, loadGeoHomeOverview } from '$lib/seo/hubServer';
 import { getHubSeoPolicy } from '$lib/seo/policy';
 
 const PAGE_SIZE = 24;
@@ -13,7 +13,10 @@ export const load = async ({
   url: URL;
 }) => {
   const page = Math.max(1, Number.parseInt(url.searchParams.get('seite') || '1', 10));
-  const hub = await loadGeoMunicipalityHub(params.country, params.district, params.municipality, page, PAGE_SIZE);
+  const [hub, countryOptions] = await Promise.all([
+    loadGeoMunicipalityHub(params.country, params.district, params.municipality, page, PAGE_SIZE),
+    loadGeoHomeOverview()
+  ]);
   const canonicalHubPath =
     buildGeoHubPath({
       countrySlug: hub.countrySlug,
@@ -31,6 +34,7 @@ export const load = async ({
 
   return {
     ...data,
+    countryOptions,
     seoPolicy: getHubSeoPolicy({
       basePath: data.hubPath,
       page

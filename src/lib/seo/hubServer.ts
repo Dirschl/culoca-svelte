@@ -182,6 +182,54 @@ export async function loadGeoHomeOverview() {
   return Array.from(countryMap.values()).sort((left, right) => right.count - left.count);
 }
 
+function getRowLevelSlug(row: GeoHierarchyInput, key: GeoLevelKey): string | null {
+  const hierarchy = buildGeoHierarchy(row);
+  return getGeoLevel(hierarchy, key)?.slug || null;
+}
+
+function resolveGeoSegments(
+  countrySlug: string,
+  rows: GeoHierarchyInput[],
+  segments: string[]
+): {
+  countrySlug: string;
+  stateSlug?: string;
+  regionSlug?: string;
+  districtSlug?: string;
+  municipalitySlug?: string;
+} | null {
+  let filteredRows = rows.filter((row) => getRowLevelSlug(row, 'country') === countrySlug);
+  if (!filteredRows.length) return null;
+
+  const resolved: {
+    countrySlug: string;
+    stateSlug?: string;
+    regionSlug?: string;
+    districtSlug?: string;
+    municipalitySlug?: string;
+  } = { countrySlug };
+
+  let currentKey: GeoLevelKey = 'country';
+
+  for (const segment of segments) {
+    const childKey = getGeoChildLevelKey(filteredRows, currentKey);
+    if (!childKey) return null;
+
+    const matchingRows = filteredRows.filter((row) => getRowLevelSlug(row, childKey) === segment);
+    if (!matchingRows.length) return null;
+
+    if (childKey === 'state') resolved.stateSlug = segment;
+    if (childKey === 'region') resolved.regionSlug = segment;
+    if (childKey === 'district') resolved.districtSlug = segment;
+    if (childKey === 'municipality') resolved.municipalitySlug = segment;
+
+    filteredRows = matchingRows;
+    currentKey = childKey;
+  }
+
+  return resolved;
+}
+
 type GeoHubResult = {
   items: HubItem[];
   totalCount: number;
@@ -626,37 +674,22 @@ export async function loadGeoHubBySegments(
     throw error(500, queryError.message);
   }
 
-  const rows = (data || []) as HubItem[];
-  for (const row of rows) {
-    const hierarchy = buildGeoHierarchy({
-      countrySlug: row.country_slug,
-      countryName: row.country_name,
-      stateSlug: row.state_slug,
-      stateName: row.state_name,
-      regionSlug: row.region_slug,
-      regionName: row.region_name,
-      districtSlug: row.district_slug,
-      districtName: row.district_name,
-      municipalitySlug: row.municipality_slug,
-      municipalityName: row.municipality_name
-    });
-    const match = hierarchy.find((level) => level.path === requestedPath);
-    if (!match) continue;
-
+  const rows = ((data || []) as HubItem[]).map((row) => ({
+    countrySlug: row.country_slug,
+    countryName: row.country_name,
+    stateSlug: row.state_slug,
+    stateName: row.state_name,
+    regionSlug: row.region_slug,
+    regionName: row.region_name,
+    districtSlug: row.district_slug,
+    districtName: row.district_name,
+    municipalitySlug: row.municipality_slug,
+    municipalityName: row.municipality_name
+  }));
+  const resolved = resolveGeoSegments(countrySlug, rows, normalized);
+  if (resolved) {
     return fetchGeoHub({
-      countrySlug,
-      ...(match.key === 'state' || match.key === 'region' || match.key === 'district' || match.key === 'municipality'
-        ? { stateSlug: getGeoLevel(hierarchy, 'state')?.slug }
-        : {}),
-      ...(match.key === 'region' || match.key === 'district' || match.key === 'municipality'
-        ? { regionSlug: getGeoLevel(hierarchy, 'region')?.slug }
-        : {}),
-      ...(match.key === 'district' || match.key === 'municipality'
-        ? { districtSlug: getGeoLevel(hierarchy, 'district')?.slug }
-        : {}),
-      ...(match.key === 'municipality'
-        ? { municipalitySlug: getGeoLevel(hierarchy, 'municipality')?.slug }
-        : {}),
+      ...resolved,
       page,
       pageSize
     });

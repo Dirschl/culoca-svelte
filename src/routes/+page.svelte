@@ -1190,7 +1190,10 @@
                     <span class="dashboard-kicker">Netzwerk</span>
                     <h2>Profile finden</h2>
                   </div>
-                  <a href="/chat">Zum Chat</a>
+                  <span class="dashboard-network-links">
+                    <a href="#geo-explorer-heading">Orte finden</a>
+                    <a href="/chat">Zum Chat</a>
+                  </span>
                 </div>
 
                 <div class="dashboard-search__bar">

@@ -83,6 +83,7 @@
   }
 
   const geoTrail = (data.breadcrumbs || []).filter((crumb: { path: string }) => crumb.path !== '/');
+  let selectedCountryPath = data.countryPath || '';
   let selectedGeoChildPath = '';
 
   let currentGpsPosition: { lat: number; lon: number } | null = browser ? getStoredGpsPosition() : null;
@@ -105,6 +106,21 @@
     if (!value) return;
 
     selectedGeoChildPath = value;
+    await goto(value);
+  }
+
+  $: {
+    const validCountryPaths = new Set((data.countryOptions || []).map((country: { path: string }) => country.path));
+    if (!validCountryPaths.has(selectedCountryPath)) {
+      selectedCountryPath = data.countryPath || '';
+    }
+  }
+
+  async function handleCountryChange(event: Event) {
+    const value = (event.currentTarget as HTMLSelectElement | null)?.value || '';
+    if (!value) return;
+
+    selectedCountryPath = value;
     await goto(value);
   }
 
@@ -333,6 +349,30 @@
               </a>
             {/each}
           </div>
+        {/if}
+
+        {#if data.countryOptions?.length > 1}
+          <section class="geo-country-switcher" aria-labelledby="geo-country-switcher-heading">
+            <div class="geo-country-switcher__header">
+              <h2 id="geo-country-switcher-heading">Land auswählen</h2>
+              <p>Wechsle direkt in den Einstiegspunkt eines anderen Landes.</p>
+            </div>
+            <div class="geo-country-switcher__selector">
+              <label class="geo-country-switcher__label" for="geo-country-switcher-select">Land</label>
+              <select
+                id="geo-country-switcher-select"
+                class="geo-country-switcher__select"
+                bind:value={selectedCountryPath}
+                on:change={handleCountryChange}
+              >
+                {#each data.countryOptions as country}
+                  <option value={country.path}>
+                    {country.label} ({country.count.toLocaleString('de-DE')})
+                  </option>
+                {/each}
+              </select>
+            </div>
+          </section>
         {/if}
 
         {#if data.geoChildren?.length}
@@ -576,6 +616,44 @@
     margin-top: 1.5rem;
     padding-top: 1.25rem;
     border-top: 1px solid var(--border-color);
+  }
+  .geo-country-switcher {
+    margin-top: 1.5rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--border-color);
+  }
+  .geo-country-switcher__header h2 {
+    margin: 0;
+    font-size: 1rem;
+  }
+  .geo-country-switcher__header p {
+    margin: 0.35rem 0 0;
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+  }
+  .geo-country-switcher__selector {
+    margin-top: 1rem;
+    max-width: 32rem;
+  }
+  .geo-country-switcher__label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 700;
+  }
+  .geo-country-switcher__select {
+    width: 100%;
+    min-height: 52px;
+    padding: 0.85rem 1rem;
+    border-radius: 1rem;
+    border: 1px solid rgba(238, 114, 33, 0.25);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font: inherit;
+  }
+  .geo-country-switcher__select:focus {
+    outline: none;
+    border-color: rgba(238, 114, 33, 0.7);
+    box-shadow: 0 0 0 4px rgba(238, 114, 33, 0.12);
   }
   .geo-children__selector {
     margin-top: 1rem;
