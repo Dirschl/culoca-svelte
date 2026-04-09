@@ -4,6 +4,11 @@ import {
   type ContentTypeDefinition
 } from '$lib/content/types';
 import { hasPersistentEventLandingPage } from '$lib/events';
+import {
+  buildGeoHubPath as buildFlexibleGeoHubPath,
+  buildGeoItemPath as buildFlexibleGeoItemPath,
+  hasGeoItemHierarchy
+} from '$lib/geo/hierarchy';
 
 export type ContentItemLike = {
   id: string;
@@ -17,12 +22,16 @@ export type ContentItemLike = {
   is_private?: boolean | null;
   show_in_main_feed?: boolean | null;
   country_slug?: string | null;
+  state_slug?: string | null;
+  region_slug?: string | null;
   district_slug?: string | null;
   municipality_slug?: string | null;
 };
 
 export type GeoPathLike = {
   country_slug?: string | null;
+  state_slug?: string | null;
+  region_slug?: string | null;
   district_slug?: string | null;
   municipality_slug?: string | null;
   slug?: string | null;
@@ -91,35 +100,54 @@ export function computeCanonicalPath(args: {
   return `/${typeSlug}/${item.slug}`;
 }
 
-export function hasGeoHierarchy(item: Pick<GeoPathLike, 'country_slug' | 'district_slug' | 'municipality_slug'>): boolean {
-  return !!(item.country_slug && item.district_slug && item.municipality_slug);
+export function hasGeoHierarchy(
+  item: Pick<GeoPathLike, 'country_slug' | 'state_slug' | 'region_slug' | 'district_slug' | 'municipality_slug'>
+): boolean {
+  return hasGeoItemHierarchy({
+    countrySlug: item.country_slug,
+    stateSlug: item.state_slug,
+    regionSlug: item.region_slug,
+    districtSlug: item.district_slug,
+    municipalitySlug: item.municipality_slug
+  });
 }
 
 export function buildGeoHubPath(args: {
   countrySlug: string;
+  stateSlug?: string | null;
+  regionSlug?: string | null;
   districtSlug?: string | null;
   municipalitySlug?: string | null;
 }): string {
-  const parts = [
-    slugifySegment(args.countrySlug),
-    args.districtSlug ? slugifySegment(args.districtSlug) : null,
-    args.municipalitySlug ? slugifySegment(args.municipalitySlug) : null
-  ].filter(Boolean);
-
-  return parts.length ? `/${parts.join('/')}` : '/';
+  return (
+    buildFlexibleGeoHubPath({
+      countrySlug: args.countrySlug,
+      stateSlug: args.stateSlug,
+      regionSlug: args.regionSlug,
+      districtSlug: args.districtSlug,
+      municipalitySlug: args.municipalitySlug
+    }) || '/'
+  );
 }
 
 export function buildGeoItemPath(args: {
   countrySlug: string;
+  stateSlug?: string | null;
+  regionSlug?: string | null;
   districtSlug: string;
   municipalitySlug: string;
   itemSlug: string;
 }): string {
-  return buildGeoHubPath({
-    countrySlug: args.countrySlug,
-    districtSlug: args.districtSlug,
-    municipalitySlug: args.municipalitySlug
-  }) + `/${slugifySegment(args.itemSlug)}`;
+  return (
+    buildFlexibleGeoItemPath({
+      countrySlug: args.countrySlug,
+      stateSlug: args.stateSlug,
+      regionSlug: args.regionSlug,
+      districtSlug: args.districtSlug,
+      municipalitySlug: args.municipalitySlug,
+      itemSlug: args.itemSlug
+    }) || `/item/${slugifySegment(args.itemSlug)}`
+  );
 }
 
 export function computeGeoAwareCanonicalPath(args: {
@@ -137,6 +165,8 @@ export function computeGeoAwareCanonicalPath(args: {
   if (item.slug && geoSource) {
     return buildGeoItemPath({
       countrySlug: geoSource.country_slug as string,
+      stateSlug: geoSource.state_slug,
+      regionSlug: geoSource.region_slug,
       districtSlug: geoSource.district_slug as string,
       municipalitySlug: geoSource.municipality_slug as string,
       itemSlug: item.slug
@@ -164,6 +194,8 @@ export function getPublicItemHref(item: {
   canonical_path?: string | null;
   canonicalPath?: string | null;
   country_slug?: string | null;
+  state_slug?: string | null;
+  region_slug?: string | null;
   district_slug?: string | null;
   municipality_slug?: string | null;
 }): string {
@@ -171,6 +203,8 @@ export function getPublicItemHref(item: {
   if (item.slug && hasGeoHierarchy(item)) {
     return buildGeoItemPath({
       countrySlug: item.country_slug as string,
+      stateSlug: item.state_slug,
+      regionSlug: item.region_slug,
       districtSlug: item.district_slug as string,
       municipalitySlug: item.municipality_slug as string,
       itemSlug: item.slug

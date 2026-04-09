@@ -34,9 +34,10 @@
 
   const canonicalUrl = absoluteUrl(data.seoPolicy.canonicalPath);
   const pageTitle =
-    data.page > 1
+    data.seoTitle ||
+    (data.page > 1
       ? `${data.hubLabel}: Seite ${data.page} | Culoca`
-      : `${data.hubLabel}: Orte, Motive und Inhalte | Culoca`;
+      : `${data.hubLabel}: Orte, Motive und Inhalte | Culoca`);
   const metaDescription = trimText(
     data.metaDescription ||
       `Entdecke ${data.totalCount} öffentliche Inhalte zu ${data.hubLabel} auf Culoca. Ortsbezogene Hub-Seite mit Bildern, Themen und Detailseiten.`
@@ -46,6 +47,10 @@
     currentName: data.hubLabel,
     countryName: data.countryName,
     countryPath: data.countryPath,
+    stateName: data.stateName,
+    statePath: data.statePath,
+    regionName: data.regionName,
+    regionPath: data.regionPath,
     districtName: data.districtName,
     districtPath: data.districtPath,
     municipalityName: data.municipalityName,
@@ -312,6 +317,25 @@
             {/each}
           </div>
         {/if}
+
+        {#if data.geoChildren?.length}
+          <section class="geo-children" aria-labelledby="geo-children-heading">
+            <div class="geo-children__header">
+              <h2 id="geo-children-heading">{data.geoChildLevelLabel || 'Weitere Ebenen'}</h2>
+              <p>Klicke dich tiefer durch die regionale Struktur.</p>
+            </div>
+            <div class="geo-children__grid">
+              {#each data.geoChildren as child}
+                <a href={child.path} class="geo-child-card">
+                  <span class="geo-child-card__label">{child.label}</span>
+                  <span class="geo-child-card__count">
+                    {child.count.toLocaleString('de-DE')} {child.count === 1 ? 'Eintrag' : 'Einträge'}
+                  </span>
+                </a>
+              {/each}
+            </div>
+          </section>
+        {/if}
       </div>
     </header>
 
@@ -512,6 +536,49 @@
     padding-top: 2rem;
     padding-bottom: 3rem;
     background: var(--bg-primary);
+  }
+  .geo-children {
+    margin-top: 1.5rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--border-color);
+  }
+  .geo-children__header h2 {
+    margin: 0;
+    font-size: 1rem;
+  }
+  .geo-children__header p {
+    margin: 0.35rem 0 0;
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+  }
+  .geo-children__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.85rem;
+    margin-top: 1rem;
+  }
+  .geo-child-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.95rem 1rem;
+    border-radius: 1rem;
+    border: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    text-decoration: none;
+    color: var(--text-primary);
+    transition: transform 0.16s ease, border-color 0.16s ease;
+  }
+  .geo-child-card:hover {
+    transform: translateY(-1px);
+    border-color: rgba(238, 114, 33, 0.4);
+  }
+  .geo-child-card__label {
+    font-weight: 700;
+  }
+  .geo-child-card__count {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
   }
   .empty {
     text-align: center;

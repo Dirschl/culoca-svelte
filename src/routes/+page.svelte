@@ -17,6 +17,7 @@
   import { buildBreadcrumbJsonLd, DEFAULT_OG_IMAGE, trimText } from '$lib/seo/site';
   import HomeTypeSectionsFeed from '$lib/HomeTypeSectionsFeed.svelte';
   import HomeDashboardDiscover from '$lib/HomeDashboardDiscover.svelte';
+  import HomeGeoExplorer from '$lib/HomeGeoExplorer.svelte';
   import { getStoredGpsPositionForHub } from '$lib/storedGpsReadout';
   import {
     readDashboardHeroVisit,
@@ -1916,6 +1917,12 @@
               </section>
             </aside>
           </div>
+        </div>
+      </section>
+
+      <section class="hero hero--geo">
+        <div class="hero-inner">
+          <HomeGeoExplorer countries={data.geoOverview || []} />
         </div>
       </section>
 

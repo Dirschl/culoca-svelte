@@ -5,6 +5,7 @@ import {
   isVisibleInMainFeed
 } from '$lib/content/routing';
 import { DEFAULT_CONTENT_TYPE_BY_ID } from '$lib/content/types';
+import { buildGeoHierarchy } from '$lib/geo/hierarchy';
 
 export const GET: RequestHandler = async () => {
   try {
@@ -62,7 +63,7 @@ export const GET: RequestHandler = async () => {
         
         const { data, error } = await supabase
           .from('items')
-          .select('id, slug, title, description, path_2048, path_512, created_at, updated_at, type_id, group_root_item_id, group_slug, canonical_path, country_slug, district_slug, municipality_slug, show_in_main_feed, is_private, ends_at, profile_id')
+          .select('id, slug, title, description, path_2048, path_512, created_at, updated_at, type_id, group_root_item_id, group_slug, canonical_path, country_slug, country_name, state_slug, state_name, region_slug, region_name, district_slug, district_name, municipality_slug, municipality_name, show_in_main_feed, is_private, ends_at, profile_id')
           .not('slug', 'is', null)
           .not('path_512', 'is', null)
           // Public items include false and null (legacy rows)
@@ -114,7 +115,7 @@ export const GET: RequestHandler = async () => {
     if (rootIds.length > 0) {
       const { data: rootRows } = await supabase
         .from('items')
-        .select('id, slug, type_id, group_slug, canonical_path, country_slug, district_slug, municipality_slug')
+        .select('id, slug, type_id, group_slug, canonical_path, country_slug, country_name, state_slug, state_name, region_slug, region_name, district_slug, district_name, municipality_slug, municipality_name')
         .in('id', rootIds);
 
       for (const rootRow of rootRows || []) {
@@ -166,6 +167,36 @@ export const GET: RequestHandler = async () => {
     for (const item of sitemapItems) {
       if (!item.profile_id) continue;
       itemCountsByProfile.set(item.profile_id, (itemCountsByProfile.get(item.profile_id) || 0) + 1);
+    }
+
+    const geoHubPaths = new Set<string>();
+    for (const item of sitemapItems) {
+      const rootItem = item.group_root_item_id ? rootMap.get(item.group_root_item_id) ?? null : null;
+      const geoSource = rootItem || item;
+      const levels = buildGeoHierarchy({
+        countrySlug: geoSource.country_slug,
+        countryName: geoSource.country_name,
+        stateSlug: geoSource.state_slug,
+        stateName: geoSource.state_name,
+        regionSlug: geoSource.region_slug,
+        regionName: geoSource.region_name,
+        districtSlug: geoSource.district_slug,
+        districtName: geoSource.district_name,
+        municipalitySlug: geoSource.municipality_slug,
+        municipalityName: geoSource.municipality_name
+      });
+      for (const level of levels) {
+        geoHubPaths.add(level.path);
+      }
+    }
+
+    for (const path of Array.from(geoHubPaths).sort()) {
+      xml += '  <url>\n';
+      xml += `    <loc>${baseUrl}${path}</loc>\n`;
+      xml += `    <lastmod>${new Date().toISOString().split('T')[0]}</lastmod>\n`;
+      xml += '    <priority>0.7</priority>\n';
+      xml += '    <changefreq>weekly</changefreq>\n';
+      xml += '  </url>\n';
     }
 
     const publicProfileIds = Array.from(itemCountsByProfile.keys());

@@ -2,13 +2,14 @@ import type { PageServerLoad } from './$types';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { DEFAULT_CONTENT_TYPES, DEFAULT_CONTENT_TYPE_BY_SLUG } from '$lib/content/types';
 import { getPublicItemHref } from '$lib/content/routing';
+import { loadGeoHomeOverview } from '$lib/seo/hubServer';
 
 export const ssr = true;
 
 const ITEMS_PER_SECTION = 8;
 
 const DISCOVER_SELECT =
-  'id, slug, title, description, caption, canonical_path, country_slug, district_slug, municipality_slug, country_name, district_name, municipality_name, locality_name, path_512, path_2048, width, height, created_at, starts_at, ends_at, lat, lon';
+  'id, slug, title, description, caption, canonical_path, country_slug, state_slug, region_slug, district_slug, municipality_slug, country_name, state_name, region_name, district_name, municipality_name, locality_name, path_512, path_2048, width, height, created_at, starts_at, ends_at, lat, lon';
 
 type DiscoverRow = {
   id: string;
@@ -27,9 +28,13 @@ type DiscoverRow = {
   lat: number | null;
   lon: number | null;
   country_slug?: string | null;
+  state_slug?: string | null;
+  region_slug?: string | null;
   district_slug?: string | null;
   municipality_slug?: string | null;
   country_name?: string | null;
+  state_name?: string | null;
+  region_name?: string | null;
   district_name?: string | null;
   municipality_name?: string | null;
   locality_name?: string | null;
@@ -240,7 +245,7 @@ export const load: PageServerLoad = async () => {
       const { data, error } = await supabase
         .from('items')
         .select(
-          'id, slug, title, description, caption, canonical_path, country_slug, district_slug, municipality_slug, country_name, district_name, municipality_name, locality_name, path_512, path_2048, width, height, created_at, starts_at, ends_at, lat, lon'
+          'id, slug, title, description, caption, canonical_path, country_slug, state_slug, region_slug, district_slug, municipality_slug, country_name, state_name, region_name, district_name, municipality_name, locality_name, path_512, path_2048, width, height, created_at, starts_at, ends_at, lat, lon'
         )
         .eq('type_id', type.id)
         .eq('is_private', false)
@@ -276,6 +281,7 @@ export const load: PageServerLoad = async () => {
   const totalItems = sections.reduce((sum, s) => sum + s.totalCount, 0);
 
   const dashboardDiscover = await loadDashboardDiscover(supabase);
+  const geoOverview = await loadGeoHomeOverview();
 
-  return { sections, totalItems, dashboardDiscover };
+  return { sections, totalItems, dashboardDiscover, geoOverview };
 };

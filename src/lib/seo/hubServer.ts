@@ -3,6 +3,14 @@ import { error } from '@sveltejs/kit';
 import { getPublicItemHref } from '$lib/content/routing';
 import { normalizeAdminDisplayLabel } from '$lib/content/locationTaxonomy';
 import { decodeHubSlug, normalizeHubToken } from '$lib/seo/hubs';
+import {
+  buildGeoHierarchy,
+  getDeepestGeoLevel,
+  getGeoChildLevelKey,
+  getGeoLevel,
+  type GeoHierarchyLevel,
+  type GeoLevelKey
+} from '$lib/geo/hierarchy';
 
 export type HubItem = {
   id: string;
@@ -20,6 +28,10 @@ export type HubItem = {
   page_settings?: Record<string, unknown> | null;
   country_slug?: string | null;
   country_name?: string | null;
+  state_slug?: string | null;
+  state_name?: string | null;
+  region_slug?: string | null;
+  region_name?: string | null;
   district_slug?: string | null;
   district_name?: string | null;
   municipality_slug?: string | null;
@@ -37,7 +49,10 @@ export type HubItem = {
 };
 
 const HUB_SELECT =
-  'id, slug, title, description, caption, canonical_path, path_512, width, height, created_at, keywords, profile_id, page_settings, country_slug, country_name, district_slug, district_name, municipality_slug, municipality_name, lat, lon';
+  'id, slug, title, description, caption, canonical_path, path_512, width, height, created_at, keywords, profile_id, page_settings, country_slug, country_name, state_slug, state_name, region_slug, region_name, district_slug, district_name, municipality_slug, municipality_name, lat, lon';
+
+const GEO_FILTER_SELECT =
+  'country_slug, country_name, state_slug, state_name, region_slug, region_name, district_slug, district_name, municipality_slug, municipality_name';
 
 function createServerSupabase() {
   const supabaseUrl = (
@@ -126,64 +141,249 @@ export async function loadPlaceHub(placeSlug: string) {
   };
 }
 
+export async function loadGeoHomeOverview() {
+  const items = await fetchAllPublicRootItems();
+  const countryMap = new Map<
+    string,
+    {
+      label: string;
+      path: string;
+      count: number;
+    }
+  >();
+
+  for (const item of items) {
+    const hierarchy = buildGeoHierarchy({
+      countrySlug: item.country_slug,
+      countryName: item.country_name,
+      stateSlug: item.state_slug,
+      stateName: item.state_name,
+      regionSlug: item.region_slug,
+      regionName: item.region_name,
+      districtSlug: item.district_slug,
+      districtName: item.district_name,
+      municipalitySlug: item.municipality_slug,
+      municipalityName: item.municipality_name
+    });
+    const countryLevel = getGeoLevel(hierarchy, 'country');
+    if (!countryLevel) continue;
+    const current = countryMap.get(countryLevel.path);
+    if (current) {
+      current.count += 1;
+    } else {
+      countryMap.set(countryLevel.path, {
+        label: countryLevel.label,
+        path: countryLevel.path,
+        count: 1
+      });
+    }
+  }
+
+  return Array.from(countryMap.values()).sort((left, right) => right.count - left.count);
+}
+
 type GeoHubResult = {
   items: HubItem[];
   totalCount: number;
   countrySlug: string;
+  stateSlug?: string;
+  regionSlug?: string;
   districtSlug?: string;
   municipalitySlug?: string;
   countryName: string;
+  stateName?: string;
+  regionName?: string;
   districtName?: string;
   municipalityName?: string;
+  hierarchy: GeoHierarchyLevel[];
+  currentLevelKey: GeoLevelKey;
+  childLevelKey: GeoLevelKey | null;
+  childLinks: Array<{
+    key: GeoLevelKey;
+    label: string;
+    path: string;
+    count: number;
+  }>;
 };
+
+function applyGeoFilters<T extends { eq: (column: string, value: string) => T }>(
+  query: T,
+  args: {
+    countrySlug: string;
+    stateSlug?: string;
+    regionSlug?: string;
+    districtSlug?: string;
+    municipalitySlug?: string;
+  }
+) {
+  let next = query.eq('country_slug', args.countrySlug);
+  if (args.stateSlug) next = next.eq('state_slug', args.stateSlug);
+  if (args.regionSlug) next = next.eq('region_slug', args.regionSlug);
+  if (args.districtSlug) next = next.eq('district_slug', args.districtSlug);
+  if (args.municipalitySlug) next = next.eq('municipality_slug', args.municipalitySlug);
+  return next;
+}
+
+function getCurrentGeoLevelKey(args: {
+  municipalitySlug?: string;
+  districtSlug?: string;
+  regionSlug?: string;
+  stateSlug?: string;
+}): GeoLevelKey {
+  if (args.municipalitySlug) return 'municipality';
+  if (args.districtSlug) return 'district';
+  if (args.regionSlug) return 'region';
+  if (args.stateSlug) return 'state';
+  return 'country';
+}
+
+function sortGeoChildLinks(
+  links: Array<{
+    key: GeoLevelKey;
+    label: string;
+    path: string;
+    count: number;
+  }>
+) {
+  return links.sort((left, right) => left.label.localeCompare(right.label, 'de-DE'));
+}
+
+function geoKicker(level: GeoLevelKey): string {
+  switch (level) {
+    case 'country':
+      return 'Land-Hub';
+    case 'state':
+      return 'Bundesland-Hub';
+    case 'region':
+      return 'Region-Hub';
+    case 'district':
+      return 'Landkreis-Hub';
+    case 'municipality':
+      return 'Gemeinde-Hub';
+  }
+}
+
+function geoPlural(level: GeoLevelKey): string {
+  switch (level) {
+    case 'country':
+      return 'Länder';
+    case 'state':
+      return 'Bundesländer';
+    case 'region':
+      return 'Regionen';
+    case 'district':
+      return 'Landkreise';
+    case 'municipality':
+      return 'Gemeinden';
+  }
+}
+
+function buildGeoHubSeoText(hub: GeoHubResult, page: number) {
+  const locationTrail = hub.hierarchy.map((level) => level.label).reverse().join(', ');
+  const hubLabel = getDeepestGeoLevel(hub.hierarchy)?.label || hub.countryName;
+
+  return {
+    seoTitle:
+      page > 1
+        ? `${hubLabel}: Seite ${page} | Culoca`
+        : `${hubLabel}: Fotos, Orte und Inhalte aus ${locationTrail} | Culoca`,
+    intro:
+      page > 1
+        ? `Seite ${page} ergänzt diesen Geo-Hub um weitere öffentliche Inhalte aus ${locationTrail}.`
+        : `Diese Seite bündelt öffentliche Inhalte aus ${locationTrail} und führt Besucher wie Suchmaschinen gezielt tiefer in die regionale Struktur von Culoca.`,
+    fallbackDescription: `Mehr Inhalte aus ${locationTrail}.`,
+    metaDescription:
+      page > 1
+        ? `Weitere öffentliche Inhalte aus ${locationTrail} auf Culoca.`
+        : `Entdecke ${hub.totalCount} öffentliche Inhalte aus ${locationTrail} auf Culoca. Mit direkter Navigation zu tieferen Orts- und Regionenebenen.`
+  };
+}
+
+export function buildGeoHubPageData(hub: GeoHubResult, page: number, pageSize: number) {
+  const deepestLevel = getDeepestGeoLevel(hub.hierarchy);
+  if (!deepestLevel) {
+    throw error(404, 'Geo-Hub nicht gefunden');
+  }
+
+  const seoText = buildGeoHubSeoText(hub, page);
+  const breadcrumbs = [{ name: 'Culoca', path: '/' }].concat(
+    hub.hierarchy.map((level) => ({ name: level.label, path: level.path }))
+  );
+
+  return {
+    hubType: `geo-${deepestLevel.key}`,
+    kicker: geoKicker(deepestLevel.key),
+    hubLabel: deepestLevel.label,
+    hubPath: deepestLevel.path,
+    hierarchy: hub.hierarchy,
+    countryName: getGeoLevel(hub.hierarchy, 'country')?.label || hub.countryName,
+    countryPath: getGeoLevel(hub.hierarchy, 'country')?.path || null,
+    stateName: getGeoLevel(hub.hierarchy, 'state')?.label || null,
+    statePath: getGeoLevel(hub.hierarchy, 'state')?.path || null,
+    regionName: getGeoLevel(hub.hierarchy, 'region')?.label || null,
+    regionPath: getGeoLevel(hub.hierarchy, 'region')?.path || null,
+    districtName: getGeoLevel(hub.hierarchy, 'district')?.label || null,
+    districtPath: getGeoLevel(hub.hierarchy, 'district')?.path || null,
+    municipalityName: getGeoLevel(hub.hierarchy, 'municipality')?.label || null,
+    municipalityPath: getGeoLevel(hub.hierarchy, 'municipality')?.path || null,
+    items: hub.items,
+    totalCount: hub.totalCount,
+    page,
+    totalPages: Math.max(1, Math.ceil(hub.totalCount / pageSize)),
+    breadcrumbs,
+    geoChildren: hub.childLinks,
+    geoChildLevelKey: hub.childLevelKey,
+    geoChildLevelLabel: hub.childLevelKey ? geoPlural(hub.childLevelKey) : null,
+    seoTitle: seoText.seoTitle,
+    intro: seoText.intro,
+    fallbackDescription: seoText.fallbackDescription,
+    metaDescription: seoText.metaDescription
+  };
+}
 
 async function fetchGeoHub(args: {
   countrySlug: string;
+  stateSlug?: string;
+  regionSlug?: string;
   districtSlug?: string;
   municipalitySlug?: string;
   page: number;
   pageSize: number;
 }): Promise<GeoHubResult> {
   const supabase = createServerSupabase();
-  let countQuery = supabase
-    .from('items')
-    .select('*', { count: 'exact', head: true })
-    .eq('admin_hidden', false)
-    .is('group_root_item_id', null)
-    .not('slug', 'is', null)
-    .or('is_private.eq.false,is_private.is.null')
-    .eq('country_slug', args.countrySlug);
+  const countQuery = applyGeoFilters(
+    supabase
+      .from('items')
+      .select('*', { count: 'exact', head: true })
+      .eq('admin_hidden', false)
+      .is('group_root_item_id', null)
+      .not('slug', 'is', null)
+      .or('is_private.eq.false,is_private.is.null'),
+    args
+  );
 
-  let itemsQuery = supabase
-    .from('items')
-    .select(HUB_SELECT)
-    .eq('admin_hidden', false)
-    .is('group_root_item_id', null)
-    .not('slug', 'is', null)
-    .or('is_private.eq.false,is_private.is.null')
-    .eq('country_slug', args.countrySlug);
+  const itemsQuery = applyGeoFilters(
+    supabase
+      .from('items')
+      .select(HUB_SELECT)
+      .eq('admin_hidden', false)
+      .is('group_root_item_id', null)
+      .not('slug', 'is', null)
+      .or('is_private.eq.false,is_private.is.null'),
+    args
+  );
 
-  let metaQuery = supabase
-    .from('items')
-    .select(HUB_SELECT)
-    .eq('admin_hidden', false)
-    .is('group_root_item_id', null)
-    .not('slug', 'is', null)
-    .or('is_private.eq.false,is_private.is.null')
-    .eq('country_slug', args.countrySlug)
-    .limit(1);
-
-  if (args.districtSlug) {
-    countQuery = countQuery.eq('district_slug', args.districtSlug);
-    itemsQuery = itemsQuery.eq('district_slug', args.districtSlug);
-    metaQuery = metaQuery.eq('district_slug', args.districtSlug);
-  }
-
-  if (args.municipalitySlug) {
-    countQuery = countQuery.eq('municipality_slug', args.municipalitySlug);
-    itemsQuery = itemsQuery.eq('municipality_slug', args.municipalitySlug);
-    metaQuery = metaQuery.eq('municipality_slug', args.municipalitySlug);
-  }
+  const metaQuery = applyGeoFilters(
+    supabase
+      .from('items')
+      .select(HUB_SELECT)
+      .eq('admin_hidden', false)
+      .is('group_root_item_id', null)
+      .not('slug', 'is', null)
+      .or('is_private.eq.false,is_private.is.null')
+      .limit(1),
+    args
+  );
 
   const [{ count, error: countError }, { data: metaItems, error: metaError }] = await Promise.all([
     countQuery,
@@ -208,7 +408,70 @@ async function fetchGeoHub(args: {
 
   if (itemsError) throw error(500, itemsError.message);
 
+  const { data: navRows, error: navError } = await applyGeoFilters(
+    supabase
+      .from('items')
+      .select(GEO_FILTER_SELECT)
+      .eq('admin_hidden', false)
+      .is('group_root_item_id', null)
+      .not('slug', 'is', null)
+      .or('is_private.eq.false,is_private.is.null'),
+    args
+  );
+
+  if (navError) throw error(500, navError.message);
+
   const baseItems = (items || []) as HubItem[];
+  const geoMeta = meta as HubItem;
+  const hierarchy = buildGeoHierarchy({
+    countrySlug: geoMeta.country_slug || args.countrySlug,
+    countryName: geoMeta.country_name,
+    stateSlug: geoMeta.state_slug || args.stateSlug,
+    stateName: geoMeta.state_name,
+    regionSlug: geoMeta.region_slug || args.regionSlug,
+    regionName: geoMeta.region_name,
+    districtSlug: geoMeta.district_slug || args.districtSlug,
+    districtName: geoMeta.district_name,
+    municipalitySlug: geoMeta.municipality_slug || args.municipalitySlug,
+    municipalityName: geoMeta.municipality_name
+  });
+  const currentLevelKey = getCurrentGeoLevelKey(args);
+  const currentLevel = getGeoLevel(hierarchy, currentLevelKey) || getDeepestGeoLevel(hierarchy);
+  const geoRows = ((navRows || []) as HubItem[]).map((row) => ({
+    countrySlug: row.country_slug,
+    countryName: row.country_name,
+    stateSlug: row.state_slug,
+    stateName: row.state_name,
+    regionSlug: row.region_slug,
+    regionName: row.region_name,
+    districtSlug: row.district_slug,
+    districtName: row.district_name,
+    municipalitySlug: row.municipality_slug,
+    municipalityName: row.municipality_name
+  }));
+  const childLevelKey = currentLevel ? getGeoChildLevelKey(geoRows, currentLevel.key) : null;
+  const childMap = new Map<string, { key: GeoLevelKey; label: string; path: string; count: number }>();
+
+  if (childLevelKey) {
+    for (const row of geoRows) {
+      const rowHierarchy = buildGeoHierarchy(row);
+      const childLevel = getGeoLevel(rowHierarchy, childLevelKey);
+      if (!childLevel) continue;
+
+      const entry = childMap.get(childLevel.path);
+      if (entry) {
+        entry.count += 1;
+      } else {
+        childMap.set(childLevel.path, {
+          key: childLevel.key,
+          label: childLevel.label,
+          path: childLevel.path,
+          count: 1
+        });
+      }
+    }
+  }
+
   const rootIds = baseItems.map((item) => item.id);
   const variantsByRoot = new Map<
     string,
@@ -258,14 +521,22 @@ async function fetchGeoHub(args: {
       child_count: (variantsByRoot.get(item.id) || []).length
     })),
     totalCount,
-    countrySlug: args.countrySlug,
-    districtSlug: args.districtSlug,
-    municipalitySlug: args.municipalitySlug,
+    countrySlug: hierarchy[0]?.slug || args.countrySlug,
+    stateSlug: getGeoLevel(hierarchy, 'state')?.slug,
+    regionSlug: getGeoLevel(hierarchy, 'region')?.slug,
+    districtSlug: getGeoLevel(hierarchy, 'district')?.slug,
+    municipalitySlug: getGeoLevel(hierarchy, 'municipality')?.slug,
     countryName:
       normalizeAdminDisplayLabel(meta.country_name || args.countrySlug.toUpperCase()) ||
       args.countrySlug.toUpperCase(),
+    stateName: normalizeAdminDisplayLabel(meta.state_name || undefined) || undefined,
+    regionName: normalizeAdminDisplayLabel(meta.region_name || undefined) || undefined,
     districtName: normalizeAdminDisplayLabel(meta.district_name || undefined) || undefined,
-    municipalityName: normalizeAdminDisplayLabel(meta.municipality_name || undefined) || undefined
+    municipalityName: normalizeAdminDisplayLabel(meta.municipality_name || undefined) || undefined,
+    hierarchy,
+    currentLevelKey: currentLevel?.key || currentLevelKey,
+    childLevelKey,
+    childLinks: sortGeoChildLinks(Array.from(childMap.values()))
   };
 }
 
@@ -273,8 +544,38 @@ export async function loadGeoCountryHub(countrySlug: string, page: number, pageS
   return fetchGeoHub({ countrySlug, page, pageSize });
 }
 
+export async function loadGeoStateHub(
+  countrySlug: string,
+  stateSlug: string,
+  page: number,
+  pageSize: number
+) {
+  return fetchGeoHub({ countrySlug, stateSlug, page, pageSize });
+}
+
+export async function loadGeoRegionHub(
+  countrySlug: string,
+  stateSlug: string,
+  regionSlug: string,
+  page: number,
+  pageSize: number
+) {
+  return fetchGeoHub({ countrySlug, stateSlug, regionSlug, page, pageSize });
+}
+
 export async function loadGeoDistrictHub(countrySlug: string, districtSlug: string, page: number, pageSize: number) {
   return fetchGeoHub({ countrySlug, districtSlug, page, pageSize });
+}
+
+export async function loadGeoDeepDistrictHub(
+  countrySlug: string,
+  stateSlug: string,
+  regionSlug: string,
+  districtSlug: string,
+  page: number,
+  pageSize: number
+) {
+  return fetchGeoHub({ countrySlug, stateSlug, regionSlug, districtSlug, page, pageSize });
 }
 
 export async function loadGeoMunicipalityHub(
@@ -285,6 +586,83 @@ export async function loadGeoMunicipalityHub(
   pageSize: number
 ) {
   return fetchGeoHub({ countrySlug, districtSlug, municipalitySlug, page, pageSize });
+}
+
+export async function loadGeoDeepMunicipalityHub(
+  countrySlug: string,
+  stateSlug: string,
+  regionSlug: string,
+  districtSlug: string,
+  municipalitySlug: string,
+  page: number,
+  pageSize: number
+) {
+  return fetchGeoHub({ countrySlug, stateSlug, regionSlug, districtSlug, municipalitySlug, page, pageSize });
+}
+
+export async function loadGeoHubBySegments(
+  countrySlug: string,
+  segments: string[],
+  page: number,
+  pageSize: number
+) {
+  const normalized = segments.filter(Boolean);
+  if (!normalized.length) {
+    return loadGeoCountryHub(countrySlug, page, pageSize);
+  }
+
+  const requestedPath = `/${[countrySlug, ...normalized].join('/')}`;
+  const supabase = createServerSupabase();
+  const { data, error: queryError } = await supabase
+    .from('items')
+    .select(GEO_FILTER_SELECT)
+    .eq('admin_hidden', false)
+    .is('group_root_item_id', null)
+    .not('slug', 'is', null)
+    .or('is_private.eq.false,is_private.is.null')
+    .eq('country_slug', countrySlug);
+
+  if (queryError) {
+    throw error(500, queryError.message);
+  }
+
+  const rows = (data || []) as HubItem[];
+  for (const row of rows) {
+    const hierarchy = buildGeoHierarchy({
+      countrySlug: row.country_slug,
+      countryName: row.country_name,
+      stateSlug: row.state_slug,
+      stateName: row.state_name,
+      regionSlug: row.region_slug,
+      regionName: row.region_name,
+      districtSlug: row.district_slug,
+      districtName: row.district_name,
+      municipalitySlug: row.municipality_slug,
+      municipalityName: row.municipality_name
+    });
+    const match = hierarchy.find((level) => level.path === requestedPath);
+    if (!match) continue;
+
+    return fetchGeoHub({
+      countrySlug,
+      ...(match.key === 'state' || match.key === 'region' || match.key === 'district' || match.key === 'municipality'
+        ? { stateSlug: getGeoLevel(hierarchy, 'state')?.slug }
+        : {}),
+      ...(match.key === 'region' || match.key === 'district' || match.key === 'municipality'
+        ? { regionSlug: getGeoLevel(hierarchy, 'region')?.slug }
+        : {}),
+      ...(match.key === 'district' || match.key === 'municipality'
+        ? { districtSlug: getGeoLevel(hierarchy, 'district')?.slug }
+        : {}),
+      ...(match.key === 'municipality'
+        ? { municipalitySlug: getGeoLevel(hierarchy, 'municipality')?.slug }
+        : {}),
+      page,
+      pageSize
+    });
+  }
+
+  throw error(404, 'Geo-Hub nicht gefunden');
 }
 
 export async function resolveLegacyPlaceSlug(placeSlug: string) {
@@ -319,8 +697,20 @@ export async function resolveLegacyPlaceSlug(placeSlug: string) {
     municipalityMatch.district_slug &&
     municipalityMatch.municipality_slug
   ) {
+    const hierarchy = buildGeoHierarchy({
+      countrySlug: municipalityMatch.country_slug,
+      countryName: municipalityMatch.country_name,
+      stateSlug: municipalityMatch.state_slug,
+      stateName: municipalityMatch.state_name,
+      regionSlug: municipalityMatch.region_slug,
+      regionName: municipalityMatch.region_name,
+      districtSlug: municipalityMatch.district_slug,
+      districtName: municipalityMatch.district_name,
+      municipalitySlug: municipalityMatch.municipality_slug,
+      municipalityName: municipalityMatch.municipality_name
+    });
     return {
-      path: `/${municipalityMatch.country_slug}/${municipalityMatch.district_slug}/${municipalityMatch.municipality_slug}`,
+      path: getGeoLevel(hierarchy, 'municipality')?.path || `/${municipalityMatch.country_slug}/${municipalityMatch.district_slug}/${municipalityMatch.municipality_slug}`,
       level: 'municipality' as const,
       label:
         normalizeAdminDisplayLabel(municipalityMatch.municipality_name || municipalityMatch.municipality_slug) ||
@@ -330,8 +720,18 @@ export async function resolveLegacyPlaceSlug(placeSlug: string) {
 
   const districtMatch = await findMatch('district_slug');
   if (districtMatch?.country_slug && districtMatch.district_slug) {
+    const hierarchy = buildGeoHierarchy({
+      countrySlug: districtMatch.country_slug,
+      countryName: districtMatch.country_name,
+      stateSlug: districtMatch.state_slug,
+      stateName: districtMatch.state_name,
+      regionSlug: districtMatch.region_slug,
+      regionName: districtMatch.region_name,
+      districtSlug: districtMatch.district_slug,
+      districtName: districtMatch.district_name
+    });
     return {
-      path: `/${districtMatch.country_slug}/${districtMatch.district_slug}`,
+      path: getGeoLevel(hierarchy, 'district')?.path || `/${districtMatch.country_slug}/${districtMatch.district_slug}`,
       level: 'district' as const,
       label:
         normalizeAdminDisplayLabel(districtMatch.district_name || districtMatch.district_slug) ||

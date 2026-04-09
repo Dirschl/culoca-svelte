@@ -16,7 +16,6 @@
 	import { browser, dev } from '$app/environment';
 	import { supabase } from '$lib/supabaseClient';
 	import {
-		buildGeoHubPath,
 		getStoredOrComputedCanonicalPath,
 		slugifySegment
 	} from '$lib/content/routing';
@@ -46,6 +45,7 @@
 	import { KEYWORDS_MAX, sanitizeKeywords } from '$lib/content/keywords';
 	import { env as publicEnv } from '$env/dynamic/public';
 	import { saveDashboardHeroVisitFromItem } from '$lib/dashboardHeroVisit';
+	import { buildGeoHierarchy, getGeoLevel } from '$lib/geo/hierarchy';
 
 	/** Wenn PUBLIC_ADOBE_AFFILIATE_REDIRECT_BASE gesetzt ist (z. B. Partnerize), wird der Adobe-Link darüber geleitet. */
 	function getAdobeAffiliateUrl(directUrl: string | null | undefined): string | null {
@@ -250,32 +250,28 @@
 		!image?.district_slug ||
 		!image?.municipality_slug
 	);
-	$: showGeoState = !!geoStateLabel;
-	$: showGeoRegion =
-		!!geoRegionLabel &&
-		normalizeGeoComparisonValue(geoRegionLabel) !== normalizeGeoComparisonValue(geoStateLabel) &&
-		normalizeGeoComparisonValue(geoRegionLabel) !== normalizeGeoComparisonValue(geoDistrictLabel);
-	$: geoCountryPath = image?.country_slug ? `/${image.country_slug}` : null;
-	$: geoDistrictPath =
-		image?.country_slug && image?.district_slug
-			? buildGeoHubPath({
-					countrySlug: image.country_slug,
-					districtSlug: image.district_slug
-				})
-			: null;
-	$: geoMunicipalityPath =
-		image?.country_slug && image?.district_slug && image?.municipality_slug
-			? buildGeoHubPath({
-					countrySlug: image.country_slug,
-					districtSlug: image.district_slug,
-					municipalitySlug: image.municipality_slug
-				})
-			: null;
+	$: geoHierarchyLevels = buildGeoHierarchy({
+		countrySlug: image?.country_slug,
+		countryName: geoCountryLabel,
+		stateSlug: image?.state_slug || geoAdminHierarchy.stateSlug,
+		stateName: geoStateLabel,
+		regionSlug: image?.region_slug || geoAdminHierarchy.regionSlug,
+		regionName: geoRegionLabel,
+		districtSlug: image?.district_slug,
+		districtName: geoDistrictLabel,
+		municipalitySlug: image?.municipality_slug,
+		municipalityName: geoMunicipalityLabel
+	});
+	$: geoCountryPath = getGeoLevel(geoHierarchyLevels, 'country')?.path || null;
+	$: geoStatePath = getGeoLevel(geoHierarchyLevels, 'state')?.path || null;
+	$: geoRegionPath = getGeoLevel(geoHierarchyLevels, 'region')?.path || null;
+	$: geoDistrictPath = getGeoLevel(geoHierarchyLevels, 'district')?.path || null;
+	$: geoMunicipalityPath = getGeoLevel(geoHierarchyLevels, 'municipality')?.path || null;
+	$: showGeoState = !!getGeoLevel(geoHierarchyLevels, 'state');
+	$: showGeoRegion = !!getGeoLevel(geoHierarchyLevels, 'region');
 	$: geoBreadcrumbLinks = [
 		{ name: 'Culoca', path: '/' },
-		...(geoCountryPath ? [{ name: geoCountryLabel, path: geoCountryPath }] : []),
-		...(geoDistrictPath ? [{ name: geoDistrictLabel, path: geoDistrictPath }] : []),
-		...(geoMunicipalityPath ? [{ name: geoMunicipalityLabel, path: geoMunicipalityPath }] : []),
+		...geoHierarchyLevels.map((level) => ({ name: level.label, path: level.path })),
 		{
 			name: image?.title || image?.original_name || itemSlug,
 			path: canonicalPath || `/item/${itemSlug}`
@@ -283,11 +279,7 @@
 	];
 	$: geoDisplayBreadcrumbs = dedupeGeoCrumbs([
 		{ name: 'Culoca', path: '/' },
-		...(geoCountryPath ? [{ name: geoCountryLabel, path: geoCountryPath }] : []),
-		...(showGeoState ? [{ name: geoStateLabel!, path: null }] : []),
-		...(showGeoRegion ? [{ name: geoRegionLabel!, path: null }] : []),
-		...(geoDistrictPath ? [{ name: geoDistrictLabel, path: geoDistrictPath }] : []),
-		...(geoMunicipalityPath ? [{ name: geoMunicipalityLabel, path: geoMunicipalityPath }] : [])
+		...geoHierarchyLevels.map((level) => ({ name: level.label, path: level.path }))
 	]);
 	$: itemBreadcrumbJsonLd = buildBreadcrumbJsonLd(geoBreadcrumbLinks);
 	$: geoPlaceGraph = buildGeoPlaceGraph({
@@ -303,7 +295,9 @@
 		countryName: geoCountryLabel,
 		countryPath: geoCountryPath,
 		stateName: geoStateLabel,
-		regionName: showGeoRegion ? geoRegionLabel : null,
+		regionName: geoRegionLabel,
+		statePath: geoStatePath,
+		regionPath: geoRegionPath,
 		districtName: geoDistrictLabel,
 		districtPath: geoDistrictPath,
 		municipalityName: image?.municipality_slug ? geoMunicipalityLabel : null,
