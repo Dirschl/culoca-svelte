@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { browser } from '$app/environment';
-  import { goto } from '$app/navigation';
   import SiteNav from '$lib/SiteNav.svelte';
   import SiteFooter from '$lib/SiteFooter.svelte';
   import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
@@ -83,8 +82,6 @@
   }
 
   const geoTrail = (data.breadcrumbs || []).filter((crumb: { path: string }) => crumb.path !== '/');
-  let selectedCountryPath = data.countryPath || '';
-  let selectedGeoChildPath = '';
 
   let currentGpsPosition: { lat: number; lon: number } | null = browser ? getStoredGpsPosition() : null;
   let variantImageIndexes: Record<string, number> = {};
@@ -93,36 +90,6 @@
   let lastRotationKey = '';
   let previewImageElements: Record<string, HTMLImageElement | null> = {};
   let previewThumbElements: Record<string, HTMLDivElement | null> = {};
-
-  $: {
-    const validPaths = new Set((data.geoChildren || []).map((child: { path: string }) => child.path));
-    if (!validPaths.has(selectedGeoChildPath)) {
-      selectedGeoChildPath = '';
-    }
-  }
-
-  async function handleGeoChildChange(event: Event) {
-    const value = (event.currentTarget as HTMLSelectElement | null)?.value || '';
-    if (!value) return;
-
-    selectedGeoChildPath = value;
-    await goto(value);
-  }
-
-  $: {
-    const validCountryPaths = new Set((data.countryOptions || []).map((country: { path: string }) => country.path));
-    if (!validCountryPaths.has(selectedCountryPath)) {
-      selectedCountryPath = data.countryPath || '';
-    }
-  }
-
-  async function handleCountryChange(event: Event) {
-    const value = (event.currentTarget as HTMLSelectElement | null)?.value || '';
-    if (!value) return;
-
-    selectedCountryPath = value;
-    await goto(value);
-  }
 
   function getStoredGpsPosition(): { lat: number; lon: number } | null {
     if (typeof window === 'undefined') return null;
@@ -318,7 +285,7 @@
             <p class="hub-kicker">{data.kicker}</p>
             <h1>{data.hubLabel}</h1>
             <p class="hub-meta">
-              {data.totalCount.toLocaleString('de-DE')} {data.totalCount === 1 ? 'Eintrag' : 'Einträge'}
+              {data.visibleCount.toLocaleString('de-DE')} {data.visibleCountLabel}
             </p>
             <p class="hub-intro">
               {#if data.page > 1}
@@ -351,26 +318,21 @@
           </div>
         {/if}
 
-        {#if data.countryOptions?.length > 1}
+        {#if data.currentLevelKey === 'country' && data.countryOptions?.length > 1}
           <section class="geo-country-switcher" aria-labelledby="geo-country-switcher-heading">
             <div class="geo-country-switcher__header">
-              <h2 id="geo-country-switcher-heading">Land auswählen</h2>
-              <p>Wechsle direkt in den Einstiegspunkt eines anderen Landes.</p>
+              <h2 id="geo-country-switcher-heading">Länder</h2>
+              <p>Direkte Einstiege in weitere Länder-Hubs.</p>
             </div>
-            <div class="geo-country-switcher__selector">
-              <label class="geo-country-switcher__label" for="geo-country-switcher-select">Land</label>
-              <select
-                id="geo-country-switcher-select"
-                class="geo-country-switcher__select"
-                bind:value={selectedCountryPath}
-                on:change={handleCountryChange}
-              >
-                {#each data.countryOptions as country}
-                  <option value={country.path}>
-                    {country.label} ({country.count.toLocaleString('de-DE')})
-                  </option>
-                {/each}
-              </select>
+            <div class="geo-children__grid">
+              {#each data.countryOptions as country}
+                <a href={country.path} class="geo-child-card">
+                  <span class="geo-child-card__label">{country.label}</span>
+                  <span class="geo-child-card__count">
+                    {country.count.toLocaleString('de-DE')} {country.count === 1 ? 'Eintrag' : 'Einträge'}
+                  </span>
+                </a>
+              {/each}
             </div>
           </section>
         {/if}
@@ -379,25 +341,7 @@
           <section class="geo-children" aria-labelledby="geo-children-heading">
             <div class="geo-children__header">
               <h2 id="geo-children-heading">{data.geoChildLevelLabel || 'Weitere Ebenen'}</h2>
-              <p>Wähle die nächste Ebene per Dropdown oder nutze die direkten Hub-Links darunter.</p>
-            </div>
-            <div class="geo-children__selector">
-              <label class="geo-children__label" for="geo-children-select">
-                {data.geoChildLevelLabel || 'Weitere Ebenen'} auswählen
-              </label>
-              <select
-                id="geo-children-select"
-                class="geo-children__select"
-                bind:value={selectedGeoChildPath}
-                on:change={handleGeoChildChange}
-              >
-                <option value="">{data.geoChildLevelLabel || 'Ebene'} wählen ...</option>
-                {#each data.geoChildren as child}
-                  <option value={child.path}>
-                    {child.label} ({child.count.toLocaleString('de-DE')})
-                  </option>
-                {/each}
-              </select>
+              <p>Klicke dich strukturiert zur nächsten Ebene weiter.</p>
             </div>
             <div class="geo-children__grid">
               {#each data.geoChildren as child}
@@ -416,7 +360,9 @@
 
     <section class="hub-content">
       <div class="hub-inner">
-        {#if !data.items?.length}
+        {#if !data.hasItemFeed}
+          <p class="empty">Wähle eine Gemeinde, um die zugehörigen Bilder und Inhalte zu sehen.</p>
+        {:else if !data.items?.length}
           <p class="empty">Noch keine Einträge vorhanden.</p>
         {:else}
           <div class="items-grid">
@@ -630,54 +576,6 @@
     margin: 0.35rem 0 0;
     color: var(--text-secondary);
     font-size: 0.95rem;
-  }
-  .geo-country-switcher__selector {
-    margin-top: 1rem;
-    max-width: 32rem;
-  }
-  .geo-country-switcher__label {
-    display: block;
-    margin-bottom: 0.5rem;
-    font-weight: 700;
-  }
-  .geo-country-switcher__select {
-    width: 100%;
-    min-height: 52px;
-    padding: 0.85rem 1rem;
-    border-radius: 1rem;
-    border: 1px solid rgba(238, 114, 33, 0.25);
-    background: var(--bg-secondary);
-    color: var(--text-primary);
-    font: inherit;
-  }
-  .geo-country-switcher__select:focus {
-    outline: none;
-    border-color: rgba(238, 114, 33, 0.7);
-    box-shadow: 0 0 0 4px rgba(238, 114, 33, 0.12);
-  }
-  .geo-children__selector {
-    margin-top: 1rem;
-    max-width: 32rem;
-  }
-  .geo-children__label {
-    display: block;
-    margin-bottom: 0.5rem;
-    font-weight: 700;
-  }
-  .geo-children__select {
-    width: 100%;
-    min-height: 52px;
-    padding: 0.85rem 1rem;
-    border-radius: 1rem;
-    border: 1px solid rgba(238, 114, 33, 0.25);
-    background: var(--bg-secondary);
-    color: var(--text-primary);
-    font: inherit;
-  }
-  .geo-children__select:focus {
-    outline: none;
-    border-color: rgba(238, 114, 33, 0.7);
-    box-shadow: 0 0 0 4px rgba(238, 114, 33, 0.12);
   }
   .geo-children__header h2 {
     margin: 0;

@@ -57,7 +57,7 @@ const GEO_FILTER_SELECT =
 
 const COUNTRY_LABELS: Record<string, string> = {
   de: 'Deutschland',
-  at: 'Oesterreich',
+  at: 'Österreich',
   ch: 'Schweiz',
   lu: 'Luxemburg',
   mc: 'Monaco'
@@ -262,6 +262,11 @@ type GeoHubResult = {
   hierarchy: GeoHierarchyLevel[];
   currentLevelKey: GeoLevelKey;
   childLevelKey: GeoLevelKey | null;
+  countryLinks: Array<{
+    label: string;
+    path: string;
+    count: number;
+  }>;
   childLinks: Array<{
     key: GeoLevelKey;
     label: string;
@@ -373,9 +378,19 @@ export function buildGeoHubPageData(hub: GeoHubResult, page: number, pageSize: n
   const breadcrumbs = [{ name: 'Culoca', path: '/' }].concat(
     hub.hierarchy.map((level) => ({ name: level.label, path: level.path }))
   );
+  const hasItemFeed = deepestLevel.key === 'municipality';
+  const visibleCount = hasItemFeed ? hub.totalCount : hub.childLinks.length;
+  const visibleCountLabel = hasItemFeed
+    ? hub.totalCount === 1
+      ? 'Eintrag'
+      : 'Einträge'
+    : hub.childLevelKey
+      ? geoPlural(hub.childLevelKey)
+      : 'Orte';
 
   return {
     hubType: `geo-${deepestLevel.key}`,
+    currentLevelKey: deepestLevel.key,
     kicker: geoKicker(deepestLevel.key),
     hubLabel: deepestLevel.label,
     hubPath: deepestLevel.path,
@@ -391,10 +406,14 @@ export function buildGeoHubPageData(hub: GeoHubResult, page: number, pageSize: n
     municipalityName: getGeoLevel(hub.hierarchy, 'municipality')?.label || null,
     municipalityPath: getGeoLevel(hub.hierarchy, 'municipality')?.path || null,
     items: hub.items,
+    hasItemFeed,
     totalCount: hub.totalCount,
+    visibleCount,
+    visibleCountLabel,
     page,
-    totalPages: Math.max(1, Math.ceil(hub.totalCount / pageSize)),
+    totalPages: hasItemFeed ? Math.max(1, Math.ceil(hub.totalCount / pageSize)) : 1,
     breadcrumbs,
+    countryLinks: hub.countryLinks,
     geoChildren: hub.childLinks,
     geoChildLevelKey: hub.childLevelKey,
     geoChildLevelLabel: hub.childLevelKey ? geoPlural(hub.childLevelKey) : null,
@@ -415,21 +434,11 @@ async function fetchGeoHub(args: {
   pageSize: number;
 }): Promise<GeoHubResult> {
   const supabase = createServerSupabase();
+  const currentLevelKey = getCurrentGeoLevelKey(args);
   const countQuery = applyGeoFilters(
     supabase
       .from('items')
       .select('*', { count: 'exact', head: true })
-      .eq('admin_hidden', false)
-      .is('group_root_item_id', null)
-      .not('slug', 'is', null)
-      .or('is_private.eq.false,is_private.is.null'),
-    args
-  );
-
-  const itemsQuery = applyGeoFilters(
-    supabase
-      .from('items')
-      .select(HUB_SELECT)
       .eq('admin_hidden', false)
       .is('group_root_item_id', null)
       .not('slug', 'is', null)
@@ -466,11 +475,28 @@ async function fetchGeoHub(args: {
 
   const totalPages = Math.max(1, Math.ceil(totalCount / args.pageSize));
   const page = Math.min(Math.max(1, args.page), totalPages);
-  const { data: items, error: itemsError } = await itemsQuery
-    .order('created_at', { ascending: false })
-    .range((page - 1) * args.pageSize, page * args.pageSize - 1);
+  const shouldLoadItems = currentLevelKey === 'municipality';
+  let items: HubItem[] = [];
 
-  if (itemsError) throw error(500, itemsError.message);
+  if (shouldLoadItems) {
+    const itemsQuery = applyGeoFilters(
+      supabase
+        .from('items')
+        .select(HUB_SELECT)
+        .eq('admin_hidden', false)
+        .is('group_root_item_id', null)
+        .not('slug', 'is', null)
+        .or('is_private.eq.false,is_private.is.null'),
+      args
+    );
+
+    const { data: itemRows, error: itemsError } = await itemsQuery
+      .order('created_at', { ascending: false })
+      .range((page - 1) * args.pageSize, page * args.pageSize - 1);
+
+    if (itemsError) throw error(500, itemsError.message);
+    items = (itemRows || []) as HubItem[];
+  }
 
   const { data: navRows, error: navError } = await applyGeoFilters(
     supabase
@@ -487,7 +513,7 @@ async function fetchGeoHub(args: {
 
   const baseItems = (items || []) as HubItem[];
   const geoMeta = meta as HubItem;
-  const hierarchy = buildGeoHierarchy({
+  const fullHierarchy = buildGeoHierarchy({
     countrySlug: geoMeta.country_slug || args.countrySlug,
     countryName: geoMeta.country_name,
     stateSlug: geoMeta.state_slug || args.stateSlug,
@@ -499,8 +525,10 @@ async function fetchGeoHub(args: {
     municipalitySlug: geoMeta.municipality_slug || args.municipalitySlug,
     municipalityName: geoMeta.municipality_name
   });
-  const currentLevelKey = getCurrentGeoLevelKey(args);
-  const currentLevel = getGeoLevel(hierarchy, currentLevelKey) || getDeepestGeoLevel(hierarchy);
+  const currentLevel = getGeoLevel(fullHierarchy, currentLevelKey) || getDeepestGeoLevel(fullHierarchy);
+  const hierarchy = currentLevel
+    ? fullHierarchy.slice(0, fullHierarchy.findIndex((level) => level.key === currentLevel.key) + 1)
+    : fullHierarchy;
   const geoRows = ((navRows || []) as HubItem[]).map((row) => ({
     countrySlug: row.country_slug,
     countryName: row.country_name,
@@ -514,6 +542,27 @@ async function fetchGeoHub(args: {
     municipalityName: row.municipality_name
   }));
   const childLevelKey = currentLevel ? getGeoChildLevelKey(geoRows, currentLevel.key) : null;
+  const countryLinks = sortGeoChildLinks(
+    Array.from(
+      geoRows.reduce((map, row) => {
+        const rowHierarchy = buildGeoHierarchy(row);
+        const countryLevel = getGeoLevel(rowHierarchy, 'country');
+        if (!countryLevel) return map;
+        const entry = map.get(countryLevel.path);
+        if (entry) {
+          entry.count += 1;
+        } else {
+          map.set(countryLevel.path, {
+            key: countryLevel.key,
+            label: countryLevel.label,
+            path: countryLevel.path,
+            count: 1
+          });
+        }
+        return map;
+      }, new Map<string, { key: GeoLevelKey; label: string; path: string; count: number }>())
+    )
+  ).map(({ label, path, count }) => ({ label, path, count }));
   const childMap = new Map<string, { key: GeoLevelKey; label: string; path: string; count: number }>();
 
   if (childLevelKey) {
@@ -536,7 +585,7 @@ async function fetchGeoHub(args: {
     }
   }
 
-  const rootIds = baseItems.map((item) => item.id);
+  const rootIds = shouldLoadItems ? baseItems.map((item) => item.id) : [];
   const variantsByRoot = new Map<
     string,
     Array<{
@@ -600,6 +649,7 @@ async function fetchGeoHub(args: {
     hierarchy,
     currentLevelKey: currentLevel?.key || currentLevelKey,
     childLevelKey,
+    countryLinks,
     childLinks: sortGeoChildLinks(Array.from(childMap.values()))
   };
 }

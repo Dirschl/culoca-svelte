@@ -1,17 +1,5 @@
 <script lang="ts">
-  import { goto } from '$app/navigation';
-
   export let countries: Array<{ label: string; path: string; count: number }> = [];
-
-  let selectedCountryPath = '';
-
-  async function handleCountryChange(event: Event) {
-    const value = (event.currentTarget as HTMLSelectElement | null)?.value || '';
-    if (!value) return;
-
-    selectedCountryPath = value;
-    await goto(value);
-  }
 </script>
 
 {#if countries.length > 0}
@@ -22,23 +10,17 @@
       <p>Wähle ein Land als Einstieg in den Location Hub. Danach geht es Ebene für Ebene tiefer.</p>
     </div>
 
-    <div class="geo-explorer__selector">
-      <label class="geo-explorer__label" for="geo-country-select">Land auswählen</label>
-      <select
-        id="geo-country-select"
-        class="geo-explorer__select"
-        bind:value={selectedCountryPath}
-        on:change={handleCountryChange}
-      >
-        <option value="">Land wählen ...</option>
-        {#each countries as country}
-          <option value={country.path}>
-            {country.label} ({country.count.toLocaleString('de-DE')})
-          </option>
-        {/each}
-      </select>
-      <p class="geo-explorer__hint">Die Auswahl öffnet direkt den passenden Einstiegspunkt des Location Hub.</p>
+    <div class="geo-explorer__grid">
+      {#each countries as country}
+        <a href={country.path} class="geo-explorer__card">
+          <span class="geo-explorer__card-label">{country.label}</span>
+          <span class="geo-explorer__card-count">
+            {country.count.toLocaleString('de-DE')} {country.count === 1 ? 'Eintrag' : 'Einträge'}
+          </span>
+        </a>
+      {/each}
     </div>
+    <p class="geo-explorer__hint">Jedes Land öffnet direkt den passenden Einstiegspunkt des Location Hub.</p>
   </section>
 {/if}
 
@@ -70,32 +52,41 @@
     font-size: 0.8rem;
     font-weight: 700;
   }
-  .geo-explorer__selector {
+  .geo-explorer__grid {
     margin-top: 1.25rem;
-    max-width: 32rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0.9rem;
   }
-  .geo-explorer__label {
-    display: block;
-    margin-bottom: 0.55rem;
-    font-weight: 700;
-  }
-  .geo-explorer__select {
-    width: 100%;
-    min-height: 52px;
-    padding: 0.85rem 1rem;
+  .geo-explorer__card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 1rem 1.1rem;
     border-radius: 1rem;
-    border: 1px solid rgba(238, 114, 33, 0.25);
+    border: 1px solid rgba(238, 114, 33, 0.18);
     background: var(--bg-primary);
     color: var(--text-primary);
-    font: inherit;
+    text-decoration: none;
+    transition:
+      transform 0.18s ease,
+      border-color 0.18s ease,
+      box-shadow 0.18s ease;
   }
-  .geo-explorer__select:focus {
-    outline: none;
-    border-color: rgba(238, 114, 33, 0.7);
-    box-shadow: 0 0 0 4px rgba(238, 114, 33, 0.12);
+  .geo-explorer__card:hover {
+    transform: translateY(-1px);
+    border-color: rgba(238, 114, 33, 0.4);
+    box-shadow: 0 18px 38px rgba(15, 23, 42, 0.08);
+  }
+  .geo-explorer__card-label {
+    font-weight: 700;
+  }
+  .geo-explorer__card-count {
+    color: var(--text-secondary);
+    font-size: 0.92rem;
   }
   .geo-explorer__hint {
-    margin: 0.55rem 0 0;
+    margin: 1rem 0 0;
     color: var(--text-secondary);
     font-size: 0.92rem;
   }
