@@ -7,12 +7,14 @@
   import { getPublicItemHref } from '$lib/content/routing';
   import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
   import { fetchProfileReviewItems } from '$lib/profile/review';
+  import { authFetch } from '$lib/authFetch';
 
   const PAGE_SIZE = 12;
 
   const DASHBOARD_SECTION_IDS = [
     'recent',
     'photos',
+    'stock',
     'events',
     'favorites',
     'likes',
@@ -80,9 +82,142 @@
   let followingSearchBusy = false;
   let contentSectionEl: HTMLElement | null = null;
 
+  /** Entwurf pro Item-ID für Stock-URL / Asset-ID (Dashboard). */
+  let stockEdits: Record<string, { url: string; assetId: string }> = {};
+  let stockActionBusy: Record<string, 'save' | 'upload' | 'reset' | undefined> = {};
+  let stockFlash: Record<string, string> = {};
+
   $: totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
   $: canPrev = currentPage > 1;
   $: canNext = currentPage < totalPages;
+
+  /** Hinweise im Menü: Fehler, Review, Upload-Probleme. */
+  $: stockAttentionCount = allItems.filter(
+    (it: any) =>
+      (it.adobe_stock_error && String(it.adobe_stock_error).trim()) ||
+      it.adobe_stock_status === 'pending_review' ||
+      it.adobe_stock_status === 'error'
+  ).length;
+
+  function mergeStockItemIntoList(updated: any) {
+    allItems = allItems.map((it: any) =>
+      it.id === updated.id
+        ? { ...it, ...updated, stats: it.stats, stock_settings: updated.stock_settings ?? it.stock_settings }
+        : it
+    );
+    stockEdits = {
+      ...stockEdits,
+      [updated.id]: {
+        url: updated.adobe_stock_url || '',
+        assetId: updated.adobe_stock_asset_id || ''
+      }
+    };
+  }
+
+  function extractAdobeAssetIdFromUrl(url: string): string {
+    const match = url.trim().match(/\/(\d+)(?:[/?#]|$)/);
+    return match ? match[1] : '';
+  }
+
+  async function saveDashboardStock(item: any) {
+    const d = stockEdits[item.id];
+    if (!d) return;
+    const normalizedUrl = d.url.trim();
+    const inferredId = d.assetId.trim() || extractAdobeAssetIdFromUrl(normalizedUrl);
+    const nextStatus = normalizedUrl
+      ? item.adobe_stock_status === 'none'
+        ? 'uploaded'
+        : item.adobe_stock_status
+      : 'none';
+    stockActionBusy = { ...stockActionBusy, [item.id]: 'save' };
+    stockFlash = { ...stockFlash, [item.id]: '' };
+    try {
+      const res = await authFetch(`/api/item/${item.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adobe_stock_url: normalizedUrl || null,
+          adobe_stock_asset_id: inferredId || null,
+          adobe_stock_status: nextStatus
+        })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        stockFlash = { ...stockFlash, [item.id]: data?.error || 'Speichern fehlgeschlagen' };
+        return;
+      }
+      if (data?.item) mergeStockItemIntoList(data.item);
+      stockFlash = { ...stockFlash, [item.id]: 'Gespeichert' };
+      d.assetId = inferredId;
+    } finally {
+      const next = { ...stockActionBusy };
+      delete next[item.id];
+      stockActionBusy = next;
+    }
+  }
+
+  async function uploadDashboardStock(item: any) {
+    stockActionBusy = { ...stockActionBusy, [item.id]: 'upload' };
+    stockFlash = { ...stockFlash, [item.id]: '' };
+    try {
+      const res = await authFetch(`/api/adobe-stock/upload/${item.id}`, { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        stockFlash = { ...stockFlash, [item.id]: data?.error || 'Upload fehlgeschlagen' };
+        return;
+      }
+      if (data?.item) mergeStockItemIntoList(data.item);
+      stockFlash = { ...stockFlash, [item.id]: data?.message || 'Upload gestartet' };
+    } finally {
+      const next = { ...stockActionBusy };
+      delete next[item.id];
+      stockActionBusy = next;
+    }
+  }
+
+  async function resetDashboardStockAdobe(item: any) {
+    stockActionBusy = { ...stockActionBusy, [item.id]: 'reset' };
+    stockFlash = { ...stockFlash, [item.id]: '' };
+    try {
+      const res = await authFetch(`/api/item/${item.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adobe_stock_status: 'none',
+          adobe_stock_uploaded_at: null,
+          adobe_stock_asset_id: null,
+          adobe_stock_url: null,
+          adobe_stock_error: null
+        })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        stockFlash = { ...stockFlash, [item.id]: data?.error || 'Zurücksetzen fehlgeschlagen' };
+        return;
+      }
+      if (data?.item) mergeStockItemIntoList(data.item);
+      stockFlash = { ...stockFlash, [item.id]: 'Adobe-Eintrag zurückgesetzt' };
+    } finally {
+      const next = { ...stockActionBusy };
+      delete next[item.id];
+      stockActionBusy = next;
+    }
+  }
+
+  $: {
+    const next = { ...stockEdits };
+    let changed = false;
+    for (const item of allItems) {
+      if (!next[item.id]) {
+        next[item.id] = {
+          url: item.adobe_stock_url || '',
+          assetId: item.adobe_stock_asset_id || ''
+        };
+        changed = true;
+      }
+    }
+    if (changed) stockEdits = next;
+  }
 
   function formatDate(value: string | null | undefined): string {
     if (!value) return '';
@@ -288,7 +423,7 @@
     let request = supabase
       .from('items')
       .select(
-        'id, slug, title, original_name, canonical_path, country_slug, district_slug, municipality_slug, path_512, created_at, updated_at',
+        'id, slug, title, original_name, canonical_path, country_slug, district_slug, municipality_slug, path_512, created_at, updated_at, adobe_stock_status, adobe_stock_uploaded_at, adobe_stock_asset_id, adobe_stock_url, adobe_stock_error, stock_settings',
         { count: 'exact' }
       )
       .eq('profile_id', currentUserId)
@@ -767,6 +902,7 @@
   const sectionToSecondaryKeys: Record<DashboardSectionId, DashboardSecondaryKey[]> = {
     recent: [],
     photos: [],
+    stock: [],
     events: ['events'],
     favorites: ['favorites'],
     likes: ['likes'],
@@ -912,6 +1048,22 @@
               <span>Meine Fotos</span>
             </span>
             <strong>{totalItems}</strong>
+          </button>
+          <button
+            type="button"
+            class="dashboard-menu__link"
+            class:is-active={activeSection === 'stock'}
+            on:click={() => setActiveSection('stock')}
+          >
+            <span class="dashboard-menu__label">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                <path d="M8 7h8M8 11h8M8 15h4" />
+              </svg>
+              <span>Stock</span>
+            </span>
+            <strong>{restLoading ? '…' : stockAttentionCount}</strong>
           </button>
           <button
             type="button"
@@ -1131,6 +1283,120 @@
                         {item.stats?.downloads || 0} Downloads
                       </a>
                     </div>
+                  </div>
+                </article>
+              {/each}
+            </div>
+          {/if}
+
+          <div class="pagination">
+            <button type="button" on:click={() => goToPage(currentPage - 1)} disabled={!canPrev}>Zurück</button>
+            <span>Seite {currentPage} von {totalPages}</span>
+            <button type="button" on:click={() => goToPage(currentPage + 1)} disabled={!canNext}>Weiter</button>
+          </div>
+        {:else if activeSection === 'stock'}
+          <div class="panel-head panel-head--space">
+            <h2>Stock</h2>
+            <span>{totalItems} Einträge · {stockAttentionCount} mit Hinweis</span>
+          </div>
+          <p class="dashboard-stock-intro">
+            Öffentlicher Stock-Link, FTP-Upload zu Adobe und Zurücksetzen nur des Adobe-Zweigs — zentral hier, nicht mehr auf der Item-Seite.
+          </p>
+          <div class="entry-actions">
+            <a href="/foto/upload">Neues Foto hochladen</a>
+          </div>
+
+          <form class="search-row" on:submit|preventDefault={applySearch}>
+            <input type="search" bind:value={searchQuery} placeholder="Suche nach Titel oder Slug" />
+            <button type="submit">Suchen</button>
+            {#if activeQuery}
+              <button type="button" class="ghost-btn" on:click={clearSearch}>Zurücksetzen</button>
+            {/if}
+          </form>
+
+          {#if loadingItems}
+            <p class="dashboard-empty">Einträge werden geladen...</p>
+          {:else if allItems.length === 0}
+            <p class="dashboard-empty">Keine Einträge gefunden.</p>
+          {:else}
+            <div class="entry-list entry-list--large dashboard-stock-list">
+              {#each allItems as item (item.id)}
+                <article class="entry-card entry-card--large dashboard-stock-card">
+                  <a class="entry-preview" href={getPublicItemHref(item)}>
+                    {#if getItemThumb(item)}
+                      <img src={getItemThumb(item)} alt={item.title || item.original_name || 'Item'} width="72" height="72" loading="lazy" />
+                    {:else}
+                      <div class="entry-thumb-fallback">?</div>
+                    {/if}
+                  </a>
+                  <div class="entry-content entry-content--large dashboard-stock-card__body">
+                    <a href={getPublicItemHref(item)}>
+                      <strong>{item.title || item.original_name || 'Ohne Titel'}</strong>
+                    </a>
+                    <div class="dashboard-stock-meta">
+                      <span>Status: <code>{item.adobe_stock_status || 'none'}</code></span>
+                      {#if item.adobe_stock_uploaded_at}
+                        <span>Upload: {formatDateTime(item.adobe_stock_uploaded_at)}</span>
+                      {/if}
+                    </div>
+                    {#if item.adobe_stock_error}
+                      <div class="dashboard-stock-error">{item.adobe_stock_error}</div>
+                    {/if}
+                    <label class="dashboard-stock-label">
+                      <span>Öffentliche Stock-URL</span>
+                      <input
+                        type="url"
+                        class="dashboard-stock-input"
+                        bind:value={stockEdits[item.id].url}
+                        placeholder="https://stock.adobe.com/…"
+                      />
+                    </label>
+                    <label class="dashboard-stock-label">
+                      <span>Asset-ID</span>
+                      <input
+                        type="text"
+                        class="dashboard-stock-input"
+                        bind:value={stockEdits[item.id].assetId}
+                        placeholder="optional"
+                      />
+                    </label>
+                    <div class="dashboard-stock-actions">
+                      <button
+                        type="button"
+                        class="ghost-btn"
+                        disabled={stockActionBusy[item.id] === 'save'}
+                        on:click={() => saveDashboardStock(item)}
+                      >
+                        {stockActionBusy[item.id] === 'save' ? 'Speichert…' : 'Speichern'}
+                      </button>
+                      <button
+                        type="button"
+                        class="dashboard-stock-btn--primary"
+                        disabled={stockActionBusy[item.id] === 'upload'}
+                        on:click={() => uploadDashboardStock(item)}
+                      >
+                        {stockActionBusy[item.id] === 'upload' ? 'Upload…' : 'Original hochladen'}
+                      </button>
+                      <button
+                        type="button"
+                        class="ghost-btn danger"
+                        disabled={stockActionBusy[item.id] === 'reset'}
+                        on:click={() => resetDashboardStockAdobe(item)}
+                      >
+                        {stockActionBusy[item.id] === 'reset' ? '…' : 'Adobe zurücksetzen'}
+                      </button>
+                    </div>
+                    {#if stockFlash[item.id]}
+                      <p class="dashboard-stock-flash">{stockFlash[item.id]}</p>
+                    {/if}
+                    {#if item.adobe_stock_url}
+                      <a
+                        class="dashboard-stock-external"
+                        href={item.adobe_stock_url}
+                        target="_blank"
+                        rel="noopener noreferrer">Link öffnen</a
+                      >
+                    {/if}
                   </div>
                 </article>
               {/each}
@@ -1440,7 +1706,7 @@
               {/each}
             </div>
           {/if}
-        {:else}
+        {:else if activeSection === 'review'}
           <div class="panel-head panel-head--space">
             <h2>Datenprüfung</h2>
             <span>{reviewCount} offen</span>
@@ -1768,6 +2034,81 @@
   }
   .dashboard-error {
     color: #ffb4b4;
+  }
+
+  .dashboard-stock-intro {
+    margin: 0 0 0.75rem;
+    color: var(--text-secondary);
+    font-size: 0.92rem;
+    line-height: 1.45;
+  }
+  .dashboard-stock-card__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    align-items: stretch;
+  }
+  .dashboard-stock-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+    font-size: 0.88rem;
+    color: var(--text-secondary);
+  }
+  .dashboard-stock-meta code {
+    font-size: 0.85rem;
+  }
+  .dashboard-stock-error {
+    font-size: 0.88rem;
+    color: #d64545;
+  }
+  .dashboard-stock-label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+  }
+  .dashboard-stock-input {
+    width: 100%;
+    padding: 0.45rem 0.55rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font: inherit;
+  }
+  .dashboard-stock-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin-top: 0.2rem;
+  }
+  .dashboard-stock-btn--primary {
+    border: 1px solid var(--culoca-orange, #ee7221);
+    background: var(--culoca-orange, #ee7221);
+    color: #fff;
+    border-radius: 10px;
+    padding: 0.45rem 0.75rem;
+    cursor: pointer;
+    font: inherit;
+  }
+  .dashboard-stock-btn--primary:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+  .ghost-btn.danger {
+    color: #c73e3e;
+    border-color: color-mix(in srgb, #c73e3e 35%, var(--border-color));
+  }
+  .dashboard-stock-flash {
+    margin: 0;
+    font-size: 0.86rem;
+    color: var(--text-secondary);
+  }
+  .dashboard-stock-external {
+    font-size: 0.88rem;
+    color: var(--accent-color);
   }
   @media (max-width: 980px) {
     .dashboard-page {

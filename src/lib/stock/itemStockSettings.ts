@@ -33,7 +33,8 @@ export type ItemStockSettings = {
 	};
 };
 
-const DEFAULT_ADOBE: AdobeStockAgencyState = {
+/** Zurücksetzen nur Adobe-Zweig (FTP/Link), ohne restliches `stock_settings` zu löschen. */
+export const EMPTY_ADOBE_STOCK_STATE: AdobeStockAgencyState = {
 	status: 'none',
 	uploadedAt: null,
 	assetId: null,
