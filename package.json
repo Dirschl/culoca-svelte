@@ -28,6 +28,8 @@
 		"taxonomy:migrate:missing": "node tools/migrate-item-location-taxonomy.mjs --missing-geo",
 		"taxonomy:migrate:missing:gps": "node tools/migrate-item-location-taxonomy.mjs --missing-geo --gps",
 		"taxonomy:migrate:apply:missing:gps": "node tools/migrate-item-location-taxonomy.mjs --apply --missing-geo --gps",
+		"geo:backfill-admin": "node tools/backfill-geo-hierarchy-fields.mjs",
+		"geo:backfill-admin:apply": "node tools/backfill-geo-hierarchy-fields.mjs --apply",
 		"similarity:backfill": "node tools/backfill-item-similarity-vectors.mjs",
 		"similarity:backfill:apply": "node tools/backfill-item-similarity-vectors.mjs --apply",
 		"images:repair-missing": "node tools/regenerate-missing-image-variants.mjs",
