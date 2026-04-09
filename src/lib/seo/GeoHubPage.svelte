@@ -4,7 +4,7 @@
   import SiteNav from '$lib/SiteNav.svelte';
   import SiteFooter from '$lib/SiteFooter.svelte';
   import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
-  import { appendReturnTo } from '$lib/content/routing';
+  import { appendReturnTo, getPublicItemHref } from '$lib/content/routing';
   import { getEffectiveGpsPosition } from '$lib/filterStore';
   import {
     absoluteUrl,
@@ -22,6 +22,11 @@
     description: string | null;
     caption: string | null;
     canonical_path: string | null;
+    country_slug?: string | null;
+    state_slug?: string | null;
+    region_slug?: string | null;
+    district_slug?: string | null;
+    municipality_slug?: string | null;
     path_512: string | null;
     group_root_item_id?: string | null;
     lat?: number | null;
@@ -65,8 +70,8 @@
     placeId: geoPlaceGraph.currentPlaceId
   });
 
-  function itemHref(item: { canonical_path: string | null; slug: string }) {
-    return appendReturnTo(item.canonical_path || `/item/${item.slug}`, data.hubPath);
+  function itemHref(item: HubItem) {
+    return appendReturnTo(getPublicItemHref(item), data.hubPath);
   }
 
   function thumbUrl(item: { slug: string; path_512: string | null }) {

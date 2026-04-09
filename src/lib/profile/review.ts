@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { getPublicItemHref } from '$lib/content/routing';
 
 export type ReviewIssue =
   | 'missing_geo'
@@ -127,13 +128,16 @@ export function buildReviewItem(row: RawReviewRow): ProfileReviewItem | null {
   if (!issues.length || !row.slug) return null;
 
   const primaryIssue = issues[0];
+  const baseHref = getPublicItemHref(row);
+  const focus = encodeURIComponent(getFocusForIssue(primaryIssue));
+  const editHref = `${baseHref}${baseHref.includes('?') ? '&' : '?'}edit=1&focus=${focus}`;
   return {
     ...row,
     moderation_status: getModerationStatus(row),
     moderation_summary: getModerationSummary(row),
     issues,
     primaryIssue,
-    editHref: `/item/${row.slug}?edit=1&focus=${encodeURIComponent(getFocusForIssue(primaryIssue))}`
+    editHref
   };
 }
 

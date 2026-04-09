@@ -2246,6 +2246,8 @@
     canonical_path?: string | null;
     slug?: string | null;
     country_slug?: string | null;
+    state_slug?: string | null;
+    region_slug?: string | null;
     district_slug?: string | null;
     municipality_slug?: string | null;
   }): string {
@@ -2508,9 +2510,11 @@
           slug: event.detail.imageSlug || event.detail.slug || null,
           canonicalPath: event.detail.canonicalPath || null,
           canonical_path: event.detail.canonical_path || null,
-          country_slug: event.detail.country_slug || null,
-          district_slug: event.detail.district_slug || null,
-          municipality_slug: event.detail.municipality_slug || null
+          country_slug: event.detail.country_slug ?? null,
+          state_slug: event.detail.state_slug ?? null,
+          region_slug: event.detail.region_slug ?? null,
+          district_slug: event.detail.district_slug ?? null,
+          municipality_slug: event.detail.municipality_slug ?? null
         });
         const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`;
         window.location.href = imageHref.includes('?')

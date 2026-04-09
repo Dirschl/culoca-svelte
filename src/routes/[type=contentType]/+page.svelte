@@ -39,6 +39,8 @@
     municipality_name?: string | null;
     locality_name?: string | null;
     country_slug?: string | null;
+    state_slug?: string | null;
+    region_slug?: string | null;
     district_slug?: string | null;
     municipality_slug?: string | null;
   };
@@ -150,8 +152,8 @@
   let previewImageElements: Record<string, HTMLImageElement | null> = {};
   let previewThumbElements: Record<string, HTMLDivElement | null> = {};
 
-  function itemHref(item: { canonical_path: string | null; slug: string }): string {
-    return appendReturnTo(item.canonical_path || `/item/${item.slug}`, currentListPath);
+  function itemHref(item: FotoListItem): string {
+    return appendReturnTo(getPublicItemHref(item), currentListPath);
   }
 
   function pickImagePath(item: { path_512?: string | null; path_2048?: string | null }): string | null {

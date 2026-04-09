@@ -32,6 +32,8 @@
     slug?: string; // Added slug to the interface
     canonical_path?: string;
     country_slug?: string | null;
+    state_slug?: string | null;
+    region_slug?: string | null;
     district_slug?: string | null;
     municipality_slug?: string | null;
   }[] = [];
@@ -153,6 +155,8 @@
     slug?: string;
     canonical_path?: string;
     country_slug?: string | null;
+    state_slug?: string | null;
+    region_slug?: string | null;
     district_slug?: string | null;
     municipality_slug?: string | null;
   }) {

@@ -1,6 +1,7 @@
 import {
   DEFAULT_CONTENT_TYPE_BY_ID,
   DEFAULT_CONTENT_TYPE_BY_SLUG,
+  VALID_CONTENT_TYPE_SLUGS,
   type ContentTypeDefinition
 } from '$lib/content/types';
 import { hasPersistentEventLandingPage } from '$lib/events';
@@ -39,10 +40,25 @@ export type GeoPathLike = {
   canonicalPath?: string | null;
 };
 
+const CONTENT_TYPE_SLUG_SET = new Set(VALID_CONTENT_TYPE_SLUGS);
+
 export function normalizePath(path: string): string {
   if (!path) return '/';
   const value = path.startsWith('/') ? path : `/${path}`;
   return value !== '/' && value.endsWith('/') ? value.slice(0, -1) : value;
+}
+
+/** Alte Typ-URLs wie /foto/slug – für öffentliche Item-Links durch Geo- oder /item/-Pfad ersetzen. */
+function shouldIgnoreLegacyTypeCanonicalPath(
+  canonicalPath: string | null | undefined,
+  slug: string | null | undefined
+): boolean {
+  if (!canonicalPath || !slug) return false;
+  const normalized = normalizePath(canonicalPath);
+  const parts = normalized.split('/').filter(Boolean);
+  if (parts.length < 2) return false;
+  if (!CONTENT_TYPE_SLUG_SET.has(parts[0])) return false;
+  return parts[parts.length - 1] === slug;
 }
 
 export function slugifySegment(value: string): string {
@@ -205,19 +221,25 @@ export function getPublicItemHref(item: {
   district_slug?: string | null;
   municipality_slug?: string | null;
 }): string {
-  const canonicalPath = item.canonicalPath || item.canonical_path;
-  if (item.slug && hasGeoHierarchy(item)) {
-    return buildGeoItemPath({
-      countrySlug: item.country_slug as string,
-      stateSlug: item.state_slug,
-      regionSlug: item.region_slug,
-      districtSlug: item.district_slug as string,
-      municipalitySlug: item.municipality_slug as string,
-      itemSlug: item.slug
-    });
+  const slug = item.slug ?? null;
+  if (slug && hasGeoHierarchy(item)) {
+    return normalizePath(
+      buildGeoItemPath({
+        countrySlug: item.country_slug as string,
+        stateSlug: item.state_slug,
+        regionSlug: item.region_slug,
+        districtSlug: item.district_slug as string,
+        municipalitySlug: item.municipality_slug as string,
+        itemSlug: slug
+      })
+    );
+  }
+  let canonicalPath = item.canonicalPath || item.canonical_path;
+  if (canonicalPath && slug && shouldIgnoreLegacyTypeCanonicalPath(canonicalPath, slug)) {
+    canonicalPath = null;
   }
   if (canonicalPath) return normalizePath(canonicalPath);
-  return item.slug ? `/item/${item.slug}` : '/';
+  return slug ? `/item/${slug}` : '/';
 }
 
 export function appendReturnTo(href: string, returnTo: string | null | undefined): string {

@@ -2,7 +2,7 @@
   import SiteNav from '$lib/SiteNav.svelte';
   import SiteFooter from '$lib/SiteFooter.svelte';
   import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
-  import { appendReturnTo } from '$lib/content/routing';
+  import { appendReturnTo, getPublicItemHref } from '$lib/content/routing';
   import { absoluteUrl, buildBreadcrumbJsonLd, DEFAULT_OG_IMAGE, trimText } from '$lib/seo/site';
 
   export let data: any;
@@ -17,8 +17,16 @@
     data.profile.bio || `${creatorName} zeigt ${data.totalCount} öffentliche Inhalte auf Culoca. Galerie mit Bildern, Themen und Detailseiten.`
   );
 
-  function itemHref(item: { canonical_path: string | null; slug: string }) {
-    return appendReturnTo(item.canonical_path || `/item/${item.slug}`, data.hubPath);
+  function itemHref(item: {
+    slug: string;
+    canonical_path?: string | null;
+    country_slug?: string | null;
+    state_slug?: string | null;
+    region_slug?: string | null;
+    district_slug?: string | null;
+    municipality_slug?: string | null;
+  }) {
+    return appendReturnTo(getPublicItemHref(item), data.hubPath);
   }
 </script>
 

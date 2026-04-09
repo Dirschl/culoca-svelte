@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { appendReturnTo } from '$lib/content/routing';
+  import { appendReturnTo, getPublicItemHref } from '$lib/content/routing';
   import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
   import { formatEventHubRange, formatHubEventPlace } from '$lib/content/eventHubFormat';
 
@@ -18,6 +18,8 @@
     lat: number | null;
     lon: number | null;
     country_slug?: string | null;
+    state_slug?: string | null;
+    region_slug?: string | null;
     district_slug?: string | null;
     municipality_slug?: string | null;
     country_name?: string | null;
@@ -57,8 +59,8 @@
     'ki-bild': '✨'
   };
 
-  function itemHref(item: { canonical_path: string | null; slug: string }): string {
-    return appendReturnTo(item.canonical_path || `/item/${item.slug}`, '/');
+  function itemHref(item: SectionItem): string {
+    return appendReturnTo(getPublicItemHref(item), '/');
   }
 
   function pickPath(item: { path_512?: string | null; path_2048?: string | null }): string | null {

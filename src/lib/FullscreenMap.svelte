@@ -718,7 +718,18 @@
       
       // Click handler for navigation
       marker.on('click', () => {
-        dispatch('imageClick', { imageSlug: image.slug, imageId: image.id, canonicalPath: image.canonical_path || null });
+        dispatch('imageClick', {
+          imageSlug: image.slug,
+          slug: image.slug,
+          imageId: image.id,
+          canonicalPath: image.canonical_path ?? null,
+          canonical_path: image.canonical_path ?? null,
+          country_slug: image.country_slug ?? null,
+          state_slug: image.state_slug ?? null,
+          region_slug: image.region_slug ?? null,
+          district_slug: image.district_slug ?? null,
+          municipality_slug: image.municipality_slug ?? null
+        });
       });
       
       // Store reference to image data

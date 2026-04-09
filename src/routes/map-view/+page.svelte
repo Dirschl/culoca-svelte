@@ -3,7 +3,7 @@
   import { goto } from '$app/navigation';
   import { filterStore } from '$lib/filterStore';
   import FullscreenMap from '$lib/FullscreenMap.svelte';
-  import { appendReturnTo } from '$lib/content/routing';
+  import { appendReturnTo, getPublicItemHref } from '$lib/content/routing';
   
   export let data;
   
@@ -93,7 +93,16 @@
       on:mapReady={handleMapReady}
       on:close={handleMapClose}
       on:imageClick={(event) => {
-        const imageHref = event.detail.canonicalPath || event.detail.canonical_path || (event.detail.imageSlug || event.detail.slug ? `/item/${event.detail.imageSlug || event.detail.slug}` : '/');
+        const imageHref = getPublicItemHref({
+          slug: event.detail.imageSlug || event.detail.slug || null,
+          canonicalPath: event.detail.canonicalPath ?? null,
+          canonical_path: event.detail.canonical_path ?? null,
+          country_slug: event.detail.country_slug ?? null,
+          state_slug: event.detail.state_slug ?? null,
+          region_slug: event.detail.region_slug ?? null,
+          district_slug: event.detail.district_slug ?? null,
+          municipality_slug: event.detail.municipality_slug ?? null
+        });
         const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`;
         window.location.href = appendReturnTo(imageHref, returnTo);
       }}
