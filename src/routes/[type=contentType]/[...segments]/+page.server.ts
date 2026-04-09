@@ -1,8 +1,9 @@
 import type { PageServerLoad } from './$types';
 import { redirect, error } from '@sveltejs/kit';
 import { loadContentPage } from '$lib/content/server';
+import { toCanonicalAbsoluteUrl } from '$lib/seo/site';
 
-export const load: PageServerLoad = async ({ params, url }) => {
+export const load: PageServerLoad = async ({ params, url, setHeaders }) => {
   // SvelteKit rest params arrive as a single slash-delimited string.
   const segments = (params.segments ?? '')
     .split('/')
@@ -25,6 +26,12 @@ export const load: PageServerLoad = async ({ params, url }) => {
 
   if ('redirectTo' in result) {
     throw redirect(301, result.redirectTo as string);
+  }
+
+  if (result.canonicalPath) {
+    setHeaders({
+      Link: `<${toCanonicalAbsoluteUrl(result.canonicalPath)}>; rel="canonical"`
+    });
   }
 
   return result;
