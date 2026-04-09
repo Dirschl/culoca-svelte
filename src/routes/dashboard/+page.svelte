@@ -260,7 +260,7 @@
   async function clearEntireHistory() {
     if (!currentUserId || historyBusy) return;
     if (!browser) return;
-    const ok = window.confirm('Moechtest du deinen gesamten Verlauf wirklich loeschen?');
+    const ok = window.confirm('Möchtest du deinen gesamten Verlauf wirklich löschen?');
     if (!ok) return;
 
     historyBusy = true;
@@ -274,7 +274,7 @@
       if (error) throw error;
       recentItems = [];
     } catch (error: any) {
-      errorMessage = error?.message || 'Verlauf konnte nicht geloescht werden.';
+      errorMessage = error?.message || 'Verlauf konnte nicht gelöscht werden.';
     } finally {
       historyBusy = false;
     }
@@ -1049,7 +1049,7 @@
             <h2>Zuletzt angesehen</h2>
             {#if recentItems.length > 0}
               <button type="button" class="ghost-btn" on:click={clearEntireHistory} disabled={historyBusy}>
-                Verlauf loeschen
+                Verlauf löschen
               </button>
             {/if}
           </div>
@@ -1447,10 +1447,10 @@
           </div>
           {#if reviewCount > 0}
             <p class="dashboard-empty">
-              <strong>{reviewCount}</strong> Eintraege brauchen noch fehlende Daten oder Ortspruefung.
+              <strong>{reviewCount}</strong> Einträge brauchen noch fehlende Daten oder Ortsprüfung.
             </p>
             <div class="entry-actions">
-              <a href="/profile/review">Offene Eintraege anzeigen</a>
+              <a href="/profile/review">Offene Einträge anzeigen</a>
               <a href="/foto/upload">Neues Foto hochladen</a>
             </div>
           {:else}

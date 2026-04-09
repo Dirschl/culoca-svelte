@@ -853,75 +853,51 @@
 		};
 	});
 
-	// Generate SEO-friendly image URLs for srcset (no query parameters)
-	let imageSource = '';
-	let imageSrcset = '';
-	let imageSizes = '';
-	let imageWidth2048 = 2048;
-	let imageHeight2048 = 1365;
+	// Hauptbild: optional 512er CSS-Hintergrund bis 2048 geladen; Größe über .main-image (max-height …)
+	let mainImageProgressive = false;
+	let mainFigureBackgroundUrl = '';
+	let mainImageSrc = '';
+	let mainImageSrcset = '';
+	let mainImageSizes = '';
+	let mainImageRevealed = false;
+	let mainImageElement: HTMLImageElement | null = null;
+
 	$: if (image) {
 		const imagePath = image.path_2048 || image.path_512;
 		if (!imagePath || !image.slug) {
-			imageSource = '';
-			imageSrcset = '';
-			imageSizes = '';
-			imageWidth2048 = 2048;
-			imageHeight2048 = 1365;
+			mainImageProgressive = false;
+			mainFigureBackgroundUrl = '';
+			mainImageSrc = '';
+			mainImageSrcset = '';
+			mainImageSizes = '';
+			mainImageRevealed = false;
 		} else {
-			// Extract extension from the actual file path (e.g., "abc123.jpg" -> ".jpg")
 			const extensionMatch = imagePath.match(/\.(jpg|jpeg|webp|png)$/i);
 			const fileExtension = extensionMatch ? extensionMatch[0].toLowerCase() : '.jpg';
 			const baseUrl = 'https://culoca.com/images';
 
-			// Calculate dimensions for 2048px version (proportional scaling)
-			const originalWidth = image.width || 2048;
-			const originalHeight = image.height || 1365;
-			const maxDimension2048 = 2048;
-			const scale2048 =
-				originalWidth > maxDimension2048 || originalHeight > maxDimension2048
-					? Math.min(maxDimension2048 / originalWidth, maxDimension2048 / originalHeight)
-					: 1;
-			imageWidth2048 = Math.max(
-				1,
-				Math.min(Math.round(originalWidth * scale2048), maxDimension2048)
-			);
-			imageHeight2048 = Math.max(
-				1,
-				Math.min(Math.round(originalHeight * scale2048), maxDimension2048)
-			);
-
-			// Generate srcset with available sizes (512px and 2048px) using size suffixes
-			// Use 512px for smaller screens, 2048px for larger screens
-			const srcsetParts: string[] = [];
-			if (image.path_2048) {
-				const sizedUrl2048 = appendVersionParam(
-					`${baseUrl}/${image.slug}-2048${fileExtension}`,
-					image
-				);
-				if (sizedUrl2048) {
-					srcsetParts.push(`${sizedUrl2048} 2048w`);
-				}
-			}
-			if (image.path_512) {
-				const sizedUrl512 = appendVersionParam(
-					`${baseUrl}/${image.slug}-512${fileExtension}`,
-					image
-				);
-				if (sizedUrl512) {
-					srcsetParts.push(`${sizedUrl512} 512w`);
-				}
-			}
-
-			// Fallback: if no srcset, use main image source (2048px version)
-			imageSource = image.path_2048
+			const url512 = image.path_512
+				? appendVersionParam(`${baseUrl}/${image.slug}-512${fileExtension}`, image) || ''
+				: '';
+			const url2048 = image.path_2048
 				? appendVersionParam(`${baseUrl}/${image.slug}-2048${fileExtension}`, image) || ''
-				: image.path_512
-					? appendVersionParam(`${baseUrl}/${image.slug}-512${fileExtension}`, image) || ''
-					: '';
-			imageSrcset = srcsetParts.join(', ');
-			// sizes: use 512px for mobile (up to 900px), 2048px for desktop
-			imageSizes = '(max-width: 900px) 512px, 2048px';
+				: '';
+
+			mainImageProgressive = !!(url512 && url2048);
+			mainFigureBackgroundUrl = mainImageProgressive ? url512 : '';
+			mainImageSrc = url2048 || url512;
+			mainImageSrcset = url2048 ? `${url2048} 2048w` : '';
+			mainImageSizes = url2048 ? '(max-width: 900px) 100vw, min(2048px, 96vw)' : '';
+			mainImageRevealed = !mainImageProgressive;
 		}
+	}
+
+	function onMainImageLoad() {
+		mainImageRevealed = true;
+	}
+
+	$: if (mainImageProgressive && mainImageElement?.complete) {
+		mainImageRevealed = true;
 	}
 
 	// Beispiel: Handler für Location-Filter
@@ -3679,21 +3655,31 @@
 		{:else if image}
 			<div class="passepartout-container">
 				{#if shouldShowMainImage}
-					<figure>
-						<!-- Kein Link: vermeidet Startseiten-Signal; einziges starkes Bild für Google Bilder (s. itemPagePublic/publicImageGet). -->
-						<img
-							src={imageSource}
-							srcset={imageSrcset || undefined}
-							sizes={imageSizes || undefined}
-							alt={mainImageAlt}
-							class="main-image"
-							width={imageWidth2048}
-							height={imageHeight2048}
-							loading="eager"
-							decoding="async"
-							fetchpriority="high"
-						/>
-					</figure>
+					<!-- 512 als Figure-Hintergrund (oft gecacht), 2048 als img — vermeidet Sprung & sofortiges Nur-2048 durch srcset -->
+					{#key image.id}
+						<figure
+							class="main-figure"
+							class:main-figure--progressive={mainImageProgressive}
+							style={mainFigureBackgroundUrl
+								? `background-image: url(${JSON.stringify(mainFigureBackgroundUrl)});`
+								: ''}
+						>
+							<img
+								bind:this={mainImageElement}
+								src={mainImageSrc}
+								srcset={mainImageSrcset || undefined}
+								sizes={mainImageSizes || undefined}
+								alt={mainImageAlt}
+								class="main-image"
+								class:main-image--progressive={mainImageProgressive}
+								class:main-image--revealed={mainImageRevealed}
+								loading="eager"
+								decoding="async"
+								fetchpriority="high"
+								on:load={onMainImageLoad}
+							/>
+						</figure>
+					{/key}
 					{#if hasVariantStrip}
 						<div class="variant-strip" data-nosnippet>
 							{#each variantStripItems as groupItem}
@@ -4548,8 +4534,8 @@
 									{/if}
 								</div>
 								<div class="geo-edit-note">
-									Freitext bleibt moeglich. Beim Speichern werden die Geo-Angaben serverseitig
-									normalisiert; unklare Orte bleiben markiert und muessen geprueft werden.
+									Freitext bleibt möglich. Beim Speichern werden die Geo-Angaben serverseitig
+									normalisiert; unklare Orte bleiben markiert und müssen geprüft werden.
 								</div>
 							{/if}
 							<div class="geo-field">
@@ -5271,6 +5257,16 @@
 		padding: 0.7rem 0.5rem 0.5rem 0.5rem;
 		background: transparent;
 	}
+	.main-figure {
+		margin: 0;
+		width: fit-content;
+		max-width: 100%;
+	}
+	.main-figure--progressive {
+		background-size: contain;
+		background-repeat: no-repeat;
+		background-position: center;
+	}
 	.main-image {
 		display: block;
 		width: auto;
@@ -5280,6 +5276,13 @@
 		border: 1px solid #ffffff;
 		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 		background: transparent;
+	}
+	.main-image--progressive {
+		opacity: 0;
+		transition: opacity 0.2s ease-out;
+	}
+	.main-image--progressive.main-image--revealed {
+		opacity: 1;
 	}
 	.variant-strip {
 		display: flex;

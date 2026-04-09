@@ -357,7 +357,7 @@
       case 'follow_create':
         return 'Neuer Follower';
       default:
-        return 'Aktivitaet';
+        return 'Aktivität';
     }
   }
 

@@ -206,7 +206,7 @@ describe('/api/download/[id] POST', () => {
 
     expect(response.status).toBe(500);
     expect(await response.json()).toEqual({
-      error: 'Die gewaehlte Exportvariante ist gerade nicht verfuegbar. Bitte versuche JPG in voller Aufloesung oder Original-Metadaten.'
+      error: 'Die gewählte Exportvariante ist gerade nicht verfügbar. Bitte versuche JPG in voller Auflösung oder Original-Metadaten.'
     });
   });
 

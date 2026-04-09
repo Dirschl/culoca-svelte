@@ -1593,12 +1593,12 @@
 			{#if settings.format === 'jpg'}
 				{#if settings.metadataMode === 'original'}
 					<p class="metadata-note">
-						Original behaelt die eingebetteten EXIF-, IPTC- und GPS-Daten des Originals unveraendert
+						Original behält die eingebetteten EXIF-, IPTC- und GPS-Daten des Originals unverändert
 						bei.
 					</p>
 				{:else if settings.metadataMode === 'culoca'}
 					<p class="metadata-note">
-						Culoca ueberschreibt nur redaktionelle Felder wie Titel, Beschreibung, Ersteller und
+						Culoca überschreibt nur redaktionelle Felder wie Titel, Beschreibung, Ersteller und
 						Copyright, technische Kameradaten bleiben erhalten.
 					</p>
 				{:else}

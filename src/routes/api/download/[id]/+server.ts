@@ -351,8 +351,8 @@ function isSharpRuntimeError(err: unknown) {
 function getUserFacingDownloadErrorMessage(err: unknown, mode: 'download' | 'estimate') {
 	if (isSharpRuntimeError(err)) {
 		return mode === 'estimate'
-			? 'Die Dateivorschau ist gerade nicht verfuegbar.'
-			: 'Die gewaehlte Exportvariante ist gerade nicht verfuegbar. Bitte versuche JPG in voller Aufloesung oder Original-Metadaten.';
+			? 'Die Dateivorschau ist gerade nicht verfügbar.'
+			: 'Die gewählte Exportvariante ist gerade nicht verfügbar. Bitte versuche JPG in voller Auflösung oder Original-Metadaten.';
 	}
 
 	return err instanceof Error ? err.message : 'Download fehlgeschlagen';

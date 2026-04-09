@@ -29,7 +29,7 @@ export const DELETE = async ({ params }) => {
     return json(
       {
         success: false,
-        error: 'Dieses Root-Item hat noch untergeordnete Inhalte. Bitte zuerst Gruppe aufloesen, neues Root waehlen oder die ganze Gruppe kontrolliert loeschen.'
+        error: 'Dieses Root-Item hat noch untergeordnete Inhalte. Bitte zuerst Gruppe auflösen, neues Root wählen oder die ganze Gruppe kontrolliert löschen.'
       },
       { status: 409 }
     );

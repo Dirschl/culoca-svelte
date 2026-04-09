@@ -303,8 +303,8 @@ export async function fetchOriginalItemBuffer(
 			}
 			throw new Error(
 				originalUrl
-					? 'Original konnte weder direkt noch per WebDAV geladen werden. Fuer Original-EXIF wird kein metadatenreduzierter Fallback verwendet.'
-					: 'Kein echtes Original verfuegbar. Fuer Original-EXIF wird kein metadatenreduzierter Fallback verwendet.'
+					? 'Original konnte weder direkt noch per WebDAV geladen werden. Für Original-EXIF wird kein metadatenreduzierter Fallback verwendet.'
+					: 'Kein echtes Original verfügbar. Für Original-EXIF wird kein metadatenreduzierter Fallback verwendet.'
 			);
 		}
 
@@ -681,7 +681,7 @@ export async function rewriteJpegMetadataWithoutSharp(
 	const options = normalizeDownloadExportOptions(rawOptions);
 
 	if (!canRewriteMetadataWithoutSharp(originalBuffer, options)) {
-		throw new Error('Exiftool-Fallback ist fuer diese Exportvariante nicht verfuegbar');
+		throw new Error('Exiftool-Fallback ist für diese Exportvariante nicht verfügbar');
 	}
 
 	const tempFile = join(tmpdir(), `culoca-download-${randomUUID()}.jpg`);
