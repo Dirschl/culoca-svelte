@@ -35,6 +35,22 @@ const COUNTRY_SLUG_ALIASES: Record<string, string> = {
   luxembourg: 'lu',
   monaco: 'mc'
 };
+const GEO_SLUG_ALIASES: Partial<Record<GeoLevelKey, Record<string, string>>> = {
+  district: {
+    altotting: 'altoetting'
+  }
+};
+
+function transliterateGerman(value: string): string {
+  return value
+    .replace(/Ä/g, 'Ae')
+    .replace(/Ö/g, 'Oe')
+    .replace(/Ü/g, 'Ue')
+    .replace(/ä/g, 'ae')
+    .replace(/ö/g, 'oe')
+    .replace(/ü/g, 'ue')
+    .replace(/ß/g, 'ss');
+}
 
 function stripGeoDecorators(value: string, key: GeoLevelKey): string {
   if (key !== 'district') return value;
@@ -46,10 +62,9 @@ function stripGeoDecorators(value: string, key: GeoLevelKey): string {
 
 function normalizeGeoSlug(value: string | null | undefined, key?: GeoLevelKey): string {
   const normalizedValue = key ? stripGeoDecorators(value || '', key) : value || '';
-  const normalized = normalizedValue
+  const normalized = transliterateGerman(normalizedValue)
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
-    .replace(/ß/g, 'ss')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
@@ -57,6 +72,10 @@ function normalizeGeoSlug(value: string | null | undefined, key?: GeoLevelKey): 
 
   if (key === 'country') {
     return COUNTRY_SLUG_ALIASES[normalized] || normalized;
+  }
+
+  if (key) {
+    return GEO_SLUG_ALIASES[key]?.[normalized] || normalized;
   }
 
   return normalized;
