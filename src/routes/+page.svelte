@@ -115,6 +115,7 @@
 
   $: dashboardNetworkProfiles =
     dashboardNetworkListMode === 'following' ? dashboardFollowedProfiles : dashboardFollowerProfiles;
+  $: geoExplorerEntryHref = data.geoOverview?.[0]?.path || '/de';
 
   async function loadCurrentUserFullName() {
     const { data: authData } = await supabase.auth.getUser();
@@ -1191,7 +1192,7 @@
                     <h2>Profile finden</h2>
                   </div>
                   <span class="dashboard-network-links">
-                    <a href="/#geo-explorer">Orte finden</a>
+                    <a href={geoExplorerEntryHref}>Orte finden</a>
                     <a href="/chat">Zum Chat</a>
                   </span>
                 </div>

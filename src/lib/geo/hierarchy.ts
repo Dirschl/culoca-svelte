@@ -21,6 +21,20 @@ export type GeoHierarchyLevel = {
 };
 
 const GEO_LEVEL_ORDER: GeoLevelKey[] = ['country', 'state', 'region', 'district', 'municipality'];
+const COUNTRY_SLUG_ALIASES: Record<string, string> = {
+  deutschland: 'de',
+  germany: 'de',
+  osterreich: 'at',
+  oesterreich: 'at',
+  austria: 'at',
+  schweiz: 'ch',
+  switzerland: 'ch',
+  suisse: 'ch',
+  svizzera: 'ch',
+  luxemburg: 'lu',
+  luxembourg: 'lu',
+  monaco: 'mc'
+};
 
 function stripGeoDecorators(value: string, key: GeoLevelKey): string {
   if (key !== 'district') return value;
@@ -32,7 +46,7 @@ function stripGeoDecorators(value: string, key: GeoLevelKey): string {
 
 function normalizeGeoSlug(value: string | null | undefined, key?: GeoLevelKey): string {
   const normalizedValue = key ? stripGeoDecorators(value || '', key) : value || '';
-  return normalizedValue
+  const normalized = normalizedValue
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/ß/g, 'ss')
@@ -40,6 +54,12 @@ function normalizeGeoSlug(value: string | null | undefined, key?: GeoLevelKey): 
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .replace(/-{2,}/g, '-');
+
+  if (key === 'country') {
+    return COUNTRY_SLUG_ALIASES[normalized] || normalized;
+  }
+
+  return normalized;
 }
 
 function labelFallback(key: GeoLevelKey, slug: string): string {
