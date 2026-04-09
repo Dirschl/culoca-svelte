@@ -15,15 +15,17 @@ const getInitialDarkMode = (): boolean => {
 
 export const darkMode = writable<boolean>(getInitialDarkMode());
 
-// Function to apply theme to DOM
+// Function to apply theme to DOM (<html> + <body>, damit :global(body[data-theme]) greift)
 function applyTheme(isDark: boolean) {
-  if (typeof window !== 'undefined') {
-    const html = document.documentElement;
-    if (isDark) {
-      html.setAttribute('data-theme', 'dark');
-    } else {
-      html.removeAttribute('data-theme');
-    }
+  if (typeof window === 'undefined') return;
+  const html = document.documentElement;
+  const body = document.body;
+  if (isDark) {
+    html.setAttribute('data-theme', 'dark');
+    body?.setAttribute('data-theme', 'dark');
+  } else {
+    html.removeAttribute('data-theme');
+    body?.removeAttribute('data-theme');
   }
 }
 
@@ -40,6 +42,10 @@ if (typeof window !== 'undefined') {
     applyTheme(value);
   });
   
-  // Apply initial theme
-  applyTheme(getInitialDarkMode());
+  // Apply initial theme (body ggf. erst nach DOMContentLoaded)
+  const run = () => applyTheme(getInitialDarkMode());
+  run();
+  if (!document.body) {
+    document.addEventListener('DOMContentLoaded', run, { once: true });
+  }
 } 

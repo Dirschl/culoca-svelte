@@ -4,7 +4,19 @@
 		<!-- Grundlegendes -->
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		
+		<!-- Theme vor erstem Paint (gleiche Logik wie $lib/darkMode: default dunkel, nur bei "false" hell) -->
+		<script>
+			(function () {
+				try {
+					if (localStorage.getItem('darkMode') !== 'false') {
+						document.documentElement.setAttribute('data-theme', 'dark');
+					}
+				} catch (e) {
+					document.documentElement.setAttribute('data-theme', 'dark');
+				}
+			})();
+		</script>
+
 		<!-- Fallback Favicons - werden von Item-spezifischen Icons überschrieben -->
 		<link rel="icon" type="image/svg+xml" href="/culoca-icon.svg">
 		<link rel="icon" type="image/png" href="/culoca-icon.png" sizes="32x32">
