@@ -3365,19 +3365,34 @@
 		}
 	}
 
+	async function hydrateCreatorProfileIfNeeded() {
+		if (!browser || !image?.profile_id || image?.profile) return;
+		try {
+			const res = await fetch(`/api/item-creator-profile/${encodeURIComponent(image.profile_id)}`);
+			if (!res.ok) return;
+			const data = await res.json().catch(() => null);
+			if (data?.profile) {
+				image = mergeItemFromApiPatch(image, { profile: data.profile });
+			}
+		} catch {
+			/* optional */
+		}
+	}
+
 	onMount(() => {
 		const explicitReturnTo = sanitizeReturnTo($page.url.searchParams.get('returnTo'), '/');
 		if (isValidImageBackTarget(explicitReturnTo)) {
 			imageBackHref = explicitReturnTo;
-			return;
+		} else {
+			imageBackHref = getStoredLocalRoute();
+
+			const localReferrer = getLocalReferrerFallback();
+			if (localReferrer !== '/') {
+				imageBackHref = localReferrer;
+			}
 		}
 
-		imageBackHref = getStoredLocalRoute();
-
-		const localReferrer = getLocalReferrerFallback();
-		if (localReferrer !== '/') {
-			imageBackHref = localReferrer;
-		}
+		void hydrateCreatorProfileIfNeeded();
 	});
 </script>
 

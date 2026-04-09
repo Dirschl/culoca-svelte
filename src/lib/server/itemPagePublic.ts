@@ -49,6 +49,29 @@ export const ITEM_PAGE_PROFILE_SELECT = [
 	'public_contact_name'
 ].join(', ');
 
+/** Kern-Spalten (ohne Attribution-Block) — Fallback wenn DB noch nicht alle Spalten hat. */
+export const ITEM_PAGE_PROFILE_SELECT_CORE = [
+	'id',
+	'full_name',
+	'accountname',
+	'avatar_url',
+	'bio',
+	'show_bio',
+	'address',
+	'show_address',
+	'phone',
+	'show_phone',
+	'email',
+	'show_email',
+	'website',
+	'show_website',
+	'instagram',
+	'facebook',
+	'twitter',
+	'show_social',
+	'privacy_mode'
+].join(', ');
+
 const ITEM_KEYS_STRIP = new Set(['original_url', 'error_message', 'adobe_stock_error']);
 
 import { fixTextEncodingIfNeeded } from '$lib/utils/utf8Mojibake';

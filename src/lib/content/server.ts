@@ -1,5 +1,6 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { error } from '@sveltejs/kit';
+import { env } from '$env/dynamic/private';
 import {
 	buildGeoHubPath,
 	computeCanonicalPath,
@@ -22,11 +23,11 @@ import { resolveAttribution } from '$lib/metadata/attributionResolver';
 import {
 	fixUtf8MojibakeIfNeeded,
 	ITEM_PAGE_PROFILE_SELECT,
+	ITEM_PAGE_PROFILE_SELECT_CORE,
 	sanitizeItemForItemPageClient,
 	scrubPublicProfileRow
 } from '$lib/server/itemPagePublic';
 import { fixDeepUtf8InObject } from '$lib/utils/utf8Mojibake';
-import { supabaseAdmin } from '$lib/supabaseAdmin.js';
 
 type ItemRecord = ContentItemLike & {
 	user_id?: string | null;
@@ -99,6 +100,23 @@ function createServerSupabase() {
 		import.meta.env.VITE_SUPABASE_ANON_KEY) as string;
 
 	return createClient(supabaseUrl, supabaseKey, {
+		auth: { persistSession: false }
+	});
+}
+
+/** Service-Role für Profil-Lesevorgänge: `$env/dynamic/private` (z. B. Vercel) statt nur Build-Zeit-Import. */
+function createServiceRoleSupabaseForProfiles(): SupabaseClient | null {
+	const supabaseUrl = (env.PUBLIC_SUPABASE_URL ||
+		env.VITE_SUPABASE_URL ||
+		process.env.PUBLIC_SUPABASE_URL ||
+		process.env.VITE_SUPABASE_URL ||
+		import.meta.env.PUBLIC_SUPABASE_URL ||
+		import.meta.env.VITE_SUPABASE_URL) as string | undefined;
+	const key =
+		env.SUPABASE_SERVICE_ROLE_KEY ||
+		(typeof process !== 'undefined' ? process.env.SUPABASE_SERVICE_ROLE_KEY : undefined);
+	if (!supabaseUrl || !key?.trim()) return null;
+	return createClient(supabaseUrl, key, {
 		auth: { persistSession: false }
 	});
 }
@@ -307,16 +325,25 @@ async function getProfile(
 ) {
 	if (!profileId) return { profile: null, full_name: 'Culoca User' };
 
-	/** Service-Role umgeht RLS — sonst liefert Anon bei „privatem“ Profil oft keine Zeile (nur Name/Attribution). */
-	const client = supabaseAdmin ?? supabase;
-	const { data, error: profileError } = await client
+	const client = createServiceRoleSupabaseForProfiles() ?? supabase;
+
+	let { data, error: profileError } = await client
 		.from('profiles')
 		.select(ITEM_PAGE_PROFILE_SELECT)
 		.eq('id', profileId)
 		.maybeSingle();
 
 	if (profileError) {
-		console.warn('[loadContentPage] getProfile', profileId, profileError.message);
+		console.warn('[loadContentPage] getProfile (voller Select)', profileId, profileError.message);
+		const second = await client
+			.from('profiles')
+			.select(ITEM_PAGE_PROFILE_SELECT_CORE)
+			.eq('id', profileId)
+			.maybeSingle();
+		if (second.error) {
+			console.warn('[loadContentPage] getProfile (Kern-Select)', profileId, second.error.message);
+		}
+		data = second.data;
 	}
 
 	const row = data as Record<string, unknown> | null;
