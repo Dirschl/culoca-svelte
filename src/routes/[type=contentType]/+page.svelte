@@ -6,7 +6,7 @@
   import SiteFooter from '$lib/SiteFooter.svelte';
   import { supabase } from '$lib/supabaseClient';
   import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
-  import { appendReturnTo } from '$lib/content/routing';
+  import { appendReturnTo, getPublicItemHref } from '$lib/content/routing';
   import { getEffectiveGpsPosition } from '$lib/filterStore';
   import { absoluteUrl, buildBreadcrumbJsonLd, DEFAULT_OG_IMAGE, trimText } from '$lib/seo/site';
   import { formatEventHubRange, formatHubEventPlace } from '$lib/content/eventHubFormat';
@@ -419,7 +419,9 @@
       while (true) {
         let pageQuery = supabase
           .from('items')
-          .select('id, slug, title, description, caption, canonical_path, path_512, path_2048, width, height, created_at, starts_at, ends_at, external_url, lat, lon, is_private, profile_id')
+          .select(
+            'id, slug, title, description, caption, canonical_path, country_slug, state_slug, region_slug, district_slug, municipality_slug, path_512, path_2048, width, height, created_at, starts_at, ends_at, external_url, lat, lon, is_private, profile_id'
+          )
           .eq('type_id', data.typeDef.id)
           .eq('admin_hidden', false)
           .is('group_root_item_id', null)
@@ -491,6 +493,7 @@
       const enriched = await attachVariants(pageRows);
       clientItems = enriched.map((item) => ({
         ...item,
+        canonical_path: getPublicItemHref(item),
         caption: item.caption ?? item.description ?? null
       }));
       clientTotalCount = totalMatching;
