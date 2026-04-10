@@ -17,6 +17,10 @@ function normalizeSftpHost(rawHost: string): string {
   return host.replace(/^sftp:\/\//i, '').replace(/\/+$/, '');
 }
 
+function normalizeRemoteDir(rawDir: string | null | undefined): string {
+  return (rawDir || '').trim().replace(/^\/+/, '').replace(/\/+$/, '');
+}
+
 export const POST: RequestHandler = async ({ params, request }) => {
   try {
     const authHeader = request.headers.get('Authorization');
@@ -80,7 +84,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
     const sftpHost = normalizeSftpHost(sftpHostRaw);
     const sftpUser = profile.adobe_stock_sftp_username;
     const sftpPassword = profile.adobe_stock_sftp_password;
-    const sftpRemoteDir = (profile.adobe_stock_sftp_remote_dir || '').replace(/^\/+/, '').replace(/\/+$/, '');
+    const configuredRemoteDir = normalizeRemoteDir(profile.adobe_stock_sftp_remote_dir);
 
     if (!sftpUser || !sftpPassword) {
       return json({ error: 'Adobe SFTP Zugangsdaten fehlen im Benutzerprofil' }, { status: 400 });
@@ -170,8 +174,6 @@ export const POST: RequestHandler = async ({ params, request }) => {
     const localTempPath = path.join(os.tmpdir(), `adobe-${item.id}-${Date.now()}-${safeName}`);
     await fs.writeFile(localTempPath, fileBuffer);
 
-    const remotePath = sftpRemoteDir ? `${sftpRemoteDir}/${safeName}` : safeName;
-
     try {
       const sftp = new SftpClient();
       try {
@@ -183,42 +185,64 @@ export const POST: RequestHandler = async ({ params, request }) => {
           readyTimeout: 30000
         });
 
-        if (sftpRemoteDir) {
-          await sftp.mkdir(sftpRemoteDir, true).catch(() => {});
+        // Adobe accounts usually ingest from an "upload"/"Upload" folder.
+        // If not explicitly configured, pick an existing upload folder, else fallback to "upload".
+        let resolvedRemoteDir = configuredRemoteDir;
+        if (!resolvedRemoteDir) {
+          const lowerUploadExists = await sftp.exists('upload');
+          const upperUploadExists = await sftp.exists('Upload');
+          if (lowerUploadExists) {
+            resolvedRemoteDir = 'upload';
+          } else if (upperUploadExists) {
+            resolvedRemoteDir = 'Upload';
+          } else {
+            resolvedRemoteDir = 'upload';
+          }
         }
+
+        if (resolvedRemoteDir) {
+          await sftp.mkdir(resolvedRemoteDir, true).catch(() => {});
+        }
+        const remotePath = resolvedRemoteDir ? `${resolvedRemoteDir}/${safeName}` : safeName;
         await sftp.put(localTempPath, remotePath);
+
+        const uploadedExists = await sftp.exists(remotePath);
+        if (!uploadedExists) {
+          throw new Error(`Upload konnte nicht bestaetigt werden (remote missing): ${remotePath}`);
+        }
+
+        const fallbackUrl = item.adobe_stock_url || profile.adobe_stock_profile_url || null;
+        const cur = getAdobeStockStateFromItem(item as Record<string, unknown>);
+        const next = {
+          ...cur,
+          status: 'uploaded' as const,
+          uploadedAt: new Date().toISOString(),
+          publicUrl: fallbackUrl,
+          error: null
+        };
+        const dual = buildAdobeDualWrite((item as { stock_settings?: unknown }).stock_settings, next);
+        const { data: updatedItem, error: updateError } = await supabase
+          .from('items')
+          .update(dual)
+          .eq('id', item.id)
+          .select(
+            'id, adobe_stock_status, adobe_stock_uploaded_at, adobe_stock_url, adobe_stock_asset_id, adobe_stock_error, stock_settings'
+          )
+          .single();
+
+        if (updateError) {
+          return json({ error: 'Upload erfolgreich, aber Item-Status konnte nicht aktualisiert werden', details: updateError.message }, { status: 500 });
+        }
+
+        return json({
+          success: true,
+          message: `Original erfolgreich zu Adobe Stock SFTP hochgeladen (${remotePath})`,
+          remotePath,
+          item: enrichItemWithResolvedAdobeStock(updatedItem as Record<string, unknown>)
+        });
       } finally {
         await sftp.end().catch(() => {});
       }
-
-      const fallbackUrl = item.adobe_stock_url || profile.adobe_stock_profile_url || null;
-      const cur = getAdobeStockStateFromItem(item as Record<string, unknown>);
-      const next = {
-        ...cur,
-        status: 'uploaded' as const,
-        uploadedAt: new Date().toISOString(),
-        publicUrl: fallbackUrl,
-        error: null
-      };
-      const dual = buildAdobeDualWrite((item as { stock_settings?: unknown }).stock_settings, next);
-      const { data: updatedItem, error: updateError } = await supabase
-        .from('items')
-        .update(dual)
-        .eq('id', item.id)
-        .select(
-          'id, adobe_stock_status, adobe_stock_uploaded_at, adobe_stock_url, adobe_stock_asset_id, adobe_stock_error, stock_settings'
-        )
-        .single();
-
-      if (updateError) {
-        return json({ error: 'Upload erfolgreich, aber Item-Status konnte nicht aktualisiert werden', details: updateError.message }, { status: 500 });
-      }
-
-      return json({
-        success: true,
-        message: 'Original erfolgreich zu Adobe Stock SFTP hochgeladen',
-        item: enrichItemWithResolvedAdobeStock(updatedItem as Record<string, unknown>)
-      });
     } catch (uploadError: any) {
       const curErr = getAdobeStockStateFromItem(item as Record<string, unknown>);
       const dualErr = buildAdobeDualWrite((item as { stock_settings?: unknown }).stock_settings, {
