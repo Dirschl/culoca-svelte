@@ -1,6 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
   import { authFetch } from '$lib/authFetch';
+  import { extractPhotoMetadataFields } from '$lib/metadata/photoMetadata';
   import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
 
   export let item: any;
@@ -13,6 +14,7 @@
 
   let stockUrl = '';
   let assetId = '';
+  let metadataMode: 'culoca' | 'original' = 'culoca';
   let filenameMode: 'original' | 'web' = 'web';
   let busy: 'save' | 'upload' | 'reset' | '' = '';
   let flash = '';
@@ -24,6 +26,7 @@
       syncKey = nextKey;
       stockUrl = item?.adobe_stock_url || '';
       assetId = item?.adobe_stock_asset_id || '';
+      metadataMode = 'culoca';
       filenameMode = 'web';
       flash = '';
     }
@@ -47,12 +50,39 @@
     return null;
   }
 
+  function slugifySegment(value: string) {
+    return value
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .replace(/-{2,}/g, '-');
+  }
+
+  function getPreviewFilename(): string {
+    if (filenameMode === 'original') {
+      return item?.original_name || `image-${item?.id || 'item'}.jpg`;
+    }
+    const seed = item?.title || item?.caption || item?.original_name || 'bild';
+    const slug = slugifySegment(seed) || 'bild';
+    const shortId = slugifySegment(item?.short_id || String(item?.id || '').slice(0, 10)) || String(item?.id || '').slice(0, 10);
+    return `${slug}-culoca-${shortId}.jpg`;
+  }
+
   $: culocaPreview = {
     title: firstText(item?.title, item?.caption),
     description: firstText(item?.description, item?.caption),
     keywords: joinedKeywords(item?.keywords)
   };
-  $: activePreview = culocaPreview;
+  $: originalMeta = extractPhotoMetadataFields((item?.exif_data || {}) as Record<string, unknown>);
+  $: originalPreview = {
+    title: firstText(originalMeta?.title, originalMeta?.caption),
+    description: firstText(originalMeta?.description, originalMeta?.caption),
+    keywords: firstText(originalMeta?.keywords)
+  };
+  $: activePreview = metadataMode === 'culoca' ? culocaPreview : originalPreview;
+  $: previewFilename = getPreviewFilename();
   $: previewThumb =
     item?.slug && item?.path_512 ? getSeoImageUrl(item.slug, item.path_512, '512') : '';
 
@@ -118,6 +148,7 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          metadataMode,
           filenameMode
         })
       });
@@ -197,7 +228,16 @@
     <section class="stock-upload-config">
       <h4>Adobe Upload</h4>
       <p class="stock-overlay-note">Adobe zeigt neue Uploads oft erst nach 10-20 Sekunden.</p>
-      <p class="stock-overlay-note">Metadatenquelle: Culoca (Titel/Beschreibung/Keywords aus Culoca)</p>
+      <div class="stock-overlay-choice-grid">
+        <label class="stock-choice">
+          <input type="radio" bind:group={metadataMode} value="culoca" />
+          <span>Culoca (Default)</span>
+        </label>
+        <label class="stock-choice">
+          <input type="radio" bind:group={metadataMode} value="original" />
+          <span>Original</span>
+        </label>
+      </div>
       <div class="stock-overlay-choice-grid">
         <label class="stock-choice">
           <input type="radio" bind:group={filenameMode} value="original" />
@@ -213,8 +253,8 @@
           <img src={previewThumb} alt="Vorschau 512px" loading="lazy" />
         {/if}
         <div class="stock-preview-meta">
-          <div><strong>Quelle:</strong> Culoca EXIF</div>
-          <div><strong>Dateiname:</strong> {filenameMode === 'web' ? 'Slug' : 'Dateiname'}</div>
+          <div><strong>Quelle:</strong> {metadataMode === 'culoca' ? 'Culoca EXIF' : 'Original EXIF'}</div>
+          <div><strong>Dateiname:</strong> {previewFilename}</div>
           <div><strong>Titel:</strong> {activePreview.title || '—'}</div>
           <div><strong>Beschreibung:</strong> {activePreview.description || '—'}</div>
           <div><strong>Keywords:</strong> {activePreview.keywords || '—'}</div>

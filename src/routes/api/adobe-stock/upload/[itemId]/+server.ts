@@ -7,6 +7,7 @@ import {
 	getAdobeStockStateFromItem
 } from '$lib/stock/itemStockSettings';
 import {
+  buildDownloadFilename,
   canRewriteMetadataWithoutSharp,
   renderDownloadExport,
   rewriteJpegMetadataWithoutSharp,
@@ -29,14 +30,21 @@ function normalizeRemoteDir(rawDir: string | null | undefined): string {
 
 export const POST: RequestHandler = async ({ params, request }) => {
   try {
-    let uploadOptions: { filenameMode: 'original' | 'web' } = {
+    let uploadOptions: { metadataMode: 'culoca' | 'original'; filenameMode: 'original' | 'web' } = {
+      metadataMode: 'culoca',
       filenameMode: 'web'
     };
     try {
       const body = (await request.json()) as Record<string, unknown>;
+      const rawMetadataMode = String(body?.metadataMode || '').toLowerCase();
+      const rawFilenameMode = String(body?.filenameMode || '').toLowerCase();
       uploadOptions = {
-        // Backward compatibility: slug|web => web, dateiname|original => original
-        filenameMode: body?.filenameMode === 'web' ? 'web' : 'original'
+        metadataMode: rawMetadataMode === 'original' ? 'original' : 'culoca',
+        // Backward compatibility: slug|web => web, dateiname|filename|original => original
+        filenameMode:
+          rawFilenameMode === 'web' || rawFilenameMode === 'slug'
+            ? 'web'
+            : 'original'
       };
     } catch {
       // Optional body; fallback defaults are intentional.
@@ -196,20 +204,40 @@ export const POST: RequestHandler = async ({ params, request }) => {
 
     let uploadBuffer = fileBuffer;
     let finalUploadFilename = (item.original_name || `${item.id}.jpg`).replace(/[^\w.\-]+/g, '_');
-    const culocaExportOptions: DownloadExportOptions = {
+    const exportOptions: DownloadExportOptions = {
       sizeMode: 'full',
       format: 'jpg',
-      metadataMode: 'culoca',
+      metadataMode: uploadOptions.metadataMode,
       filenameMode: uploadOptions.filenameMode
     };
-    if (canRewriteMetadataWithoutSharp(fileBuffer, culocaExportOptions)) {
-      const rewritten = await rewriteJpegMetadataWithoutSharp(fileBuffer, sourceItemForExport as any, culocaExportOptions);
-      uploadBuffer = rewritten.buffer;
-      finalUploadFilename = rewritten.filename;
+    if (uploadOptions.metadataMode === 'culoca') {
+      try {
+        if (canRewriteMetadataWithoutSharp(fileBuffer, exportOptions)) {
+          const rewritten = await rewriteJpegMetadataWithoutSharp(fileBuffer, sourceItemForExport as any, exportOptions);
+          uploadBuffer = rewritten.buffer;
+          finalUploadFilename = rewritten.filename;
+        } else {
+          const rendered = await renderDownloadExport(fileBuffer, sourceItemForExport as any, exportOptions);
+          uploadBuffer = rendered.buffer;
+          finalUploadFilename = rendered.filename;
+        }
+      } catch (metadataError: any) {
+        // Robust fallback: upload original bytes if metadata-rewrite fails
+        uploadBuffer = fileBuffer;
+        finalUploadFilename = buildDownloadFilename(sourceItemForExport as any, {
+          sizeMode: 'full',
+          format: 'jpg',
+          metadataMode: 'original',
+          filenameMode: uploadOptions.filenameMode
+        });
+      }
     } else {
-      const rendered = await renderDownloadExport(fileBuffer, sourceItemForExport as any, culocaExportOptions);
-      uploadBuffer = rendered.buffer;
-      finalUploadFilename = rendered.filename;
+      finalUploadFilename = buildDownloadFilename(sourceItemForExport as any, {
+        sizeMode: 'full',
+        format: 'jpg',
+        metadataMode: 'original',
+        filenameMode: uploadOptions.filenameMode
+      });
     }
 
     const safeName = finalUploadFilename.replace(/[^\w.\-]+/g, '_');
@@ -268,7 +296,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
           message: `Original erfolgreich zu Adobe Stock SFTP hochgeladen (${remotePath})`,
           remotePath,
           upload: {
-            metadataMode: 'culoca',
+            metadataMode: uploadOptions.metadataMode,
             filenameMode: uploadOptions.filenameMode,
             filename: safeName,
             metadataPreview: {
