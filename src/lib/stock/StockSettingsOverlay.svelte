@@ -60,15 +60,20 @@
       .replace(/-{2,}/g, '-');
   }
 
-  function getPreviewFilename(): string {
-    if (filenameMode === 'original') {
-      return item?.original_name || `image-${item?.id || 'item'}.jpg`;
-    }
-    const seed = item?.title || item?.caption || item?.original_name || 'bild';
-    const slug = slugifySegment(seed) || 'bild';
-    const shortId = slugifySegment(item?.short_id || String(item?.id || '').slice(0, 10)) || String(item?.id || '').slice(0, 10);
-    return `${slug}-culoca-${shortId}.jpg`;
-  }
+  /** Gleiche Logik wie `buildDownloadFilename` — muss im `$:`-Block stehen, damit Svelte `filenameMode` mitverfolgt. */
+  $: previewFilename =
+    filenameMode === 'original'
+      ? (typeof item?.original_name === 'string' && item.original_name.trim()
+          ? item.original_name.trim()
+          : `image-${item?.id || 'item'}.jpg`)
+      : (() => {
+          const seed = item?.title || item?.caption || item?.original_name || 'bild';
+          const slug = slugifySegment(String(seed)) || 'bild';
+          const shortId =
+            slugifySegment(item?.short_id || String(item?.id || '').slice(0, 10)) ||
+            String(item?.id || '').slice(0, 10);
+          return `${slug}-culoca-${shortId}.jpg`;
+        })();
 
   $: culocaPreview = {
     title: firstText(item?.title, item?.caption),
@@ -82,7 +87,6 @@
     keywords: firstText(originalMeta?.keywords)
   };
   $: activePreview = metadataMode === 'culoca' ? culocaPreview : originalPreview;
-  $: previewFilename = getPreviewFilename();
   $: previewThumb =
     item?.slug && item?.path_512 ? getSeoImageUrl(item.slug, item.path_512, '512') : '';
 
