@@ -351,7 +351,7 @@
     let request = supabase
       .from('items')
       .select(
-        'id, slug, title, original_name, canonical_path, country_slug, district_slug, municipality_slug, path_512, created_at, updated_at, adobe_stock_status, adobe_stock_uploaded_at, adobe_stock_asset_id, adobe_stock_url, adobe_stock_error, stock_settings',
+        'id, slug, title, caption, description, keywords, exif_data, short_id, original_name, canonical_path, country_slug, district_slug, municipality_slug, path_512, created_at, updated_at, adobe_stock_status, adobe_stock_uploaded_at, adobe_stock_asset_id, adobe_stock_url, adobe_stock_error, stock_settings',
         { count: 'exact' }
       )
       .eq('profile_id', currentUserId)

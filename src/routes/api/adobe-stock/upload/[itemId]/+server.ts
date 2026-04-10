@@ -6,11 +6,19 @@ import {
 	enrichItemWithResolvedAdobeStock,
 	getAdobeStockStateFromItem
 } from '$lib/stock/itemStockSettings';
+import {
+  buildDownloadFilename,
+  canRewriteMetadataWithoutSharp,
+  renderDownloadExport,
+  rewriteJpegMetadataWithoutSharp,
+  type DownloadExportOptions
+} from '$lib/server/downloadExport';
 import { promises as fs } from 'fs';
 import os from 'os';
 import path from 'path';
 import SftpClient from 'ssh2-sftp-client';
 import { createClient as createWebdavClient } from 'webdav';
+import { extractPhotoMetadataFields } from '$lib/metadata/photoMetadata';
 
 function normalizeSftpHost(rawHost: string): string {
   const host = rawHost.trim();
@@ -23,6 +31,20 @@ function normalizeRemoteDir(rawDir: string | null | undefined): string {
 
 export const POST: RequestHandler = async ({ params, request }) => {
   try {
+    let uploadOptions: { metadataMode: 'culoca' | 'original'; filenameMode: 'original' | 'web' } = {
+      metadataMode: 'culoca',
+      filenameMode: 'original'
+    };
+    try {
+      const body = (await request.json()) as Record<string, unknown>;
+      uploadOptions = {
+        metadataMode: body?.metadataMode === 'original' ? 'original' : 'culoca',
+        filenameMode: body?.filenameMode === 'web' ? 'web' : 'original'
+      };
+    } catch {
+      // Optional body; fallback defaults are intentional.
+    }
+
     const authHeader = request.headers.get('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return json({ error: 'Nicht angemeldet' }, { status: 401 });
@@ -52,7 +74,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
     const { data: item, error: itemError } = await supabase
       .from('items')
       .select(
-        'id, profile_id, original_url, original_name, adobe_stock_url, stock_settings, adobe_stock_status, adobe_stock_uploaded_at, adobe_stock_asset_id, adobe_stock_error'
+        'id, profile_id, short_id, title, caption, description, keywords, exif_data, lat, lon, original_url, original_name, adobe_stock_url, stock_settings, adobe_stock_status, adobe_stock_uploaded_at, adobe_stock_asset_id, adobe_stock_error'
       )
       .eq('id', itemId)
       .single();
@@ -66,7 +88,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
 
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('adobe_stock_sftp_enabled, adobe_stock_profile_url, adobe_stock_sftp_host, adobe_stock_sftp_username, adobe_stock_sftp_password, adobe_stock_sftp_remote_dir')
+      .select('adobe_stock_sftp_enabled, adobe_stock_profile_url, adobe_stock_sftp_host, adobe_stock_sftp_username, adobe_stock_sftp_password, adobe_stock_sftp_remote_dir, display_name_public, legal_entity_name, copyright_holder_name, default_creator_name, default_credit_text, default_copyright_notice, default_license_url, default_author_meta, organization_name, use_exif_creator_override, use_exif_credit_override, use_exif_copyright_override, photographer_label_mode, public_contact_name, full_name, accountname')
       .eq('id', user.id)
       .single();
 
@@ -170,9 +192,41 @@ export const POST: RequestHandler = async ({ params, request }) => {
         details: lastDownloadError
       }, { status: 502 });
     }
-    const safeName = (item.original_name || `${item.id}.jpg`).replace(/[^\w.\-]+/g, '_');
+    const sourceItemForExport = {
+      ...(item as Record<string, unknown>),
+      profile: profile || null
+    } as Record<string, unknown>;
+
+    let uploadBuffer = fileBuffer;
+    let finalUploadFilename = (item.original_name || `${item.id}.jpg`).replace(/[^\w.\-]+/g, '_');
+    if (uploadOptions.metadataMode === 'culoca') {
+      const culocaExportOptions: DownloadExportOptions = {
+        sizeMode: 'full',
+        format: 'jpg',
+        metadataMode: 'culoca',
+        filenameMode: uploadOptions.filenameMode
+      };
+      if (canRewriteMetadataWithoutSharp(fileBuffer, culocaExportOptions)) {
+        const rewritten = await rewriteJpegMetadataWithoutSharp(fileBuffer, sourceItemForExport as any, culocaExportOptions);
+        uploadBuffer = rewritten.buffer;
+        finalUploadFilename = rewritten.filename;
+      } else {
+        const rendered = await renderDownloadExport(fileBuffer, sourceItemForExport as any, culocaExportOptions);
+        uploadBuffer = rendered.buffer;
+        finalUploadFilename = rendered.filename;
+      }
+    } else if (uploadOptions.filenameMode === 'web') {
+      finalUploadFilename = buildDownloadFilename(sourceItemForExport as any, {
+        sizeMode: 'full',
+        format: 'jpg',
+        metadataMode: 'original',
+        filenameMode: 'web'
+      });
+    }
+
+    const safeName = finalUploadFilename.replace(/[^\w.\-]+/g, '_');
     const localTempPath = path.join(os.tmpdir(), `adobe-${item.id}-${Date.now()}-${safeName}`);
-    await fs.writeFile(localTempPath, fileBuffer);
+    await fs.writeFile(localTempPath, uploadBuffer);
 
     try {
       const sftp = new SftpClient();
@@ -185,20 +239,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
           readyTimeout: 30000
         });
 
-        // Adobe accounts usually ingest from an "upload"/"Upload" folder.
-        // If not explicitly configured, pick an existing upload folder, else fallback to "upload".
-        let resolvedRemoteDir = configuredRemoteDir;
-        if (!resolvedRemoteDir) {
-          const lowerUploadExists = await sftp.exists('upload');
-          const upperUploadExists = await sftp.exists('Upload');
-          if (lowerUploadExists) {
-            resolvedRemoteDir = 'upload';
-          } else if (upperUploadExists) {
-            resolvedRemoteDir = 'Upload';
-          } else {
-            resolvedRemoteDir = 'upload';
-          }
-        }
+        const resolvedRemoteDir = configuredRemoteDir;
 
         if (resolvedRemoteDir) {
           await sftp.mkdir(resolvedRemoteDir, true).catch(() => {});
@@ -238,6 +279,23 @@ export const POST: RequestHandler = async ({ params, request }) => {
           success: true,
           message: `Original erfolgreich zu Adobe Stock SFTP hochgeladen (${remotePath})`,
           remotePath,
+          upload: {
+            metadataMode: uploadOptions.metadataMode,
+            filenameMode: uploadOptions.filenameMode,
+            filename: safeName,
+            metadataPreview: {
+              culoca: {
+                title: item.title || null,
+                description: item.description || item.caption || null,
+                keywords: Array.isArray(item.keywords) ? item.keywords.join(', ') : null
+              },
+              original: {
+                title: extractPhotoMetadataFields((item.exif_data || {}) as Record<string, unknown>).title,
+                description: extractPhotoMetadataFields((item.exif_data || {}) as Record<string, unknown>).description,
+                keywords: extractPhotoMetadataFields((item.exif_data || {}) as Record<string, unknown>).keywords
+              }
+            }
+          },
           item: enrichItemWithResolvedAdobeStock(updatedItem as Record<string, unknown>)
         });
       } finally {

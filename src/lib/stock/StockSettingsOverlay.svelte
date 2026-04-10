@@ -1,6 +1,8 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
   import { authFetch } from '$lib/authFetch';
+  import { extractPhotoMetadataFields } from '$lib/metadata/photoMetadata';
+  import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
 
   export let item: any;
   export let title = 'Stock-Einstellungen';
@@ -12,6 +14,8 @@
 
   let stockUrl = '';
   let assetId = '';
+  let metadataMode: 'culoca' | 'original' = 'culoca';
+  let filenameMode: 'original' | 'web' = 'original';
   let busy: 'save' | 'upload' | 'reset' | '' = '';
   let flash = '';
   let syncKey = '';
@@ -22,9 +26,44 @@
       syncKey = nextKey;
       stockUrl = item?.adobe_stock_url || '';
       assetId = item?.adobe_stock_asset_id || '';
+      metadataMode = 'culoca';
+      filenameMode = 'original';
       flash = '';
     }
   }
+
+  function firstText(...values: Array<unknown>) {
+    for (const value of values) {
+      if (typeof value === 'string' && value.trim()) return value.trim();
+    }
+    return null;
+  }
+
+  function joinedKeywords(value: unknown): string | null {
+    if (Array.isArray(value)) {
+      const list = value
+        .filter((entry): entry is string => typeof entry === 'string' && !!entry.trim())
+        .map((entry) => entry.trim());
+      return list.length ? list.join(', ') : null;
+    }
+    if (typeof value === 'string' && value.trim()) return value.trim();
+    return null;
+  }
+
+  $: originalMeta = extractPhotoMetadataFields((item?.exif_data || {}) as Record<string, unknown>);
+  $: culocaPreview = {
+    title: firstText(item?.title, item?.caption),
+    description: firstText(item?.description, item?.caption),
+    keywords: joinedKeywords(item?.keywords)
+  };
+  $: originalPreview = {
+    title: firstText(originalMeta?.title, originalMeta?.caption),
+    description: firstText(originalMeta?.description, originalMeta?.caption),
+    keywords: firstText(originalMeta?.keywords)
+  };
+  $: activePreview = metadataMode === 'culoca' ? culocaPreview : originalPreview;
+  $: previewThumb =
+    item?.slug && item?.path_512 ? getSeoImageUrl(item.slug, item.path_512, '512') : '';
 
   function extractAdobeAssetIdFromUrl(url: string): string {
     const match = url.trim().match(/\/(\d+)(?:[/?#]|$)/);
@@ -84,7 +123,14 @@
     busy = 'upload';
     flash = '';
     try {
-      const res = await authFetch(`/api/adobe-stock/upload/${item.id}`, { method: 'POST' });
+      const res = await authFetch(`/api/adobe-stock/upload/${item.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          metadataMode,
+          filenameMode
+        })
+      });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         flash = data?.error || 'Upload fehlgeschlagen';
@@ -158,12 +204,49 @@
       <input type="text" bind:value={assetId} placeholder="optional" />
     </label>
 
+    <section class="stock-upload-config">
+      <h4>Adobe Upload</h4>
+      <p class="stock-overlay-note">Adobe zeigt neue Uploads oft erst nach 10-20 Sekunden.</p>
+      <div class="stock-overlay-choice-grid">
+        <label class="stock-choice">
+          <input type="radio" bind:group={metadataMode} value="culoca" />
+          <span>Culoca EXIF (empfohlen)</span>
+        </label>
+        <label class="stock-choice">
+          <input type="radio" bind:group={metadataMode} value="original" />
+          <span>Original EXIF</span>
+        </label>
+      </div>
+      <div class="stock-overlay-choice-grid">
+        <label class="stock-choice">
+          <input type="radio" bind:group={filenameMode} value="original" />
+          <span>Dateiname: Original</span>
+        </label>
+        <label class="stock-choice">
+          <input type="radio" bind:group={filenameMode} value="web" />
+          <span>Dateiname: Culoca</span>
+        </label>
+      </div>
+      <div class="stock-preview">
+        {#if previewThumb}
+          <img src={previewThumb} alt="Vorschau 512px" loading="lazy" />
+        {/if}
+        <div class="stock-preview-meta">
+          <div><strong>Quelle:</strong> {metadataMode === 'culoca' ? 'Culoca EXIF' : 'Original EXIF'}</div>
+          <div><strong>Dateiname:</strong> {filenameMode === 'web' ? 'Culoca-Name' : (item?.original_name || 'original.jpg')}</div>
+          <div><strong>Titel:</strong> {activePreview.title || '—'}</div>
+          <div><strong>Beschreibung:</strong> {activePreview.description || '—'}</div>
+          <div><strong>Keywords:</strong> {activePreview.keywords || '—'}</div>
+        </div>
+      </div>
+    </section>
+
     <div class="stock-overlay-actions">
       <button type="button" class="ghost-btn" on:click={saveStock} disabled={busy === 'save'}>
         {busy === 'save' ? 'Speichert...' : 'Speichern'}
       </button>
       <button type="button" class="primary-btn" on:click={uploadToAdobe} disabled={busy === 'upload'}>
-        {busy === 'upload' ? 'Upload...' : 'Original hochladen'}
+        {busy === 'upload' ? 'Upload...' : 'Adobe Upload'}
       </button>
       <button type="button" class="ghost-btn danger" on:click={resetAdobeBranch} disabled={busy === 'reset'}>
         {busy === 'reset' ? '...' : 'Adobe zurücksetzen'}
@@ -289,5 +372,57 @@
   .stock-overlay-link {
     font-size: 0.9rem;
     color: var(--accent-color);
+  }
+  .stock-upload-config {
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 0.75rem;
+    background: color-mix(in srgb, var(--bg-primary) 82%, transparent);
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .stock-upload-config h4 {
+    margin: 0;
+    font-size: 1rem;
+  }
+  .stock-overlay-note {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 0.88rem;
+  }
+  .stock-overlay-choice-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .stock-choice {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    padding: 0.35rem 0.6rem;
+    background: var(--bg-secondary);
+    font-size: 0.88rem;
+  }
+  .stock-preview {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.65rem;
+    align-items: start;
+  }
+  .stock-preview img {
+    width: 96px;
+    height: 96px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+  }
+  .stock-preview-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    font-size: 0.88rem;
   }
 </style>
