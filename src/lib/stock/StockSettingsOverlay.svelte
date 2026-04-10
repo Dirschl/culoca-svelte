@@ -1,7 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
   import { authFetch } from '$lib/authFetch';
-  import { extractPhotoMetadataFields } from '$lib/metadata/photoMetadata';
   import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
 
   export let item: any;
@@ -14,8 +13,7 @@
 
   let stockUrl = '';
   let assetId = '';
-  let metadataMode: 'culoca' | 'original' = 'culoca';
-  let filenameMode: 'original' | 'web' = 'original';
+  let filenameMode: 'original' | 'web' = 'web';
   let busy: 'save' | 'upload' | 'reset' | '' = '';
   let flash = '';
   let syncKey = '';
@@ -26,8 +24,7 @@
       syncKey = nextKey;
       stockUrl = item?.adobe_stock_url || '';
       assetId = item?.adobe_stock_asset_id || '';
-      metadataMode = 'culoca';
-      filenameMode = 'original';
+      filenameMode = 'web';
       flash = '';
     }
   }
@@ -50,18 +47,12 @@
     return null;
   }
 
-  $: originalMeta = extractPhotoMetadataFields((item?.exif_data || {}) as Record<string, unknown>);
   $: culocaPreview = {
     title: firstText(item?.title, item?.caption),
     description: firstText(item?.description, item?.caption),
     keywords: joinedKeywords(item?.keywords)
   };
-  $: originalPreview = {
-    title: firstText(originalMeta?.title, originalMeta?.caption),
-    description: firstText(originalMeta?.description, originalMeta?.caption),
-    keywords: firstText(originalMeta?.keywords)
-  };
-  $: activePreview = metadataMode === 'culoca' ? culocaPreview : originalPreview;
+  $: activePreview = culocaPreview;
   $: previewThumb =
     item?.slug && item?.path_512 ? getSeoImageUrl(item.slug, item.path_512, '512') : '';
 
@@ -127,7 +118,6 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          metadataMode,
           filenameMode
         })
       });
@@ -207,24 +197,15 @@
     <section class="stock-upload-config">
       <h4>Adobe Upload</h4>
       <p class="stock-overlay-note">Adobe zeigt neue Uploads oft erst nach 10-20 Sekunden.</p>
-      <div class="stock-overlay-choice-grid">
-        <label class="stock-choice">
-          <input type="radio" bind:group={metadataMode} value="culoca" />
-          <span>Culoca EXIF (empfohlen)</span>
-        </label>
-        <label class="stock-choice">
-          <input type="radio" bind:group={metadataMode} value="original" />
-          <span>Original EXIF</span>
-        </label>
-      </div>
+      <p class="stock-overlay-note">Metadatenquelle: Culoca (Titel/Beschreibung/Keywords aus Culoca)</p>
       <div class="stock-overlay-choice-grid">
         <label class="stock-choice">
           <input type="radio" bind:group={filenameMode} value="original" />
-          <span>Dateiname: Original</span>
+          <span>Dateiname</span>
         </label>
         <label class="stock-choice">
           <input type="radio" bind:group={filenameMode} value="web" />
-          <span>Dateiname: Culoca</span>
+          <span>Slug (empfohlen)</span>
         </label>
       </div>
       <div class="stock-preview">
@@ -232,8 +213,8 @@
           <img src={previewThumb} alt="Vorschau 512px" loading="lazy" />
         {/if}
         <div class="stock-preview-meta">
-          <div><strong>Quelle:</strong> {metadataMode === 'culoca' ? 'Culoca EXIF' : 'Original EXIF'}</div>
-          <div><strong>Dateiname:</strong> {filenameMode === 'web' ? 'Culoca-Name' : (item?.original_name || 'original.jpg')}</div>
+          <div><strong>Quelle:</strong> Culoca EXIF</div>
+          <div><strong>Dateiname:</strong> {filenameMode === 'web' ? 'Slug' : 'Dateiname'}</div>
           <div><strong>Titel:</strong> {activePreview.title || '—'}</div>
           <div><strong>Beschreibung:</strong> {activePreview.description || '—'}</div>
           <div><strong>Keywords:</strong> {activePreview.keywords || '—'}</div>

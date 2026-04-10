@@ -7,7 +7,6 @@ import {
 	getAdobeStockStateFromItem
 } from '$lib/stock/itemStockSettings';
 import {
-  buildDownloadFilename,
   canRewriteMetadataWithoutSharp,
   renderDownloadExport,
   rewriteJpegMetadataWithoutSharp,
@@ -18,7 +17,6 @@ import os from 'os';
 import path from 'path';
 import SftpClient from 'ssh2-sftp-client';
 import { createClient as createWebdavClient } from 'webdav';
-import { extractPhotoMetadataFields } from '$lib/metadata/photoMetadata';
 
 function normalizeSftpHost(rawHost: string): string {
   const host = rawHost.trim();
@@ -31,14 +29,13 @@ function normalizeRemoteDir(rawDir: string | null | undefined): string {
 
 export const POST: RequestHandler = async ({ params, request }) => {
   try {
-    let uploadOptions: { metadataMode: 'culoca' | 'original'; filenameMode: 'original' | 'web' } = {
-      metadataMode: 'culoca',
-      filenameMode: 'original'
+    let uploadOptions: { filenameMode: 'original' | 'web' } = {
+      filenameMode: 'web'
     };
     try {
       const body = (await request.json()) as Record<string, unknown>;
       uploadOptions = {
-        metadataMode: body?.metadataMode === 'original' ? 'original' : 'culoca',
+        // Backward compatibility: slug|web => web, dateiname|original => original
         filenameMode: body?.filenameMode === 'web' ? 'web' : 'original'
       };
     } catch {
@@ -199,29 +196,20 @@ export const POST: RequestHandler = async ({ params, request }) => {
 
     let uploadBuffer = fileBuffer;
     let finalUploadFilename = (item.original_name || `${item.id}.jpg`).replace(/[^\w.\-]+/g, '_');
-    if (uploadOptions.metadataMode === 'culoca') {
-      const culocaExportOptions: DownloadExportOptions = {
-        sizeMode: 'full',
-        format: 'jpg',
-        metadataMode: 'culoca',
-        filenameMode: uploadOptions.filenameMode
-      };
-      if (canRewriteMetadataWithoutSharp(fileBuffer, culocaExportOptions)) {
-        const rewritten = await rewriteJpegMetadataWithoutSharp(fileBuffer, sourceItemForExport as any, culocaExportOptions);
-        uploadBuffer = rewritten.buffer;
-        finalUploadFilename = rewritten.filename;
-      } else {
-        const rendered = await renderDownloadExport(fileBuffer, sourceItemForExport as any, culocaExportOptions);
-        uploadBuffer = rendered.buffer;
-        finalUploadFilename = rendered.filename;
-      }
-    } else if (uploadOptions.filenameMode === 'web') {
-      finalUploadFilename = buildDownloadFilename(sourceItemForExport as any, {
-        sizeMode: 'full',
-        format: 'jpg',
-        metadataMode: 'original',
-        filenameMode: 'web'
-      });
+    const culocaExportOptions: DownloadExportOptions = {
+      sizeMode: 'full',
+      format: 'jpg',
+      metadataMode: 'culoca',
+      filenameMode: uploadOptions.filenameMode
+    };
+    if (canRewriteMetadataWithoutSharp(fileBuffer, culocaExportOptions)) {
+      const rewritten = await rewriteJpegMetadataWithoutSharp(fileBuffer, sourceItemForExport as any, culocaExportOptions);
+      uploadBuffer = rewritten.buffer;
+      finalUploadFilename = rewritten.filename;
+    } else {
+      const rendered = await renderDownloadExport(fileBuffer, sourceItemForExport as any, culocaExportOptions);
+      uploadBuffer = rendered.buffer;
+      finalUploadFilename = rendered.filename;
     }
 
     const safeName = finalUploadFilename.replace(/[^\w.\-]+/g, '_');
@@ -280,7 +268,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
           message: `Original erfolgreich zu Adobe Stock SFTP hochgeladen (${remotePath})`,
           remotePath,
           upload: {
-            metadataMode: uploadOptions.metadataMode,
+            metadataMode: 'culoca',
             filenameMode: uploadOptions.filenameMode,
             filename: safeName,
             metadataPreview: {
@@ -288,11 +276,6 @@ export const POST: RequestHandler = async ({ params, request }) => {
                 title: item.title || null,
                 description: item.description || item.caption || null,
                 keywords: Array.isArray(item.keywords) ? item.keywords.join(', ') : null
-              },
-              original: {
-                title: extractPhotoMetadataFields((item.exif_data || {}) as Record<string, unknown>).title,
-                description: extractPhotoMetadataFields((item.exif_data || {}) as Record<string, unknown>).description,
-                keywords: extractPhotoMetadataFields((item.exif_data || {}) as Record<string, unknown>).keywords
               }
             }
           },
