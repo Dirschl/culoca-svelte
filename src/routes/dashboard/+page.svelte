@@ -7,7 +7,7 @@
   import { getPublicItemHref } from '$lib/content/routing';
   import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
   import { fetchProfileReviewItems } from '$lib/profile/review';
-  import { authFetch } from '$lib/authFetch';
+  import StockSettingsOverlay from '$lib/stock/StockSettingsOverlay.svelte';
 
   const PAGE_SIZE = 12;
 
@@ -82,10 +82,8 @@
   let followingSearchBusy = false;
   let contentSectionEl: HTMLElement | null = null;
 
-  /** Entwurf pro Item-ID für Stock-URL / Asset-ID (Dashboard). */
-  let stockEdits: Record<string, { url: string; assetId: string }> = {};
-  let stockActionBusy: Record<string, 'save' | 'upload' | 'reset' | undefined> = {};
-  let stockFlash: Record<string, string> = {};
+  let stockOverlayItem: any = null;
+  let stockItemParamId = '';
 
   $: totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
   $: canPrev = currentPage > 1;
@@ -105,118 +103,48 @@
         ? { ...it, ...updated, stats: it.stats, stock_settings: updated.stock_settings ?? it.stock_settings }
         : it
     );
-    stockEdits = {
-      ...stockEdits,
-      [updated.id]: {
-        url: updated.adobe_stock_url || '',
-        assetId: updated.adobe_stock_asset_id || ''
-      }
-    };
-  }
-
-  function extractAdobeAssetIdFromUrl(url: string): string {
-    const match = url.trim().match(/\/(\d+)(?:[/?#]|$)/);
-    return match ? match[1] : '';
-  }
-
-  async function saveDashboardStock(item: any) {
-    const d = stockEdits[item.id];
-    if (!d) return;
-    const normalizedUrl = d.url.trim();
-    const inferredId = d.assetId.trim() || extractAdobeAssetIdFromUrl(normalizedUrl);
-    const nextStatus = normalizedUrl
-      ? item.adobe_stock_status === 'none'
-        ? 'uploaded'
-        : item.adobe_stock_status
-      : 'none';
-    stockActionBusy = { ...stockActionBusy, [item.id]: 'save' };
-    stockFlash = { ...stockFlash, [item.id]: '' };
-    try {
-      const res = await authFetch(`/api/item/${item.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          adobe_stock_url: normalizedUrl || null,
-          adobe_stock_asset_id: inferredId || null,
-          adobe_stock_status: nextStatus
-        })
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        stockFlash = { ...stockFlash, [item.id]: data?.error || 'Speichern fehlgeschlagen' };
-        return;
-      }
-      if (data?.item) mergeStockItemIntoList(data.item);
-      stockFlash = { ...stockFlash, [item.id]: 'Gespeichert' };
-      d.assetId = inferredId;
-    } finally {
-      const next = { ...stockActionBusy };
-      delete next[item.id];
-      stockActionBusy = next;
+    if (stockOverlayItem?.id === updated.id) {
+      stockOverlayItem = { ...stockOverlayItem, ...updated };
     }
   }
 
-  async function uploadDashboardStock(item: any) {
-    stockActionBusy = { ...stockActionBusy, [item.id]: 'upload' };
-    stockFlash = { ...stockFlash, [item.id]: '' };
-    try {
-      const res = await authFetch(`/api/adobe-stock/upload/${item.id}`, { method: 'POST' });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        stockFlash = { ...stockFlash, [item.id]: data?.error || 'Upload fehlgeschlagen' };
-        return;
-      }
-      if (data?.item) mergeStockItemIntoList(data.item);
-      stockFlash = { ...stockFlash, [item.id]: data?.message || 'Upload gestartet' };
-    } finally {
-      const next = { ...stockActionBusy };
-      delete next[item.id];
-      stockActionBusy = next;
+  function openStockOverlay(item: any) {
+    stockOverlayItem = item;
+    if (!browser) return;
+    const url = new URL(window.location.href);
+    if (item?.id) {
+      url.searchParams.set('stockItem', item.id);
+      window.history.replaceState(null, '', url.toString());
     }
   }
 
-  async function resetDashboardStockAdobe(item: any) {
-    stockActionBusy = { ...stockActionBusy, [item.id]: 'reset' };
-    stockFlash = { ...stockFlash, [item.id]: '' };
-    try {
-      const res = await authFetch(`/api/item/${item.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          adobe_stock_status: 'none',
-          adobe_stock_uploaded_at: null,
-          adobe_stock_asset_id: null,
-          adobe_stock_url: null,
-          adobe_stock_error: null
-        })
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        stockFlash = { ...stockFlash, [item.id]: data?.error || 'Zurücksetzen fehlgeschlagen' };
-        return;
-      }
-      if (data?.item) mergeStockItemIntoList(data.item);
-      stockFlash = { ...stockFlash, [item.id]: 'Adobe-Eintrag zurückgesetzt' };
-    } finally {
-      const next = { ...stockActionBusy };
-      delete next[item.id];
-      stockActionBusy = next;
-    }
+  function closeStockOverlay() {
+    stockOverlayItem = null;
+    if (!browser) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete('stockItem');
+    window.history.replaceState(null, '', url.toString());
   }
 
-  $: {
-    const next = { ...stockEdits };
-    let changed = false;
-    for (const item of allItems) {
-      if (!next[item.id]) {
-        next[item.id] = {
-          url: item.adobe_stock_url || '',
-          assetId: item.adobe_stock_asset_id || ''
-        };
-        changed = true;
-      }
+  async function tryOpenStockOverlayFromParam() {
+    if (!stockItemParamId) return;
+    const inList = allItems.find((it: any) => it.id === stockItemParamId);
+    if (inList) {
+      openStockOverlay(inList);
+      return;
     }
-    if (changed) stockEdits = next;
+    const { data, error } = await supabase
+      .from('items')
+      .select(
+        'id, slug, title, original_name, canonical_path, country_slug, district_slug, municipality_slug, path_512, created_at, updated_at, adobe_stock_status, adobe_stock_uploaded_at, adobe_stock_asset_id, adobe_stock_url, adobe_stock_error, stock_settings'
+      )
+      .eq('profile_id', currentUserId)
+      .eq('id', stockItemParamId)
+      .eq('admin_hidden', false)
+      .maybeSingle();
+    if (!error && data) {
+      openStockOverlay(data);
+    }
   }
 
   function formatDate(value: string | null | undefined): string {
@@ -975,12 +903,16 @@
       if (sectionParam && isDashboardSectionId(sectionParam)) {
         activeSection = sectionParam;
       }
+      stockItemParamId = new URL(window.location.href).searchParams.get('stockItem') || '';
       const priorityKeys = sectionToSecondaryKeys[activeSection];
       await Promise.all([
         loadRecentItems(),
         loadOwnItems(1, ''),
         ...priorityKeys.map((k) => loadSecondaryKey(k))
       ]);
+      if (activeSection === 'stock' && stockItemParamId) {
+        await tryOpenStockOverlayFromParam();
+      }
       loading = false;
       await Promise.all(
         SECONDARY_KEY_ORDER.filter((k) => !loadedSecondaryKeys.has(k)).map((k) => loadSecondaryKey(k))
@@ -1319,17 +1251,17 @@
           {:else if allItems.length === 0}
             <p class="dashboard-empty">Keine Einträge gefunden.</p>
           {:else}
-            <div class="entry-list entry-list--large dashboard-stock-list">
+            <div class="entry-list dashboard-stock-list">
               {#each allItems as item (item.id)}
-                <article class="entry-card entry-card--large dashboard-stock-card">
+                <article class="entry-card dashboard-stock-row">
                   <a class="entry-preview" href={getPublicItemHref(item)}>
                     {#if getItemThumb(item)}
-                      <img src={getItemThumb(item)} alt={item.title || item.original_name || 'Item'} width="72" height="72" loading="lazy" />
+                      <img src={getItemThumb(item)} alt={item.title || item.original_name || 'Item'} width="56" height="56" loading="lazy" />
                     {:else}
                       <div class="entry-thumb-fallback">?</div>
                     {/if}
                   </a>
-                  <div class="entry-content entry-content--large dashboard-stock-card__body">
+                  <div class="entry-content">
                     <a href={getPublicItemHref(item)}>
                       <strong>{item.title || item.original_name || 'Ohne Titel'}</strong>
                     </a>
@@ -1342,60 +1274,15 @@
                     {#if item.adobe_stock_error}
                       <div class="dashboard-stock-error">{item.adobe_stock_error}</div>
                     {/if}
-                    <label class="dashboard-stock-label">
-                      <span>Öffentliche Stock-URL</span>
-                      <input
-                        type="url"
-                        class="dashboard-stock-input"
-                        bind:value={stockEdits[item.id].url}
-                        placeholder="https://stock.adobe.com/…"
-                      />
-                    </label>
-                    <label class="dashboard-stock-label">
-                      <span>Asset-ID</span>
-                      <input
-                        type="text"
-                        class="dashboard-stock-input"
-                        bind:value={stockEdits[item.id].assetId}
-                        placeholder="optional"
-                      />
-                    </label>
-                    <div class="dashboard-stock-actions">
-                      <button
-                        type="button"
-                        class="ghost-btn"
-                        disabled={stockActionBusy[item.id] === 'save'}
-                        on:click={() => saveDashboardStock(item)}
-                      >
-                        {stockActionBusy[item.id] === 'save' ? 'Speichert…' : 'Speichern'}
-                      </button>
-                      <button
-                        type="button"
-                        class="dashboard-stock-btn--primary"
-                        disabled={stockActionBusy[item.id] === 'upload'}
-                        on:click={() => uploadDashboardStock(item)}
-                      >
-                        {stockActionBusy[item.id] === 'upload' ? 'Upload…' : 'Original hochladen'}
-                      </button>
-                      <button
-                        type="button"
-                        class="ghost-btn danger"
-                        disabled={stockActionBusy[item.id] === 'reset'}
-                        on:click={() => resetDashboardStockAdobe(item)}
-                      >
-                        {stockActionBusy[item.id] === 'reset' ? '…' : 'Adobe zurücksetzen'}
-                      </button>
-                    </div>
-                    {#if stockFlash[item.id]}
-                      <p class="dashboard-stock-flash">{stockFlash[item.id]}</p>
-                    {/if}
+                  </div>
+                  <div class="dashboard-stock-actions">
+                    <button type="button" class="ghost-btn" on:click={() => openStockOverlay(item)}>
+                      Konfigurieren
+                    </button>
                     {#if item.adobe_stock_url}
-                      <a
-                        class="dashboard-stock-external"
-                        href={item.adobe_stock_url}
-                        target="_blank"
-                        rel="noopener noreferrer">Link öffnen</a
-                      >
+                      <a class="dashboard-stock-external" href={item.adobe_stock_url} target="_blank" rel="noopener noreferrer">
+                        Link öffnen
+                      </a>
                     {/if}
                   </div>
                 </article>
@@ -1725,6 +1612,14 @@
         {/if}
       </section>
     </section>
+    {#if stockOverlayItem}
+      <StockSettingsOverlay
+        item={stockOverlayItem}
+        title="Stock konfigurieren"
+        on:close={closeStockOverlay}
+        on:updated={(e) => mergeStockItemIntoList(e.detail.item)}
+      />
+    {/if}
   {/if}
 </main>
 
@@ -2042,11 +1937,9 @@
     font-size: 0.92rem;
     line-height: 1.45;
   }
-  .dashboard-stock-card__body {
-    display: flex;
-    flex-direction: column;
-    gap: 0.45rem;
-    align-items: stretch;
+  .dashboard-stock-row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
   }
   .dashboard-stock-meta {
     display: flex;
@@ -2062,49 +1955,11 @@
     font-size: 0.88rem;
     color: #d64545;
   }
-  .dashboard-stock-label {
-    display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
-    font-size: 0.82rem;
-    color: var(--text-secondary);
-  }
-  .dashboard-stock-input {
-    width: 100%;
-    padding: 0.45rem 0.55rem;
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    background: var(--bg-primary);
-    color: var(--text-primary);
-    font: inherit;
-  }
   .dashboard-stock-actions {
     display: flex;
     flex-wrap: wrap;
     gap: 0.45rem;
-    margin-top: 0.2rem;
-  }
-  .dashboard-stock-btn--primary {
-    border: 1px solid var(--culoca-orange, #ee7221);
-    background: var(--culoca-orange, #ee7221);
-    color: #fff;
-    border-radius: 10px;
-    padding: 0.45rem 0.75rem;
-    cursor: pointer;
-    font: inherit;
-  }
-  .dashboard-stock-btn--primary:disabled {
-    opacity: 0.45;
-    cursor: not-allowed;
-  }
-  .ghost-btn.danger {
-    color: #c73e3e;
-    border-color: color-mix(in srgb, #c73e3e 35%, var(--border-color));
-  }
-  .dashboard-stock-flash {
-    margin: 0;
-    font-size: 0.86rem;
-    color: var(--text-secondary);
+    justify-content: flex-end;
   }
   .dashboard-stock-external {
     font-size: 0.88rem;

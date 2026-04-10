@@ -66,9 +66,11 @@
 	import RadiusControl from '$lib/detail/RadiusControl.svelte';
 	import MapPickerOverlay from '$lib/detail/MapPickerOverlay.svelte';
 	import ItemRightsManager from '$lib/ItemRightsManager.svelte';
+	import StockSettingsOverlay from '$lib/stock/StockSettingsOverlay.svelte';
 	import { unifiedRightsStore } from '$lib/unifiedRightsStore';
 	let showMapPicker = false;
 	let showRightsManager = false;
+	let showStockSettingsOverlay = false;
 	import { useJustifiedLayout } from '$lib/galleryStore';
 	import FloatingActionButtons from '$lib/FloatingActionButtons.svelte';
 	import FollowButton from '$lib/FollowButton.svelte';
@@ -4561,8 +4563,12 @@
 
 					{#if isCreator}
 						<p class="stock-dashboard-hint">
-							<a href="/dashboard?section=stock">Stock im Dashboard verwalten</a>
-							— Link, FTP-Upload und Adobe-Zurücksetzen.
+							<button type="button" class="stock-dashboard-hint__button" on:click={() => (showStockSettingsOverlay = true)}>
+								Stock konfigurieren
+							</button>
+							<span>
+								oder im <a href={`/dashboard?section=stock&stockItem=${encodeURIComponent(image.id)}`}>Dashboard öffnen</a>.
+							</span>
 						</p>
 					{/if}
 				</div>
@@ -5146,6 +5152,14 @@
 			</button>
 		{/if}
 	{/key}
+	{#if showStockSettingsOverlay && isCreator && image?.id}
+		<StockSettingsOverlay
+			item={image}
+			title="Stock konfigurieren"
+			on:close={() => (showStockSettingsOverlay = false)}
+			on:updated={(e) => (image = mergeItemFromApiPatch(image, e.detail.item))}
+		/>
+	{/if}
 	<SiteFooter />
 </div>
 
@@ -6288,6 +6302,16 @@
 		color: var(--culoca-orange, #ee7221);
 		font-weight: 600;
 		text-decoration: none;
+	}
+	.stock-dashboard-hint__button {
+		border: 1px solid var(--culoca-orange, #ee7221);
+		background: var(--culoca-orange, #ee7221);
+		color: #fff;
+		border-radius: 8px;
+		padding: 0.38rem 0.68rem;
+		font: inherit;
+		margin-right: 0.55rem;
+		cursor: pointer;
 	}
 	.stock-dashboard-hint a:hover {
 		text-decoration: underline;
