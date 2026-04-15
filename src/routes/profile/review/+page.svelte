@@ -57,7 +57,7 @@
           Hier siehst du alle eigenen Inhalte, bei denen Ortsdaten, wichtige SEO-Angaben oder später auch problematische Inhalte geprüft werden müssen.
         </p>
       </div>
-      <a class="upload-link" href="/foto/upload">Neues Foto hochladen</a>
+      <a class="upload-link" href="/upload">Neues Foto hochladen</a>
     </div>
 
     {#if loading}

@@ -1,6 +1,7 @@
 import type { RequestHandler } from './$types';
 import { createClient } from '@supabase/supabase-js';
 import { env } from '$env/dynamic/private';
+import { getPublicItemHref } from '$lib/content/routing';
 
 export const GET: RequestHandler = async () => {
   try {
@@ -26,6 +27,7 @@ export const GET: RequestHandler = async () => {
         .from('items')
         .select(`
           id, title, description, caption, slug, lat, lon, path_64, path_512, created_at, user_id,
+          canonical_path, country_slug, state_slug, region_slug, district_slug, municipality_slug,
           profiles!inner(full_name)
         `)
         .not('lat', 'is', null)
@@ -126,7 +128,7 @@ function generatePlacemark(item: any): string {
   const description = escapeXml(item.description || '');
   const caption = escapeXml(item.caption || '');
   const slug = item.slug || item.id;
-  const itemUrl = `https://culoca.com/web/google-item/${slug}`;
+  const itemUrl = new URL(getPublicItemHref(item), 'https://culoca.com').href;
   
   // Koordinaten mit voller Präzision
   const lat = parseFloat(item.lat).toFixed(6);

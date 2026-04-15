@@ -49,7 +49,7 @@ function hasDisplayableImagePath(p512: string | null | undefined, p2048: string 
   return Boolean(p512 || p2048);
 }
 
-/** Varianten inkl. Einträge nur mit path_2048 (path_512 fehlt noch) – wie sichtbar auf /foto */
+/** Varianten inkl. Einträge nur mit path_2048 (path_512 fehlt noch) – wie im regionalen Hub */
 async function attachDiscoverVariants(
   supabase: ServerSupabase,
   items: DiscoverRow[]

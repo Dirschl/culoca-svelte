@@ -315,6 +315,18 @@ function applyGeoFilters<T extends { eq: (column: string, value: string) => T }>
   return next;
 }
 
+/** Volltext-Filter für Hub-Itemlisten (Ersatz für die frühere Suche auf `/foto`). */
+function applyOptionalHubItemSearch<T extends { or: (filters: string) => T }>(
+  query: T,
+  rawSearch: string | undefined | null
+): T {
+  const s = (rawSearch ?? '').trim();
+  if (s.length < 2) return query;
+  const safe = s.replace(/"/g, '').replace(/,/g, ' ').slice(0, 120);
+  const p = `%${safe}%`;
+  return query.or(`title.ilike."${p}",description.ilike."${p}",caption.ilike."${p}"`);
+}
+
 function getCurrentGeoLevelKey(args: {
   municipalitySlug?: string;
   districtSlug?: string;
@@ -369,9 +381,84 @@ function geoPlural(level: GeoLevelKey): string {
   }
 }
 
+/** Länder-Einstieg (DACH): Foto-fokussierte Titel, Intro und Metadaten für maximale Klarheit (SEO + UX). */
+function buildCountryPhotoHubSeoText(hub: GeoHubResult, page: number) {
+  const n = hub.totalCount.toLocaleString('de-DE');
+  const slug = hub.countrySlug;
+
+  if (slug === 'de') {
+    return {
+      seoTitle:
+        page > 1
+          ? `Regionale Fotos Deutschland – Seite ${page} | Culoca`
+          : 'Regionale Fotos in Deutschland: GPS-Bilder, Orte & Motive | Culoca',
+      intro:
+        page > 1
+          ? `Weitere Fotos und Inhalte aus Deutschland – Seite ${page}. Zurück zur ersten Seite für den vollen Überblick.`
+          : `Hier findest du ${n} öffentliche Fotos und Motive mit Ortsbezug – strukturiert von Region bis Gemeinde. Nutze die Suche oder klicke dich durch Bundesländer und Landkreise. Eigene Aufnahmen lädst du hoch und verwaltest sie zentral im Dashboard (Metadaten, Varianten, Freigaben).`,
+      metaDescription:
+        page > 1
+          ? `Weitere regionale Fotos in Deutschland auf Culoca – Seite ${page}.`
+          : `${n} regionale Fotos in Deutschland mit GPS & Schlagwörtern. Landkreise, Gemeinden, Suche. Bilder hochladen und verwalten bei Culoca.`,
+      fallbackDescription: 'Weitere regionale Motive aus Deutschland.',
+      displayHubTitle: 'Regionale Fotos in Deutschland',
+      hubKicker: 'Fotos · regionale Entdeckung'
+    };
+  }
+
+  if (slug === 'at') {
+    return {
+      seoTitle:
+        page > 1
+          ? `Regionale Fotos Österreich – Seite ${page} | Culoca`
+          : 'Regionale Fotos in Österreich: GPS-Bilder & Motive | Culoca',
+      intro:
+        page > 1
+          ? `Weitere Fotos aus Österreich – Seite ${page}.`
+          : `${n} öffentliche Fotos mit regionalem Bezug. Suche oder Navigation nach Bundesland und Region. Upload und Verwaltung im Dashboard.`,
+      metaDescription:
+        page > 1
+          ? `Weitere Fotos in Österreich auf Culoca – Seite ${page}.`
+          : `${n} regionale Fotos in Österreich. GPS, Orte, Suche. Culoca – Fotos entdecken und verwalten.`,
+      fallbackDescription: 'Weitere Motive aus Österreich.',
+      displayHubTitle: 'Regionale Fotos in Österreich',
+      hubKicker: 'Fotos · regionale Entdeckung'
+    };
+  }
+
+  if (slug === 'ch') {
+    return {
+      seoTitle:
+        page > 1
+          ? `Regionale Fotos Schweiz – Seite ${page} | Culoca`
+          : 'Regionale Fotos in der Schweiz: GPS-Bilder & Motive | Culoca',
+      intro:
+        page > 1
+          ? `Weitere Fotos aus der Schweiz – Seite ${page}.`
+          : `${n} öffentliche Fotos mit regionalem Bezug. Suche oder Navigation nach Kanton und Region. Upload und Verwaltung im Dashboard.`,
+      metaDescription:
+        page > 1
+          ? `Weitere Fotos in der Schweiz auf Culoca – Seite ${page}.`
+          : `${n} regionale Fotos in der Schweiz. GPS, Orte, Suche. Culoca – Fotos entdecken und verwalten.`,
+      fallbackDescription: 'Weitere Motive aus der Schweiz.',
+      displayHubTitle: 'Regionale Fotos in der Schweiz',
+      hubKicker: 'Fotos · regionale Entdeckung'
+    };
+  }
+
+  return null;
+}
+
 function buildGeoHubSeoText(hub: GeoHubResult, page: number) {
   const locationTrail = hub.hierarchy.map((level) => level.label).reverse().join(', ');
   const hubLabel = getDeepestGeoLevel(hub.hierarchy)?.label || hub.countryName;
+
+  if (hub.currentLevelKey === 'country') {
+    const countryPack = buildCountryPhotoHubSeoText(hub, page);
+    if (countryPack) {
+      return countryPack;
+    }
+  }
 
   return {
     seoTitle:
@@ -386,11 +473,18 @@ function buildGeoHubSeoText(hub: GeoHubResult, page: number) {
     metaDescription:
       page > 1
         ? `Weitere öffentliche Inhalte aus ${locationTrail} auf Culoca.`
-        : `Entdecke ${hub.totalCount} öffentliche Inhalte aus ${locationTrail} auf Culoca. Mit direkter Navigation zu tieferen Orts- und Regionenebenen.`
+        : `Entdecke ${hub.totalCount} öffentliche Inhalte aus ${locationTrail} auf Culoca. Mit direkter Navigation zu tieferen Orts- und Regionenebenen.`,
+    displayHubTitle: undefined as string | undefined,
+    hubKicker: undefined as string | undefined
   };
 }
 
-export function buildGeoHubPageData(hub: GeoHubResult, page: number, pageSize: number) {
+export function buildGeoHubPageData(
+  hub: GeoHubResult,
+  page: number,
+  pageSize: number,
+  hubSearch: string = ''
+) {
   const deepestLevel = getDeepestGeoLevel(hub.hierarchy);
   if (!deepestLevel) {
     throw error(404, 'Geo-Hub nicht gefunden');
@@ -404,10 +498,16 @@ export function buildGeoHubPageData(hub: GeoHubResult, page: number, pageSize: n
     hub.hierarchy.map((level) => ({ name: level.label, path: level.path }))
   );
   const visibleCount = hasItemFeed ? hub.totalCount : hub.childLinks.length;
+  const isDachCountryPhotoHub =
+    hasItemFeed && hub.currentLevelKey === 'country' && ['de', 'at', 'ch'].includes(hub.countrySlug);
   const visibleCountLabel = hasItemFeed
-    ? hub.totalCount === 1
-      ? 'Eintrag'
-      : 'Einträge'
+    ? isDachCountryPhotoHub
+      ? hub.totalCount === 1
+        ? 'öffentliches Foto'
+        : 'öffentliche Fotos'
+      : hub.totalCount === 1
+        ? 'Eintrag'
+        : 'Einträge'
     : hub.childLevelKey
       ? geoPlural(hub.childLevelKey)
       : 'Orte';
@@ -415,8 +515,9 @@ export function buildGeoHubPageData(hub: GeoHubResult, page: number, pageSize: n
   return {
     hubType: `geo-${deepestLevel.key}`,
     currentLevelKey: deepestLevel.key,
-    kicker: geoKicker(deepestLevel.key),
+    kicker: seoText.hubKicker ?? geoKicker(deepestLevel.key),
     hubLabel: deepestLevel.label,
+    hubDisplayTitle: seoText.displayHubTitle ?? deepestLevel.label,
     hubPath: deepestLevel.path,
     hierarchy: hub.hierarchy,
     countryName: getGeoLevel(hub.hierarchy, 'country')?.label || hub.countryName,
@@ -444,7 +545,9 @@ export function buildGeoHubPageData(hub: GeoHubResult, page: number, pageSize: n
     seoTitle: seoText.seoTitle,
     intro: seoText.intro,
     fallbackDescription: seoText.fallbackDescription,
-    metaDescription: seoText.metaDescription
+    metaDescription: seoText.metaDescription,
+    hubSearch: hubSearch.trim(),
+    countrySlug: hub.countrySlug
   };
 }
 
@@ -456,6 +559,8 @@ async function fetchGeoHub(args: {
   municipalitySlug?: string;
   page: number;
   pageSize: number;
+  /** Filtert die Itemliste (Titel/Beschreibung/Caption); Canonical bleibt der reine Geo-Pfad. */
+  search?: string;
 }): Promise<GeoHubResult> {
   const supabase = createServerSupabase();
   const currentLevelKey = getCurrentGeoLevelKey(args);
@@ -543,14 +648,17 @@ async function fetchGeoHub(args: {
   let items: HubItem[] = [];
 
   if (shouldLoadItems) {
-    const itemCountQuery = applyGeoFilters(
-      supabase
-        .from('items')
-        .select('*', { count: 'exact', head: true })
-        .eq('admin_hidden', false)
-        .not('slug', 'is', null)
-        .or('is_private.eq.false,is_private.is.null'),
-      args
+    const itemCountQuery = applyOptionalHubItemSearch(
+      applyGeoFilters(
+        supabase
+          .from('items')
+          .select('*', { count: 'exact', head: true })
+          .eq('admin_hidden', false)
+          .not('slug', 'is', null)
+          .or('is_private.eq.false,is_private.is.null'),
+        args
+      ),
+      args.search
     );
 
     const { count: itemCount, error: itemCountError } = await itemCountQuery;
@@ -560,14 +668,17 @@ async function fetchGeoHub(args: {
     const totalPages = Math.max(1, Math.ceil(totalCount / args.pageSize));
     const page = Math.min(Math.max(1, args.page), totalPages);
 
-    const itemsQuery = applyGeoFilters(
-      supabase
-        .from('items')
-        .select(HUB_SELECT)
-        .eq('admin_hidden', false)
-        .not('slug', 'is', null)
-        .or('is_private.eq.false,is_private.is.null'),
-      args
+    const itemsQuery = applyOptionalHubItemSearch(
+      applyGeoFilters(
+        supabase
+          .from('items')
+          .select(HUB_SELECT)
+          .eq('admin_hidden', false)
+          .not('slug', 'is', null)
+          .or('is_private.eq.false,is_private.is.null'),
+        args
+      ),
+      args.search
     );
 
     const { data: itemRows, error: itemsError } = await itemsQuery
@@ -646,17 +757,23 @@ async function fetchGeoHub(args: {
   };
 }
 
-export async function loadGeoCountryHub(countrySlug: string, page: number, pageSize: number) {
-  return fetchGeoHub({ countrySlug, page, pageSize });
+export async function loadGeoCountryHub(
+  countrySlug: string,
+  page: number,
+  pageSize: number,
+  search?: string
+) {
+  return fetchGeoHub({ countrySlug, page, pageSize, search });
 }
 
 export async function loadGeoStateHub(
   countrySlug: string,
   stateSlug: string,
   page: number,
-  pageSize: number
+  pageSize: number,
+  search?: string
 ) {
-  return fetchGeoHub({ countrySlug, stateSlug, page, pageSize });
+  return fetchGeoHub({ countrySlug, stateSlug, page, pageSize, search });
 }
 
 export async function loadGeoRegionHub(
@@ -664,13 +781,20 @@ export async function loadGeoRegionHub(
   stateSlug: string,
   regionSlug: string,
   page: number,
-  pageSize: number
+  pageSize: number,
+  search?: string
 ) {
-  return fetchGeoHub({ countrySlug, stateSlug, regionSlug, page, pageSize });
+  return fetchGeoHub({ countrySlug, stateSlug, regionSlug, page, pageSize, search });
 }
 
-export async function loadGeoDistrictHub(countrySlug: string, districtSlug: string, page: number, pageSize: number) {
-  return fetchGeoHub({ countrySlug, districtSlug, page, pageSize });
+export async function loadGeoDistrictHub(
+  countrySlug: string,
+  districtSlug: string,
+  page: number,
+  pageSize: number,
+  search?: string
+) {
+  return fetchGeoHub({ countrySlug, districtSlug, page, pageSize, search });
 }
 
 export async function loadGeoDeepDistrictHub(
@@ -679,9 +803,10 @@ export async function loadGeoDeepDistrictHub(
   regionSlug: string,
   districtSlug: string,
   page: number,
-  pageSize: number
+  pageSize: number,
+  search?: string
 ) {
-  return fetchGeoHub({ countrySlug, stateSlug, regionSlug, districtSlug, page, pageSize });
+  return fetchGeoHub({ countrySlug, stateSlug, regionSlug, districtSlug, page, pageSize, search });
 }
 
 export async function loadGeoMunicipalityHub(
@@ -689,9 +814,10 @@ export async function loadGeoMunicipalityHub(
   districtSlug: string,
   municipalitySlug: string,
   page: number,
-  pageSize: number
+  pageSize: number,
+  search?: string
 ) {
-  return fetchGeoHub({ countrySlug, districtSlug, municipalitySlug, page, pageSize });
+  return fetchGeoHub({ countrySlug, districtSlug, municipalitySlug, page, pageSize, search });
 }
 
 export async function loadGeoDeepMunicipalityHub(
@@ -701,20 +827,31 @@ export async function loadGeoDeepMunicipalityHub(
   districtSlug: string,
   municipalitySlug: string,
   page: number,
-  pageSize: number
+  pageSize: number,
+  search?: string
 ) {
-  return fetchGeoHub({ countrySlug, stateSlug, regionSlug, districtSlug, municipalitySlug, page, pageSize });
+  return fetchGeoHub({
+    countrySlug,
+    stateSlug,
+    regionSlug,
+    districtSlug,
+    municipalitySlug,
+    page,
+    pageSize,
+    search
+  });
 }
 
 export async function loadGeoHubBySegments(
   countrySlug: string,
   segments: string[],
   page: number,
-  pageSize: number
+  pageSize: number,
+  search?: string
 ) {
   const normalized = segments.filter(Boolean);
   if (!normalized.length) {
-    return loadGeoCountryHub(countrySlug, page, pageSize);
+    return loadGeoCountryHub(countrySlug, page, pageSize, search);
   }
 
   const requestedPath = `/${[countrySlug, ...normalized].join('/')}`;
@@ -749,7 +886,8 @@ export async function loadGeoHubBySegments(
     return fetchGeoHub({
       ...resolved,
       page,
-      pageSize
+      pageSize,
+      search
     });
   }
 

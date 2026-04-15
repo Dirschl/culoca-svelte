@@ -13,7 +13,9 @@ export type GeoPlaceJsonLdInput = {
   countryName?: string | null;
   countryPath?: string | null;
   stateName?: string | null;
+  statePath?: string | null;
   regionName?: string | null;
+  regionPath?: string | null;
   districtName?: string | null;
   districtPath?: string | null;
   municipalityName?: string | null;
@@ -223,6 +225,31 @@ export function buildGeoCollectionPageJsonLd(args: {
     ...(args.description ? { description: args.description } : {}),
     ...(args.placeId ? { about: { '@id': args.placeId } } : {}),
     ...(args.breadcrumbPath ? { breadcrumb: toCanonicalAbsoluteUrl(args.breadcrumbPath) } : {})
+  };
+}
+
+/**
+ * Länder-Foto-Hub: SearchAction für die interne Fotosuche (hilft Google Sitelinks / Suchfeld zu verstehen).
+ * Nur auf reinen Country-Hubs einbinden (z. B. /de, /at, /ch).
+ */
+export function buildCountryPhotoHubSearchJsonLd(args: { hubPath: string; pageName: string }) {
+  const path = args.hubPath.startsWith('/') ? args.hubPath : `/${args.hubPath}`;
+  const template = `${SITE_URL}${path}?suche={search_term_string}`;
+  const pageUrl = toCanonicalAbsoluteUrl(path);
+  return {
+    '@type': 'WebPage',
+    '@id': `${pageUrl}#photo-hub-search`,
+    url: pageUrl,
+    name: args.pageName,
+    isPartOf: { '@id': `${SITE_URL}/#website` },
+    potentialAction: {
+      '@type': 'SearchAction',
+      target: {
+        '@type': 'EntryPoint',
+        urlTemplate: template
+      },
+      'query-input': 'required name=search_term_string'
+    }
   };
 }
 

@@ -777,7 +777,7 @@
 
             <div class="foto-upload-panel">
               <div class="foto-upload-actions">
-                <a class="foto-upload-link foto-upload-link--primary" href="/foto/upload">Foto Upload</a>
+                <a class="foto-upload-link foto-upload-link--primary" href="/upload">Foto Upload</a>
                 <a class="foto-upload-link" href="/bulk-upload">Batch Upload</a>
               </div>
             </div>

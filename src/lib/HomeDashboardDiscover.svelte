@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
   import { browser } from '$app/environment';
-  import { appendReturnTo, getPublicItemHref } from '$lib/content/routing';
+  import { appendReturnTo, getPublicItemHref, PRIMARY_REGIONAL_FEED_PATH } from '$lib/content/routing';
   import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
   import { formatEventHubRange, formatHubEventPlace } from '$lib/content/eventHubFormat';
 
@@ -35,7 +35,7 @@
   export let upcomingEvents: DiscoverListItem[] = [];
   export let latestPhotos: DiscoverListItem[] = [];
   export let latestFirms: DiscoverListItem[] = [];
-  /** Wie /foto: userLat/userLon, Filter-Store, Fallback savedLocation */
+  /** Wie regionaler Hub: userLat/userLon, Filter-Store, Fallback savedLocation */
   export let referenceCoords: { lat: number; lon: number } | null = null;
 
   let animatedPreviewUrls: Record<string, string> = {};
@@ -256,9 +256,9 @@
     <section class="discover-block" aria-labelledby="discover-foto-heading">
       <div class="discover-head">
         <h2 id="discover-foto-heading">
-          <a href="/foto"><span class="discover-icon" aria-hidden="true">📷</span>Neueste Fotos</a>
+          <a href={PRIMARY_REGIONAL_FEED_PATH}><span class="discover-icon" aria-hidden="true">📷</span>Neueste Fotos</a>
         </h2>
-        <a href="/foto" class="discover-all">Alle anzeigen</a>
+        <a href={PRIMARY_REGIONAL_FEED_PATH} class="discover-all">Alle anzeigen</a>
       </div>
       <div class="items-grid">
         {#each latestPhotos as item (item.id)}

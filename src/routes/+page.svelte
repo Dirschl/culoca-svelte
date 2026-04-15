@@ -30,7 +30,7 @@
 
   let savedLocation: RememberedLocation | null = null;
 
-  /** Wie /foto: gleiche Koordinaten-Quellen, nicht nur readRememberedLocation (gpsAllowed) */
+  /** Wie regionaler Hub: gleiche Koordinaten-Quellen, nicht nur readRememberedLocation (gpsAllowed) */
   $: discoverDistanceCoords =
     browser
       ? getStoredGpsPositionForHub() ??
@@ -982,7 +982,7 @@
         description: 'GPS-basierte Plattform zum Entdecken und Teilen von Fotos, Events, Firmen und mehr.',
         potentialAction: {
           '@type': 'SearchAction',
-          target: 'https://culoca.com/foto?suche={search_term_string}',
+          target: 'https://culoca.com/de?suche={search_term_string}',
           'query-input': 'required name=search_term_string'
         }
       },

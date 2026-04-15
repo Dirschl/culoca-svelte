@@ -110,7 +110,7 @@
   import { goto } from '$app/navigation';
   import InfoPageLayout from '$lib/InfoPageLayout.svelte';
   import NewsFlash from '$lib/NewsFlash.svelte';
-  import { getPublicItemHref } from '$lib/content/routing';
+  import { getPublicItemHref, PRIMARY_REGIONAL_FEED_PATH } from '$lib/content/routing';
 
   let stats = {
     totalItems: 0,
@@ -499,7 +499,7 @@
     </p>
 
     <div class="content-types-grid">
-      <a href="/foto" class="content-type-card">
+      <a href={PRIMARY_REGIONAL_FEED_PATH} class="content-type-card">
         <span class="ct-icon">📸</span>
         <h4>Fotos</h4>
         <p>Fotografien und Bilder mit GPS-Koordinaten, EXIF-Daten und automatischer Bildoptimierung</p>

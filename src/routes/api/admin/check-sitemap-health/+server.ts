@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import { getPublicItemHref } from '$lib/content/routing';
 
 type HealthEntry = {
   url: string;
@@ -15,7 +16,9 @@ export const GET: RequestHandler = async () => {
     // Fetch all public items for health check
     const { data: items, error } = await supabase
       .from('items')
-      .select('slug, path_2048, path_512')
+      .select(
+        'slug, path_2048, path_512, canonical_path, country_slug, state_slug, region_slug, district_slug, municipality_slug'
+      )
       .not('slug', 'is', null)
       .eq('is_private', false);
     
@@ -81,7 +84,7 @@ export const GET: RequestHandler = async () => {
     // Check item pages (sample first 10)
     const sampleItems = items?.slice(0, 10) || [];
     for (const item of sampleItems) {
-      const url = `https://culoca.com/item/${item.slug}`;
+      const url = new URL(getPublicItemHref(item), 'https://culoca.com').href;
       try {
         const response = await fetch(url, { method: 'HEAD' });
         const status = response.status;

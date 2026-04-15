@@ -4,7 +4,7 @@
   import SiteNav from '$lib/SiteNav.svelte';
   import SiteFooter from '$lib/SiteFooter.svelte';
   import { supabase } from '$lib/supabaseClient';
-  import { getPublicItemHref } from '$lib/content/routing';
+  import { getPublicItemDownloadHref, getPublicItemHref } from '$lib/content/routing';
   import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
   import { fetchProfileReviewItems } from '$lib/profile/review';
   import StockSettingsOverlay from '$lib/stock/StockSettingsOverlay.svelte';
@@ -1175,7 +1175,7 @@
             <span>{totalItems} gesamt</span>
           </div>
           <div class="entry-actions">
-            <a href="/foto/upload">Upload</a>
+            <a href="/upload">Upload</a>
             <a href="/profile/freigaben">Globale Freigaben</a>
           </div>
 
@@ -1211,7 +1211,7 @@
                       <span>{item.stats?.views || 0} Aufrufe</span>
                       <span>{item.stats?.likes || 0} Likes</span>
                       <span>{item.stats?.favorites || 0} Gemerkte</span>
-                      <a href={`/item/${encodeURIComponent(item.slug)}/download`}>
+                      <a href={getPublicItemDownloadHref(item)}>
                         {item.stats?.downloads || 0} Downloads
                       </a>
                     </div>
@@ -1235,7 +1235,7 @@
             Öffentlicher Stock-Link, FTP-Upload zu Adobe und Zurücksetzen nur des Adobe-Zweigs — zentral hier, nicht mehr auf der Item-Seite.
           </p>
           <div class="entry-actions">
-            <a href="/foto/upload">Neues Foto hochladen</a>
+            <a href="/upload">Neues Foto hochladen</a>
           </div>
 
           <form class="search-row" on:submit|preventDefault={applySearch}>
@@ -1604,7 +1604,7 @@
             </p>
             <div class="entry-actions">
               <a href="/profile/review">Offene Einträge anzeigen</a>
-              <a href="/foto/upload">Neues Foto hochladen</a>
+              <a href="/upload">Neues Foto hochladen</a>
             </div>
           {:else}
             <p class="dashboard-empty">Keine offenen Daten. Dein Bestand ist aktuell sauber gepflegt.</p>

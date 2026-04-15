@@ -549,7 +549,7 @@ Bitte optimiere alle diese Felder für maximale SEO-Performance und erstelle auc
         <input
           type="text"
           bind:value={testUrl}
-          placeholder="https://example.com oder https://culoca.com/foto/..."
+          placeholder="https://example.com oder https://culoca.com/de/..."
           on:click={clearInput}
           on:keydown={handleUrlSubmit}
           class="url-input"

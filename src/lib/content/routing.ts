@@ -48,6 +48,12 @@ export function normalizePath(path: string): string {
   return value !== '/' && value.endsWith('/') ? value.slice(0, -1) : value;
 }
 
+/**
+ * Haupteinstieg für den regionalen Bild-Feed (ersetzt die frühere Startseite `/foto`).
+ * Nur `de`/`at`/`ch` sind als Länder-Slugs erlaubt — Deutschland ist der Standard-Hub.
+ */
+export const PRIMARY_REGIONAL_FEED_PATH = '/de';
+
 /** Alte Typ-URLs wie /foto/slug – für öffentliche Item-Links durch Geo- oder /item/-Pfad ersetzen. */
 function shouldIgnoreLegacyTypeCanonicalPath(
   canonicalPath: string | null | undefined,
@@ -240,6 +246,15 @@ export function getPublicItemHref(item: {
   }
   if (canonicalPath) return normalizePath(canonicalPath);
   return slug ? `/item/${slug}` : '/';
+}
+
+/** Öffentliche Download-Seite zum Item — gleiche Pfadlogik wie {@link getPublicItemHref}. */
+export function getPublicItemDownloadHref(
+  item: Parameters<typeof getPublicItemHref>[0]
+): string {
+  const base = getPublicItemHref(item);
+  if (!base || base === '/') return '/';
+  return `${normalizePath(base)}/download`;
 }
 
 export function appendReturnTo(href: string, returnTo: string | null | undefined): string {

@@ -25,6 +25,7 @@ export const load = async ({
   depends('app:item');
 
   const page = Math.max(1, Number.parseInt(url.searchParams.get('seite') || '1', 10));
+  const hubSearch = (url.searchParams.get('suche') || '').trim();
   const segments = (params.geo || '')
     .split('/')
     .map((segment) => segment.trim())
@@ -32,17 +33,18 @@ export const load = async ({
 
   try {
     const [hub, countryOptions] = await Promise.all([
-      loadGeoHubBySegments(params.country, segments, page, PAGE_SIZE),
+      loadGeoHubBySegments(params.country, segments, page, PAGE_SIZE, hubSearch),
       loadGeoHomeOverview()
     ]);
-    const data = buildGeoHubPageData(hub, page, PAGE_SIZE);
+    const data = buildGeoHubPageData(hub, page, PAGE_SIZE, hubSearch);
 
     return {
       ...data,
       countryOptions,
       seoPolicy: getHubSeoPolicy({
         basePath: data.hubPath,
-        page
+        page,
+        hasSearch: !!hubSearch
       })
     };
   } catch (hubError) {

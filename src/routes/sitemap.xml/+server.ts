@@ -18,7 +18,7 @@ export const GET: RequestHandler = async () => {
     // Mit priority und changefreq für bessere Indexierung
     const staticPages = [
       { url: '', priority: '1.0', changefreq: 'daily' },
-      { url: '/foto', priority: '0.9', changefreq: 'daily' },
+      { url: '/de', priority: '0.85', changefreq: 'daily' },
       { url: '/event', priority: '0.9', changefreq: 'daily' },
       { url: '/firma', priority: '0.9', changefreq: 'daily' },
       { url: '/video', priority: '0.8', changefreq: 'daily' },
@@ -232,6 +232,8 @@ export const GET: RequestHandler = async () => {
       const lastModDate = item.updated_at || item.created_at;
       const formattedDate = lastModDate ? new Date(lastModDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
       xml += `    <lastmod>${formattedDate}</lastmod>\n`;
+      xml += `    <priority>0.95</priority>\n`;
+      xml += `    <changefreq>weekly</changefreq>\n`;
       
       // Add enhanced image data for better SEO
       // Use SEO-friendly URL with size suffix: /images/{slug}-2048.jpg (no query parameters)

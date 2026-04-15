@@ -1,6 +1,7 @@
 import type { PageServerLoad } from './$types';
 import { createClient } from '@supabase/supabase-js';
 import { env } from '$env/dynamic/private';
+import { getPublicItemHref } from '$lib/content/routing';
 
 export const load: PageServerLoad = async ({ params }) => {
   try {
@@ -19,6 +20,7 @@ export const load: PageServerLoad = async ({ params }) => {
       .from('items')
       .select(`
         id, title, description, caption, slug, lat, lon, path_2048, created_at, user_id,
+        canonical_path, country_slug, state_slug, region_slug, district_slug, municipality_slug,
         profiles!inner(full_name)
       `)
       .eq('slug', params.slug)
@@ -42,7 +44,7 @@ export const load: PageServerLoad = async ({ params }) => {
         path_2048: item.path_2048,
         created_at: item.created_at,
         creator: (((Array.isArray(item.profiles) ? item.profiles[0] : item.profiles) as { full_name?: string } | null)?.full_name) || 'Unbekannt',
-        culoca_url: `https://culoca.com/item/${item.slug}`
+        culoca_url: new URL(getPublicItemHref(item), 'https://culoca.com').href
       }
     };
 

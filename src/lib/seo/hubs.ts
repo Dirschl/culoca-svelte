@@ -1,5 +1,5 @@
 import { normalizeAdminDisplayLabel } from '$lib/content/locationTaxonomy';
-import { slugifySegment } from '$lib/content/routing';
+import { PRIMARY_REGIONAL_FEED_PATH, slugifySegment } from '$lib/content/routing';
 
 export type HubLink = {
   label: string;
@@ -8,8 +8,8 @@ export type HubLink = {
 
 export function buildKeywordHubPath(keyword: string): string {
   const label = (keyword || '').trim();
-  if (!label) return '/foto';
-  return `/foto?suche=${encodeURIComponent(label)}`;
+  if (!label) return PRIMARY_REGIONAL_FEED_PATH;
+  return `${PRIMARY_REGIONAL_FEED_PATH}?suche=${encodeURIComponent(label)}`;
 }
 
 export function buildPhotographerHubPath(accountname: string): string {

@@ -6,6 +6,7 @@
   import { supabase } from '$lib/supabaseClient';
   import { currentPathWithSearch, sanitizeReturnTo } from '$lib/returnTo';
   import { fetchProfileReviewItems } from '$lib/profile/review';
+  import { PRIMARY_REGIONAL_FEED_PATH } from '$lib/content/routing';
 
   let mobileOpen = false;
   let openDropdown: string | null = null;
@@ -21,7 +22,7 @@
 
   const navLinks = [
     { href: '/galerie', label: 'Galerie' },
-    { href: '/foto', label: 'Fotos' },
+    { href: PRIMARY_REGIONAL_FEED_PATH, label: 'Fotos' },
     { href: '/event', label: 'Events' },
     { href: '/firma', label: 'Firmen' },
     { href: '/web', label: 'Info' },

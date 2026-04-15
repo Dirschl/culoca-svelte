@@ -19,19 +19,28 @@ export const load = async ({
 }) => {
   depends('app:item');
 
+  const hubSearch = (url.searchParams.get('suche') || '').trim();
+
   try {
     const [hub, countryOptions] = await Promise.all([
-      loadGeoHubBySegments(params.country, [params.district, params.municipality, params.slug], 1, PAGE_SIZE),
+      loadGeoHubBySegments(
+        params.country,
+        [params.district, params.municipality, params.slug],
+        1,
+        PAGE_SIZE,
+        hubSearch
+      ),
       loadGeoHomeOverview()
     ]);
-    const data = buildGeoHubPageData(hub, 1, PAGE_SIZE);
+    const data = buildGeoHubPageData(hub, 1, PAGE_SIZE, hubSearch);
 
     return {
       ...data,
       countryOptions,
       seoPolicy: getHubSeoPolicy({
         basePath: data.hubPath,
-        page: 1
+        page: 1,
+        hasSearch: !!hubSearch
       })
     };
   } catch (hubError) {

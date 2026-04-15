@@ -12,18 +12,20 @@ const PAGE_SIZE = 24;
 
 export const load = async ({ params, url }: { params: { country: string; district: string }; url: URL }) => {
   const page = Math.max(1, Number.parseInt(url.searchParams.get('seite') || '1', 10));
+  const hubSearch = (url.searchParams.get('suche') || '').trim();
   const countryOptions = await loadGeoHomeOverview();
 
   try {
-    const hub = await loadGeoHubBySegments(params.country, [params.district], page, PAGE_SIZE);
-    const data = buildGeoHubPageData(hub, page, PAGE_SIZE);
+    const hub = await loadGeoHubBySegments(params.country, [params.district], page, PAGE_SIZE, hubSearch);
+    const data = buildGeoHubPageData(hub, page, PAGE_SIZE, hubSearch);
 
     return {
       ...data,
       countryOptions,
       seoPolicy: getHubSeoPolicy({
         basePath: data.hubPath,
-        page
+        page,
+        hasSearch: !!hubSearch
       })
     };
   } catch (routeError) {
@@ -32,7 +34,7 @@ export const load = async ({ params, url }: { params: { country: string; distric
     }
   }
 
-  const hub = await loadGeoDistrictHub(params.country, params.district, page, PAGE_SIZE);
+  const hub = await loadGeoDistrictHub(params.country, params.district, page, PAGE_SIZE, hubSearch);
   const canonicalHubPath =
     buildGeoHubPath({
       countrySlug: hub.countrySlug,
@@ -45,14 +47,15 @@ export const load = async ({ params, url }: { params: { country: string; distric
     throw redirect(301, canonicalHubPath);
   }
 
-  const data = buildGeoHubPageData(hub, page, PAGE_SIZE);
+  const data = buildGeoHubPageData(hub, page, PAGE_SIZE, hubSearch);
 
   return {
     ...data,
     countryOptions,
     seoPolicy: getHubSeoPolicy({
       basePath: data.hubPath,
-      page
+      page,
+      hasSearch: !!hubSearch
     })
   };
 };

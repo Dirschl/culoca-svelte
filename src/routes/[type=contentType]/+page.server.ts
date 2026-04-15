@@ -122,7 +122,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
 
   /**
    * Ohne Suche: geschätzte Gesamtanzahl (PostgREST `count=estimated`, reltuples — sehr schnell).
-   * Vermeidet `count=exact` über tausende Zeilen, was /foto & Co. spürbar verlangsamt.
+   * Vermeidet `count=exact` über tausende Zeilen, was Typ-Hubs spürbar verlangsamt.
    */
   const buildHubTotalCountQuery = () => {
     let query = supabase

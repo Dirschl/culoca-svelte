@@ -4,11 +4,12 @@
   import SiteNav from '$lib/SiteNav.svelte';
   import SiteFooter from '$lib/SiteFooter.svelte';
   import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
-  import { appendReturnTo, getPublicItemHref } from '$lib/content/routing';
+  import { appendReturnTo, getPublicItemHref, PRIMARY_REGIONAL_FEED_PATH } from '$lib/content/routing';
   import { getEffectiveGpsPosition } from '$lib/filterStore';
   import {
     absoluteUrl,
     buildBreadcrumbJsonLd,
+    buildCountryPhotoHubSearchJsonLd,
     buildGeoCollectionPageJsonLd,
     buildGeoPlaceGraph,
     DEFAULT_OG_IMAGE,
@@ -42,8 +43,16 @@
   const pageTitle =
     data.seoTitle ||
     (data.page > 1
-      ? `${data.hubLabel}: Seite ${data.page} | Culoca`
-      : `${data.hubLabel}: Orte, Motive und Inhalte | Culoca`);
+      ? `${data.hubDisplayTitle ?? data.hubLabel}: Seite ${data.page} | Culoca`
+      : `${data.hubDisplayTitle ?? data.hubLabel}: Orte, Motive und Inhalte | Culoca`);
+
+  $: countryPhotoSearchJsonLd =
+    data?.currentLevelKey === 'country' && ['de', 'at', 'ch'].includes(data?.countrySlug)
+      ? buildCountryPhotoHubSearchJsonLd({
+          hubPath: data.hubPath,
+          pageName: data.hubDisplayTitle ?? data.hubLabel
+        })
+      : null;
   const metaDescription = trimText(
     data.metaDescription ||
       `Entdecke ${data.totalCount} öffentliche Inhalte zu ${data.hubLabel} auf Culoca. Ortsbezogene Hub-Seite mit Bildern, Themen und Detailseiten.`
@@ -79,8 +88,12 @@
   }
 
   function pageUrl(page: number): string {
-    if (page <= 1) return data.hubPath;
-    return `${data.hubPath}?seite=${page}`;
+    const params = new URLSearchParams();
+    const q = (data.hubSearch || '').trim();
+    if (q) params.set('suche', q);
+    if (page > 1) params.set('seite', String(page));
+    const qs = params.toString();
+    return qs ? `${data.hubPath}?${qs}` : data.hubPath;
   }
 
   function truncate(text: string | null | undefined, maxLength = 120) {
@@ -263,7 +276,12 @@
 
   {@html `<script type="application/ld+json">${JSON.stringify({
     '@context': 'https://schema.org',
-    '@graph': [buildBreadcrumbJsonLd(data.breadcrumbs), hubCollectionJsonLd, ...geoPlaceGraph.nodes]
+    '@graph': [
+      buildBreadcrumbJsonLd(data.breadcrumbs),
+      hubCollectionJsonLd,
+      ...geoPlaceGraph.nodes,
+      ...(countryPhotoSearchJsonLd ? [countryPhotoSearchJsonLd] : [])
+    ]
   })}</script>`}
 </svelte:head>
 
@@ -289,23 +307,60 @@
         <div class="hub-header-row">
           <div>
             <p class="hub-kicker">{data.kicker}</p>
-            <h1>{data.hubLabel}</h1>
+            <h1>{data.hubDisplayTitle ?? data.hubLabel}</h1>
             <p class="hub-meta">
               {data.visibleCount.toLocaleString('de-DE')} {data.visibleCountLabel}
             </p>
             <p class="hub-intro">
               {#if data.page > 1}
-                Seite {data.page} erweitert diesen Orts-Hub mit weiteren Inhalten. Die erste Seite bleibt der kanonische Einstieg.
+                {#if data.currentLevelKey === 'country'}
+                  Seite {data.page} mit weiteren Fotos aus {data.countryName}. Die erste Seite ist der zentrale Einstieg für
+                  Nutzer und Suchmaschinen.
+                {:else}
+                  Seite {data.page} erweitert diesen Orts-Hub mit weiteren Inhalten. Die erste Seite bleibt der kanonische
+                  Einstieg.
+                {/if}
               {:else}
                 {data.intro}
               {/if}
             </p>
+
+            {#if data.hasItemFeed}
+              <form class="hub-search" method="get" action={data.hubPath} role="search" aria-label="Fotos durchsuchen">
+                <label class="hub-search-label" for="hub-suche">Suche in diesem Gebiet</label>
+                <div class="hub-search-row">
+                  <input
+                    id="hub-suche"
+                    name="suche"
+                    type="search"
+                    value={data.hubSearch || ''}
+                    placeholder="Titel, Ort, Schlagwort …"
+                    autocomplete="off"
+                    maxlength="120"
+                  />
+                  <button type="submit" class="hub-search-submit">Suchen</button>
+                </div>
+                {#if data.currentLevelKey === 'country' && ['de', 'at', 'ch'].includes(data.countrySlug)}
+                  <p class="hub-search-hint">
+                    Durchsucht alle öffentlichen Fotos in {data.countryName}. Für die Bildverwaltung (Upload, Varianten,
+                    Metadaten) nutze das Dashboard.
+                  </p>
+                {/if}
+              </form>
+            {/if}
           </div>
 
           <div class="hub-actions">
-            <a class="hub-action hub-action--primary" href="/foto">Zu Foto</a>
-            <a class="hub-action" href="/foto/upload">Foto anlegen</a>
-            <a class="hub-action" href="/profile/review">Daten prüfen</a>
+            {#if data.currentLevelKey === 'country'}
+              <a class="hub-action hub-action--primary" href="/galerie">Galerie</a>
+              <a class="hub-action" href="/map-view">Kartenansicht</a>
+              <a class="hub-action" href="/upload">Foto hochladen</a>
+              <a class="hub-action" href="/dashboard?section=photos">Bildverwaltung</a>
+            {:else}
+              <a class="hub-action hub-action--primary" href={PRIMARY_REGIONAL_FEED_PATH}>Deutschland</a>
+              <a class="hub-action" href="/upload">Foto anlegen</a>
+              <a class="hub-action" href="/profile/review">Daten prüfen</a>
+            {/if}
           </div>
         </div>
 
@@ -515,6 +570,50 @@
     max-width: 42rem;
     color: var(--text-secondary);
     line-height: 1.6;
+  }
+  .hub-search {
+    margin-top: 1.25rem;
+    max-width: 40rem;
+  }
+  .hub-search-label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 0.4rem;
+  }
+  .hub-search-row {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .hub-search-row input[type='search'] {
+    flex: 1;
+    min-width: 12rem;
+    padding: 0.65rem 0.85rem;
+    border-radius: 999px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+  }
+  .hub-search-submit {
+    padding: 0.65rem 1.25rem;
+    border-radius: 999px;
+    border: none;
+    background: var(--culoca-orange);
+    color: #fff;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .hub-search-submit:hover {
+    filter: brightness(1.05);
+  }
+  .hub-search-hint {
+    margin: 0.5rem 0 0;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    line-height: 1.45;
   }
   .hub-actions {
     display: flex;

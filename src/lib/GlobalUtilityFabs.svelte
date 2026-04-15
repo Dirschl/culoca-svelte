@@ -6,7 +6,7 @@
   import { isAuthenticated } from '$lib/sessionStore';
   import { isDetailPath } from '$lib/returnTo';
 
-  const EXCLUDED_PREFIXES = ['/galerie', '/item', '/map-view', '/map-view-share', '/simulation'];
+  const EXCLUDED_PREFIXES = ['/galerie', '/item', '/upload', '/map-view', '/map-view-share', '/simulation'];
   let showScrollToTop = false;
   let isFullscreen = false;
   let unreadChatCount = 0;

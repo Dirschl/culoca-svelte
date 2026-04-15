@@ -1,5 +1,5 @@
 /**
- * Gleiche Priorität wie /foto (src/routes/[type=contentType]/+page.svelte getStoredGpsPosition).
+ * Gleiche Priorität wie der regionale Hub (src/routes/[type=contentType]/+page.svelte getStoredGpsPosition).
  * Unabhängig von locationPreferences.readRememberedLocation (gpsAllowed),
  * damit Entfernungs-Badges überall konsistent sind.
  */

@@ -6,6 +6,12 @@ export type SeoPolicy = {
   shouldIndex: boolean;
 };
 
+/**
+ * Geo-Hubs (Land → … → Gemeinde): indexierbar, damit Google die Verzeichnisstruktur
+ * bis zu den Item-Detailseiten crawlen kann. Dünne/duplizierte Varianten
+ * (Suche, Pagination ab Seite 3) werden auf noindex gestellt — Priorität haben die
+ * einzelnen Item-URLs (siehe Item-Detail-Metadaten und Sitemap-Prioritäten).
+ */
 export function getHubSeoPolicy(args: {
   basePath: string;
   page: number;

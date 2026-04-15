@@ -11,6 +11,7 @@
 	import { unifiedRightsStore } from '$lib/unifiedRightsStore';
 	import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
 	import { extractPhotoMetadataFields } from '$lib/metadata/photoMetadata';
+	import { getPublicItemHref } from '$lib/content/routing';
 
 	export let data: any;
 
@@ -1156,7 +1157,7 @@
 
 	function goBack() {
 		const returnTo = $page.url.searchParams.get('returnTo');
-		goto(returnTo || (image?.slug ? `/item/${image.slug}` : '/'));
+		goto(returnTo || (image ? getPublicItemHref(image) : '/'));
 	}
 
 	function handleCompressionToggle(event: Event) {

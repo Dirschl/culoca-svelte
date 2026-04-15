@@ -14,5 +14,6 @@ export const load: PageServerLoad = async ({ params, url }) => {
     searchParams.set('seite', String(page));
   };
 
-  throw redirect(308, `/foto?${searchParams.toString()}`);
+  const qs = searchParams.toString();
+  throw redirect(308, qs ? `/de?${qs}` : '/de');
 };

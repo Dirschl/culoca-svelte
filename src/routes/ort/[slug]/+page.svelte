@@ -2,7 +2,7 @@
   import SiteNav from '$lib/SiteNav.svelte';
   import SiteFooter from '$lib/SiteFooter.svelte';
   import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
-  import { appendReturnTo, getPublicItemHref } from '$lib/content/routing';
+  import { appendReturnTo, getPublicItemHref, PRIMARY_REGIONAL_FEED_PATH } from '$lib/content/routing';
   import { absoluteUrl, buildBreadcrumbJsonLd, DEFAULT_OG_IMAGE, trimText } from '$lib/seo/site';
 
   export let data: any;
@@ -42,7 +42,7 @@
   <meta name="twitter:card" content="summary_large_image" />
   {@html `<script type="application/ld+json">${JSON.stringify(buildBreadcrumbJsonLd([
     { name: 'Culoca', path: '/' },
-    { name: 'Orte', path: '/foto' },
+    { name: 'Orte', path: PRIMARY_REGIONAL_FEED_PATH },
     { name: data.hubLabel, path: data.seoPolicy.canonicalPath }
   ]))}</script>`}
 </svelte:head>
@@ -54,7 +54,7 @@
       <nav class="breadcrumb" aria-label="Breadcrumb">
         <a href="/">Culoca</a>
         <span>/</span>
-        <a href="/foto">Orte</a>
+        <a href={PRIMARY_REGIONAL_FEED_PATH}>Region</a>
         <span>/</span>
         <span>{data.hubLabel}</span>
       </nav>

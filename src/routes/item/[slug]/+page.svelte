@@ -16,6 +16,8 @@
 	import { browser, dev } from '$app/environment';
 	import { supabase } from '$lib/supabaseClient';
 	import {
+		getPublicItemDownloadHref,
+		getPublicItemHref,
 		getStoredOrComputedCanonicalPath,
 		slugifySegment
 	} from '$lib/content/routing';
@@ -3274,7 +3276,8 @@
 		const returnTo = browser
 			? `${window.location.pathname}${window.location.search}`
 			: canonicalPath || `/item/${slug}`;
-		await goto(`/item/${slug}/download?returnTo=${encodeURIComponent(returnTo)}`);
+		const dl = image ? getPublicItemDownloadHref(image) : `/item/${slug}/download`;
+		await goto(`${dl}?returnTo=${encodeURIComponent(returnTo)}`);
 	}
 
 	function toggleGallery() {
@@ -3635,10 +3638,20 @@
 								<a
 									class:active={groupItem.id === activeGroupItemId}
 									class="variant-strip-item"
-									href={groupItem.canonicalPath || `/item/${groupItem.slug}`}
+									href={groupItem.canonicalPath ||
+										getPublicItemHref({
+											slug: groupItem.slug,
+											canonical_path: groupItem.canonicalPath ?? null
+										})}
 									title={groupItem.title || 'Variante'}
 									on:click|preventDefault={() =>
-										openVariantItem(groupItem.canonicalPath || `/item/${groupItem.slug}`)}
+										openVariantItem(
+											groupItem.canonicalPath ||
+												getPublicItemHref({
+													slug: groupItem.slug,
+													canonical_path: groupItem.canonicalPath ?? null
+												})
+										)}
 								>
 									{#if groupItem.path_512 && groupItem.slug}
 										<img
@@ -4331,7 +4344,16 @@
 						{#each nearby.slice(0, 300) as item}
 							<li>
 								<a
-									href={item.canonicalPath || `/item/${item.slug}`}
+									href={item.canonicalPath ||
+										getPublicItemHref({
+											slug: item.slug,
+											canonical_path: item.canonicalPath ?? null,
+											country_slug: item.country_slug,
+											state_slug: item.state_slug,
+											region_slug: item.region_slug,
+											district_slug: item.district_slug,
+											municipality_slug: item.municipality_slug
+										})}
 									title={item.caption || item.description}
 								>
 									{item.title} ({Math.round(item.distance)}m)
@@ -4883,7 +4905,19 @@
 					<div class="similar-motifs-grid">
 						{#each visibleSimilarMotifItems as item (item.id)}
 							<article class="similar-item-card">
-								<a href={item.canonicalPath} class="similar-item-link">
+								<a
+									href={item.canonicalPath ||
+										getPublicItemHref({
+											slug: item.slug,
+											canonical_path: item.canonical_path ?? item.canonicalPath ?? null,
+											country_slug: item.country_slug,
+											state_slug: item.state_slug,
+											region_slug: item.region_slug,
+											district_slug: item.district_slug,
+											municipality_slug: item.municipality_slug
+										})}
+									class="similar-item-link"
+								>
 									{#if item.path_512}
 										<div
 											class="similar-item-thumb"

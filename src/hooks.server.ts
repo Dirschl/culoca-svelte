@@ -1,6 +1,19 @@
 import type { Handle } from '@sveltejs/kit';
+import { PRIMARY_REGIONAL_FEED_PATH } from '$lib/content/routing';
 
 export const handle: Handle = async ({ event, resolve }) => {
+	const pathname = event.url.pathname;
+
+	// Legacy: /foto → regionaler Hub (einheitliche Entdeckungs-URLs für Google & Nutzer)
+	if (pathname === '/foto') {
+		return Response.redirect(new URL(`${PRIMARY_REGIONAL_FEED_PATH}${event.url.search}`, event.url.origin), 301);
+	}
+	// Upload liegt unter /upload (früher /foto/upload)
+	if (pathname === '/foto/upload' || pathname.startsWith('/foto/upload/')) {
+		const rest = pathname === '/foto/upload' ? '' : pathname.slice('/foto/upload'.length);
+		return Response.redirect(new URL(`/upload${rest}${event.url.search}`, event.url.origin), 301);
+	}
+
 	const response = await resolve(event);
 
 	const path = event.url.pathname;

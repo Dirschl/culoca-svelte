@@ -2464,9 +2464,9 @@
       settingsIconRotation={settingsIconRotation}
       continuousRotation={continuousRotation}
       rotationSpeed={rotationSpeed}
-      on:upload={() => isLoggedIn ? window.location.href = '/foto/upload' : window.location.href = '/login'}
+      on:upload={() => isLoggedIn ? window.location.href = '/upload' : window.location.href = '/login'}
       on:publicContent={() => {}}
-      on:bulkUpload={() => isLoggedIn ? window.location.href = '/foto/upload' : window.location.href = '/login'}
+      on:bulkUpload={() => isLoggedIn ? window.location.href = '/upload' : window.location.href = '/login'}
       on:profile={() => isLoggedIn ? window.location.href = '/profile' : window.location.href = '/login'}
       on:settings={() => isLoggedIn ? window.location.href = '/settings' : window.location.href = '/login'}
       on:map={() => { window.location.href = buildMapViewHref(); }}

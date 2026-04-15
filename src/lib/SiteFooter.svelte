@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { PRIMARY_REGIONAL_FEED_PATH } from '$lib/content/routing';
+
   const year = new Date().getFullYear();
 </script>
 
@@ -22,7 +24,7 @@
     <div class="footer-col">
       <h4>Entdecken</h4>
       <ul>
-        <li><a href="/foto">Fotos</a></li>
+        <li><a href={PRIMARY_REGIONAL_FEED_PATH}>Regionale Fotos</a></li>
         <li><a href="/event">Events</a></li>
         <li><a href="/firma">Firmen</a></li>
         <li><a href="/video">Videos</a></li>
