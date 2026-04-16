@@ -308,8 +308,8 @@
           <div>
             <p class="hub-kicker">{data.kicker}</p>
             <h1>{data.hubDisplayTitle ?? data.hubLabel}</h1>
-            <p class="hub-meta">
-              {data.visibleCount.toLocaleString('de-DE')} {data.visibleCountLabel}
+            <p class="hub-meta" aria-label={`${data.visibleCount.toLocaleString('de-DE')} Inhalte`}>
+              {data.visibleCount.toLocaleString('de-DE')}
             </p>
             <p class="hub-intro">
               {#if data.page > 1}
@@ -370,8 +370,8 @@
               {#each data.geoChildren as child}
                 <a href={child.path} class="geo-child-card">
                   <span class="geo-child-card__label">{child.label}</span>
-                  <span class="geo-child-card__count">
-                    {child.count.toLocaleString('de-DE')} {child.count === 1 ? 'Eintrag' : 'Einträge'}
+                  <span class="geo-child-card__count" aria-label={`${child.count.toLocaleString('de-DE')} Inhalte`}>
+                    {child.count.toLocaleString('de-DE')}
                   </span>
                 </a>
               {/each}

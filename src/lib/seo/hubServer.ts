@@ -621,19 +621,6 @@ export function buildGeoHubPageData(
     ...hub.hierarchy.map((level) => ({ name: level.label, path: level.path }))
   ];
   const visibleCount = hasItemFeed ? hub.totalCount : hub.childLinks.length;
-  const isDachCountryPhotoHub =
-    hasItemFeed && hub.currentLevelKey === 'country' && ['de', 'at', 'ch'].includes(hub.countrySlug);
-  const visibleCountLabel = hasItemFeed
-    ? isDachCountryPhotoHub
-      ? hub.totalCount === 1
-        ? 'öffentliches Foto'
-        : 'öffentliche Fotos'
-      : hub.totalCount === 1
-        ? 'Eintrag'
-        : 'Einträge'
-    : hub.childLevelKey
-      ? geoPlural(hub.childLevelKey)
-      : 'Orte';
 
   return {
     hubType: `geo-${deepestLevel.key}`,
@@ -657,7 +644,6 @@ export function buildGeoHubPageData(
     hasItemFeed,
     totalCount: hub.totalCount,
     visibleCount,
-    visibleCountLabel,
     page: resolvedPage,
     totalPages,
     breadcrumbs,

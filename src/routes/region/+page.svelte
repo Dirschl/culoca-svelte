@@ -59,9 +59,8 @@
               {#each data.countryOptions as country}
                 <a href={country.path} class="country-card">
                   <span class="country-card__label">{country.label}</span>
-                  <span class="country-card__count">
+                  <span class="country-card__count" aria-label={`${country.count.toLocaleString('de-DE')} Inhalte`}>
                     {country.count.toLocaleString('de-DE')}
-                    {country.count === 1 ? 'Foto' : 'Fotos'}
                   </span>
                 </a>
               {/each}
