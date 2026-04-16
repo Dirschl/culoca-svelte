@@ -18,7 +18,8 @@ export const GET: RequestHandler = async () => {
     // Mit priority und changefreq für bessere Indexierung
     const staticPages = [
       { url: '', priority: '1.0', changefreq: 'daily' },
-      { url: '/de', priority: '0.85', changefreq: 'daily' },
+      { url: '/foto', priority: '0.88', changefreq: 'daily' },
+      { url: '/region', priority: '0.85', changefreq: 'daily' },
       { url: '/event', priority: '0.9', changefreq: 'daily' },
       { url: '/firma', priority: '0.9', changefreq: 'daily' },
       { url: '/video', priority: '0.8', changefreq: 'daily' },

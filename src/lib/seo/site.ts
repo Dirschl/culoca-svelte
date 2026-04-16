@@ -230,7 +230,7 @@ export function buildGeoCollectionPageJsonLd(args: {
 
 /**
  * Länder-Foto-Hub: SearchAction für die interne Fotosuche (hilft Google Sitelinks / Suchfeld zu verstehen).
- * Nur auf reinen Country-Hubs einbinden (z. B. /de, /at, /ch).
+ * Auf Foto-Landing (`/foto`) oder reinen Country-Hubs unter `/region/...` einbinden.
  */
 export function buildCountryPhotoHubSearchJsonLd(args: { hubPath: string; pageName: string }) {
   const path = args.hubPath.startsWith('/') ? args.hubPath : `/${args.hubPath}`;

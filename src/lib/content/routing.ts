@@ -48,11 +48,14 @@ export function normalizePath(path: string): string {
   return value !== '/' && value.endsWith('/') ? value.slice(0, -1) : value;
 }
 
+/** Foto-Typ-Hub (Suche, Varianten, Upload); gleiche Seite wie unter `/foto`. */
+export const FOTO_SEARCH_LANDING_PATH = '/foto';
+
 /**
- * Haupteinstieg für den regionalen Bild-Feed (ersetzt die frühere Startseite `/foto`).
- * Nur `de`/`at`/`ch` sind als Länder-Slugs erlaubt — Deutschland ist der Standard-Hub.
+ * Haupteinstieg für die regionale Navigation (Land → Bundesland → …).
+ * Konkrete Länder-URLs: `/region/de`, `/region/at`, …
  */
-export const PRIMARY_REGIONAL_FEED_PATH = '/de';
+export const PRIMARY_REGIONAL_FEED_PATH = '/region';
 
 /** Alte Typ-URLs wie /foto/slug – für öffentliche Item-Links durch Geo- oder /item/-Pfad ersetzen. */
 function shouldIgnoreLegacyTypeCanonicalPath(

@@ -20,6 +20,9 @@ export type GeoHierarchyLevel = {
   path: string;
 };
 
+/** Öffentliche Geo-Hub-URLs (Land → … → Gemeinde) unter diesem Präfix. */
+export const GEO_ROUTE_PREFIX = '/region';
+
 const GEO_LEVEL_ORDER: GeoLevelKey[] = ['country', 'state', 'region', 'district', 'municipality'];
 const COUNTRY_SLUG_ALIASES: Record<string, string> = {
   deutschland: 'de',
@@ -146,7 +149,7 @@ export function buildGeoHierarchy(input: GeoHierarchyInput): GeoHierarchyLevel[]
     parts.push(level.slug);
     return {
       ...level,
-      path: `/${parts.join('/')}`
+      path: `${GEO_ROUTE_PREFIX}/${parts.join('/')}`
     };
   });
 }
@@ -180,13 +183,13 @@ export function buildGeoItemPath(
   const itemSlug = normalizeGeoSlug(input.itemSlug);
   if (!itemSlug) return null;
 
-  const countrySlug = normalizeGeoSlug(input.countrySlug);
-  const districtSlug = normalizeGeoSlug(input.districtSlug, 'district');
-  const municipalitySlug = normalizeGeoSlug(input.municipalitySlug);
+  if (!hasGeoItemHierarchy(input)) return null;
 
-  if (!countrySlug || !districtSlug || !municipalitySlug) return null;
+  const hierarchy = buildGeoHierarchy(input);
+  if (!hierarchy.length) return null;
 
-  return `/${countrySlug}/${districtSlug}/${municipalitySlug}/${itemSlug}`;
+  const basePath = hierarchy[hierarchy.length - 1].path;
+  return `${basePath}/${itemSlug}`;
 }
 
 export function hasGeoItemHierarchy(input: GeoHierarchyInput): boolean {

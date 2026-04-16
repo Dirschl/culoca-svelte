@@ -1,5 +1,5 @@
 import { normalizeAdminDisplayLabel } from '$lib/content/locationTaxonomy';
-import { PRIMARY_REGIONAL_FEED_PATH, slugifySegment } from '$lib/content/routing';
+import { FOTO_SEARCH_LANDING_PATH, PRIMARY_REGIONAL_FEED_PATH, slugifySegment } from '$lib/content/routing';
 
 export type HubLink = {
   label: string;
@@ -8,8 +8,8 @@ export type HubLink = {
 
 export function buildKeywordHubPath(keyword: string): string {
   const label = (keyword || '').trim();
-  if (!label) return PRIMARY_REGIONAL_FEED_PATH;
-  return `${PRIMARY_REGIONAL_FEED_PATH}?suche=${encodeURIComponent(label)}`;
+  if (!label) return FOTO_SEARCH_LANDING_PATH;
+  return `${FOTO_SEARCH_LANDING_PATH}?suche=${encodeURIComponent(label)}`;
 }
 
 export function buildPhotographerHubPath(accountname: string): string {
@@ -21,11 +21,11 @@ export function buildPlaceHubPath(place: string): string {
 }
 
 export function buildGeoCountryHubPath(countrySlug: string): string {
-  return `/${slugifySegment(countrySlug)}`;
+  return `${PRIMARY_REGIONAL_FEED_PATH}/${slugifySegment(countrySlug)}`;
 }
 
 export function buildGeoDistrictHubPath(countrySlug: string, districtSlug: string): string {
-  return `/${slugifySegment(countrySlug)}/${slugifySegment(districtSlug)}`;
+  return `${PRIMARY_REGIONAL_FEED_PATH}/${slugifySegment(countrySlug)}/${slugifySegment(districtSlug)}`;
 }
 
 export function buildGeoMunicipalityHubPath(
@@ -33,7 +33,7 @@ export function buildGeoMunicipalityHubPath(
   districtSlug: string,
   municipalitySlug: string
 ): string {
-  return `/${slugifySegment(countrySlug)}/${slugifySegment(districtSlug)}/${slugifySegment(municipalitySlug)}`;
+  return `${PRIMARY_REGIONAL_FEED_PATH}/${slugifySegment(countrySlug)}/${slugifySegment(districtSlug)}/${slugifySegment(municipalitySlug)}`;
 }
 
 export function normalizeHubToken(value: string | null | undefined): string {

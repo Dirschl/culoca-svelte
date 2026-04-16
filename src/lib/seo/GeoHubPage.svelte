@@ -357,7 +357,9 @@
               <a class="hub-action" href="/upload">Foto hochladen</a>
               <a class="hub-action" href="/dashboard?section=photos">Bildverwaltung</a>
             {:else}
-              <a class="hub-action hub-action--primary" href={PRIMARY_REGIONAL_FEED_PATH}>Deutschland</a>
+              <a class="hub-action hub-action--primary" href={`${PRIMARY_REGIONAL_FEED_PATH}/de`}
+                >Deutschland</a
+              >
               <a class="hub-action" href="/upload">Foto anlegen</a>
               <a class="hub-action" href="/profile/review">Daten prüfen</a>
             {/if}

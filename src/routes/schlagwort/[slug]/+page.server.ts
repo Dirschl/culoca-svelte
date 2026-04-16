@@ -15,5 +15,5 @@ export const load: PageServerLoad = async ({ params, url }) => {
   };
 
   const qs = searchParams.toString();
-  throw redirect(308, qs ? `/de?${qs}` : '/de');
+  throw redirect(308, qs ? `/foto?${qs}` : '/foto');
 };

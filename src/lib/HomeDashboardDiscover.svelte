@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
   import { browser } from '$app/environment';
-  import { appendReturnTo, getPublicItemHref, PRIMARY_REGIONAL_FEED_PATH } from '$lib/content/routing';
+  import { appendReturnTo, FOTO_SEARCH_LANDING_PATH, getPublicItemHref } from '$lib/content/routing';
   import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
   import { formatEventHubRange, formatHubEventPlace } from '$lib/content/eventHubFormat';
 
@@ -256,9 +256,9 @@
     <section class="discover-block" aria-labelledby="discover-foto-heading">
       <div class="discover-head">
         <h2 id="discover-foto-heading">
-          <a href={PRIMARY_REGIONAL_FEED_PATH}><span class="discover-icon" aria-hidden="true">📷</span>Neueste Fotos</a>
+          <a href={FOTO_SEARCH_LANDING_PATH}><span class="discover-icon" aria-hidden="true">📷</span>Neueste Fotos</a>
         </h2>
-        <a href={PRIMARY_REGIONAL_FEED_PATH} class="discover-all">Alle anzeigen</a>
+        <a href={FOTO_SEARCH_LANDING_PATH} class="discover-all">Alle anzeigen</a>
       </div>
       <div class="items-grid">
         {#each latestPhotos as item (item.id)}

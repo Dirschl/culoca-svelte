@@ -5,6 +5,7 @@ import { getAdministrativeHierarchy, normalizeAdminDisplayLabel } from '$lib/con
 import { decodeHubSlug, normalizeHubToken } from '$lib/seo/hubs';
 import {
   buildGeoHierarchy,
+  GEO_ROUTE_PREFIX,
   getDeepestGeoLevel,
   getGeoChildLevelKey,
   getGeoLevel,
@@ -315,7 +316,7 @@ function applyGeoFilters<T extends { eq: (column: string, value: string) => T }>
   return next;
 }
 
-/** Volltext-Filter für Hub-Itemlisten (Ersatz für die frühere Suche auf `/foto`). */
+/** Volltext-Filter für Geo-Hub-Itemlisten (`/region/...`; alle Typen, nicht nur Fotos). */
 function applyOptionalHubItemSearch<T extends { or: (filters: string) => T }>(
   query: T,
   rawSearch: string | undefined | null
@@ -706,7 +707,7 @@ async function fetchGeoHub(args: {
           });
         }
         return map;
-      }, new Map<string, { key: GeoLevelKey; label: string; path: string; count: number }>())
+      }, new Map<string, { key: GeoLevelKey; label: string; path: string; count: number }>()).values()
     )
   ).map(({ label, path, count }) => ({ label, path, count }));
   const childMap = new Map<string, { key: GeoLevelKey; label: string; path: string; count: number }>();
@@ -854,7 +855,7 @@ export async function loadGeoHubBySegments(
     return loadGeoCountryHub(countrySlug, page, pageSize, search);
   }
 
-  const requestedPath = `/${[countrySlug, ...normalized].join('/')}`;
+  const requestedPath = `${GEO_ROUTE_PREFIX}/${[countrySlug, ...normalized].join('/')}`;
   const supabase = createServerSupabase();
   const { data, error: queryError } = await supabase
     .from('items')
@@ -939,7 +940,9 @@ export async function resolveLegacyPlaceSlug(placeSlug: string) {
       municipalityName: municipalityMatch.municipality_name
     }));
     return {
-      path: getGeoLevel(hierarchy, 'municipality')?.path || `/${municipalityMatch.country_slug}/${municipalityMatch.district_slug}/${municipalityMatch.municipality_slug}`,
+      path:
+        getGeoLevel(hierarchy, 'municipality')?.path ||
+        `${GEO_ROUTE_PREFIX}/${municipalityMatch.country_slug}/${municipalityMatch.district_slug}/${municipalityMatch.municipality_slug}`,
       level: 'municipality' as const,
       label:
         normalizeAdminDisplayLabel(municipalityMatch.municipality_name || municipalityMatch.municipality_slug) ||
@@ -960,7 +963,9 @@ export async function resolveLegacyPlaceSlug(placeSlug: string) {
       districtName: districtMatch.district_name
     }));
     return {
-      path: getGeoLevel(hierarchy, 'district')?.path || `/${districtMatch.country_slug}/${districtMatch.district_slug}`,
+      path:
+        getGeoLevel(hierarchy, 'district')?.path ||
+        `${GEO_ROUTE_PREFIX}/${districtMatch.country_slug}/${districtMatch.district_slug}`,
       level: 'district' as const,
       label:
         normalizeAdminDisplayLabel(districtMatch.district_name || districtMatch.district_slug) ||
@@ -971,7 +976,7 @@ export async function resolveLegacyPlaceSlug(placeSlug: string) {
   const countryMatch = await findMatch('country_slug');
   if (countryMatch?.country_slug) {
     return {
-      path: `/${countryMatch.country_slug}`,
+      path: `${GEO_ROUTE_PREFIX}/${countryMatch.country_slug}`,
       level: 'country' as const,
       label:
         normalizeAdminDisplayLabel(countryMatch.country_name || countryMatch.country_slug.toUpperCase()) ||

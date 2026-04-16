@@ -1,5 +1,5 @@
 <script lang="ts">
-  import ItemDetailPage from '../../../../item/[slug]/+page.svelte';
+  import ItemDetailPage from '../../../../../item/[slug]/+page.svelte';
   import GeoHubPage from '$lib/seo/GeoHubPage.svelte';
 
   export let data;
