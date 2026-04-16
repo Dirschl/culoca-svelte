@@ -4,7 +4,7 @@
   import SiteNav from '$lib/SiteNav.svelte';
   import SiteFooter from '$lib/SiteFooter.svelte';
   import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
-  import { appendReturnTo, getPublicItemHref, PRIMARY_REGIONAL_FEED_PATH } from '$lib/content/routing';
+  import { appendReturnTo, getPublicItemHref } from '$lib/content/routing';
   import { getEffectiveGpsPosition } from '$lib/filterStore';
   import {
     absoluteUrl,
@@ -340,28 +340,7 @@
                   />
                   <button type="submit" class="hub-search-submit">Suchen</button>
                 </div>
-                {#if data.currentLevelKey === 'country' && ['de', 'at', 'ch'].includes(data.countrySlug)}
-                  <p class="hub-search-hint">
-                    Durchsucht alle öffentlichen Fotos in {data.countryName}. Für die Bildverwaltung (Upload, Varianten,
-                    Metadaten) nutze das Dashboard.
-                  </p>
-                {/if}
               </form>
-            {/if}
-          </div>
-
-          <div class="hub-actions">
-            {#if data.currentLevelKey === 'country'}
-              <a class="hub-action hub-action--primary" href="/galerie">Galerie</a>
-              <a class="hub-action" href="/map-view">Kartenansicht</a>
-              <a class="hub-action" href="/upload">Foto hochladen</a>
-              <a class="hub-action" href="/dashboard?section=photos">Bildverwaltung</a>
-            {:else}
-              <a class="hub-action hub-action--primary" href={data.countryPath || `${PRIMARY_REGIONAL_FEED_PATH}/${data.countrySlug}`}
-                >{data.countryName}</a
-              >
-              <a class="hub-action" href="/upload">Foto anlegen</a>
-              <a class="hub-action" href="/profile/review">Daten prüfen</a>
             {/if}
           </div>
         </div>
@@ -591,36 +570,6 @@
   }
   .hub-search-submit:hover {
     filter: brightness(1.05);
-  }
-  .hub-search-hint {
-    margin: 0.5rem 0 0;
-    font-size: 0.82rem;
-    color: var(--text-muted);
-    line-height: 1.45;
-  }
-  .hub-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-    justify-content: flex-end;
-  }
-  .hub-action {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 44px;
-    padding: 0.75rem 1rem;
-    border-radius: 999px;
-    border: 1px solid var(--border-color);
-    background: var(--bg-secondary);
-    color: var(--text-primary);
-    text-decoration: none;
-    font-weight: 600;
-  }
-  .hub-action--primary {
-    background: var(--culoca-orange);
-    color: #fff;
-    border-color: var(--culoca-orange);
   }
   .geo-levels {
     display: flex;
@@ -877,9 +826,6 @@
     .hub-header-row {
       flex-direction: column;
       align-items: flex-start;
-    }
-    .hub-actions {
-      justify-content: flex-start;
     }
     .items-grid {
       grid-template-columns: repeat(2, 1fr);

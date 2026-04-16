@@ -115,7 +115,8 @@
 
   $: dashboardNetworkProfiles =
     dashboardNetworkListMode === 'following' ? dashboardFollowedProfiles : dashboardFollowerProfiles;
-  $: geoExplorerEntryHref = data.geoOverview?.[0]?.path || '/region';
+  /** Immer zur Länderauswahl `/region`, nicht direkt zum ersten Land (z. B. `/region/de`). */
+  const geoExplorerEntryHref = '/region';
 
   async function loadCurrentUserFullName() {
     const { data: authData } = await supabase.auth.getUser();

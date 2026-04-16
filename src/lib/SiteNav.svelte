@@ -42,6 +42,11 @@
   }
 
   $: currentPath = $page.url?.pathname || '/';
+  /** Unter /region: keine Galerie-/Foto-Suche-Links (SEO-Fokus auf regionale Items). */
+  $: regionHubSeo = currentPath === '/region' || currentPath.startsWith('/region/');
+  $: visibleNavLinks = regionHubSeo
+    ? navLinks.filter((l) => l.href !== '/galerie' && l.href !== FOTO_SEARCH_LANDING_PATH)
+    : navLinks;
   $: isChatRoute = isActive('/chat');
   $: userIdentityLabel = $customerBranding?.accountName || $customerBranding?.fullName || '';
   $: userMenuLabel = $isAuthenticated ? 'Konto' : 'Login';
@@ -348,7 +353,7 @@
     </a>
 
     <div class="nav-links" class:open={mobileOpen}>
-      {#each navLinks as link}
+      {#each visibleNavLinks as link}
         <a href={link.href} class="nav-link" class:active={isActive(link.href)} on:click={closeMobile}>{link.label}</a>
       {/each}
 

@@ -1,7 +1,10 @@
 <script lang="ts">
+  import { page } from '$app/stores';
   import { PRIMARY_REGIONAL_FEED_PATH } from '$lib/content/routing';
 
   const year = new Date().getFullYear();
+  /** Region-SEO-Hubs: keine App-Links (Galerie/Karte), nur Inhaltsnavigation. */
+  $: regionHubSeo = $page.url.pathname === '/region' || $page.url.pathname.startsWith('/region/');
 </script>
 
 <footer class="site-footer">
@@ -29,8 +32,10 @@
         <li><a href="/firma">Firmen</a></li>
         <li><a href="/video">Videos</a></li>
         <li><a href="/musik">Musik</a></li>
-        <li><a href="/galerie">Galerie</a></li>
-        <li><a href="/map-view">Karte</a></li>
+        {#if !regionHubSeo}
+          <li><a href="/galerie">Galerie</a></li>
+          <li><a href="/map-view">Karte</a></li>
+        {/if}
       </ul>
     </div>
 

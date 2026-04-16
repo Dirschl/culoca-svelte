@@ -348,7 +348,8 @@ async function fetchAllGeoInputsGlobalBatched(): Promise<GeoHierarchyInput[]> {
   const supabase = createServerSupabase();
   const out: GeoHierarchyInput[] = [];
   let from = 0;
-  const batchSize = 5000;
+  /** PostgREST `max-rows` ist oft 1000 — Seitengröße anpassen, sonst bricht die Schleife nach dem ersten Teilbatch ab. */
+  const pageSize = 1000;
   while (true) {
     const { data, error: qError } = await supabase
       .from('items')
@@ -358,7 +359,7 @@ async function fetchAllGeoInputsGlobalBatched(): Promise<GeoHierarchyInput[]> {
       .not('slug', 'is', null)
       .or('is_private.eq.false,is_private.is.null')
       .order('id', { ascending: true })
-      .range(from, from + batchSize - 1);
+      .range(from, from + pageSize - 1);
     if (qError) {
       throw error(500, qError.message);
     }
@@ -367,8 +368,8 @@ async function fetchAllGeoInputsGlobalBatched(): Promise<GeoHierarchyInput[]> {
     for (const row of rows) {
       out.push(mapGeoSelectRowToInput(row));
     }
-    if (rows.length < batchSize) break;
-    from += batchSize;
+    from += rows.length;
+    if (rows.length < pageSize) break;
   }
   return out;
 }
@@ -383,7 +384,7 @@ async function fetchAllGeoInputsForHubBatched(args: {
   const supabase = createServerSupabase();
   const out: GeoHierarchyInput[] = [];
   let from = 0;
-  const batchSize = 5000;
+  const pageSize = 1000;
   while (true) {
     const q = applyGeoFilters(
       supabase
@@ -394,7 +395,7 @@ async function fetchAllGeoInputsForHubBatched(args: {
         .not('slug', 'is', null)
         .or('is_private.eq.false,is_private.is.null')
         .order('id', { ascending: true })
-        .range(from, from + batchSize - 1),
+        .range(from, from + pageSize - 1),
       args
     );
     const { data, error: qError } = await q;
@@ -406,8 +407,8 @@ async function fetchAllGeoInputsForHubBatched(args: {
     for (const row of rows) {
       out.push(mapGeoSelectRowToInput(row));
     }
-    if (rows.length < batchSize) break;
-    from += batchSize;
+    from += rows.length;
+    if (rows.length < pageSize) break;
   }
   return out;
 }

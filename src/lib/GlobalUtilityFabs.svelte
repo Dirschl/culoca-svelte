@@ -22,6 +22,8 @@
     routeId === '/[country=countrySlug]/[district]/[municipality]/[slug]/download' ||
     isDetailPath(pathname) ||
     pathname.startsWith('/item/') ||
+    pathname === '/region' ||
+    pathname.startsWith('/region/') ||
     EXCLUDED_PREFIXES.some((prefix) => pathname.startsWith(prefix));
   $: hideChatFab = pathname.startsWith('/chat');
   $: showFabs = !hideFabs;
