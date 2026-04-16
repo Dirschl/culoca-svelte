@@ -40,6 +40,7 @@ function fixEncoding(str: string | null): string | null {
 function slugify(text: string): string {
   return text
     .toString()
+    .normalize('NFC')
     .toLowerCase()
     // Deutsche Umlaute korrekt ersetzen
     .replace(/ä/g, 'ae')

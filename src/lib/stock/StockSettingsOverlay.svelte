@@ -3,6 +3,7 @@
   import { authFetch } from '$lib/authFetch';
   import { extractPhotoMetadataFields } from '$lib/metadata/photoMetadata';
   import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
+  import { slugifySegment } from '$lib/content/routing';
 
   export let item: any;
   export let title = 'Stock-Einstellungen';
@@ -48,16 +49,6 @@
     }
     if (typeof value === 'string' && value.trim()) return value.trim();
     return null;
-  }
-
-  function slugifySegment(value: string) {
-    return value
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .replace(/-{2,}/g, '-');
   }
 
   /** Gleiche Logik wie `buildDownloadFilename` — muss im `$:`-Block stehen, damit Svelte `filenameMode` mitverfolgt. */

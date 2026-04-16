@@ -9,6 +9,7 @@ import {
 	resolveAttribution,
 	type AttributionProfileSettings
 } from '$lib/metadata/attributionResolver';
+import { slugifySegment } from '$lib/content/routing';
 
 export type DownloadExportMetadataMode = 'original' | 'culoca' | 'none';
 export type DownloadExportFormat = 'jpg' | 'webp';
@@ -108,16 +109,6 @@ function sanitizeBaseName(value: string | null | undefined, fallback: string) {
 		.replace(/[\\/:*?"<>|]+/g, '-')
 		.replace(/\s+/g, ' ')
 		.trim();
-}
-
-function slugifySegment(value: string) {
-	return value
-		.normalize('NFD')
-		.replace(/[\u0300-\u036f]/g, '')
-		.toLowerCase()
-		.replace(/[^a-z0-9]+/g, '-')
-		.replace(/^-+|-+$/g, '')
-		.replace(/-{2,}/g, '-');
 }
 
 function normalizeFileExtension(format: DownloadExportFormat) {

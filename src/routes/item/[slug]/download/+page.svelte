@@ -11,7 +11,7 @@
 	import { unifiedRightsStore } from '$lib/unifiedRightsStore';
 	import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
 	import { extractPhotoMetadataFields } from '$lib/metadata/photoMetadata';
-	import { getPublicItemHref } from '$lib/content/routing';
+	import { getPublicItemHref, slugifySegment } from '$lib/content/routing';
 
 	export let data: any;
 
@@ -475,15 +475,7 @@
 	}
 
 	function slugifyFilenamePart(value: string | null | undefined) {
-		const normalized = (value || '')
-			.normalize('NFD')
-			.replace(/[\u0300-\u036f]/g, '')
-			.toLowerCase()
-			.replace(/[^a-z0-9]+/g, '-')
-			.replace(/^-+|-+$/g, '')
-			.replace(/-{2,}/g, '-');
-
-		return normalized || 'bild';
+		return slugifySegment(value || '') || 'bild';
 	}
 
 	function findNestedMetadataText(

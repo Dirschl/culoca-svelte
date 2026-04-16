@@ -72,6 +72,8 @@ function shouldIgnoreLegacyTypeCanonicalPath(
 
 export function slugifySegment(value: string): string {
   return value
+    /** Zuerst NFC: sonst bleibt „ü“ als u+Combining und /ü/ trifft nicht → nach Strip nur „u“. */
+    .normalize('NFC')
     .replace(/Ä/g, 'Ae')
     .replace(/Ö/g, 'Oe')
     .replace(/Ü/g, 'Ue')

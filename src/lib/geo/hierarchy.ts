@@ -65,7 +65,7 @@ function stripGeoDecorators(value: string, key: GeoLevelKey): string {
 
 function normalizeGeoSlug(value: string | null | undefined, key?: GeoLevelKey): string {
   const normalizedValue = key ? stripGeoDecorators(value || '', key) : value || '';
-  const normalized = transliterateGerman(normalizedValue)
+  const normalized = transliterateGerman(normalizedValue.normalize('NFC'))
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()

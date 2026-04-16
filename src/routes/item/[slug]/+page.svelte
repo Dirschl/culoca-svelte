@@ -19,6 +19,7 @@
 		getPublicItemDownloadHref,
 		getPublicItemHref,
 		getStoredOrComputedCanonicalPath,
+		PRIMARY_REGIONAL_FEED_PATH,
 		slugifySegment
 	} from '$lib/content/routing';
 	import { sanitizeContentHtml } from '$lib/content/html';
@@ -310,7 +311,7 @@
 	$: showGeoState = !!getGeoLevel(geoHierarchyLevels, 'state');
 	$: showGeoRegion = !!getGeoLevel(geoHierarchyLevels, 'region');
 	$: geoBreadcrumbLinks = [
-		{ name: 'Culoca', path: '/' },
+		{ name: 'Region', path: PRIMARY_REGIONAL_FEED_PATH },
 		...geoHierarchyLevels.map((level) => ({ name: level.label, path: level.path })),
 		{
 			name: image?.title || image?.original_name || itemSlug,
@@ -318,7 +319,7 @@
 		}
 	];
 	$: geoDisplayBreadcrumbs = dedupeGeoCrumbs([
-		{ name: 'Culoca', path: '/' },
+		{ name: 'Region', path: PRIMARY_REGIONAL_FEED_PATH },
 		...geoHierarchyLevels.map((level) => ({ name: level.label, path: level.path }))
 	]);
 	$: itemBreadcrumbJsonLd = buildBreadcrumbJsonLd(geoBreadcrumbLinks);
