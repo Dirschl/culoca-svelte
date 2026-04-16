@@ -1,11 +1,6 @@
 import { redirect } from '@sveltejs/kit';
-import { buildGeoHubPath } from '$lib/geo/hierarchy';
-import {
-  loadGeoMunicipalityHub,
-  buildGeoHubPageData,
-  loadGeoHomeOverview,
-  loadGeoHubBySegments
-} from '$lib/seo/hubServer';
+import { buildGeoHubPath, GEO_ROUTE_PREFIX } from '$lib/geo/hierarchy';
+import { loadGeoMunicipalityHub, buildGeoHubPageData, loadGeoHubBySegments } from '$lib/seo/hubServer';
 import { getHubSeoPolicy } from '$lib/seo/policy';
 
 const PAGE_SIZE = 24;
@@ -19,7 +14,6 @@ export const load = async ({
 }) => {
   const page = Math.max(1, Number.parseInt(url.searchParams.get('seite') || '1', 10));
   const hubSearch = (url.searchParams.get('suche') || '').trim();
-  const countryOptions = await loadGeoHomeOverview();
 
   try {
     const hub = await loadGeoHubBySegments(
@@ -33,7 +27,7 @@ export const load = async ({
 
     return {
       ...data,
-      countryOptions,
+      countryOptions: [],
       seoPolicy: getHubSeoPolicy({
         basePath: data.hubPath,
         page,
@@ -61,7 +55,7 @@ export const load = async ({
       regionSlug: hub.regionSlug,
       districtSlug: hub.districtSlug,
       municipalitySlug: hub.municipalitySlug
-    }) || `/${params.country}/${params.district}/${params.municipality}`;
+    }) || `${GEO_ROUTE_PREFIX}/${params.country}/${params.district}/${params.municipality}`;
 
   if (canonicalHubPath !== url.pathname) {
     throw redirect(301, canonicalHubPath);
@@ -71,7 +65,7 @@ export const load = async ({
 
   return {
     ...data,
-    countryOptions,
+    countryOptions: [],
     seoPolicy: getHubSeoPolicy({
       basePath: data.hubPath,
       page,

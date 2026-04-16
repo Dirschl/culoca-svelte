@@ -1,13 +1,17 @@
 import { createClient } from '@supabase/supabase-js';
 import { error } from '@sveltejs/kit';
 import { getPublicItemHref } from '$lib/content/routing';
-import { getAdministrativeHierarchy, normalizeAdminDisplayLabel } from '$lib/content/locationTaxonomy';
+import {
+  getAdministrativeHierarchy,
+  getDistrictSlugsForBundesland,
+  getDistrictSlugsForRegion,
+  normalizeAdminDisplayLabel
+} from '$lib/content/locationTaxonomy';
 import { decodeHubSlug, normalizeHubToken } from '$lib/seo/hubs';
 import {
   buildGeoHierarchy,
   GEO_ROUTE_PREFIX,
   getDeepestGeoLevel,
-  getGeoChildLevelKey,
   getGeoLevel,
   type GeoHierarchyInput,
   type GeoHierarchyLevel,
@@ -91,6 +95,22 @@ function enrichGeoInput<T extends GeoHierarchyInput>(input: T): T {
     districtName: input.districtName || administrativeHierarchy.districtName,
     districtSlug: input.districtSlug || administrativeHierarchy.districtSlug
   };
+}
+
+const GEO_LEVEL_SEQUENCE: GeoLevelKey[] = ['country', 'state', 'region', 'district', 'municipality'];
+
+/** Nächste Geo-Ebene — immer mit {@link enrichGeoInput}, damit Bundesland/Region aus Landkreis-Taxonomie zählen. */
+function getGeoChildLevelKeyEnriched(rows: GeoHierarchyInput[], currentKey: GeoLevelKey): GeoLevelKey | null {
+  const startIndex = GEO_LEVEL_SEQUENCE.indexOf(currentKey) + 1;
+  if (startIndex <= 0) return null;
+  for (const key of GEO_LEVEL_SEQUENCE.slice(startIndex)) {
+    const hasAnyValue = rows.some((row) => {
+      const levels = buildGeoHierarchy(enrichGeoInput(row));
+      return levels.some((level) => level.key === key);
+    });
+    if (hasAnyValue) return key;
+  }
+  return null;
 }
 
 function createServerSupabase() {
@@ -181,41 +201,51 @@ export async function loadPlaceHub(placeSlug: string) {
 }
 
 export async function loadGeoHomeOverview() {
-  const items = await fetchAllPublicRootItems();
-  const countryMap = new Map<
-    string,
-    {
-      label: string;
-      path: string;
-      count: number;
-    }
-  >();
+  const supabase = createServerSupabase();
+  const countryMap = new Map<string, { label: string; path: string; count: number }>();
+  let from = 0;
+  const batchSize = 4000;
 
-  for (const item of items) {
-    const hierarchy = buildGeoHierarchy(enrichGeoInput({
-      countrySlug: item.country_slug,
-      countryName: item.country_name,
-      stateSlug: item.state_slug,
-      stateName: item.state_name,
-      regionSlug: item.region_slug,
-      regionName: item.region_name,
-      districtSlug: item.district_slug,
-      districtName: item.district_name,
-      municipalitySlug: item.municipality_slug,
-      municipalityName: item.municipality_name
-    }));
-    const countryLevel = getGeoLevel(hierarchy, 'country');
-    if (!countryLevel) continue;
-    const current = countryMap.get(countryLevel.path);
-    if (current) {
-      current.count += 1;
-    } else {
-      countryMap.set(countryLevel.path, {
-        label: getCountryLabel(item.country_slug, item.country_name),
-        path: countryLevel.path,
-        count: 1
-      });
+  while (true) {
+    const { data, error: batchError } = await supabase
+      .from('items')
+      .select('country_slug, country_name')
+      .eq('admin_hidden', false)
+      .is('group_root_item_id', null)
+      .not('slug', 'is', null)
+      .or('is_private.eq.false,is_private.is.null')
+      .range(from, from + batchSize - 1);
+
+    if (batchError) {
+      throw error(500, batchError.message);
     }
+
+    const rows = data || [];
+    if (!rows.length) break;
+
+    for (const row of rows) {
+      const hierarchy = buildGeoHierarchy(
+        enrichGeoInput({
+          countrySlug: row.country_slug,
+          countryName: row.country_name
+        })
+      );
+      const countryLevel = getGeoLevel(hierarchy, 'country');
+      if (!countryLevel) continue;
+      const current = countryMap.get(countryLevel.path);
+      if (current) {
+        current.count += 1;
+      } else {
+        countryMap.set(countryLevel.path, {
+          label: getCountryLabel(row.country_slug, row.country_name),
+          path: countryLevel.path,
+          count: 1
+        });
+      }
+    }
+
+    if (rows.length < batchSize) break;
+    from += batchSize;
   }
 
   return Array.from(countryMap.values()).sort((left, right) => right.count - left.count);
@@ -251,7 +281,7 @@ function resolveGeoSegments(
   let currentKey: GeoLevelKey = 'country';
 
   for (const segment of segments) {
-    const childKey = getGeoChildLevelKey(filteredRows, currentKey);
+    const childKey = getGeoChildLevelKeyEnriched(filteredRows, currentKey);
     if (!childKey) return null;
 
     const matchingRows = filteredRows.filter((row) => getRowLevelSlug(row, childKey) === segment);
@@ -298,7 +328,7 @@ type GeoHubResult = {
   }>;
 };
 
-function applyGeoFilters<T extends { eq: (column: string, value: string) => T }>(
+function applyGeoFilters<T extends { eq: (column: string, value: string) => T; or: (filter: string) => T }>(
   query: T,
   args: {
     countrySlug: string;
@@ -309,8 +339,25 @@ function applyGeoFilters<T extends { eq: (column: string, value: string) => T }>
   }
 ) {
   let next = query.eq('country_slug', args.countrySlug);
-  if (args.stateSlug) next = next.eq('state_slug', args.stateSlug);
-  if (args.regionSlug) next = next.eq('region_slug', args.regionSlug);
+  if (args.stateSlug) {
+    const inferredDistricts = getDistrictSlugsForBundesland(args.stateSlug);
+    if (inferredDistricts.length > 0) {
+      next = next.or(`state_slug.eq.${args.stateSlug},district_slug.in.(${inferredDistricts.join(',')})`);
+    } else {
+      next = next.eq('state_slug', args.stateSlug);
+    }
+  }
+  if (args.regionSlug) {
+    const inferredDistricts =
+      args.stateSlug != null && args.stateSlug !== ''
+        ? getDistrictSlugsForRegion(args.stateSlug, args.regionSlug)
+        : [];
+    if (inferredDistricts.length > 0) {
+      next = next.or(`region_slug.eq.${args.regionSlug},district_slug.in.(${inferredDistricts.join(',')})`);
+    } else {
+      next = next.eq('region_slug', args.regionSlug);
+    }
+  }
   if (args.districtSlug) next = next.eq('district_slug', args.districtSlug);
   if (args.municipalitySlug) next = next.eq('municipality_slug', args.municipalitySlug);
   return next;
@@ -643,7 +690,7 @@ async function fetchGeoHub(args: {
     municipalitySlug: row.municipality_slug,
     municipalityName: row.municipality_name
   }));
-  const childLevelKey = currentLevel ? getGeoChildLevelKey(geoRows, currentLevel.key) : null;
+  const childLevelKey = currentLevel ? getGeoChildLevelKeyEnriched(geoRows, currentLevel.key) : null;
   const shouldLoadItems = !childLevelKey;
   let totalCount = totalRootCount;
   let items: HubItem[] = [];

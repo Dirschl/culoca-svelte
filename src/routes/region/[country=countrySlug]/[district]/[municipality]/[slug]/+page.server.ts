@@ -1,7 +1,7 @@
 import { redirect } from '@sveltejs/kit';
 import { loadContentPage } from '$lib/content/server';
 import { toCanonicalAbsoluteUrl } from '$lib/seo/site';
-import { buildGeoHubPageData, loadGeoHubBySegments, loadGeoHomeOverview } from '$lib/seo/hubServer';
+import { buildGeoHubPageData, loadGeoHubBySegments } from '$lib/seo/hubServer';
 import { getHubSeoPolicy } from '$lib/seo/policy';
 
 const PAGE_SIZE = 24;
@@ -22,21 +22,18 @@ export const load = async ({
   const hubSearch = (url.searchParams.get('suche') || '').trim();
 
   try {
-    const [hub, countryOptions] = await Promise.all([
-      loadGeoHubBySegments(
-        params.country,
-        [params.district, params.municipality, params.slug],
-        1,
-        PAGE_SIZE,
-        hubSearch
-      ),
-      loadGeoHomeOverview()
-    ]);
+    const hub = await loadGeoHubBySegments(
+      params.country,
+      [params.district, params.municipality, params.slug],
+      1,
+      PAGE_SIZE,
+      hubSearch
+    );
     const data = buildGeoHubPageData(hub, 1, PAGE_SIZE, hubSearch);
 
     return {
       ...data,
-      countryOptions,
+      countryOptions: [],
       seoPolicy: getHubSeoPolicy({
         basePath: data.hubPath,
         page: 1,

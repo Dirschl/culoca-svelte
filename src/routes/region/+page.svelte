@@ -8,9 +8,9 @@
   export let data: PageData;
 
   const canonicalUrl = absoluteUrl(data.seoPolicy.canonicalPath);
-  const pageTitle = 'Region wählen: Fotos nach Land & Ort | Culoca';
+  const pageTitle = 'Region: Land wählen | Culoca';
   const metaDescription = trimText(
-    'Starte mit dem Land, dann Bundesland, Region und Gemeinde – strukturierte Foto-Hubs. Alternativ alle Fotos durchsuchen.'
+    'Einstieg in die geografische Verzeichnisstruktur: zuerst nur das Land, danach Bundesland, Region und Gemeinde. Alle öffentlichen Inhalte pro Ebene.'
   );
 </script>
 
@@ -44,18 +44,17 @@
           <span>Region</span>
         </nav>
         <p class="region-kicker">Geografischer Einstieg</p>
-        <h1>Region &amp; Orte</h1>
+        <h1>Region: Land wählen</h1>
         <p class="region-lead">
-          Hier liegen echte Verzeichnis-URLs bis zur Gemeinde — für Crawler und interne Verlinkung, ohne
-          Typ- oder Suchfilter (alle öffentlichen Items). Für die Foto-Oberfläche mit starker Suche, Varianten und Upload
-          nutze
-          <a href={FOTO_SEARCH_LANDING_PATH}>/foto</a>.
+          Schritt 1: nur das Land. Anschließend öffnet sich pro Land zuerst die Bundesland-Ebene, dann jeweils nur die
+          nächste Unterebene (Region, Landkreis, Gemeinde). Alle öffentlichen Items — ohne Typfilter. Für Suche, Varianten
+          und Upload: <a href={FOTO_SEARCH_LANDING_PATH}>/foto</a>.
         </p>
 
         {#if data.countryOptions?.length}
           <section class="country-section" aria-labelledby="country-heading">
             <h2 id="country-heading">Länder</h2>
-            <p class="country-hint">Direkter Sprung in den jeweiligen Länder-Hub.</p>
+            <p class="country-hint">Nächster Schritt: z. B. <strong>/region/de</strong> für Deutschland.</p>
             <div class="country-grid">
               {#each data.countryOptions as country}
                 <a href={country.path} class="country-card">

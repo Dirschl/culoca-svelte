@@ -4,7 +4,6 @@ import { toCanonicalAbsoluteUrl } from '$lib/seo/site';
 import {
   buildGeoHubPageData,
   loadGeoHubBySegments,
-  loadGeoHomeOverview,
   resolveLegacyPlaceSlug
 } from '$lib/seo/hubServer';
 import { getHubSeoPolicy } from '$lib/seo/policy';
@@ -32,15 +31,12 @@ export const load = async ({
     .filter(Boolean);
 
   try {
-    const [hub, countryOptions] = await Promise.all([
-      loadGeoHubBySegments(params.country, segments, page, PAGE_SIZE, hubSearch),
-      loadGeoHomeOverview()
-    ]);
+    const hub = await loadGeoHubBySegments(params.country, segments, page, PAGE_SIZE, hubSearch);
     const data = buildGeoHubPageData(hub, page, PAGE_SIZE, hubSearch);
 
     return {
       ...data,
-      countryOptions,
+      countryOptions: [],
       seoPolicy: getHubSeoPolicy({
         basePath: data.hubPath,
         page,

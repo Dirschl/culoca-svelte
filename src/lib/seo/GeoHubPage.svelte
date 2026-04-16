@@ -357,8 +357,8 @@
               <a class="hub-action" href="/upload">Foto hochladen</a>
               <a class="hub-action" href="/dashboard?section=photos">Bildverwaltung</a>
             {:else}
-              <a class="hub-action hub-action--primary" href={`${PRIMARY_REGIONAL_FEED_PATH}/de`}
-                >Deutschland</a
+              <a class="hub-action hub-action--primary" href={data.countryPath || `${PRIMARY_REGIONAL_FEED_PATH}/${data.countrySlug}`}
+                >{data.countryName}</a
               >
               <a class="hub-action" href="/upload">Foto anlegen</a>
               <a class="hub-action" href="/profile/review">Daten prüfen</a>
@@ -379,25 +379,6 @@
               </a>
             {/each}
           </div>
-        {/if}
-
-        {#if data.currentLevelKey === 'country' && data.countryOptions?.length > 1}
-          <section class="geo-country-switcher" aria-labelledby="geo-country-switcher-heading">
-            <div class="geo-country-switcher__header">
-              <h2 id="geo-country-switcher-heading">Länder</h2>
-              <p>Direkte Einstiege in weitere Länder-Hubs.</p>
-            </div>
-            <div class="geo-children__grid">
-              {#each data.countryOptions as country}
-                <a href={country.path} class="geo-child-card">
-                  <span class="geo-child-card__label">{country.label}</span>
-                  <span class="geo-child-card__count">
-                    {country.count.toLocaleString('de-DE')} {country.count === 1 ? 'Eintrag' : 'Einträge'}
-                  </span>
-                </a>
-              {/each}
-            </div>
-          </section>
         {/if}
 
         {#if data.geoChildren?.length}
@@ -672,20 +653,6 @@
     margin-top: 1.5rem;
     padding-top: 1.25rem;
     border-top: 1px solid var(--border-color);
-  }
-  .geo-country-switcher {
-    margin-top: 1.5rem;
-    padding-top: 1.25rem;
-    border-top: 1px solid var(--border-color);
-  }
-  .geo-country-switcher__header h2 {
-    margin: 0;
-    font-size: 1rem;
-  }
-  .geo-country-switcher__header p {
-    margin: 0.35rem 0 0;
-    color: var(--text-secondary);
-    font-size: 0.95rem;
   }
   .geo-children__header h2 {
     margin: 0;

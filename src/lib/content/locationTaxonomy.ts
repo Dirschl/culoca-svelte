@@ -71,6 +71,33 @@ const DISTRICT_METADATA: Record<string, DistrictMetadata> = {
   BREMEN: { name: 'Bremen', slug: 'bremen', stateName: 'Bremen', stateSlug: 'bremen', regionName: 'Bremen', regionSlug: 'bremen' }
 };
 
+/** Landkreis-/Bezirksslugs aus der statischen Taxonomie (wenn `state_slug` in der DB fehlt). */
+export function getDistrictSlugsForBundesland(stateSlug: string): string[] {
+  const want = stateSlug.trim().toLowerCase();
+  const out = new Set<string>();
+  for (const meta of Object.values(DISTRICT_METADATA)) {
+    if (meta.stateSlug?.toLowerCase() === want && meta.slug) out.add(meta.slug);
+  }
+  return Array.from(out);
+}
+
+/** Landkreise, die einer Region (Regierungsbezirk o. ä.) in der Taxonomie zugeordnet sind. */
+export function getDistrictSlugsForRegion(stateSlug: string, regionSlug: string): string[] {
+  const wantState = stateSlug.trim().toLowerCase();
+  const wantRegion = regionSlug.trim().toLowerCase();
+  const out = new Set<string>();
+  for (const meta of Object.values(DISTRICT_METADATA)) {
+    if (
+      meta.stateSlug?.toLowerCase() === wantState &&
+      meta.regionSlug?.toLowerCase() === wantRegion &&
+      meta.slug
+    ) {
+      out.add(meta.slug);
+    }
+  }
+  return Array.from(out);
+}
+
 export type AdministrativeHierarchy = {
   countryName: string | null;
   countrySlug: string | null;
