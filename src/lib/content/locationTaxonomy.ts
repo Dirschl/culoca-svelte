@@ -198,7 +198,8 @@ export function getAdministrativeHierarchy(args: {
     regionName: normalizeAdminDisplayLabel(districtMeta?.regionName || null),
     regionSlug: districtMeta?.regionSlug || null,
     districtName: normalizeAdminDisplayLabel(args.districtName || districtMeta?.name || null),
-    districtSlug: args.districtSlug || districtMeta?.slug || null,
+    /** Bekannte Taxonomie schlägt beliebige Slug-Strings (inkl. veralteter/fehlerhafter DB-Werte). */
+    districtSlug: districtMeta?.slug || args.districtSlug || null,
     districtResolved: !!districtMeta
   };
 }
@@ -248,11 +249,18 @@ export function normalizeGeoDraft(args: {
     args.countryName || args.countrySlug || args.countryCode
   );
   const districtName = normalizeAdminDisplayLabel(args.districtName) || null;
-  const districtSlug = args.districtSlug ? slugifySegment(args.districtSlug) : slugifySegment(districtName || '');
+  /** Namen sind maßgeblich: alter DB-Slug (z. B. `muhldorf-…` statt `muehldorf-…`) darf nicht Vorrang haben. */
+  const districtSlug = districtName
+    ? slugifySegment(districtName)
+    : args.districtSlug
+      ? slugifySegment(args.districtSlug)
+      : '';
   const municipalityName = normalizeAdminDisplayLabel(args.municipalityName) || null;
-  const municipalitySlug = args.municipalitySlug
-    ? slugifySegment(args.municipalitySlug)
-    : slugifySegment(municipalityName || '');
+  const municipalitySlug = municipalityName
+    ? slugifySegment(municipalityName)
+    : args.municipalitySlug
+      ? slugifySegment(args.municipalitySlug)
+      : '';
   const localityName = normalizeAdminDisplayLabel(args.localityName) || null;
 
   if (!normalizedCountry && !districtName && !districtSlug && !municipalityName && !municipalitySlug) {
