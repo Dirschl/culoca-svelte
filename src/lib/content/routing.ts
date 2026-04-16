@@ -52,8 +52,8 @@ export function normalizePath(path: string): string {
 export const FOTO_SEARCH_LANDING_PATH = '/foto';
 
 /**
- * Haupteinstieg für die regionale Navigation (Land → Bundesland → …).
- * Konkrete Länder-URLs: `/region/de`, `/region/at`, …
+ * Region-Hub (Navigation für Crawler: Land → Bundesland → …).
+ * Item-Kanonikal-URLs bleiben kurz: `/de/landkreis/gemeinde/slug` (siehe {@link buildGeoItemPath}).
  */
 export const PRIMARY_REGIONAL_FEED_PATH = '/region';
 

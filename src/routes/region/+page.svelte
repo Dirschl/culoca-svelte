@@ -95,8 +95,6 @@
   }
   .region-inner {
     padding: 2rem;
-    max-width: 960px;
-    margin: 0 auto;
   }
   .breadcrumb {
     display: flex;

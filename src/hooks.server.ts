@@ -1,14 +1,19 @@
 import type { Handle } from '@sveltejs/kit';
 import { GEO_ROUTE_PREFIX } from '$lib/geo/hierarchy';
 
-/** Frühere Geo-URLs ohne `/region`-Präfix (Bookmarks, alte canonical_path). */
+/** Länder-Kurzcodes: früher Country-Hub unter `/de` statt `/region/de` — nicht Items umleiten. */
 const LEGACY_GEO_ROOT_SEGMENTS = new Set(['de', 'at', 'ch', 'lu', 'mc']);
 
+/**
+ * Nur kurze Pfade (1–3 Segmente nach Land) → Region-Hub. Items bleiben unter
+ * `/de/landkreis/gemeinde/slug` (4 Segmente), keine Umleitung.
+ */
 function legacyGeoRedirectTarget(pathname: string): string | null {
 	const parts = pathname.split('/').filter(Boolean);
 	if (!parts.length) return null;
 	const root = parts[0].toLowerCase();
 	if (!LEGACY_GEO_ROOT_SEGMENTS.has(root)) return null;
+	if (parts.length >= 4) return null;
 	return `${GEO_ROUTE_PREFIX}/${parts.join('/')}`;
 }
 

@@ -200,57 +200,6 @@ export async function loadPlaceHub(placeSlug: string) {
   };
 }
 
-export async function loadGeoHomeOverview() {
-  const supabase = createServerSupabase();
-  const countryMap = new Map<string, { label: string; path: string; count: number }>();
-  let from = 0;
-  const batchSize = 4000;
-
-  while (true) {
-    const { data, error: batchError } = await supabase
-      .from('items')
-      .select('country_slug, country_name')
-      .eq('admin_hidden', false)
-      .is('group_root_item_id', null)
-      .not('slug', 'is', null)
-      .or('is_private.eq.false,is_private.is.null')
-      .range(from, from + batchSize - 1);
-
-    if (batchError) {
-      throw error(500, batchError.message);
-    }
-
-    const rows = data || [];
-    if (!rows.length) break;
-
-    for (const row of rows) {
-      const hierarchy = buildGeoHierarchy(
-        enrichGeoInput({
-          countrySlug: row.country_slug,
-          countryName: row.country_name
-        })
-      );
-      const countryLevel = getGeoLevel(hierarchy, 'country');
-      if (!countryLevel) continue;
-      const current = countryMap.get(countryLevel.path);
-      if (current) {
-        current.count += 1;
-      } else {
-        countryMap.set(countryLevel.path, {
-          label: getCountryLabel(row.country_slug, row.country_name),
-          path: countryLevel.path,
-          count: 1
-        });
-      }
-    }
-
-    if (rows.length < batchSize) break;
-    from += batchSize;
-  }
-
-  return Array.from(countryMap.values()).sort((left, right) => right.count - left.count);
-}
-
 function getRowLevelSlug(row: GeoHierarchyInput, key: GeoLevelKey): string | null {
   const hierarchy = buildGeoHierarchy(enrichGeoInput(row));
   return getGeoLevel(hierarchy, key)?.slug || null;
@@ -361,6 +310,129 @@ function applyGeoFilters<T extends { eq: (column: string, value: string) => T; o
   if (args.districtSlug) next = next.eq('district_slug', args.districtSlug);
   if (args.municipalitySlug) next = next.eq('municipality_slug', args.municipalitySlug);
   return next;
+}
+
+type GeoSelectRow = {
+  country_slug?: string | null;
+  country_name?: string | null;
+  state_slug?: string | null;
+  state_name?: string | null;
+  region_slug?: string | null;
+  region_name?: string | null;
+  district_slug?: string | null;
+  district_name?: string | null;
+  municipality_slug?: string | null;
+  municipality_name?: string | null;
+};
+
+function mapGeoSelectRowToInput(row: GeoSelectRow): GeoHierarchyInput {
+  return {
+    countrySlug: row.country_slug,
+    countryName: row.country_name,
+    stateSlug: row.state_slug,
+    stateName: row.state_name,
+    regionSlug: row.region_slug,
+    regionName: row.region_name,
+    districtSlug: row.district_slug,
+    districtName: row.district_name,
+    municipalitySlug: row.municipality_slug,
+    municipalityName: row.municipality_name
+  };
+}
+
+/**
+ * PostgREST liefert pro Request oft nur ~1000 Zeilen — für Zählungen und Navigation müssen wir alle
+ * passenden Zeilen in sortierten Batches laden.
+ */
+async function fetchAllGeoInputsGlobalBatched(): Promise<GeoHierarchyInput[]> {
+  const supabase = createServerSupabase();
+  const out: GeoHierarchyInput[] = [];
+  let from = 0;
+  const batchSize = 5000;
+  while (true) {
+    const { data, error: qError } = await supabase
+      .from('items')
+      .select(GEO_FILTER_SELECT)
+      .eq('admin_hidden', false)
+      .is('group_root_item_id', null)
+      .not('slug', 'is', null)
+      .or('is_private.eq.false,is_private.is.null')
+      .order('id', { ascending: true })
+      .range(from, from + batchSize - 1);
+    if (qError) {
+      throw error(500, qError.message);
+    }
+    const rows = (data || []) as GeoSelectRow[];
+    if (!rows.length) break;
+    for (const row of rows) {
+      out.push(mapGeoSelectRowToInput(row));
+    }
+    if (rows.length < batchSize) break;
+    from += batchSize;
+  }
+  return out;
+}
+
+async function fetchAllGeoInputsForHubBatched(args: {
+  countrySlug: string;
+  stateSlug?: string;
+  regionSlug?: string;
+  districtSlug?: string;
+  municipalitySlug?: string;
+}): Promise<GeoHierarchyInput[]> {
+  const supabase = createServerSupabase();
+  const out: GeoHierarchyInput[] = [];
+  let from = 0;
+  const batchSize = 5000;
+  while (true) {
+    const q = applyGeoFilters(
+      supabase
+        .from('items')
+        .select(GEO_FILTER_SELECT)
+        .eq('admin_hidden', false)
+        .is('group_root_item_id', null)
+        .not('slug', 'is', null)
+        .or('is_private.eq.false,is_private.is.null')
+        .order('id', { ascending: true })
+        .range(from, from + batchSize - 1),
+      args
+    );
+    const { data, error: qError } = await q;
+    if (qError) {
+      throw error(500, qError.message);
+    }
+    const rows = (data || []) as GeoSelectRow[];
+    if (!rows.length) break;
+    for (const row of rows) {
+      out.push(mapGeoSelectRowToInput(row));
+    }
+    if (rows.length < batchSize) break;
+    from += batchSize;
+  }
+  return out;
+}
+
+export async function loadGeoHomeOverview() {
+  const rows = await fetchAllGeoInputsGlobalBatched();
+  const countryMap = new Map<string, { label: string; path: string; count: number }>();
+
+  for (const row of rows) {
+    const hierarchy = buildGeoHierarchy(enrichGeoInput(row));
+    const countryLevel = getGeoLevel(hierarchy, 'country');
+    if (!countryLevel) continue;
+    const current = countryMap.get(countryLevel.path);
+    if (current) {
+      current.count += 1;
+    } else {
+      countryMap.set(countryLevel.path, {
+        label: getCountryLabel(row.countrySlug, row.countryName),
+        path: countryLevel.path,
+        count: 1
+      });
+    }
+  }
+
+  return Array.from(countryMap.values()).sort((left, right) => right.count - left.count);
 }
 
 /** Volltext-Filter für Geo-Hub-Itemlisten (`/region/...`; alle Typen, nicht nur Fotos). */
@@ -542,9 +614,11 @@ export function buildGeoHubPageData(
   const totalPages = hasItemFeed ? Math.max(1, Math.ceil(hub.totalCount / pageSize)) : 1;
   const resolvedPage = Math.min(Math.max(1, page), totalPages);
   const seoText = buildGeoHubSeoText(hub, resolvedPage);
-  const breadcrumbs = [{ name: 'Culoca', path: '/' }].concat(
-    hub.hierarchy.map((level) => ({ name: level.label, path: level.path }))
-  );
+  const breadcrumbs = [
+    { name: 'Culoca', path: '/' },
+    { name: 'Region', path: GEO_ROUTE_PREFIX },
+    ...hub.hierarchy.map((level) => ({ name: level.label, path: level.path }))
+  ];
   const visibleCount = hasItemFeed ? hub.totalCount : hub.childLinks.length;
   const isDachCountryPhotoHub =
     hasItemFeed && hub.currentLevelKey === 'country' && ['de', 'at', 'ch'].includes(hub.countrySlug);
@@ -649,18 +723,7 @@ async function fetchGeoHub(args: {
   if (!totalRootCount || !meta) {
     throw error(404, 'Geo-Hub nicht gefunden');
   }
-  const { data: navRows, error: navError } = await applyGeoFilters(
-    supabase
-      .from('items')
-      .select(GEO_FILTER_SELECT)
-      .eq('admin_hidden', false)
-      .is('group_root_item_id', null)
-      .not('slug', 'is', null)
-      .or('is_private.eq.false,is_private.is.null'),
-    args
-  );
-
-  if (navError) throw error(500, navError.message);
+  const geoRows = await fetchAllGeoInputsForHubBatched(args);
   const geoMeta = meta as HubItem;
   const fullHierarchy = buildGeoHierarchy(enrichGeoInput({
     countrySlug: geoMeta.country_slug || args.countrySlug,
@@ -678,18 +741,6 @@ async function fetchGeoHub(args: {
   const hierarchy = currentLevel
     ? fullHierarchy.slice(0, fullHierarchy.findIndex((level) => level.key === currentLevel.key) + 1)
     : fullHierarchy;
-  const geoRows = ((navRows || []) as HubItem[]).map((row) => ({
-    countrySlug: row.country_slug,
-    countryName: row.country_name,
-    stateSlug: row.state_slug,
-    stateName: row.state_name,
-    regionSlug: row.region_slug,
-    regionName: row.region_name,
-    districtSlug: row.district_slug,
-    districtName: row.district_name,
-    municipalitySlug: row.municipality_slug,
-    municipalityName: row.municipality_name
-  }));
   const childLevelKey = currentLevel ? getGeoChildLevelKeyEnriched(geoRows, currentLevel.key) : null;
   const shouldLoadItems = !childLevelKey;
   let totalCount = totalRootCount;
@@ -902,33 +953,7 @@ export async function loadGeoHubBySegments(
     return loadGeoCountryHub(countrySlug, page, pageSize, search);
   }
 
-  const requestedPath = `${GEO_ROUTE_PREFIX}/${[countrySlug, ...normalized].join('/')}`;
-  const supabase = createServerSupabase();
-  const { data, error: queryError } = await supabase
-    .from('items')
-    .select(GEO_FILTER_SELECT)
-    .eq('admin_hidden', false)
-    .is('group_root_item_id', null)
-    .not('slug', 'is', null)
-    .or('is_private.eq.false,is_private.is.null')
-    .eq('country_slug', countrySlug);
-
-  if (queryError) {
-    throw error(500, queryError.message);
-  }
-
-  const rows = ((data || []) as HubItem[]).map((row) => ({
-    countrySlug: row.country_slug,
-    countryName: row.country_name,
-    stateSlug: row.state_slug,
-    stateName: row.state_name,
-    regionSlug: row.region_slug,
-    regionName: row.region_name,
-    districtSlug: row.district_slug,
-    districtName: row.district_name,
-    municipalitySlug: row.municipality_slug,
-    municipalityName: row.municipality_name
-  }));
+  const rows = await fetchAllGeoInputsForHubBatched({ countrySlug });
   const resolved = resolveGeoSegments(countrySlug, rows, normalized);
   if (resolved) {
     return fetchGeoHub({

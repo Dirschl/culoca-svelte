@@ -175,6 +175,10 @@ export function buildGeoHubPath(input: GeoHierarchyInput, deepestKey?: GeoLevelK
   return target?.path || null;
 }
 
+/**
+ * Kanonische Item-URL: kurz (`/de/landkreis/gemeinde/slug`) — ohne `/region` und ohne
+ * Bundesland/Region im Pfad (SEO, Länge). Der Region-Hub bleibt unter {@link GEO_ROUTE_PREFIX}.
+ */
 export function buildGeoItemPath(
   input: GeoHierarchyInput & {
     itemSlug?: string | null;
@@ -185,11 +189,13 @@ export function buildGeoItemPath(
 
   if (!hasGeoItemHierarchy(input)) return null;
 
-  const hierarchy = buildGeoHierarchy(input);
-  if (!hierarchy.length) return null;
+  const countrySlug = normalizeGeoSlug(input.countrySlug);
+  const districtSlug = normalizeGeoSlug(input.districtSlug, 'district');
+  const municipalitySlug = normalizeGeoSlug(input.municipalitySlug);
 
-  const basePath = hierarchy[hierarchy.length - 1].path;
-  return `${basePath}/${itemSlug}`;
+  if (!countrySlug || !districtSlug || !municipalitySlug) return null;
+
+  return `/${countrySlug}/${districtSlug}/${municipalitySlug}/${itemSlug}`;
 }
 
 export function hasGeoItemHierarchy(input: GeoHierarchyInput): boolean {
