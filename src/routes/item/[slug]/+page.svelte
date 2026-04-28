@@ -35,7 +35,12 @@
 		type EventSettings
 	} from '$lib/events';
 	import { buildKeywordHubPath } from '$lib/seo/hubs';
-	import { buildBreadcrumbJsonLd, buildGeoPlaceGraph, trimText } from '$lib/seo/site';
+	import {
+		DEFAULT_OG_IMAGE,
+		buildBreadcrumbJsonLd,
+		buildGeoPlaceGraph,
+		trimText
+	} from '$lib/seo/site';
 	import {
 		getAdministrativeHierarchy,
 		normalizeAdminDisplayLabel
@@ -204,12 +209,7 @@
 		loading = false;
 	}
 	/** SSR liefert Profil; nach PATCH kann es fehlen. Nach Invalidate: data.profile wieder da, image gleiche ID → nachziehen. */
-	$: if (
-		data?.image?.id &&
-		image?.id === data.image.id &&
-		data.image?.profile &&
-		!image?.profile
-	) {
+	$: if (data?.image?.id && image?.id === data.image.id && data.image?.profile && !image?.profile) {
 		image = mergeItemFromApiPatch(image, {
 			profile: data.image.profile,
 			full_name: data.image.full_name ?? image.full_name
@@ -899,15 +899,9 @@
 			mainFigureBackgroundUrl = '';
 			mainImageSrc = '';
 		} else {
-			const extensionMatch = imagePath.match(/\.(jpg|jpeg|webp|png)$/i);
-			const fileExtension = extensionMatch ? extensionMatch[0].toLowerCase() : '.jpg';
-			const baseUrl = 'https://culoca.com/images';
-
-			const url512 = image.path_512
-				? appendVersionParam(`${baseUrl}/${image.slug}-512${fileExtension}`, image) || ''
-				: '';
+			const url512 = image.path_512 ? buildSeoSizedImageUrl('512', { versioned: true }) || '' : '';
 			const url2048 = image.path_2048
-				? appendVersionParam(`${baseUrl}/${image.slug}-2048${fileExtension}`, image) || ''
+				? buildSeoSizedImageUrl('2048', { versioned: true }) || ''
 				: '';
 
 			mainImageProgressive = !!(url512 && url2048);
@@ -931,7 +925,8 @@
 	// Funktion zum Zurücksetzen auf aktuelle GPS-Koordinaten
 	function clearLocationFilter() {
 		filterStore.clearLocationFilter();
-		if (dev) console.log('[Item Detail] Location filter cleared, returning to current GPS coordinates');
+		if (dev)
+			console.log('[Item Detail] Location filter cleared, returning to current GPS coordinates');
 	}
 
 	// Radius initial setzen - URL-Parameter haben Vorrang
@@ -2555,8 +2550,7 @@
 					: {
 							...mergeItemFromApiPatch(rootItem || {}, result.item),
 							group_slug: result.item?.group_slug ?? null
-						}) ||
-				rootItem;
+						}) || rootItem;
 			const nextType =
 				availableTypes.find((type) => type.id === result.item?.type_id) || contentType;
 			const resolvedCanonicalPath =
@@ -3086,7 +3080,7 @@
 		return `${url}${separator}v=${version}`;
 	}
 
-	function buildSeoSizedImageUrl(size: '512' | '2048') {
+	function buildSeoSizedImageUrl(size: '512' | '2048', options: { versioned?: boolean } = {}) {
 		if (!image?.slug) return null;
 
 		const imagePath = size === '2048' ? image.path_2048 || image.path_512 : image.path_512;
@@ -3095,16 +3089,12 @@
 		const extensionMatch = imagePath.match(/\.(jpg|jpeg|webp|png)$/i);
 		const fileExtension = extensionMatch ? extensionMatch[0].toLowerCase() : '.jpg';
 
-		return appendVersionParam(
-			`https://culoca.com/images/${image.slug}-${size}${fileExtension}`,
-			image
-		);
+		const url = `https://culoca.com/images/${image.slug}-${size}${fileExtension}`;
+		return options.versioned ? appendVersionParam(url, image) : url;
 	}
 
-	/** Canonical share/JSON-LD URL (2048, sonst 512) inkl. Cache-Buster — identisch zu og/twitter. */
-	$: primaryImageAbsoluteUrl = image?.slug
-		? buildSeoSizedImageUrl('2048') || buildSeoSizedImageUrl('512') || ''
-		: '';
+	/** Canonical share/JSON-LD URL: ausschließlich das indexierbare 2048er Hauptbild. */
+	$: primaryImageAbsoluteUrl = image?.slug ? buildSeoSizedImageUrl('2048') || '' : '';
 
 	async function fetchRemoteFileSize(url: string | null) {
 		if (!url) return null;
@@ -3373,7 +3363,7 @@
 			'culoca.com - see you local, Deine Webseite für regionalen Content. Entdecke deine Umgebung immer wieder neu.'}
 	/>
 	<meta property="og:url" content={canonicalUrl} />
-	<!-- Open Graph: gleiche URL wie JSON-LD primary / Hauptbild (inkl. v= Cache-Buster). -->
+	<!-- Open Graph: kanonische Bild-URL ohne Cache-Buster, identisch zur Sitemap / JSON-LD. -->
 	{#if image}
 		{@const imagePathForExtension = image.path_2048 || image.path_512}
 		{@const extensionMatch = imagePathForExtension
@@ -3399,17 +3389,30 @@
 		)}
 		{#if ogImageUrl}
 			<meta property="og:image" content={ogImageUrl} />
+			<meta property="og:image:secure_url" content={ogImageUrl} />
+			<meta
+				property="og:image:type"
+				content={fileExtension === '.png'
+					? 'image/png'
+					: fileExtension === '.webp'
+						? 'image/webp'
+						: 'image/jpeg'}
+			/>
 			<meta property="og:image:width" content={width2048.toString()} />
 			<meta property="og:image:height" content={height2048.toString()} />
 			<meta property="og:image:alt" content={mainImageAlt || image.title || `Item ${itemSlug}`} />
 		{:else}
-			<meta property="og:image" content={`https://culoca.com/api/og-image/${itemSlug}`} />
+			<meta property="og:image" content={DEFAULT_OG_IMAGE} />
+			<meta property="og:image:secure_url" content={DEFAULT_OG_IMAGE} />
+			<meta property="og:image:type" content="image/jpeg" />
 			<meta property="og:image:width" content="1200" />
 			<meta property="og:image:height" content="630" />
 			<meta property="og:image:alt" content={mainImageAlt || image.title || `Item ${itemSlug}`} />
 		{/if}
 	{:else}
-		<meta property="og:image" content={`https://culoca.com/api/og-image/${itemSlug}`} />
+		<meta property="og:image" content={DEFAULT_OG_IMAGE} />
+		<meta property="og:image:secure_url" content={DEFAULT_OG_IMAGE} />
+		<meta property="og:image:type" content="image/jpeg" />
 		<meta property="og:image:width" content="1200" />
 		<meta property="og:image:height" content="630" />
 		<meta property="og:image:alt" content={`Item ${itemSlug}`} />
@@ -3428,10 +3431,10 @@
 		{#if primaryImageAbsoluteUrl}
 			<meta name="twitter:image" content={primaryImageAbsoluteUrl} />
 		{:else}
-			<meta name="twitter:image" content={`https://culoca.com/api/og-image/${itemSlug}`} />
+			<meta name="twitter:image" content={DEFAULT_OG_IMAGE} />
 		{/if}
 	{:else}
-		<meta name="twitter:image" content={`https://culoca.com/api/og-image/${itemSlug}`} />
+		<meta name="twitter:image" content={DEFAULT_OG_IMAGE} />
 	{/if}
 	<meta name="twitter:image:alt" content={mainImageAlt || image?.title || `Item ${itemSlug}`} />
 
@@ -3461,14 +3464,10 @@
 			: null}
 		{@const fileExtension = extensionMatch ? extensionMatch[0].toLowerCase() : '.jpg'}
 
-		<!-- Primärbild-URL: identisch zu <img src>/og/twitter (inkl. v=), Fallback ohne v nur wenn nötig -->
+		<!-- Primärbild-URL: identisch zu Sitemap / og / twitter, bewusst ohne v=-Cache-Buster -->
 		{@const imageUrl2048 =
 			primaryImageAbsoluteUrl ||
-			(hasPath2048
-				? `https://culoca.com/images/${image.slug}-2048${fileExtension}`
-				: hasPath512
-					? `https://culoca.com/images/${image.slug}-512${fileExtension}`
-					: '')}
+			(hasPath2048 ? `https://culoca.com/images/${image.slug}-2048${fileExtension}` : '')}
 
 		<!-- Calculate dimensions for 2048px and 512px versions (proportional scaling) -->
 		<!-- Note: image.width and image.height are original dimensions after EXIF orientation -->
@@ -4586,11 +4585,18 @@
 
 					{#if isCreator}
 						<p class="stock-dashboard-hint">
-							<button type="button" class="stock-dashboard-hint__button" on:click={() => (showStockSettingsOverlay = true)}>
+							<button
+								type="button"
+								class="stock-dashboard-hint__button"
+								on:click={() => (showStockSettingsOverlay = true)}
+							>
 								Stock konfigurieren
 							</button>
 							<span>
-								oder im <a href={`/dashboard?section=stock&stockItem=${encodeURIComponent(image.id)}`}>Dashboard öffnen</a>.
+								oder im <a
+									href={`/dashboard?section=stock&stockItem=${encodeURIComponent(image.id)}`}
+									>Dashboard öffnen</a
+								>.
 							</span>
 						</p>
 					{/if}
@@ -4599,72 +4605,72 @@
 				<div class="meta-column">
 					<h2>Aufnahmedaten</h2>
 					<!-- Essential EXIF data -->
-						{#if image.width && image.height}
-							<div class="meta-line">Auflösung: {image.width}×{image.height} px</div>
+					{#if image.width && image.height}
+						<div class="meta-line">Auflösung: {image.width}×{image.height} px</div>
+					{/if}
+					{#if image.exif_data && image.exif_data.FileSize}
+						<div class="meta-line">Dateigröße: {formatFileSize(image.exif_data.FileSize)}</div>
+					{/if}
+					{#if image.exif_data && exifDisplayStr(image.exif_data.Make)}
+						<div class="meta-line">
+							Kamera: {exifDisplayStr(image.exif_data.Make)}{exifDisplayStr(image.exif_data.Model)
+								? ` ${exifDisplayStr(image.exif_data.Model)}`
+								: ''}
+						</div>
+					{/if}
+					{#if image.exif_data && exifDisplayStr(image.exif_data.LensModel)}
+						<div class="meta-line">Objektiv: {exifDisplayStr(image.exif_data.LensModel)}</div>
+					{/if}
+					{#if image.exif_data && image.exif_data.FocalLength}
+						<div class="meta-line">
+							Brennweite: {image.exif_data.FocalLength} mm{#if image.exif_data.FocalLengthIn35mmFormat && image.exif_data.FocalLengthIn35mmFormat !== image.exif_data.FocalLength}
+								(35mm: {image.exif_data.FocalLengthIn35mmFormat} mm){/if}
+						</div>
+					{/if}
+					{#if image.exif_data && image.exif_data.ISO}
+						<div class="meta-line">ISO: {image.exif_data.ISO}</div>
+					{/if}
+					{#if image.exif_data && image.exif_data.FNumber}
+						<div class="meta-line">Blende: ƒ/{image.exif_data.FNumber}</div>
+					{/if}
+					{#if image.exif_data && image.exif_data.ExposureTime}
+						<div class="meta-line">
+							Verschlusszeit: {formatExposureTime(image.exif_data.ExposureTime)}
+						</div>
+					{/if}
+					{#if itemCaptureDateLabel}
+						<div class="meta-line">Aufgenommen: {itemCaptureDateLabel}</div>
+					{/if}
+					{#if image.lat && image.lon}
+						<div class="meta-line">GPS: {image.lat.toFixed(5)}, {image.lon.toFixed(5)}</div>
+					{/if}
+					{#if attribution?.creatorName}
+						<div class="meta-line">Fotograf: {attribution.creatorName}</div>
+					{/if}
+					{#if attribution?.copyrightNotice}
+						<div class="meta-line">Copyright: {attribution.copyrightNotice}</div>
+					{/if}
+					{#if image.created_at}
+						<div class="meta-line">
+							Veröffentlicht am: {new Date(image.created_at).toLocaleDateString('de-DE')}
+						</div>
+					{/if}
+					{#if image.exif_data}
+						{#if image.exif_data.Orientation}
+							<div class="meta-line">Ausrichtung: {image.exif_data.Orientation}</div>
 						{/if}
-						{#if image.exif_data && image.exif_data.FileSize}
-							<div class="meta-line">Dateigröße: {formatFileSize(image.exif_data.FileSize)}</div>
+						{#if image.exif_data.Flash != null && image.exif_data.Flash !== '' && typeof image.exif_data.Flash !== 'object'}
+							<div class="meta-line">Blitz: {image.exif_data.Flash}</div>
 						{/if}
-						{#if image.exif_data && exifDisplayStr(image.exif_data.Make)}
+						{#if exifDisplayStr(image.exif_data.Software)}
+							<div class="meta-line">Software: {exifDisplayStr(image.exif_data.Software)}</div>
+						{/if}
+						{#if formatTimeCreated(image.exif_data.TimeCreated)}
 							<div class="meta-line">
-								Kamera: {exifDisplayStr(image.exif_data.Make)}{exifDisplayStr(image.exif_data.Model)
-									? ` ${exifDisplayStr(image.exif_data.Model)}`
-									: ''}
+								Aufnahmezeit: {formatTimeCreated(image.exif_data.TimeCreated)}
 							</div>
 						{/if}
-						{#if image.exif_data && exifDisplayStr(image.exif_data.LensModel)}
-							<div class="meta-line">Objektiv: {exifDisplayStr(image.exif_data.LensModel)}</div>
-						{/if}
-						{#if image.exif_data && image.exif_data.FocalLength}
-							<div class="meta-line">
-								Brennweite: {image.exif_data.FocalLength} mm{#if image.exif_data.FocalLengthIn35mmFormat && image.exif_data.FocalLengthIn35mmFormat !== image.exif_data.FocalLength}
-									(35mm: {image.exif_data.FocalLengthIn35mmFormat} mm){/if}
-							</div>
-						{/if}
-						{#if image.exif_data && image.exif_data.ISO}
-							<div class="meta-line">ISO: {image.exif_data.ISO}</div>
-						{/if}
-						{#if image.exif_data && image.exif_data.FNumber}
-							<div class="meta-line">Blende: ƒ/{image.exif_data.FNumber}</div>
-						{/if}
-						{#if image.exif_data && image.exif_data.ExposureTime}
-							<div class="meta-line">
-								Verschlusszeit: {formatExposureTime(image.exif_data.ExposureTime)}
-							</div>
-						{/if}
-						{#if itemCaptureDateLabel}
-							<div class="meta-line">Aufgenommen: {itemCaptureDateLabel}</div>
-						{/if}
-						{#if image.lat && image.lon}
-							<div class="meta-line">GPS: {image.lat.toFixed(5)}, {image.lon.toFixed(5)}</div>
-						{/if}
-						{#if attribution?.creatorName}
-							<div class="meta-line">Fotograf: {attribution.creatorName}</div>
-						{/if}
-						{#if attribution?.copyrightNotice}
-							<div class="meta-line">Copyright: {attribution.copyrightNotice}</div>
-						{/if}
-						{#if image.created_at}
-							<div class="meta-line">
-								Veröffentlicht am: {new Date(image.created_at).toLocaleDateString('de-DE')}
-							</div>
-						{/if}
-						{#if image.exif_data}
-							{#if image.exif_data.Orientation}
-								<div class="meta-line">Ausrichtung: {image.exif_data.Orientation}</div>
-							{/if}
-							{#if image.exif_data.Flash != null && image.exif_data.Flash !== '' && typeof image.exif_data.Flash !== 'object'}
-								<div class="meta-line">Blitz: {image.exif_data.Flash}</div>
-							{/if}
-							{#if exifDisplayStr(image.exif_data.Software)}
-								<div class="meta-line">Software: {exifDisplayStr(image.exif_data.Software)}</div>
-							{/if}
-							{#if formatTimeCreated(image.exif_data.TimeCreated)}
-								<div class="meta-line">
-									Aufnahmezeit: {formatTimeCreated(image.exif_data.TimeCreated)}
-								</div>
-							{/if}
-						{/if}
+					{/if}
 				</div>
 				<!-- Column 3: Creator Card (if available) -->
 				<div class="column-card">
@@ -4903,90 +4909,90 @@
 					{#if similarMotifsStatus === 'loading'}
 						<p class="dashboard-empty similar-motifs-loading">Bitte kurz warten …</p>
 					{:else}
-					<div class="similar-motifs-grid">
-						{#each visibleSimilarMotifItems as item (item.id)}
-							<article class="similar-item-card">
-								<a
-									href={item.canonicalPath ||
-										getPublicItemHref({
-											slug: item.slug,
-											canonical_path: item.canonical_path ?? item.canonicalPath ?? null,
-											country_slug: item.country_slug,
-											state_slug: item.state_slug,
-											region_slug: item.region_slug,
-											district_slug: item.district_slug,
-											municipality_slug: item.municipality_slug
-										})}
-									class="similar-item-link"
-								>
-									{#if item.path_512}
-										<div
-											class="similar-item-thumb"
-											style={`--thumb-preview:url('${relatedThumbUrl(item)}')`}
-										>
-											<img
-												src={relatedThumbUrl(item)}
-												alt=""
-												width="320"
-												height="213"
-												loading="lazy"
-												decoding="async"
-												fetchpriority="low"
-											/>
-										</div>
-									{/if}
-									<div class="similar-item-body">
-										<h3>{item.title}</h3>
-										<p>
-											{trimText(
-												item.description || item.caption || 'Aehnliches Motiv auf Culoca.',
-												100
-											)}
-										</p>
-									</div>
-								</a>
-							</article>
-						{/each}
-					</div>
-
-					{#if similarMotifTotalPages > 1}
-						<nav class="pagination similar-pagination" aria-label="Pagination ähnliche Motive">
-							<button
-								type="button"
-								class="pg-link"
-								on:click={() => (similarMotifPage = Math.max(1, similarMotifPage - 1))}
-								disabled={similarMotifPage === 1}
-							>
-								Zurück
-							</button>
-
-							{#each Array.from({ length: similarMotifTotalPages }, (_, i) => i + 1) as p}
-								{#if p === 1 || p === similarMotifTotalPages || (p >= similarMotifPage - 2 && p <= similarMotifPage + 2)}
-									<button
-										type="button"
-										class="pg-link"
-										class:pg-active={p === similarMotifPage}
-										aria-current={p === similarMotifPage ? 'page' : undefined}
-										on:click={() => (similarMotifPage = p)}
+						<div class="similar-motifs-grid">
+							{#each visibleSimilarMotifItems as item (item.id)}
+								<article class="similar-item-card">
+									<a
+										href={item.canonicalPath ||
+											getPublicItemHref({
+												slug: item.slug,
+												canonical_path: item.canonical_path ?? item.canonicalPath ?? null,
+												country_slug: item.country_slug,
+												state_slug: item.state_slug,
+												region_slug: item.region_slug,
+												district_slug: item.district_slug,
+												municipality_slug: item.municipality_slug
+											})}
+										class="similar-item-link"
 									>
-										{p}
-									</button>
-								{:else if p === similarMotifPage - 3 || p === similarMotifPage + 3}
-									<span class="pg-dots" aria-hidden="true">...</span>
-								{/if}
+										{#if item.path_512}
+											<div
+												class="similar-item-thumb"
+												style={`--thumb-preview:url('${relatedThumbUrl(item)}')`}
+											>
+												<img
+													src={relatedThumbUrl(item)}
+													alt=""
+													width="320"
+													height="213"
+													loading="lazy"
+													decoding="async"
+													fetchpriority="low"
+												/>
+											</div>
+										{/if}
+										<div class="similar-item-body">
+											<h3>{item.title}</h3>
+											<p>
+												{trimText(
+													item.description || item.caption || 'Aehnliches Motiv auf Culoca.',
+													100
+												)}
+											</p>
+										</div>
+									</a>
+								</article>
 							{/each}
+						</div>
 
-							<button
-								type="button"
-								class="pg-link"
-								on:click={() =>
-									(similarMotifPage = Math.min(similarMotifTotalPages, similarMotifPage + 1))}
-								disabled={similarMotifPage === similarMotifTotalPages}
-							>
-								Weiter
-							</button>
-						</nav>
-					{/if}
+						{#if similarMotifTotalPages > 1}
+							<nav class="pagination similar-pagination" aria-label="Pagination ähnliche Motive">
+								<button
+									type="button"
+									class="pg-link"
+									on:click={() => (similarMotifPage = Math.max(1, similarMotifPage - 1))}
+									disabled={similarMotifPage === 1}
+								>
+									Zurück
+								</button>
+
+								{#each Array.from({ length: similarMotifTotalPages }, (_, i) => i + 1) as p}
+									{#if p === 1 || p === similarMotifTotalPages || (p >= similarMotifPage - 2 && p <= similarMotifPage + 2)}
+										<button
+											type="button"
+											class="pg-link"
+											class:pg-active={p === similarMotifPage}
+											aria-current={p === similarMotifPage ? 'page' : undefined}
+											on:click={() => (similarMotifPage = p)}
+										>
+											{p}
+										</button>
+									{:else if p === similarMotifPage - 3 || p === similarMotifPage + 3}
+										<span class="pg-dots" aria-hidden="true">...</span>
+									{/if}
+								{/each}
+
+								<button
+									type="button"
+									class="pg-link"
+									on:click={() =>
+										(similarMotifPage = Math.min(similarMotifTotalPages, similarMotifPage + 1))}
+									disabled={similarMotifPage === similarMotifTotalPages}
+								>
+									Weiter
+								</button>
+							</nav>
+						{/if}
 					{/if}
 				</section>
 			{/if}

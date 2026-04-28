@@ -1,7 +1,7 @@
 /**
  * Utility function to generate SEO-friendly image URLs
  * Instead of: https://supabase.co/storage/.../uuid.jpg
- * Generate:   https://culoca.com/images/slug-512.jpg (Response: X-Robots-Tag noimageindex)
+ * Generate:   https://culoca.com/images/slug-512.jpg
  */
 
 /**
@@ -12,18 +12,18 @@
  * @returns SEO-friendly URL or empty string if missing required params
  */
 export function getSeoImageUrl(
-  slug: string | undefined | null,
-  path: string | undefined | null,
-  size: '512' | '2048' = '512'
+	slug: string | undefined | null,
+	path: string | undefined | null,
+	size: '512' | '2048' = '512'
 ): string {
-  if (!slug || !path) {
-    return '';
-  }
-  
-  const extensionMatch = path.match(/\.(jpg|jpeg|webp|png)$/i);
-  const fileExtension = extensionMatch ? extensionMatch[0].toLowerCase() : '.jpg';
-  
-  return `https://culoca.com/images/${slug}-${size}${fileExtension}`;
+	if (!slug || !path) {
+		return '';
+	}
+
+	const extensionMatch = path.match(/\.(jpg|jpeg|webp|png)$/i);
+	const fileExtension = extensionMatch ? extensionMatch[0].toLowerCase() : '.jpg';
+
+	return `https://culoca.com/images/${slug}-${size}${fileExtension}`;
 }
 
 /**
@@ -31,18 +31,18 @@ export function getSeoImageUrl(
  * Verhindert, dass Google diese Bilder dem Host-Item in der Bildersuche zuordnet.
  */
 export function getSeoSimilarEmbedImageUrl(
-  slug: string | undefined | null,
-  path: string | undefined | null,
-  size: '512' | '2048' = '512'
+	slug: string | undefined | null,
+	path: string | undefined | null,
+	size: '512' | '2048' = '512'
 ): string {
-  if (!slug || !path) {
-    return '';
-  }
+	if (!slug || !path) {
+		return '';
+	}
 
-  const extensionMatch = path.match(/\.(jpg|jpeg|webp|png)$/i);
-  const fileExtension = extensionMatch ? extensionMatch[0].toLowerCase() : '.jpg';
+	const extensionMatch = path.match(/\.(jpg|jpeg|webp|png)$/i);
+	const fileExtension = extensionMatch ? extensionMatch[0].toLowerCase() : '.jpg';
 
-  return `https://culoca.com/images/similar/${slug}-${size}${fileExtension}`;
+	return `https://culoca.com/images/similar/${slug}-${size}${fileExtension}`;
 }
 
 /**
@@ -51,7 +51,7 @@ export function getSeoSimilarEmbedImageUrl(
  * @returns The extension including dot (e.g., ".jpg")
  */
 export function getImageExtension(path: string | undefined | null): string {
-  if (!path) return '.jpg';
-  const match = path.match(/\.(jpg|jpeg|webp|png)$/i);
-  return match ? match[0].toLowerCase() : '.jpg';
+	if (!path) return '.jpg';
+	const match = path.match(/\.(jpg|jpeg|webp|png)$/i);
+	return match ? match[0].toLowerCase() : '.jpg';
 }

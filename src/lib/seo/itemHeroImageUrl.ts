@@ -22,8 +22,8 @@ function appendVersionParam(
 }
 
 /**
- * CDN-URL des Item-Hauptbildes (2048, sonst 512) inkl. v=-Cachebuster —
- * gleiche Logik wie `src` / `primaryImageAbsoluteUrl` auf der Item-Seite.
+ * CDN-URL des Item-Hauptbildes (2048, sonst 512) inkl. v=-Cachebuster für Preload.
+ * OG/JSON-LD nutzen dieselbe URL ohne Cachebuster, damit sie zur Sitemap passt.
  */
 export function buildItemHeroCdnImageUrl(item: {
 	slug: string | null | undefined;
