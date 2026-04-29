@@ -1899,19 +1899,27 @@
 		}
 	}
 
-	// Copy current link to clipboard
+	function getCanonicalShareUrl() {
+		if (canonicalUrl) return canonicalUrl;
+		if (canonicalPath) return `https://culoca.com${canonicalPathWithTrailingSlash(canonicalPath)}`;
+		if (image?.slug || itemSlug) return `https://culoca.com/item/${image?.slug || itemSlug}/`;
+
+		if (!browser) return 'https://culoca.com/';
+		const url = new URL(window.location.href);
+		url.searchParams.delete('returnTo');
+		return url.toString();
+	}
+
+	// Copy canonical item link to clipboard, without UI return parameters.
 	async function copyCurrentLink() {
 		if (!browser) return;
+		const shareUrl = getCanonicalShareUrl();
 
 		try {
-			// Get current URL with all parameters
-			const currentUrl = window.location.href;
-
-			// Copy to clipboard
-			await navigator.clipboard.writeText(currentUrl);
+			await navigator.clipboard.writeText(shareUrl);
 
 			// Show success feedback
-			console.log('✅ Link copied to clipboard:', currentUrl);
+			console.log('✅ Link copied to clipboard:', shareUrl);
 
 			// Optional: Show a brief success message
 			// You could add a toast notification here
@@ -1921,7 +1929,7 @@
 			// Fallback for older browsers
 			try {
 				const textArea = document.createElement('textarea');
-				textArea.value = window.location.href;
+				textArea.value = shareUrl;
 				document.body.appendChild(textArea);
 				textArea.select();
 				document.execCommand('copy');
