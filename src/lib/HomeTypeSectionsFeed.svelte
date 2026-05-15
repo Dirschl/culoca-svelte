@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { appendReturnTo, getPublicItemHref } from '$lib/content/routing';
+  import { getPublicItemHref } from '$lib/content/routing';
+  import { rememberLocalRouteForItem } from '$lib/returnTo';
   import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
   import { formatEventHubRange, formatHubEventPlace } from '$lib/content/eventHubFormat';
 
@@ -60,7 +61,7 @@
   };
 
   function itemHref(item: SectionItem): string {
-    return appendReturnTo(getPublicItemHref(item), '/');
+    return getPublicItemHref(item);
   }
 
   function pickPath(item: { path_512?: string | null; path_2048?: string | null }): string | null {
@@ -158,7 +159,7 @@
             {@const eventRange = section.slug === 'event' ? formatEventHubRange(item.starts_at, item.ends_at) : ''}
             {@const eventPlace = section.slug === 'event' ? formatHubEventPlace(item) : ''}
             <article class="item-card">
-              <a href={itemHref(item)} class="item-link">
+              <a href={itemHref(item)} class="item-link" on:click={() => rememberLocalRouteForItem('/')}>
                 {#if pickPath(item)}
                   <div
                     class="item-thumb"

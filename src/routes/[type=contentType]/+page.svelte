@@ -6,7 +6,8 @@
   import SiteFooter from '$lib/SiteFooter.svelte';
   import { supabase } from '$lib/supabaseClient';
   import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
-  import { appendReturnTo, getPublicItemHref } from '$lib/content/routing';
+  import { getPublicItemHref } from '$lib/content/routing';
+  import { rememberLocalRouteForItem } from '$lib/returnTo';
   import { getEffectiveGpsPosition } from '$lib/filterStore';
   import { absoluteUrl, buildBreadcrumbJsonLd, DEFAULT_OG_IMAGE, trimText } from '$lib/seo/site';
   import { formatEventHubRange, formatHubEventPlace } from '$lib/content/eventHubFormat';
@@ -153,7 +154,7 @@
   let previewThumbElements: Record<string, HTMLDivElement | null> = {};
 
   function itemHref(item: FotoListItem): string {
-    return appendReturnTo(getPublicItemHref(item), currentListPath);
+    return getPublicItemHref(item);
   }
 
   function pickImagePath(item: { path_512?: string | null; path_2048?: string | null }): string | null {
@@ -794,7 +795,11 @@
           <div class="items-grid">
             {#each displayedItems as item (item.id)}
               <article class="item-card">
-                <a href={itemHref(item)} class="item-link">
+                <a
+                  href={itemHref(item)}
+                  class="item-link"
+                  on:click={() => rememberLocalRouteForItem(currentListPath)}
+                >
                   {#if pickImagePath(item)}
                     {@const previewUrl = currentThumbUrl(item)}
                     <div

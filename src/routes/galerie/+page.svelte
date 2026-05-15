@@ -122,6 +122,7 @@
   import { supabase } from '$lib/supabaseClient';
   import { get } from 'svelte/store';
   import { getPublicItemHref } from '$lib/content/routing';
+  import { currentBrowserRoute, rememberLocalRouteForItem } from '$lib/returnTo';
 
   // Gallery store
   const pics = galleryItems;
@@ -2516,10 +2517,8 @@
           district_slug: event.detail.district_slug ?? null,
           municipality_slug: event.detail.municipality_slug ?? null
         });
-        const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`;
-        window.location.href = imageHref.includes('?')
-          ? `${imageHref}&returnTo=${encodeURIComponent(returnTo)}`
-          : `${imageHref}?returnTo=${encodeURIComponent(returnTo)}`;
+        rememberLocalRouteForItem(currentBrowserRoute());
+        window.location.href = imageHref;
       }}
       on:locationSelected={(event) => {
         const { lat, lon } = event.detail;

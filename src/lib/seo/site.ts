@@ -30,29 +30,28 @@ export function absoluteUrl(path: string): string {
   return path.startsWith('http') ? path : `${SITE_URL}${path.startsWith('/') ? path : `/${path}`}`;
 }
 
-/** Einheitlich Trailing Slash für Content-URLs (canonical / JSON-LD / Breadcrumbs). */
-export function withTrailingSlash(path: string): string {
-  if (!path) return '/';
-  const qIndex = path.indexOf('?');
-  const pathname = qIndex === -1 ? path : path.slice(0, qIndex);
-  const query = qIndex === -1 ? '' : path.slice(qIndex);
-  if (!pathname || pathname === '/') return `/${query}`;
-  if (pathname.endsWith('/')) return pathname + query;
-  return `${pathname}/${query}`;
+/** Einheitlich ohne Trailing Slash für Canonicals / JSON-LD / Breadcrumbs. */
+export function withoutTrailingSlash(path: string): string {
+	if (!path) return '/';
+	const qIndex = path.indexOf('?');
+	const pathname = qIndex === -1 ? path : path.slice(0, qIndex);
+	const query = qIndex === -1 ? '' : path.slice(qIndex);
+	if (!pathname || pathname === '/') return `/${query}`;
+	return `${pathname.replace(/\/+$/, '')}${query}`;
 }
 
 export function toCanonicalAbsoluteUrl(pathOrUrl: string): string {
-  if (!pathOrUrl) return `${SITE_URL}/`;
-  try {
-    if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) {
-      const u = new URL(pathOrUrl);
-      u.pathname = withTrailingSlash(u.pathname);
-      return u.toString();
-    }
-  } catch {
-    /* use relative path below */
-  }
-  return absoluteUrl(withTrailingSlash(pathOrUrl));
+	if (!pathOrUrl) return SITE_URL;
+	try {
+		if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) {
+			const u = new URL(pathOrUrl);
+			u.pathname = withoutTrailingSlash(u.pathname);
+			return u.toString();
+		}
+	} catch {
+		/* use relative path below */
+	}
+	return absoluteUrl(withoutTrailingSlash(pathOrUrl));
 }
 
 export function normalizeRobots(value: string): string {

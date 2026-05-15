@@ -3,7 +3,8 @@
   import { goto } from '$app/navigation';
   import { filterStore } from '$lib/filterStore';
   import FullscreenMap from '$lib/FullscreenMap.svelte';
-  import { appendReturnTo, getPublicItemHref } from '$lib/content/routing';
+  import { getPublicItemHref } from '$lib/content/routing';
+  import { currentBrowserRoute, rememberLocalRouteForItem } from '$lib/returnTo';
   
   export let data;
   
@@ -103,8 +104,8 @@
           district_slug: event.detail.district_slug ?? null,
           municipality_slug: event.detail.municipality_slug ?? null
         });
-        const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`;
-        window.location.href = appendReturnTo(imageHref, returnTo);
+        rememberLocalRouteForItem(currentBrowserRoute());
+        window.location.href = imageHref;
       }}
       on:locationSelected={(event) => {
         // Navigate back to main page with location

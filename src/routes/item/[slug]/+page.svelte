@@ -325,8 +325,8 @@
 	$: itemBreadcrumbJsonLd = buildBreadcrumbJsonLd(geoBreadcrumbLinks);
 	$: geoPlaceGraph = buildGeoPlaceGraph({
 		currentPath: canonicalPath
-			? canonicalPathWithTrailingSlash(canonicalPath)
-			: `/item/${itemSlug}/`,
+			? canonicalPathNormalized(canonicalPath)
+			: `/item/${itemSlug}`,
 		currentName:
 			normalizeAdminDisplayLabel(image?.locality_name) ||
 			normalizeAdminDisplayLabel(image?.municipality_name) ||
@@ -379,9 +379,9 @@
 	$: contextItem = data?.contextItem ?? image;
 	$: groupItems = data?.groupItems ?? [];
 	$: activeGroupItemId = data?.activeGroupItemId ?? image?.id ?? null;
-	function canonicalPathWithTrailingSlash(path: string): string {
+	function canonicalPathNormalized(path: string): string {
 		const p = path.startsWith('/') ? path : `/${path}`;
-		return p.endsWith('/') ? p : `${p}/`;
+		return p === '/' ? p : p.replace(/\/+$/, '');
 	}
 
 	function buildMainImageAlt(
@@ -408,10 +408,10 @@
 	$: itemCaptureDateLabel = pickBestExifCaptureDateFormatted(image?.exif_data);
 
 	$: canonicalUrl = canonicalPath
-		? `https://culoca.com${canonicalPathWithTrailingSlash(canonicalPath)}`
+		? `https://culoca.com${canonicalPathNormalized(canonicalPath)}`
 		: image?.slug
-			? `https://culoca.com/item/${image.slug}/`
-			: 'https://culoca.com/';
+			? `https://culoca.com/item/${image.slug}`
+			: 'https://culoca.com';
 	$: effectiveContentHtml = sanitizeContentHtml(contextItem?.content || image?.content || '');
 	$: hasVisibleGroupItems = Array.isArray(groupItems) && groupItems.length > 1;
 	$: hasDateRange = !!(
@@ -900,9 +900,7 @@
 			mainImageSrc = '';
 		} else {
 			const url512 = image.path_512 ? buildSeoSizedImageUrl('512', { versioned: true }) || '' : '';
-			const url2048 = image.path_2048
-				? buildSeoSizedImageUrl('2048', { versioned: true }) || ''
-				: '';
+			const url2048 = image.path_2048 ? buildSeoSizedImageUrl('2048') || '' : '';
 
 			mainImageProgressive = !!(url512 && url2048);
 			mainFigureBackgroundUrl = mainImageProgressive ? url512 : '';
@@ -1901,10 +1899,10 @@
 
 	function getCanonicalShareUrl() {
 		if (canonicalUrl) return canonicalUrl;
-		if (canonicalPath) return `https://culoca.com${canonicalPathWithTrailingSlash(canonicalPath)}`;
-		if (image?.slug || itemSlug) return `https://culoca.com/item/${image?.slug || itemSlug}/`;
+		if (canonicalPath) return `https://culoca.com${canonicalPathNormalized(canonicalPath)}`;
+		if (image?.slug || itemSlug) return `https://culoca.com/item/${image?.slug || itemSlug}`;
 
-		if (!browser) return 'https://culoca.com/';
+		if (!browser) return 'https://culoca.com';
 		const url = new URL(window.location.href);
 		url.searchParams.delete('returnTo');
 		return url.toString();
@@ -3336,13 +3334,13 @@
 	{#if seoLinks?.older?.canonicalPath}
 		<link
 			rel="prev"
-			href={`https://culoca.com${canonicalPathWithTrailingSlash(seoLinks.older.canonicalPath)}`}
+			href={`https://culoca.com${canonicalPathNormalized(seoLinks.older.canonicalPath)}`}
 		/>
 	{/if}
 	{#if seoLinks?.newer?.canonicalPath}
 		<link
 			rel="next"
-			href={`https://culoca.com${canonicalPathWithTrailingSlash(seoLinks.newer.canonicalPath)}`}
+			href={`https://culoca.com${canonicalPathNormalized(seoLinks.newer.canonicalPath)}`}
 		/>
 	{/if}
 

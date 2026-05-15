@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import justifiedLayout from 'justified-layout';
-  import { appendReturnTo, getPublicItemHref } from '$lib/content/routing';
+  import { getPublicItemHref } from '$lib/content/routing';
+  import { currentBrowserRoute, rememberLocalRouteForItem } from '$lib/returnTo';
 
   // Typen für justified-layout
   interface LayoutBox {
@@ -145,8 +146,8 @@
     // Use SvelteKit navigation
     if (typeof window !== 'undefined') {
       const item = items.find((candidate) => candidate.slug === slug);
-      const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`;
-      window.location.href = appendReturnTo(getPublicItemHref(item || { slug }), returnTo);
+      rememberLocalRouteForItem(currentBrowserRoute());
+      window.location.href = getPublicItemHref(item || { slug });
     }
   }
 

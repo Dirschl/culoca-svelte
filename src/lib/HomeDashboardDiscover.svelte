@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
   import { browser } from '$app/environment';
-  import { appendReturnTo, FOTO_SEARCH_LANDING_PATH, getPublicItemHref } from '$lib/content/routing';
+  import { FOTO_SEARCH_LANDING_PATH, getPublicItemHref } from '$lib/content/routing';
+  import { rememberLocalRouteForItem } from '$lib/returnTo';
   import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
   import { formatEventHubRange, formatHubEventPlace } from '$lib/content/eventHubFormat';
 
@@ -46,7 +47,7 @@
   let previewThumbElements: Record<string, HTMLDivElement | null> = {};
 
   function itemHref(item: DiscoverListItem): string {
-    return appendReturnTo(getPublicItemHref(item), '/');
+    return getPublicItemHref(item);
   }
 
   function pickPath(item: { path_512?: string | null; path_2048?: string | null }): string | null {
@@ -205,7 +206,7 @@
           {@const eventRange = formatEventHubRange(item.starts_at, item.ends_at)}
           {@const eventPlace = formatHubEventPlace(item)}
           <article class="item-card">
-            <a href={itemHref(item)} class="item-link">
+            <a href={itemHref(item)} class="item-link" on:click={() => rememberLocalRouteForItem('/')}>
               {#if pickPath(item)}
                 <div
                   class="item-thumb item-thumb--foto"
@@ -265,7 +266,7 @@
           {@const previewUrl = currentThumbUrl(item)}
           {@const dist = distanceForItem(item)}
           <article class="item-card">
-            <a href={itemHref(item)} class="item-link">
+            <a href={itemHref(item)} class="item-link" on:click={() => rememberLocalRouteForItem('/')}>
               {#if pickPath(item)}
                 <div
                   class="item-thumb item-thumb--foto"
@@ -316,7 +317,7 @@
           {@const previewUrl = currentThumbUrl(item)}
           {@const dist = distanceForItem(item)}
           <article class="item-card">
-            <a href={itemHref(item)} class="item-link">
+            <a href={itemHref(item)} class="item-link" on:click={() => rememberLocalRouteForItem('/')}>
               {#if pickPath(item)}
                 <div
                   class="item-thumb item-thumb--foto"

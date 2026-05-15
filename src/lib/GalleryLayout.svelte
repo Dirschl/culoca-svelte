@@ -2,7 +2,8 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import justifiedLayout from 'justified-layout';
-  import { appendReturnTo, getPublicItemHref } from '$lib/content/routing';
+  import { getPublicItemHref } from '$lib/content/routing';
+  import { currentBrowserRoute, rememberLocalRouteForItem } from '$lib/returnTo';
 
   // Types for justified-layout
   interface LayoutBox {
@@ -160,16 +161,14 @@
     district_slug?: string | null;
     municipality_slug?: string | null;
   }) {
-    const returnTo = typeof window !== 'undefined'
-      ? `${window.location.pathname}${window.location.search}${window.location.hash}`
-      : null;
-    return appendReturnTo(getPublicItemHref(item), returnTo);
+    return getPublicItemHref(item);
   }
 
   function handleImageClick(itemSlug: string) {
     const item = items.find(item => item.slug === itemSlug);
     if (item && item.slug) {
-      const href = getItemHref(item);
+	      const href = getItemHref(item);
+	      rememberLocalRouteForItem(currentBrowserRoute());
       console.log('[GalleryLayout] Click detected for item:', itemSlug);
       console.log('[GalleryLayout] Item found:', item);
       console.log('[GalleryLayout] Attempting navigation to:', href);
@@ -187,7 +186,8 @@
       event.preventDefault();
       const item = items.find(item => item.slug === itemSlug);
       if (item && item.slug) {
-        const href = getItemHref(item);
+	        const href = getItemHref(item);
+	        rememberLocalRouteForItem(currentBrowserRoute());
         console.log('[GalleryLayout] Keyboard navigation for item:', itemSlug);
         console.log('[GalleryLayout] Attempting navigation to:', href);
         
@@ -484,8 +484,9 @@
                 aria-label="View image {item.id}" 
                 style="left:{boxes[index].left}px; top:{boxes[index].top}px; width:{boxes[index].width}px; height:{boxes[index].height}px;"
                 title={item.title || ''}
-                on:click|preventDefault={async (e) => {
-                  if (forceReload) {
+	                on:click|preventDefault={async (e) => {
+	                  rememberLocalRouteForItem(currentBrowserRoute());
+	                  if (forceReload) {
                     // Force full page reload for detail page navigation
                     window.location.href = getItemHref(item);
                   } else {
@@ -582,9 +583,10 @@
           role="button" 
           aria-label="View image {item.slug}"
           title={item.title || ''}
-          on:click|preventDefault={async (e) => {
-            console.log('🔍 [GalleryLayout] Clicked item slug:', item.slug);
-            if (forceReload) {
+	          on:click|preventDefault={async (e) => {
+	            console.log('🔍 [GalleryLayout] Clicked item slug:', item.slug);
+	            rememberLocalRouteForItem(currentBrowserRoute());
+	            if (forceReload) {
               // Force full page reload for detail page navigation
               window.location.href = getItemHref(item);
             } else {

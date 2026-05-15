@@ -30,7 +30,7 @@ export const load = async ({
       countryOptions: [],
       seoPolicy: getHubSeoPolicy({
         basePath: data.hubPath,
-        page,
+        page: data.page,
         hasSearch: !!hubSearch
       })
     };
@@ -68,7 +68,7 @@ export const load = async ({
     countryOptions: [],
     seoPolicy: getHubSeoPolicy({
       basePath: data.hubPath,
-      page,
+      page: data.page,
       hasSearch: !!hubSearch
     })
   };

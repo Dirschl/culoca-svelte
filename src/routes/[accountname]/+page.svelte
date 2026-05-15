@@ -3,7 +3,8 @@
   import SiteFooter from '$lib/SiteFooter.svelte';
   import FollowButton from '$lib/FollowButton.svelte';
   import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
-  import { appendReturnTo, getPublicItemHref } from '$lib/content/routing';
+  import { getPublicItemHref } from '$lib/content/routing';
+  import { rememberLocalRouteForItem } from '$lib/returnTo';
   import { absoluteUrl, buildBreadcrumbJsonLd, DEFAULT_OG_IMAGE, trimText } from '$lib/seo/site';
 
   export let data: any;
@@ -24,7 +25,7 @@
     district_slug?: string | null;
     municipality_slug?: string | null;
   }) {
-    return appendReturnTo(getPublicItemHref(item), data.hubPath);
+    return getPublicItemHref(item);
   }
 </script>
 
@@ -87,7 +88,7 @@
         <div class="items-grid">
           {#each data.items as item (item.id)}
             <article class="item-card">
-              <a href={itemHref(item)}>
+              <a href={itemHref(item)} on:click={() => rememberLocalRouteForItem(data.hubPath)}>
                 {#if item.path_512}
                   <img
                     src={getSeoImageUrl(item.slug, item.path_512, '512')}

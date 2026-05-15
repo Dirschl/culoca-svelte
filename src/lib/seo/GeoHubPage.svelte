@@ -4,7 +4,8 @@
   import SiteNav from '$lib/SiteNav.svelte';
   import SiteFooter from '$lib/SiteFooter.svelte';
   import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
-  import { appendReturnTo, getPublicItemHref } from '$lib/content/routing';
+  import { getPublicItemHref } from '$lib/content/routing';
+  import { rememberLocalRouteForItem } from '$lib/returnTo';
   import { getEffectiveGpsPosition } from '$lib/filterStore';
   import {
     absoluteUrl,
@@ -80,7 +81,7 @@
   });
 
   function itemHref(item: HubItem) {
-    return appendReturnTo(getPublicItemHref(item), data.hubPath);
+    return getPublicItemHref(item);
   }
 
   function thumbUrl(item: { slug: string; path_512: string | null }) {
@@ -391,7 +392,11 @@
           <div class="items-grid">
             {#each displayedItems as item (item.id)}
               <article class="item-card">
-                <a href={itemHref(item)} class="item-link">
+                <a
+                  href={itemHref(item)}
+                  class="item-link"
+                  on:click={() => rememberLocalRouteForItem(data.hubPath)}
+                >
                   {#if item.path_512}
                     {@const previewUrl = currentThumbUrl(item)}
                     <div

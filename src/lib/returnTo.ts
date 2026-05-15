@@ -19,6 +19,18 @@ export function currentPathWithSearch(url: URL): string {
   return `${url.pathname}${url.search}${url.hash}`;
 }
 
+export function rememberLocalRouteForItem(returnTo: string | null | undefined): void {
+  if (typeof sessionStorage === 'undefined') return;
+  const sanitized = sanitizeReturnTo(returnTo, '/');
+  if (!sanitized || sanitized === '/') return;
+  sessionStorage.setItem(LAST_LOCAL_ROUTE_KEY, sanitized);
+}
+
+export function currentBrowserRoute(): string | null {
+  if (typeof window === 'undefined') return null;
+  return `${window.location.pathname}${window.location.search}${window.location.hash}`;
+}
+
 export function isDetailPath(pathname: string): boolean {
   const segments = pathname.split('/').filter(Boolean);
   if (segments.length < 2) return false;

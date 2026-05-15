@@ -5,7 +5,8 @@ import type { NewsFlashImage } from './types';
 import { galleryStats } from './galleryStats';
 import { supabase } from './supabaseClient';
 import { getSeoImageUrl } from './utils/seoImageUrl';
-import { appendReturnTo, getPublicItemHref } from '$lib/content/routing';
+import { getPublicItemHref } from '$lib/content/routing';
+import { currentBrowserRoute, rememberLocalRouteForItem } from '$lib/returnTo';
 
 // Modus: 'eigene', 'alle', 'aus'
 export let mode: 'eigene' | 'alle' | 'aus' = 'alle';
@@ -39,11 +40,8 @@ let refreshInterval: ReturnType<typeof setInterval> | null = null;
 let mounted = false;
 let usedInitialItems = false; // NEU: Merker, ob SSR-Items verwendet wurden
 
-function getItemHrefWithReturnTo(img: NewsFlashImage): string {
-  const returnTo = typeof window !== 'undefined'
-    ? `${window.location.pathname}${window.location.search}${window.location.hash}`
-    : null;
-  return appendReturnTo(getPublicItemHref(img), returnTo);
+function getItemHref(img: NewsFlashImage): string {
+  return getPublicItemHref(img);
 }
 
 async function attachCanonicalPaths<T extends { id: string }>(items: T[]): Promise<Array<T & { canonical_path?: string | null }>> {
@@ -292,10 +290,8 @@ onDestroy(() => {
 
 function handleImageClick(img: NewsFlashImage) {
   console.log('[NewsFlash] handleImageClick:', img);
-  const returnTo = typeof window !== 'undefined'
-    ? `${window.location.pathname}${window.location.search}${window.location.hash}`
-    : null;
-  goto(appendReturnTo(getPublicItemHref(img), returnTo));
+  rememberLocalRouteForItem(currentBrowserRoute());
+  goto(getPublicItemHref(img));
 }
 
 function toggleMode() {
@@ -369,7 +365,7 @@ function handleScroll(event: Event) {
           {#each images as img (img.id)}
             {@const displayWidth = img.width && img.height ? Math.round(140 * img.width / img.height) : 140}
             {@const seoImageUrl = getSeoImageUrl(img.slug, img.path_512, '512')}
-            <a href={getItemHrefWithReturnTo(img)} class="newsflash-thumb" tabindex="0" role="button" aria-label={img.title || img.original_name || 'Bild'} title={img.title || img.original_name || 'Bild'} style="width:{displayWidth}px;">
+            <a href={getItemHref(img)} class="newsflash-thumb" tabindex="0" role="button" aria-label={img.title || img.original_name || 'Bild'} title={img.title || img.original_name || 'Bild'} style="width:{displayWidth}px;" on:click={() => rememberLocalRouteForItem(currentBrowserRoute())}>
               <div class="newsflash-image-frame">
                 <img src={seoImageUrl || `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${img.path_512}`} alt={img.title || img.original_name || 'Bild'} width={displayWidth} height="140" loading="lazy" />
                 {#if showDistance && userLat !== null && userLon !== null && img.lat && img.lon && getDistanceFromLatLonInMeters}
@@ -404,7 +400,7 @@ function handleScroll(event: Event) {
           {/if}
           {#each images as img (img.id)}
             {@const seoGridImageUrl = getSeoImageUrl(img.slug, img.path_512, '512')}
-            <a href={getItemHrefWithReturnTo(img)} class="newsflash-thumb" tabindex="0" role="button" aria-label={img.title || img.original_name || 'Bild'} title={img.title || img.original_name || 'Bild'}>
+            <a href={getItemHref(img)} class="newsflash-thumb" tabindex="0" role="button" aria-label={img.title || img.original_name || 'Bild'} title={img.title || img.original_name || 'Bild'} on:click={() => rememberLocalRouteForItem(currentBrowserRoute())}>
               <div class="newsflash-image-frame">
                 <img src={seoGridImageUrl || `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${img.path_512}`} alt={img.title || img.original_name || 'Bild'} />
                 {#if showDistance && userLat !== null && userLon !== null && img.lat && img.lon && getDistanceFromLatLonInMeters}

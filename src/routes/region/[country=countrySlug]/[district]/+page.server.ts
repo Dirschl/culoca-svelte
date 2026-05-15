@@ -18,7 +18,7 @@ export const load = async ({ params, url }: { params: { country: string; distric
       countryOptions: [],
       seoPolicy: getHubSeoPolicy({
         basePath: data.hubPath,
-        page,
+        page: data.page,
         hasSearch: !!hubSearch
       })
     };
@@ -48,7 +48,7 @@ export const load = async ({ params, url }: { params: { country: string; distric
     countryOptions: [],
     seoPolicy: getHubSeoPolicy({
       basePath: data.hubPath,
-      page,
+      page: data.page,
       hasSearch: !!hubSearch
     })
   };
