@@ -1,6 +1,7 @@
 import { supabase } from '$lib/supabaseClient';
 import { getPublicItemHref, isVisibleInMainFeed } from '$lib/content/routing';
 import { SITE_URL } from '$lib/seo/site';
+import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
 
 const GALLERY_SELECT =
 	'id, slug, title, description, lat, lon, path_512, path_2048, width, height, created_at, canonical_path, country_slug, state_slug, region_slug, district_slug, district_name, municipality_slug, municipality_name, type_id, group_root_item_id, show_in_main_feed, ends_at';
@@ -12,6 +13,10 @@ export type EmbedGalleryItem = {
 	description: string | null;
 	canonical_path: string | null;
 	url: string;
+	/** Direct 512px image URL (no HTML/OG fetch required). */
+	image_512: string | null;
+	width: number;
+	height: number;
 	/** Human-readable place label (Gemeinde preferred) for embed headings. */
 	place: string | null;
 	municipality_slug: string | null;
@@ -80,13 +85,22 @@ export function toEmbedGalleryItem(row: Record<string, unknown>): EmbedGalleryIt
 		municipality_slug: (row.municipality_slug as string) ?? null
 	});
 	const path = href.startsWith('http') ? href : `${SITE_URL}${href.startsWith('/') ? href : `/${href}`}`;
+	const slug = (row.slug as string) ?? null;
+	const path512 = (row.path_512 as string) ?? null;
+	const image512 = getSeoImageUrl(slug, path512, '512') || null;
+	const width = typeof row.width === 'number' ? row.width : parseInt(String(row.width ?? 0), 10) || 0;
+	const height = typeof row.height === 'number' ? row.height : parseInt(String(row.height ?? 0), 10) || 0;
+
 	return {
 		id: String(row.id),
-		slug: (row.slug as string) ?? null,
+		slug,
 		title: (row.title as string) ?? null,
 		description: (row.description as string) ?? null,
 		canonical_path: href.startsWith('http') ? new URL(href).pathname : href,
 		url: path,
+		image_512: image512,
+		width,
+		height,
 		place: resolvePlaceLabel(row),
 		municipality_slug: (row.municipality_slug as string) ?? null,
 		municipality_name: (row.municipality_name as string) ?? null,
