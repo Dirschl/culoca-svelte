@@ -511,19 +511,19 @@ function buildCountryPhotoHubSeoText(hub: GeoHubResult, page: number) {
     return {
       seoTitle:
         page > 1
-          ? `Regionale Fotos Deutschland – Seite ${page} | Culoca`
-          : 'Regionale Fotos in Deutschland: GPS-Bilder, Orte & Motive | Culoca',
+          ? `Regionale Einträge Deutschland – Seite ${page} | Culoca`
+          : 'Regionale Einträge in Deutschland | Culoca',
       intro:
         page > 1
-          ? `Weitere Fotos und Inhalte aus Deutschland – Seite ${page}. Zurück zur ersten Seite für den vollen Überblick.`
-          : `Hier findest du ${n} öffentliche Fotos und Motive mit Ortsbezug – strukturiert von Region bis Gemeinde. Nutze die Suche oder klicke dich durch Bundesländer und Landkreise. Eigene Aufnahmen lädst du hoch und verwaltest sie zentral im Dashboard (Metadaten, Varianten, Freigaben).`,
+          ? `Weitere Einträge aus Deutschland – Seite ${page}. Zurück zur ersten Seite für den vollen Überblick.`
+          : `Hier findest du ${n} öffentliche Ergebnisse mit Ortsbezug – strukturiert von Land bis Gemeinde. Nutze die Suche oder klicke dich durch Bundesländer und Landkreise.`,
       metaDescription:
         page > 1
-          ? `Weitere regionale Fotos in Deutschland auf Culoca – Seite ${page}.`
-          : `${n} regionale Fotos in Deutschland mit GPS & Schlagwörtern. Landkreise, Gemeinden, Suche. Bilder hochladen und verwalten bei Culoca.`,
-      fallbackDescription: 'Weitere regionale Motive aus Deutschland.',
-      displayHubTitle: 'Regionale Fotos in Deutschland',
-      hubKicker: 'Fotos · regionale Entdeckung'
+          ? `Weitere regionale Einträge in Deutschland auf Culoca – Seite ${page}.`
+          : `${n} öffentliche Ergebnisse mit Ortsbezug in Deutschland. Landkreise, Gemeinden, Suche. Strukturiert von Land bis Gemeinde.`,
+      fallbackDescription: 'Weitere regionale Einträge aus Deutschland.',
+      displayHubTitle: 'Regionale Einträge in Deutschland',
+      hubKicker: 'Einträge · regionale Entdeckung'
     };
   }
 
