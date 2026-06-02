@@ -88,6 +88,10 @@
     return getSeoImageUrl(item.slug, item.path_512, '512');
   }
 
+  function cssThumbBgValue(url: string): string {
+    return url.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  }
+
   function pageUrl(page: number): string {
     const params = new URLSearchParams();
     const q = (data.hubSearch || '').trim();
@@ -192,7 +196,7 @@
     const imageEl = previewImageElements[itemId];
     if (imageEl && imageEl.src !== url) imageEl.src = url;
     const thumbEl = previewThumbElements[itemId];
-    if (thumbEl) thumbEl.style.setProperty('--thumb-preview', `url('${url}')`);
+    if (thumbEl) thumbEl.style.setProperty('--thumb-preview', `url('${cssThumbBgValue(url)}')`);
   }
 
   function preloadVariantImages() {
@@ -401,7 +405,7 @@
                     {@const previewUrl = currentThumbUrl(item)}
                     <div
                       class="item-thumb item-thumb--foto"
-                      style={`--thumb-preview:url('${previewUrl}')`}
+                      style={`--thumb-preview:url('${cssThumbBgValue(previewUrl)}')`}
                       bind:this={previewThumbElements[item.id]}
                     >
                       {#if (item.child_count || 0) > 0}

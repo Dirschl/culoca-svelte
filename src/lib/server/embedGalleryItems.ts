@@ -73,6 +73,24 @@ function locationKey(item: {
 	return `i:${item.id}`;
 }
 
+function isPortraitItem(item: EmbedGalleryItem): boolean {
+	return item.height > item.width;
+}
+
+/** Interleave portrait and landscape so embed grids show more vertical motifs. */
+function interleavePortraitFirst(items: EmbedGalleryItem[]): EmbedGalleryItem[] {
+	const portraits = items.filter(isPortraitItem);
+	const others = items.filter((item) => !isPortraitItem(item));
+	const mixed: EmbedGalleryItem[] = [];
+	let pi = 0;
+	let oi = 0;
+	while (pi < portraits.length || oi < others.length) {
+		if (pi < portraits.length) mixed.push(portraits[pi++]);
+		if (oi < others.length) mixed.push(others[oi++]);
+	}
+	return mixed;
+}
+
 export function toEmbedGalleryItem(row: Record<string, unknown>): EmbedGalleryItem | null {
 	if (!row?.id || !row?.path_512) return null;
 	const href = getPublicItemHref({
@@ -161,7 +179,7 @@ export async function fetchDiscoverEmbedItems(count: number): Promise<{
 		return { error: null, items: [] };
 	}
 
-	const shuffled = shuffle(pool);
+	const shuffled = interleavePortraitFirst(shuffle(pool));
 	const diverse: EmbedGalleryItem[] = [];
 	const seenLocations = new Set<string>();
 	const seenIds = new Set<string>();
