@@ -236,7 +236,10 @@
 								{/if}
 							</h2>
 							{#if line.already_licensed}
-								<p class="warn">Sie besitzen bereits eine Lizenz — wird beim Checkout übersprungen.</p>
+								<p class="warn">
+									Sie besitzen bereits eine Lizenz — wird beim Checkout übersprungen.
+									<a href="/dashboard?section=licenses">Gekaufte Lizenzen im Konto</a>
+								</p>
 							{/if}
 							<div class="tier-row">
 								<label>
@@ -413,6 +416,10 @@
 		color: #b45309;
 		font-size: 0.88rem;
 		margin: 0.2rem 0;
+	}
+
+	.warn a {
+		font-weight: 600;
 	}
 
 	.remove-btn {
