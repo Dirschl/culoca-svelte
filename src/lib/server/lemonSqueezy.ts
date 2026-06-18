@@ -72,6 +72,9 @@ export async function createLemonCheckout(
 			attributes: {
 				custom_price: input.priceCents,
 				test_mode: input.testMode ?? config.testMode,
+				checkout_options: {
+					embed: true
+				},
 				product_options: {
 					name: input.productName,
 					description: input.productDescription,

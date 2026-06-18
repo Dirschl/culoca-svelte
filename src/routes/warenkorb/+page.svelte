@@ -13,6 +13,7 @@
 	import type { CartLineDisplay } from '$lib/licensing/cart';
 	import { MAX_CART_ITEMS } from '$lib/licensing/cart';
 	import { notifyCartUpdated } from '$lib/licensing/licenseCartStore';
+	import { openLemonCheckout } from '$lib/licensing/lemonCheckoutClient';
 
 	let loading = true;
 	let checkoutLoading = false;
@@ -156,7 +157,9 @@
 				throw new Error(data?.error || data?.message || 'Checkout fehlgeschlagen');
 			}
 			if (data.checkoutUrl) {
-				window.location.href = data.checkoutUrl;
+				await openLemonCheckout(data.checkoutUrl, {
+					onSuccessRedirect: '/settings/licenses?purchase=success'
+				});
 				return;
 			}
 			throw new Error('Keine Checkout-URL erhalten');
