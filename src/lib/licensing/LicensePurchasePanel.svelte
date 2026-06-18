@@ -20,6 +20,8 @@
 	export let embedded = false;
 	/** Ersteller-Ansicht: Shop-Status ohne deaktivierte Kauf-Buttons */
 	export let ownerView = false;
+	/** Crawlbare Lizenz-URL (#lizenzbedingungen) für Shop-Bilder */
+	export let imageLicenseUrl = '';
 
 	let addingTier: LicenseTier | null = null;
 	let cartAddedTier: LicenseTier | null = null;
@@ -117,6 +119,9 @@
 			<a href="/web/license#kommerziell">Culoca-Lizenzbedingungen</a>
 			sowie die <a href="/web/license#zahlung">Zahlungs- und Rückerstattungsinfos</a>
 			und <a href="/web/widerruf">Widerrufsbelehrung</a> (Lemon Squeezy).
+			{#if !ownerView && imageLicenseUrl}
+				· <a href={imageLicenseUrl}>Lizenzbedingungen für dieses Bild</a>
+			{/if}
 		</p>
 
 		{#if errorMessage}

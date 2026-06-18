@@ -1,15 +1,18 @@
 import type { RequestHandler } from '@sveltejs/kit';
-import { supabase } from '$lib/supabaseClient';
 import {
   getStoredOrComputedCanonicalPath,
   isVisibleInMainFeed
 } from '$lib/content/routing';
 import { DEFAULT_CONTENT_TYPE_BY_ID } from '$lib/content/types';
 import { buildGeoHierarchy } from '$lib/geo/hierarchy';
+import { createSupabaseServerClient } from '$lib/server/supabaseServer';
+import { isItemShopIndexable, loadProfileLicensingMap } from '$lib/server/sitemapLicensing';
 
 export const GET: RequestHandler = async () => {
   try {
     console.log('[Sitemap] Generating dynamic sitemap...');
+
+    const supabase = createSupabaseServerClient();
 
     // Base URL
     const baseUrl = 'https://culoca.com';
@@ -30,6 +33,8 @@ export const GET: RequestHandler = async () => {
       { url: '/galerie', priority: '0.7', changefreq: 'daily' },
       { url: '/map-view', priority: '0.7', changefreq: 'daily' },
       { url: '/web', priority: '0.5', changefreq: 'monthly' },
+      { url: '/web/license', priority: '0.55', changefreq: 'monthly' },
+      { url: '/web/widerruf', priority: '0.45', changefreq: 'monthly' },
       { url: '/web/impressum', priority: '0.3', changefreq: 'yearly' },
       { url: '/web/datenschutz', priority: '0.3', changefreq: 'yearly' }
     ];
@@ -64,7 +69,7 @@ export const GET: RequestHandler = async () => {
         
         const { data, error } = await supabase
           .from('items')
-          .select('id, slug, title, description, path_2048, path_512, created_at, updated_at, type_id, group_root_item_id, group_slug, canonical_path, country_slug, country_name, state_slug, state_name, region_slug, region_name, district_slug, district_name, municipality_slug, municipality_name, show_in_main_feed, is_private, ends_at, profile_id')
+          .select('id, slug, title, description, path_2048, path_512, created_at, updated_at, type_id, group_root_item_id, group_slug, canonical_path, country_slug, country_name, state_slug, state_name, region_slug, region_name, district_slug, district_name, municipality_slug, municipality_name, show_in_main_feed, is_private, ends_at, profile_id, stock_settings')
           .not('slug', 'is', null)
           .not('path_512', 'is', null)
           // Public items include false and null (legacy rows)
@@ -132,6 +137,12 @@ export const GET: RequestHandler = async () => {
     });
 
     console.log(`[Sitemap] Found ${sitemapItems.length} public items`);
+
+    const profileLicensingMap = await loadProfileLicensingMap(
+      supabase,
+      sitemapItems.map((item) => item.profile_id).filter(Boolean)
+    );
+    let licenseDownloadUrlCount = 0;
 
     // Generate XML
     let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
@@ -258,6 +269,16 @@ export const GET: RequestHandler = async () => {
       }
       
       xml += '  </url>\n';
+
+      if (isItemShopIndexable(item, profileLicensingMap)) {
+        licenseDownloadUrlCount += 1;
+        xml += '  <url>\n';
+        xml += `    <loc>${baseUrl}${canonicalPath}/download</loc>\n`;
+        xml += `    <lastmod>${formattedDate}</lastmod>\n`;
+        xml += '    <priority>0.9</priority>\n';
+        xml += '    <changefreq>weekly</changefreq>\n';
+        xml += '  </url>\n';
+      }
     }
 
     // Entfernt: Keine "gone" Einträge mehr
@@ -265,7 +286,7 @@ export const GET: RequestHandler = async () => {
 
     xml += '</urlset>';
 
-    console.log(`[Sitemap] Generated sitemap with ${staticPages.length} static pages and ${sitemapItems.length} items`);
+    console.log(`[Sitemap] Generated sitemap with ${staticPages.length} static pages, ${sitemapItems.length} items and ${licenseDownloadUrlCount} license/download URLs`);
     console.log(`[Sitemap] Items use their actual updated_at/created_at dates for better crawl efficiency`);
 
     return new Response(xml, {

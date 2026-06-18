@@ -22,6 +22,12 @@
 		LICENSE_TIER_LABELS
 	} from '$lib/licensing/tiers';
 	import { DEFAULT_CONTENT_TYPES } from '$lib/content/types';
+	import { buildAcquireLicensePageUrl, buildImageLicenseUrl } from '$lib/seo/licenseUrls';
+	import {
+		buildLicenseProductJsonLd,
+		resolveImageLicenseSchemaUrls
+	} from '$lib/seo/licensingStructuredData';
+	import { toCanonicalAbsoluteUrl } from '$lib/seo/site';
 
 	export let data: any;
 
@@ -198,6 +204,56 @@
 	$: licenseExtendedPrice = image
 		? getTierPriceCents('extended', image, culocaSalesPriceDefaults)
 		: culocaSalesPriceDefaults.extended;
+	$: shopCommercialSale = licensingSale?.eligible === true;
+	$: downloadCanonicalPath = data?.canonicalPath
+		? `${String(data.canonicalPath).replace(/\/$/, '')}/download`
+		: '';
+	$: downloadPageUrl = downloadCanonicalPath ? toCanonicalAbsoluteUrl(downloadCanonicalPath) : '';
+	$: downloadPageTitle = image?.title || image?.original_name || 'Bild';
+	$: downloadMetaDescription = shopCommercialSale
+		? `Bildlizenz für „${downloadPageTitle}“ erwerben: Standard-Lizenz und Erweiterte Lizenz mit Download auf Culoca.`
+		: `Download und Export für „${downloadPageTitle}“ auf Culoca — Auflösung, Format und Metadaten anpassen.`;
+	$: itemAcquireLicenseUrl = image ? buildAcquireLicensePageUrl(image) : '';
+	$: itemImageLicenseUrl = image ? buildImageLicenseUrl(image) : '';
+	$: licenseSchemaUrls = resolveImageLicenseSchemaUrls({
+		commercialSale: shopCommercialSale,
+		item: image || {},
+		attributionLicenseUrl: data?.attribution?.licenseUrl
+	});
+	$: downloadProductJsonLd =
+		shopCommercialSale && itemAcquireLicenseUrl
+			? buildLicenseProductJsonLd({
+					productName: `Bildlizenz: ${downloadPageTitle}`,
+					description: downloadMetaDescription,
+					imageUrl: previewImageUrl || null,
+					pageUrl: itemAcquireLicenseUrl,
+					standardPriceCents: licenseStandardPrice,
+					extendedPriceCents: licenseExtendedPrice
+				})
+			: null;
+	$: downloadPageJsonLd =
+		downloadPageUrl && image
+			? {
+					'@context': 'https://schema.org',
+					'@graph': [
+						{
+							'@type': 'WebPage',
+							'@id': downloadPageUrl,
+							url: downloadPageUrl,
+							name: shopCommercialSale
+								? `Bildlizenz: ${downloadPageTitle}`
+								: `Download: ${downloadPageTitle}`,
+							description: downloadMetaDescription,
+							inLanguage: 'de',
+							isPartOf: { '@type': 'WebSite', name: 'Culoca', url: 'https://culoca.com/' },
+							...(downloadProductJsonLd ? { mainEntity: downloadProductJsonLd } : {})
+						}
+					]
+				}
+			: null;
+	$: showLicenseTermsSection =
+		culocaSalesGloballyEnabled &&
+		(shopCommercialSale || licensingSale?.shopApproved === true);
 	$: previewImageUrl =
 		image?.slug && (image?.path_2048 || image?.path_512)
 			? getSeoImageUrl(
@@ -1289,7 +1345,31 @@
 </script>
 
 <svelte:head>
-	<title>{image?.title || image?.original_name || 'Download'} | Culoca</title>
+	<title
+		>{shopCommercialSale ? `Bildlizenz: ${downloadPageTitle}` : `Download: ${downloadPageTitle}`} |
+		Culoca</title
+	>
+	{#if downloadCanonicalPath}
+		<link rel="canonical" href={downloadPageUrl} />
+	{/if}
+	<meta name="description" content={downloadMetaDescription} />
+	<meta name="robots" content="index, follow" />
+	<meta property="og:type" content="website" />
+	<meta property="og:site_name" content="Culoca" />
+	<meta
+		property="og:title"
+		content={shopCommercialSale ? `Bildlizenz: ${downloadPageTitle}` : `Download: ${downloadPageTitle}`}
+	/>
+	<meta property="og:description" content={downloadMetaDescription} />
+	{#if downloadPageUrl}
+		<meta property="og:url" content={downloadPageUrl} />
+	{/if}
+	{#if previewImageUrl}
+		<meta property="og:image" content={previewImageUrl} />
+	{/if}
+	{#if downloadPageJsonLd}
+		{@html `<script type="application/ld+json">${JSON.stringify(downloadPageJsonLd)}</script>`}
+	{/if}
 </svelte:head>
 
 <SiteNav />
@@ -1379,6 +1459,7 @@
 					salesEnabled={true}
 					standardPriceCents={licenseStandardPrice}
 					extendedPriceCents={licenseExtendedPrice}
+					imageLicenseUrl={itemImageLicenseUrl}
 					compact
 				/>
 			{/if}
@@ -1675,7 +1756,7 @@
 			{/if}
 		</section>
 
-		{#if culocaSalesGloballyEnabled}
+		{#if showLicenseTermsSection}
 			<section id="lizenzbedingungen" class="settings-card license-terms-card">
 				<h2>Lizenz &amp; Kauf</h2>
 				<p>

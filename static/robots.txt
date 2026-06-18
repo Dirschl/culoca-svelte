@@ -18,8 +18,11 @@ Allow: /galerie
 Allow: /item/
 Allow: /images/
 
+Allow: /web/
+
 # Disallow login and admin pages
 Disallow: /login
+Disallow: /warenkorb
 Disallow: /admin/
 Disallow: /api/
 Disallow: /auth/

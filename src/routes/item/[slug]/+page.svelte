@@ -42,6 +42,10 @@
 		trimText
 	} from '$lib/seo/site';
 	import { buildAcquireLicensePageUrl, buildImageLicenseUrl } from '$lib/seo/licenseUrls';
+	import {
+		buildLicenseProductJsonLd,
+		resolveImageLicenseSchemaUrls
+	} from '$lib/seo/licensingStructuredData';
 	import LicensePurchasePanel from '$lib/licensing/LicensePurchasePanel.svelte';
 	import LicenseRequestPanel from '$lib/licensing/LicenseRequestPanel.svelte';
 	import { getTierPriceCents, isItemForSale, canRequestLicense, resolveItemShopApproved, getCulocaSaleDenial } from '$lib/licensing/tiers';
@@ -525,6 +529,28 @@
 		: culocaSalesPriceDefaults.extended;
 	$: itemAcquireLicenseUrl = image ? buildAcquireLicensePageUrl(image) : '';
 	$: itemImageLicenseUrl = image ? buildImageLicenseUrl(image) : '';
+	$: licenseSchemaUrls = resolveImageLicenseSchemaUrls({
+		commercialSale: itemEligibleForSale,
+		item: image || {},
+		attributionLicenseUrl: attribution?.licenseUrl
+	});
+	$: licenseProductImageUrl = (() => {
+		if (!image?.slug) return null;
+		const path = image.path_2048 || image.path_512;
+		const ext = path?.match(/\.(jpg|jpeg|webp|png)$/i)?.[0]?.toLowerCase() || '.jpg';
+		return `https://culoca.com/images/${image.slug}-2048${ext}`;
+	})();
+	$: licenseProductJsonLd =
+		itemEligibleForSale && image?.id && itemAcquireLicenseUrl
+			? buildLicenseProductJsonLd({
+					productName: `Bildlizenz: ${image.title || image.original_name || 'Culoca Foto'}`,
+					description: `Kommerzielle Standard- oder Erweiterte Lizenz für „${image.title || image.original_name || 'Foto'}“ auf Culoca.`,
+					imageUrl: licenseProductImageUrl,
+					pageUrl: itemAcquireLicenseUrl,
+					standardPriceCents: licenseStandardPrice,
+					extendedPriceCents: licenseExtendedPrice
+				})
+			: null;
 	$: heroSeoDimensions = (() => {
 		if (!image) return { width: 2048, height: 1365 };
 		const originalWidth = image.width || 2048;
@@ -3663,10 +3689,10 @@
 								: fileExtension === '.png'
 									? 'image/png'
 									: 'image/jpeg',
-						license: (itemImageLicenseUrl || attribution?.licenseUrl) ?? 'https://culoca.com/web/license',
+						license: licenseSchemaUrls.license,
 						creditText: normalizedCreditText,
 						copyrightNotice: normalizedCopyrightNotice,
-						acquireLicensePage: (itemAcquireLicenseUrl || attribution?.licenseUrl) ?? 'https://culoca.com/web/license',
+						acquireLicensePage: licenseSchemaUrls.acquireLicensePage,
 						creator: {
 							'@type': attribution?.creatorIsOrganization ? 'Organization' : 'Person',
 							name: normalizedSchemaCreatorName
@@ -3698,7 +3724,8 @@
 						primaryImageOfPage: {
 							'@id': imageUrl2048
 						}
-					}
+					},
+					...(licenseProductJsonLd ? [licenseProductJsonLd] : [])
 				]
 			},
 			null,
@@ -4457,6 +4484,7 @@
 							salesEnabled={true}
 							standardPriceCents={licenseStandardPrice}
 							extendedPriceCents={licenseExtendedPrice}
+							imageLicenseUrl={itemImageLicenseUrl}
 							embedded
 							ownerView={showLicenseShopOwner}
 						/>
