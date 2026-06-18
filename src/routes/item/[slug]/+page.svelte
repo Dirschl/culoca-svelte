@@ -4191,6 +4191,7 @@
 					{/if}
 				</section>
 			{/if}
+			<div class="item-detail-inset">
 			<section class="content-panel comments-panel">
 				<h2>Kommentare</h2>
 				<div class="comment-form">
@@ -4360,6 +4361,7 @@
 					<p class="comment-empty">Noch keine Kommentare vorhanden.</p>
 				{/if}
 			</section>
+			</div>
 			{#if shouldShowNearbyGallery}
 				<div class="radius-control">
 					<div class="radius-value" class:limit-reached={isAtItemLimit}>
@@ -4401,23 +4403,27 @@
 				</section>
 			{/if}
 
-			{#if showLicensePurchase}
-				<LicensePurchasePanel
-					itemId={image.id}
-					itemTitle={image.title || ''}
-					salesEnabled={true}
-					standardPriceCents={licenseStandardPrice}
-					extendedPriceCents={licenseExtendedPrice}
-					embedded
-				/>
-			{/if}
-			{#if showLicenseRequest}
-				<LicenseRequestPanel
-					itemId={image.id}
-					itemTitle={image.title || ''}
-					creatorUserId={image.profile_id || image.profile?.id || null}
-					embedded
-				/>
+			{#if showLicensePurchase || showLicenseRequest}
+				<div class="item-detail-inset">
+					{#if showLicensePurchase}
+						<LicensePurchasePanel
+							itemId={image.id}
+							itemTitle={image.title || ''}
+							salesEnabled={true}
+							standardPriceCents={licenseStandardPrice}
+							extendedPriceCents={licenseExtendedPrice}
+							embedded
+						/>
+					{/if}
+					{#if showLicenseRequest}
+						<LicenseRequestPanel
+							itemId={image.id}
+							itemTitle={image.title || ''}
+							creatorUserId={image.profile_id || image.profile?.id || null}
+							embedded
+						/>
+					{/if}
+				</div>
 			{/if}
 
 			<!-- SEO-optimiert: Serverseitig gerenderte Links für Google -->
@@ -6107,6 +6113,11 @@
 		transition: color 0.3s ease;
 	}
 	@media (max-width: 900px) {
+		.item-detail-inset {
+			padding-left: 0.5rem;
+			padding-right: 0.5rem;
+		}
+
 		.meta-section.single-exif {
 			grid-template-columns: 1fr;
 			padding: 1rem 0.5rem;
@@ -6132,11 +6143,30 @@
 		.column-card {
 			text-align: center;
 		}
+		.keywords-title {
+			text-align: center;
+			width: 100%;
+		}
 		.keywords {
 			justify-content: center;
 		}
 		.avatar {
 			margin: 0 auto 0.5rem auto;
+		}
+		.avatar-placeholder {
+			margin-left: auto;
+			margin-right: auto;
+		}
+		.creator-header {
+			justify-content: center;
+			width: 100%;
+		}
+		.creator-details,
+		.creator-details.creator-fallback {
+			align-items: center;
+		}
+		.creator-name {
+			text-align: center;
 		}
 		.creator-contact {
 			justify-content: center;
@@ -6147,6 +6177,13 @@
 		}
 		.creator-socials {
 			justify-content: center;
+		}
+		.creator-actions {
+			justify-content: center;
+		}
+		.geo-navigation-head {
+			align-items: center;
+			text-align: center;
 		}
 	}
 	@media (max-width: 1200px) {
@@ -6155,19 +6192,39 @@
 			gap: 2rem;
 		}
 		.geo-navigation-head {
-			align-items: flex-start;
+			align-items: center;
 			flex-direction: column;
+			text-align: center;
 		}
 		.keywords-column,
 		.meta-column,
 		.column-card {
 			text-align: center;
 		}
+		.keywords-title {
+			text-align: center;
+			width: 100%;
+		}
 		.keywords {
 			justify-content: center;
 		}
 		.avatar {
 			margin: 0 auto 0.5rem auto;
+		}
+		.avatar-placeholder {
+			margin-left: auto;
+			margin-right: auto;
+		}
+		.creator-header {
+			justify-content: center;
+			width: 100%;
+		}
+		.creator-details,
+		.creator-details.creator-fallback {
+			align-items: center;
+		}
+		.creator-name {
+			text-align: center;
 		}
 		.creator-contact {
 			justify-content: center;
@@ -6177,6 +6234,9 @@
 			justify-content: center;
 		}
 		.creator-socials {
+			justify-content: center;
+		}
+		.creator-actions {
 			justify-content: center;
 		}
 	}
@@ -6709,6 +6769,12 @@
 
 	.group-context-line a {
 		color: var(--accent-color);
+	}
+
+	.item-detail-inset {
+		padding-left: 1rem;
+		padding-right: 1rem;
+		box-sizing: border-box;
 	}
 
 	.content-panel {
