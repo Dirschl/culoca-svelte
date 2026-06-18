@@ -43,7 +43,9 @@
 	} from '$lib/seo/site';
 	import { buildAcquireLicensePageUrl, buildImageLicenseUrl } from '$lib/seo/licenseUrls';
 	import LicensePurchasePanel from '$lib/licensing/LicensePurchasePanel.svelte';
-	import { getTierPriceCents, isItemForSale } from '$lib/licensing/tiers';
+	import LicenseRequestPanel from '$lib/licensing/LicenseRequestPanel.svelte';
+	import { getTierPriceCents, isItemForSale, canRequestLicense } from '$lib/licensing/tiers';
+	import { isLicenseCuratorClient, LICENSE_CURATOR_USER_ID } from '$lib/licensing/curator';
 	import {
 		getAdministrativeHierarchy,
 		normalizeAdminDisplayLabel
@@ -443,15 +445,32 @@
 		standard: $page.data.culocaSales?.standardPriceCents ?? 2900,
 		extended: $page.data.culocaSales?.extendedPriceCents ?? 9900
 	};
+	$: isLicenseCuratorUser = isLicenseCuratorClient(currentUser?.id);
+	$: creatorLicensingOptIn =
+		image?.profile_id === LICENSE_CURATOR_USER_ID ||
+		image?.profile?.culoca_licensing_opt_in === true;
+	$: saleEligibilityOptions = {
+		salesGloballyEnabled: culocaSalesGloballyEnabled,
+		fotoTypeId,
+		creatorLicensingOptIn,
+		curatorUserId: LICENSE_CURATOR_USER_ID
+	};
 	$: showLicensePurchase =
 		contentType?.slug === 'foto' &&
 		!!image?.id &&
 		!isCreator &&
 		!(canEditItem && editMode) &&
-		isItemForSale(image, {
-			salesGloballyEnabled: culocaSalesGloballyEnabled,
-			fotoTypeId
-		});
+		isItemForSale(image, saleEligibilityOptions);
+	$: showLicenseRequest =
+		contentType?.slug === 'foto' &&
+		!!image?.id &&
+		!isCreator &&
+		!(canEditItem && editMode) &&
+		canRequestLicense(image, {
+			...saleEligibilityOptions,
+			isViewerCreator: isCreator
+		}) &&
+		!!(image?.profile_id || image?.profile?.id);
 	$: licenseStandardPrice = image
 		? getTierPriceCents('standard', image, culocaSalesPriceDefaults)
 		: culocaSalesPriceDefaults.standard;
@@ -4091,6 +4110,13 @@
 					extendedPriceCents={licenseExtendedPrice}
 				/>
 			{/if}
+			{#if showLicenseRequest}
+				<LicenseRequestPanel
+					itemId={image.id}
+					itemTitle={image.title || ''}
+					creatorUserId={image.profile_id || image.profile?.id || null}
+				/>
+			{/if}
 			{#if favoriteStatus}
 				<p class="favorite-status">{favoriteStatus}</p>
 			{/if}
@@ -4638,14 +4664,16 @@
 						replaceOriginalFile={replaceOriginalImage}
 					/>
 
-					{#if isCreator}
+					{#if isCreator || isLicenseCuratorUser}
 						<p class="stock-dashboard-hint">
 							<button
 								type="button"
 								class="stock-dashboard-hint__button"
 								on:click={() => (showStockSettingsOverlay = true)}
 							>
-								Stock konfigurieren
+								{isLicenseCuratorUser && !isCreator
+									? 'Lizenz & Stock'
+									: 'Stock konfigurieren'}
 							</button>
 							<span>
 								oder im <a
@@ -5248,10 +5276,13 @@
 			</button>
 		{/if}
 	{/key}
-	{#if showStockSettingsOverlay && isCreator && image?.id}
+	{#if showStockSettingsOverlay && image?.id && (isCreator || isLicenseCuratorUser)}
 		<StockSettingsOverlay
 			item={image}
-			title="Stock konfigurieren"
+			title={isLicenseCuratorUser && !isCreator ? 'Lizenz & Stock' : 'Stock konfigurieren'}
+			isItemOwner={isCreator}
+			canManageCulocaLicense={isLicenseCuratorUser}
+			creatorLicensingOptIn={creatorLicensingOptIn}
 			on:close={() => (showStockSettingsOverlay = false)}
 			on:updated={(e) => (image = mergeItemFromApiPatch(image, e.detail.item))}
 		/>

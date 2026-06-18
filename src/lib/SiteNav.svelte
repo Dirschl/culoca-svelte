@@ -251,18 +251,19 @@
     openDropdown = null;
   }
 
-  function buildChatDrawerSrc(options?: { chatWith?: string; conversation?: string; item?: string }) {
+  function buildChatDrawerSrc(options?: { chatWith?: string; conversation?: string; item?: string; draft?: string }) {
     const params = new URLSearchParams();
     params.set('embed', '1');
 
     if (options?.chatWith) params.set('chatWith', options.chatWith);
     if (options?.conversation) params.set('conversation', options.conversation);
     if (options?.item) params.set('item', options.item);
+    if (options?.draft) params.set('draft', options.draft);
 
     return `/chat?${params.toString()}`;
   }
 
-  function openChatDrawer(options?: { chatWith?: string; conversation?: string; item?: string }) {
+  function openChatDrawer(options?: { chatWith?: string; conversation?: string; item?: string; draft?: string }) {
     if (!$isAuthenticated) {
       goto('/login');
       return;
@@ -284,7 +285,7 @@
     openDropdown = null;
   }
 
-  function toggleChatDrawer(options?: { chatWith?: string; conversation?: string; item?: string }) {
+  function toggleChatDrawer(options?: { chatWith?: string; conversation?: string; item?: string; draft?: string }) {
     if (chatDrawerOpen && !isChatRoute) {
       closeChatDrawer();
       return;
@@ -323,11 +324,11 @@
       }
     };
     const handleOpenChat = (event: Event) => {
-      const customEvent = event as CustomEvent<{ chatWith?: string; conversation?: string; item?: string }>;
+      const customEvent = event as CustomEvent<{ chatWith?: string; conversation?: string; item?: string; draft?: string }>;
       openChatDrawer(customEvent.detail || undefined);
     };
     const handleToggleChat = (event: Event) => {
-      const customEvent = event as CustomEvent<{ chatWith?: string; conversation?: string; item?: string }>;
+      const customEvent = event as CustomEvent<{ chatWith?: string; conversation?: string; item?: string; draft?: string }>;
       toggleChatDrawer(customEvent.detail || undefined);
     };
     document.addEventListener('keydown', handleKeydown);

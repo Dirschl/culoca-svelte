@@ -1,11 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { DEFAULT_CONTENT_TYPE_BY_SLUG } from '$lib/content/types';
 import { getPublicItemHref } from '$lib/content/routing';
-import { getTierPriceCents, isItemForSale, type LicenseTier } from '$lib/licensing/tiers';
+import { getTierPriceCents, type LicenseTier } from '$lib/licensing/tiers';
 import type { LemonSqueezyConfig } from '$lib/server/lemonSqueezy';
+import { isItemEligibleForSale } from '$lib/server/licensingSale';
+import { isCulocaSalesEnabled } from '$lib/server/lemonSqueezy';
 import { MAX_CART_ITEMS, type CartLineDisplay } from '$lib/licensing/cart';
-
-const FOTO_TYPE_ID = DEFAULT_CONTENT_TYPE_BY_SLUG.get('foto')?.id ?? 1;
 
 const ITEM_SELECT =
 	'id, slug, title, profile_id, type_id, is_private, stock_settings, path_512, path_2048, canonical_path, country_slug, district_slug, municipality_slug';
@@ -86,7 +85,10 @@ export async function addToCart(
 		throw new Error('Bild nicht gefunden');
 	}
 
-	if (!isItemForSale(item, { salesGloballyEnabled: true, fotoTypeId: FOTO_TYPE_ID })) {
+	const salesOn = isCulocaSalesEnabled();
+	if (
+		!(await isItemEligibleForSale(supabase, item, { salesGloballyEnabled: salesOn }))
+	) {
 		throw new Error('Bild nicht zum Verkauf freigegeben');
 	}
 

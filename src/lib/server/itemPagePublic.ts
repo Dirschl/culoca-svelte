@@ -46,7 +46,8 @@ export const ITEM_PAGE_PROFILE_SELECT = [
 	'use_exif_credit_override',
 	'use_exif_copyright_override',
 	'photographer_label_mode',
-	'public_contact_name'
+	'public_contact_name',
+	'culoca_licensing_opt_in'
 ].join(', ');
 
 /** Kern-Spalten (ohne Attribution-Block) — Fallback wenn DB noch nicht alle Spalten hat. */

@@ -11,12 +11,14 @@
 	import SiteFooter from '$lib/SiteFooter.svelte';
 	import ProfileDashboardNav from '$lib/profile/ProfileDashboardNav.svelte';
 	import ProfileSectionAttribution from '$lib/profile/sections/ProfileSectionAttribution.svelte';
+	import ProfileSectionLicensing from '$lib/profile/sections/ProfileSectionLicensing.svelte';
 	import ProfileSectionPrivacy from '$lib/profile/sections/ProfileSectionPrivacy.svelte';
 	import ProfileSectionGps from '$lib/profile/sections/ProfileSectionGps.svelte';
 	import ProfileSectionContact from '$lib/profile/sections/ProfileSectionContact.svelte';
 	import ProfileSectionSocial from '$lib/profile/sections/ProfileSectionSocial.svelte';
 	import type { ProfileSection } from '$lib/profile/profileSection';
 	import { isProfileSection } from '$lib/profile/profileSection';
+	import { isLicenseCuratorClient } from '$lib/licensing/curator';
 
 	let user: any = null;
 	let profile: any = null;
@@ -66,6 +68,8 @@
 	let use_exif_copyright_override = false;
 	let photographer_label_mode = 'auto';
 	let public_contact_name = '';
+	let culoca_licensing_opt_in = false;
+	let culoca_licensing_opt_in_prev = false;
 
 	// GPS Tracking Settings
 	let homeLat = '';
@@ -195,6 +199,8 @@
 				return 'Profil & Konto';
 			case 'attribution':
 				return 'Attribution & Rechte';
+			case 'licensing':
+				return 'Bildlizenzen';
 			case 'privacy':
 				return 'Privatsphäre';
 			case 'gps':
@@ -305,6 +311,8 @@
 				use_exif_copyright_override = data.use_exif_copyright_override ?? false;
 				photographer_label_mode = data.photographer_label_mode ?? 'auto';
 				public_contact_name = data.public_contact_name ?? '';
+				culoca_licensing_opt_in = data.culoca_licensing_opt_in === true;
+				culoca_licensing_opt_in_prev = culoca_licensing_opt_in;
 
 				// Load GPS settings
 				homeLat = data.home_lat ? data.home_lat.toString() : '';
@@ -1107,7 +1115,11 @@
 				use_exif_credit_override,
 				use_exif_copyright_override,
 				photographer_label_mode,
-				public_contact_name
+				public_contact_name,
+				culoca_licensing_opt_in,
+				...(culoca_licensing_opt_in && !culoca_licensing_opt_in_prev
+					? { culoca_licensing_opt_in_at: new Date().toISOString() }
+					: {})
 			};
 
 			// Update profile
@@ -1121,6 +1133,7 @@
 			}
 
 			profile = profileData;
+			culoca_licensing_opt_in_prev = culoca_licensing_opt_in;
 			showMessage('Profil erfolgreich gespeichert!', 'success');
 			if (avatarPreview) {
 				URL.revokeObjectURL(avatarPreview);
@@ -1452,6 +1465,16 @@
 							bind:use_exif_creator_override
 							bind:use_exif_credit_override
 							bind:use_exif_copyright_override
+						/>
+					</div>
+
+					<div
+						class="profile-section"
+						class:profile-section--hidden={activeProfileSection !== 'licensing'}
+					>
+						<ProfileSectionLicensing
+							bind:culoca_licensing_opt_in
+							isLicenseCuratorProfile={isLicenseCuratorClient(user?.id)}
 						/>
 					</div>
 

@@ -100,7 +100,21 @@ CULOCA_LICENSE_STANDARD_PRICE_CENTS=2900
 CULOCA_LICENSE_EXTENDED_PRICE_CENTS=9900
 PUBLIC_CULOCA_LICENSE_STANDARD_PRICE_CENTS=2900
 PUBLIC_CULOCA_LICENSE_EXTENDED_PRICE_CENTS=9900
+
+# Optional: Kurator für Lizenz-Freigaben (Default: DIRSCHL-User-ID)
+# CULOCA_LICENSE_CURATOR_USER_ID=0ceb2320-0553-463b-971a-a0eef5ecdf09
 ```
+
+## 2b. Lizenz-Governance (Kurator-Shop)
+
+Vorerst verkauft nur der **Kurator** (DIRSCHL) kuratiert:
+
+1. **Migration** `database-migrations/2026-06-19_culoca-licensing-governance.sql` ausführen (`profiles.culoca_licensing_opt_in`).
+2. **Ersteller** stimmt im Profil unter **Bildlizenzen** zu (`culoca_licensing_opt_in`).
+3. **Kurator** gibt pro Bild frei: Stock-/Lizenz-Overlay → „Für Culoca-Shop freigeben“ (`stock_settings.culoca.saleApproved`).
+4. Ohne beides: kein Shop — Besucher sehen **Lizenz anfragen** (Chat mit Ersteller).
+
+API: `POST /api/licensing/item-approval` (nur Kurator).
 
 `SUPABASE_SERVICE_ROLE_KEY` muss gesetzt sein (Webhook schreibt Lizenzen).
 

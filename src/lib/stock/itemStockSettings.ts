@@ -5,6 +5,8 @@
  * Legacy-Spalten `adobe_stock_*` bleiben vorerst parallel; Leselogik bevorzugt JSON.
  */
 
+import { parseCulocaSaleSettings, type CulocaSaleSettings } from '$lib/licensing/tiers';
+
 export type AdobeStockAgencyState = {
 	status: AdobeStockStatus;
 	uploadedAt: string | null;
@@ -31,11 +33,15 @@ export type ItemStockSettings = {
 			error: string | null;
 		}> | null;
 	};
-	/** Culoca-eigener Verkauf (Lemon Squeezy) */
+	/** Culoca-eigener Verkauf (Lemon Squeezy) — Freigabe durch Kurator */
 	culoca?: {
-		saleEnabled?: boolean;
+		saleApproved?: boolean;
+		saleApprovedAt?: string | null;
+		saleApprovedBy?: string | null;
 		standardPriceCents?: number | null;
 		extendedPriceCents?: number | null;
+		/** @deprecated */
+		saleEnabled?: boolean;
 	} | null;
 };
 
@@ -175,6 +181,27 @@ export function setAdobeInStockSettings(
 		}
 	};
 	return { ...base, agencies } as Record<string, unknown>;
+}
+
+/** Culoca-Lizenz-Freigabe in stock_settings (Adobe/rest unverändert). */
+export function setCulocaInStockSettings(
+	existingStock: unknown,
+	culoca: CulocaSaleSettings
+): Record<string, unknown> {
+	const base = parseItemStockSettings(existingStock);
+	const prev = parseItemStockSettings(existingStock).culoca;
+	const parsedPrev = prev ? parseCulocaSaleSettings(prev) : null;
+	return {
+		...base,
+		culoca: {
+			...(parsedPrev ?? {}),
+			saleApproved: culoca.saleApproved === true,
+			saleApprovedAt: culoca.saleApprovedAt ?? null,
+			saleApprovedBy: culoca.saleApprovedBy ?? null,
+			standardPriceCents: culoca.standardPriceCents ?? parsedPrev?.standardPriceCents ?? null,
+			extendedPriceCents: culoca.extendedPriceCents ?? parsedPrev?.extendedPriceCents ?? null
+		}
+	} as Record<string, unknown>;
 }
 
 /**

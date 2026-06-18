@@ -4,9 +4,16 @@
   import { extractPhotoMetadataFields } from '$lib/metadata/photoMetadata';
   import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
   import { slugifySegment } from '$lib/content/routing';
+  import { getCulocaFromStockSettings } from '$lib/licensing/tiers';
 
   export let item: any;
   export let title = 'Stock-Einstellungen';
+  /** Eigentümer — Adobe-Bereich */
+  export let isItemOwner = true;
+  /** Culoca-Lizenz-Kurator (DIRSCHL) */
+  export let canManageCulocaLicense = false;
+  /** Ersteller hat culoca_licensing_opt_in (für Kurator-Hinweis) */
+  export let creatorLicensingOptIn = false;
 
   const dispatch = createEventDispatcher<{
     close: void;
@@ -20,9 +27,12 @@
   let busy: 'save' | 'upload' | 'reset' | '' = '';
   let flash = '';
   let syncKey = '';
+  let culocaSaleApproved = false;
+  let culocaBusy = false;
 
+  $: culocaSettings = getCulocaFromStockSettings(item?.stock_settings);
   $: {
-    const nextKey = `${item?.id || ''}:${item?.adobe_stock_url || ''}:${item?.adobe_stock_asset_id || ''}`;
+    const nextKey = `${item?.id || ''}:${item?.adobe_stock_url || ''}:${item?.adobe_stock_asset_id || ''}:${culocaSettings?.saleApproved ? '1' : '0'}`;
     if (nextKey !== syncKey) {
       syncKey = nextKey;
       stockUrl = item?.adobe_stock_url || '';
@@ -30,6 +40,7 @@
       metadataMode = 'culoca';
       filenameMode = 'web';
       flash = '';
+      culocaSaleApproved = culocaSettings?.saleApproved === true;
     }
   }
 
@@ -184,6 +195,28 @@
       busy = '';
     }
   }
+
+  async function saveCulocaLicenseApproval() {
+    if (!item?.id || !canManageCulocaLicense) return;
+    culocaBusy = true;
+    flash = '';
+    try {
+      const res = await authFetch('/api/licensing/item-approval', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ itemId: item.id, saleApproved: culocaSaleApproved })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.message || data?.error || 'Freigabe fehlgeschlagen');
+      }
+      applyUpdatedItem(data, data?.message || 'Culoca-Lizenz gespeichert');
+    } catch (e) {
+      flash = e instanceof Error ? e.message : 'Freigabe fehlgeschlagen';
+    } finally {
+      culocaBusy = false;
+    }
+  }
 </script>
 
 <div class="stock-overlay-backdrop" role="presentation" on:click={handleBackdropClick}>
@@ -201,16 +234,25 @@
     </p>
 
     <div class="stock-overlay-meta">
-      <span>Status: <code>{item?.adobe_stock_status || 'none'}</code></span>
-      {#if item?.adobe_stock_uploaded_at}
-        <span>Upload: {new Date(item.adobe_stock_uploaded_at).toLocaleString('de-DE')}</span>
+      {#if isItemOwner}
+        <span>Status: <code>{item?.adobe_stock_status || 'none'}</code></span>
+        {#if item?.adobe_stock_uploaded_at}
+          <span>Upload: {new Date(item.adobe_stock_uploaded_at).toLocaleString('de-DE')}</span>
+        {/if}
+      {/if}
+      {#if canManageCulocaLicense}
+        <span>
+          Culoca-Shop:
+          <code>{culocaSaleApproved ? 'freigegeben' : 'nicht freigegeben'}</code>
+        </span>
       {/if}
     </div>
 
-    {#if item?.adobe_stock_error}
+    {#if isItemOwner && item?.adobe_stock_error}
       <p class="stock-overlay-error">{item.adobe_stock_error}</p>
     {/if}
 
+    {#if isItemOwner}
     <label class="stock-overlay-label">
       <span>Öffentliche Stock-URL</span>
       <input type="url" bind:value={stockUrl} placeholder="https://stock.adobe.com/..." />
@@ -269,14 +311,50 @@
       </button>
     </div>
 
-    {#if flash}
-      <p class="stock-overlay-flash">{flash}</p>
-    {/if}
-
-    {#if item?.adobe_stock_url}
+    {#if item?.adobe_stock_url && isItemOwner}
       <a class="stock-overlay-link" href={item.adobe_stock_url} target="_blank" rel="noopener noreferrer">
         Link öffnen
       </a>
+    {/if}
+    {/if}
+
+    {#if canManageCulocaLicense}
+      <section class="stock-upload-config culoca-license-block">
+        <h4>Culoca-Lizenzverkauf</h4>
+        {#if !isItemOwner && !creatorLicensingOptIn}
+          <p class="stock-overlay-note stock-overlay-warning">
+            Der Ersteller hat dem Lizenzverkauf über Culoca noch nicht zugestimmt (Profil-Einstellung).
+            Freigabe ist erst nach Opt-in möglich.
+          </p>
+        {:else}
+          <p class="stock-overlay-note">
+            Nur freigegebene Bilder erscheinen im Shop. Ersteller-Zustimmung und Einzelfreigabe sind
+            erforderlich.
+          </p>
+          <label class="stock-choice culoca-approve-row">
+            <input
+              type="checkbox"
+              bind:checked={culocaSaleApproved}
+              disabled={!isItemOwner && !creatorLicensingOptIn}
+            />
+            <span>Für Culoca-Shop freigeben (Standard/Erweiterte Lizenz)</span>
+          </label>
+          <div class="stock-overlay-actions">
+            <button
+              type="button"
+              class="primary-btn"
+              on:click={saveCulocaLicenseApproval}
+              disabled={culocaBusy || (!isItemOwner && !creatorLicensingOptIn)}
+            >
+              {culocaBusy ? 'Speichert…' : 'Lizenz-Freigabe speichern'}
+            </button>
+          </div>
+        {/if}
+      </section>
+    {/if}
+
+    {#if flash}
+      <p class="stock-overlay-flash">{flash}</p>
     {/if}
   </section>
 </div>
@@ -291,6 +369,21 @@
     justify-content: center;
     align-items: flex-start;
     padding: 4rem 1rem 1rem;
+  }
+  .stock-overlay-warning {
+    color: #f59e0b;
+    border-left: 3px solid #f59e0b;
+    padding-left: 0.65rem;
+  }
+
+  .culoca-license-block {
+    margin-top: 0.5rem;
+    border-top: 1px solid var(--border-color);
+    padding-top: 0.75rem;
+  }
+
+  .culoca-approve-row {
+    margin-top: 0.5rem;
   }
   .stock-overlay-panel {
     width: min(760px, 100%);

@@ -1,6 +1,7 @@
 export const PROFILE_SECTION_IDS = [
 	'basics',
 	'attribution',
+	'licensing',
 	'privacy',
 	'gps',
 	'contact',

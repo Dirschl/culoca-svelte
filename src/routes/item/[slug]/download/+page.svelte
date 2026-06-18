@@ -13,12 +13,15 @@
 	import { extractPhotoMetadataFields } from '$lib/metadata/photoMetadata';
 	import { getPublicItemHref, slugifySegment } from '$lib/content/routing';
 	import LicensePurchasePanel from '$lib/licensing/LicensePurchasePanel.svelte';
+	import LicenseRequestPanel from '$lib/licensing/LicenseRequestPanel.svelte';
 	import {
 		getTierPriceCents,
 		isItemForSale,
+		canRequestLicense,
 		LICENSE_TIER_DESCRIPTIONS,
 		LICENSE_TIER_LABELS
 	} from '$lib/licensing/tiers';
+	import { LICENSE_CURATOR_USER_ID } from '$lib/licensing/curator';
 	import { DEFAULT_CONTENT_TYPES } from '$lib/content/types';
 
 	export let data: any;
@@ -161,15 +164,31 @@
 		standard: $page.data.culocaSales?.standardPriceCents ?? 2900,
 		extended: $page.data.culocaSales?.extendedPriceCents ?? 9900
 	};
+	$: creatorLicensingOptIn =
+		image?.profile_id === LICENSE_CURATOR_USER_ID ||
+		image?.profile?.culoca_licensing_opt_in === true;
+	$: saleEligibilityOptions = {
+		salesGloballyEnabled: culocaSalesGloballyEnabled,
+		fotoTypeId,
+		creatorLicensingOptIn,
+		curatorUserId: LICENSE_CURATOR_USER_ID
+	};
 	$: showLicensePurchase =
 		!isCreator &&
 		!canDownload &&
 		!$unifiedRightsStore.loading &&
 		!!image?.id &&
-		isItemForSale(image, {
-			salesGloballyEnabled: culocaSalesGloballyEnabled,
-			fotoTypeId
-		});
+		isItemForSale(image, saleEligibilityOptions);
+	$: showLicenseRequest =
+		!isCreator &&
+		!canDownload &&
+		!$unifiedRightsStore.loading &&
+		!!image?.id &&
+		canRequestLicense(image, {
+			...saleEligibilityOptions,
+			isViewerCreator: isCreator
+		}) &&
+		!!(image?.profile_id || image?.profile?.id);
 	$: licenseStandardPrice = image
 		? getTierPriceCents('standard', image, culocaSalesPriceDefaults)
 		: culocaSalesPriceDefaults.standard;
@@ -1357,6 +1376,15 @@
 					salesEnabled={true}
 					standardPriceCents={licenseStandardPrice}
 					extendedPriceCents={licenseExtendedPrice}
+					compact
+				/>
+			{/if}
+			{#if showLicenseRequest}
+				<LicenseRequestPanel
+					itemId={image.id}
+					itemTitle={image.title || ''}
+					creatorUserId={image.profile_id || image.profile?.id || null}
+					compact
 				/>
 			{/if}
 

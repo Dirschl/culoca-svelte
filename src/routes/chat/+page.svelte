@@ -433,8 +433,9 @@
     const chatWith = ($page.url.searchParams.get('chatWith') || '').trim();
     const conversationId = ($page.url.searchParams.get('conversation') || '').trim();
     const itemId = ($page.url.searchParams.get('item') || '').trim() || null;
+    const draft = ($page.url.searchParams.get('draft') || '').trim();
     // Kein conversations.length: sonst mehrfache Läufe nach loadChatData / neue Conversation
-    const intentKey = `${currentUserId}:${chatWith}:${conversationId}:${itemId}`;
+    const intentKey = `${currentUserId}:${chatWith}:${conversationId}:${itemId}:${draft}`;
 
     if (intentKey === handledConversationIntentKey) return;
     handledConversationIntentKey = intentKey;
@@ -444,6 +445,9 @@
       const conversation = await ensureConversation(chatWith, itemId);
       if (conversation) {
         await selectConversation(conversation, false);
+        if (draft) {
+          messageDraft = draft;
+        }
         await tick();
         requestAnimationFrame(() => {
           composeTextarea?.focus();

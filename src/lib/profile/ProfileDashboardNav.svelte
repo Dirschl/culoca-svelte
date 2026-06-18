@@ -46,6 +46,22 @@
 	<button
 		type="button"
 		class="dashboard-menu__link"
+		class:is-active={active === 'licensing'}
+		on:click={() => select('licensing')}
+	>
+		<span class="dashboard-menu__label">
+			<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+				<path
+					d="M7 2h10a2 2 0 0 1 2 2v16l-7-3.5L5 20V4a2 2 0 0 1 2-2zm0 2v13.25l5-2.5 5 2.5V4H7zm2 2h6v2H9V6zm0 4h6v2H9v-2z"
+				/>
+			</svg>
+			<span>Bildlizenzen</span>
+		</span>
+	</button>
+
+	<button
+		type="button"
+		class="dashboard-menu__link"
 		class:is-active={active === 'privacy'}
 		on:click={() => select('privacy')}
 	>

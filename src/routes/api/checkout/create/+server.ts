@@ -2,12 +2,8 @@ import { error, json, type RequestHandler } from '@sveltejs/kit';
 import { createAuthedSupabaseFromRequest, requireAuthedUser } from '$lib/server/authedSupabase';
 import { getPublicItemDownloadHref } from '$lib/content/routing';
 import { buildItemHeroCdnImageUrl } from '$lib/seo/itemHeroImageUrl';
-import {
-	getTierPriceCents,
-	isItemForSale,
-	LICENSE_TIER_LABELS,
-	type LicenseTier
-} from '$lib/licensing/tiers';
+import { isItemEligibleForSale } from '$lib/server/licensingSale';
+import { getTierPriceCents, LICENSE_TIER_LABELS, type LicenseTier } from '$lib/licensing/tiers';
 import {
 	createLemonCheckout,
 	getLemonSqueezyConfig,
@@ -15,10 +11,7 @@ import {
 	variantIdForTier
 } from '$lib/server/lemonSqueezy';
 import { absoluteUrl } from '$lib/seo/site';
-import { DEFAULT_CONTENT_TYPE_BY_SLUG } from '$lib/content/types';
 import { addToCart } from '$lib/server/licenseCart';
-
-const FOTO_TYPE_ID = DEFAULT_CONTENT_TYPE_BY_SLUG.get('foto')?.id ?? 1;
 
 export const POST: RequestHandler = async ({ request }) => {
 	if (!isCulocaSalesEnabled()) {
@@ -57,7 +50,9 @@ export const POST: RequestHandler = async ({ request }) => {
 		throw error(404, 'Bild nicht gefunden');
 	}
 
-	if (!isItemForSale(item, { salesGloballyEnabled: true, fotoTypeId: FOTO_TYPE_ID })) {
+	if (
+		!(await isItemEligibleForSale(supabase, item, { salesGloballyEnabled: true }))
+	) {
 		throw error(403, 'Dieses Bild ist nicht zum Verkauf freigegeben');
 	}
 

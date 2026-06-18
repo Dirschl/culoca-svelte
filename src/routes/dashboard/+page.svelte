@@ -9,6 +9,7 @@
   import { fetchProfileReviewItems } from '$lib/profile/review';
   import StockSettingsOverlay from '$lib/stock/StockSettingsOverlay.svelte';
   import LicensedPurchasesPanel from '$lib/licensing/LicensedPurchasesPanel.svelte';
+  import { isLicenseCuratorClient } from '$lib/licensing/curator';
   import { authFetch } from '$lib/authFetch';
 
   const PAGE_SIZE = 12;
@@ -1662,6 +1663,9 @@
       <StockSettingsOverlay
         item={stockOverlayItem}
         title="Stock konfigurieren"
+        isItemOwner={true}
+        canManageCulocaLicense={isLicenseCuratorClient(currentUserId)}
+        creatorLicensingOptIn={true}
         on:close={closeStockOverlay}
         on:updated={(e) => mergeStockItemIntoList(e.detail.item)}
       />
