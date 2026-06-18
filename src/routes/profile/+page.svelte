@@ -18,8 +18,9 @@
 	import ProfileSectionSocial from '$lib/profile/sections/ProfileSectionSocial.svelte';
 	import type { ProfileSection } from '$lib/profile/profileSection';
 	import { isProfileSection } from '$lib/profile/profileSection';
-	import { isLicenseCuratorClient } from '$lib/licensing/curator';
+	import { userHasAutoApproveCapability } from '$lib/licensing/shopApproval';
 	import { formatProfileSaveError, upsertProfileRow } from '$lib/profile/upsertProfileRow';
+	import { userPermissions } from '$lib/sessionStore';
 
 	let user: any = null;
 	let profile: any = null;
@@ -71,6 +72,7 @@
 	let public_contact_name = '';
 	let culoca_licensing_opt_in = false;
 	let culoca_licensing_opt_in_prev = false;
+	let culoca_licensing_auto_approve = false;
 
 	// GPS Tracking Settings
 	let homeLat = '';
@@ -104,6 +106,7 @@
 	let messageListElement: HTMLDivElement | null = null;
 
 	$: nameValid = name.length >= 2 && name.length <= 60;
+	$: canAutoApproveLicenses = userHasAutoApproveCapability($userPermissions);
 	$: phoneValid = phone.length === 0 || /^\+?[0-9\- ]{7,20}$/.test(phone);
 	$: websiteValid = website.length === 0 || website.startsWith('http');
 	$: instagramValid = instagram.length === 0 || instagram.startsWith('https://');
@@ -314,6 +317,7 @@
 				public_contact_name = data.public_contact_name ?? '';
 				culoca_licensing_opt_in = data.culoca_licensing_opt_in === true;
 				culoca_licensing_opt_in_prev = culoca_licensing_opt_in;
+				culoca_licensing_auto_approve = data.culoca_licensing_auto_approve === true;
 
 				// Load GPS settings
 				homeLat = data.home_lat ? data.home_lat.toString() : '';
@@ -1120,7 +1124,10 @@
 				culoca_licensing_opt_in,
 				...(culoca_licensing_opt_in && !culoca_licensing_opt_in_prev
 					? { culoca_licensing_opt_in_at: new Date().toISOString() }
-					: {})
+					: {}),
+				...(canAutoApproveLicenses
+					? { culoca_licensing_auto_approve: culoca_licensing_opt_in && culoca_licensing_auto_approve }
+					: { culoca_licensing_auto_approve: false })
 			};
 
 			// Update profile
@@ -1482,7 +1489,8 @@
 					>
 						<ProfileSectionLicensing
 							bind:culoca_licensing_opt_in
-							isLicenseCuratorProfile={isLicenseCuratorClient(user?.id)}
+							bind:culoca_licensing_auto_approve
+							{canAutoApproveLicenses}
 						/>
 					</div>
 

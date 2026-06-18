@@ -10,6 +10,11 @@
   import StockSettingsOverlay from '$lib/stock/StockSettingsOverlay.svelte';
   import LicensedPurchasesPanel from '$lib/licensing/LicensedPurchasesPanel.svelte';
   import { isLicenseCuratorClient } from '$lib/licensing/curator';
+  import {
+    userHasAutoApproveCapability,
+    MANAGE_CULOCA_LICENSING_PERMISSION
+  } from '$lib/licensing/shopApproval';
+  import { userPermissions } from '$lib/sessionStore';
   import { authFetch } from '$lib/authFetch';
 
   const PAGE_SIZE = 12;
@@ -88,6 +93,8 @@
 
   let stockOverlayItem: any = null;
   let stockItemParamId = '';
+  let profileLicensingOptIn = false;
+  let profileAutoApprove = false;
   let licenseCount = 0;
   let licensesPanel: LicensedPurchasesPanel | null = null;
   let showLicensePurchaseSuccess = false;
@@ -95,6 +102,23 @@
   $: totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
   $: canPrev = currentPage > 1;
   $: canNext = currentPage < totalPages;
+
+  $: canManageCulocaLicensing =
+    isLicenseCuratorClient(currentUserId) ||
+    $userPermissions?.[MANAGE_CULOCA_LICENSING_PERMISSION] === true;
+  $: ownerCanEditShopApproval =
+    profileAutoApprove && userHasAutoApproveCapability($userPermissions);
+
+  async function loadProfileLicensing() {
+    if (!currentUserId) return;
+    const { data } = await supabase
+      .from('profiles')
+      .select('culoca_licensing_opt_in, culoca_licensing_auto_approve')
+      .eq('id', currentUserId)
+      .maybeSingle();
+    profileLicensingOptIn = data?.culoca_licensing_opt_in === true;
+    profileAutoApprove = data?.culoca_licensing_auto_approve === true;
+  }
 
   /** Hinweise im Menü: Fehler, Review, Upload-Probleme. */
   $: stockAttentionCount = allItems.filter(
@@ -922,6 +946,7 @@
         restLoading = false;
         return;
       }
+      await loadProfileLicensing();
       const sectionParam = new URL(window.location.href).searchParams.get('section');
       if (sectionParam && isDashboardSectionId(sectionParam)) {
         activeSection = sectionParam;
@@ -1664,8 +1689,10 @@
         item={stockOverlayItem}
         title="Stock konfigurieren"
         isItemOwner={true}
-        canManageCulocaLicense={isLicenseCuratorClient(currentUserId)}
-        creatorLicensingOptIn={true}
+        canManageCulocaLicense={canManageCulocaLicensing}
+        canEditOwnShopApproval={ownerCanEditShopApproval}
+        creatorAutoApprove={profileAutoApprove}
+        creatorLicensingOptIn={profileLicensingOptIn}
         on:close={closeStockOverlay}
         on:updated={(e) => mergeStockItemIntoList(e.detail.item)}
       />

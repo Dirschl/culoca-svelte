@@ -4,16 +4,21 @@
   import { extractPhotoMetadataFields } from '$lib/metadata/photoMetadata';
   import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
   import { slugifySegment } from '$lib/content/routing';
-  import { getCulocaFromStockSettings } from '$lib/licensing/tiers';
+  import { getCulocaFromStockSettings, resolveItemShopApproved } from '$lib/licensing/tiers';
 
   export let item: any;
   export let title = 'Stock-Einstellungen';
   /** Eigentümer — Adobe-Bereich */
   export let isItemOwner = true;
-  /** Culoca-Lizenz-Kurator (DIRSCHL) */
+  /** Culoca-Lizenz-Kurator (fremde Bilder freigeben) */
   export let canManageCulocaLicense = false;
+  /** Eigentümer mit Autofreigabe — eigenes Bild im Shop ein/aus */
+  export let canEditOwnShopApproval = false;
+  export let creatorAutoApprove = false;
   /** Ersteller hat culoca_licensing_opt_in (für Kurator-Hinweis) */
   export let creatorLicensingOptIn = false;
+
+  $: canEditCulocaShop = canManageCulocaLicense || canEditOwnShopApproval;
 
   const dispatch = createEventDispatcher<{
     close: void;
@@ -31,8 +36,9 @@
   let culocaBusy = false;
 
   $: culocaSettings = getCulocaFromStockSettings(item?.stock_settings);
+  $: culocaShopActive = resolveItemShopApproved(item?.stock_settings, creatorAutoApprove);
   $: {
-    const nextKey = `${item?.id || ''}:${item?.adobe_stock_url || ''}:${item?.adobe_stock_asset_id || ''}:${culocaSettings?.saleApproved ? '1' : '0'}`;
+    const nextKey = `${item?.id || ''}:${item?.adobe_stock_url || ''}:${item?.adobe_stock_asset_id || ''}:${culocaShopActive ? '1' : '0'}`;
     if (nextKey !== syncKey) {
       syncKey = nextKey;
       stockUrl = item?.adobe_stock_url || '';
@@ -40,7 +46,7 @@
       metadataMode = 'culoca';
       filenameMode = 'web';
       flash = '';
-      culocaSaleApproved = culocaSettings?.saleApproved === true;
+      culocaSaleApproved = culocaShopActive;
     }
   }
 
@@ -197,7 +203,7 @@
   }
 
   async function saveCulocaLicenseApproval() {
-    if (!item?.id || !canManageCulocaLicense) return;
+    if (!item?.id || !canEditCulocaShop) return;
     culocaBusy = true;
     flash = '';
     try {
@@ -240,10 +246,10 @@
           <span>Upload: {new Date(item.adobe_stock_uploaded_at).toLocaleString('de-DE')}</span>
         {/if}
       {/if}
-      {#if canManageCulocaLicense}
+      {#if canEditCulocaShop}
         <span>
           Culoca-Shop:
-          <code>{culocaSaleApproved ? 'freigegeben' : 'nicht freigegeben'}</code>
+          <code>{culocaShopActive ? 'freigegeben' : 'nicht freigegeben'}</code>
         </span>
       {/if}
     </div>
@@ -318,7 +324,7 @@
     {/if}
     {/if}
 
-    {#if canManageCulocaLicense}
+    {#if canEditCulocaShop}
       <section class="stock-upload-config culoca-license-block">
         <h4>Culoca-Lizenzverkauf</h4>
         {#if !isItemOwner && !creatorLicensingOptIn}
@@ -326,9 +332,28 @@
             Der Ersteller hat dem Lizenzverkauf über Culoca noch nicht zugestimmt (Profil-Einstellung).
             Freigabe ist erst nach Opt-in möglich.
           </p>
+        {:else if canEditOwnShopApproval && !canManageCulocaLicense}
+          <p class="stock-overlay-note">
+            Mit Autofreigabe sind Ihre Bilder standardmäßig im Shop. Deaktivieren Sie hier einzelne
+            Ausnahmen.
+          </p>
+          <label class="stock-choice culoca-approve-row">
+            <input type="checkbox" bind:checked={culocaSaleApproved} />
+            <span>Im Culoca-Shop anbieten (Standard/Erweiterte Lizenz)</span>
+          </label>
+          <div class="stock-overlay-actions">
+            <button
+              type="button"
+              class="primary-btn"
+              on:click={saveCulocaLicenseApproval}
+              disabled={culocaBusy}
+            >
+              {culocaBusy ? 'Speichert…' : 'Shop-Freigabe speichern'}
+            </button>
+          </div>
         {:else}
           <p class="stock-overlay-note">
-            Nur freigegebene Bilder erscheinen im Shop. Ersteller-Zustimmung und Einzelfreigabe sind
+            Nur freigegebene Bilder erscheinen im Shop. Ersteller-Zustimmung und Freigabe sind
             erforderlich.
           </p>
           <label class="stock-choice culoca-approve-row">

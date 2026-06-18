@@ -1,7 +1,12 @@
 import { error, json, type RequestHandler } from '@sveltejs/kit';
 import { createAuthedSupabaseFromRequest, requireAuthedUser } from '$lib/server/authedSupabase';
 import { isLicenseCurator } from '$lib/licensing/curator';
-import { getCreatorLicensingOptIn } from '$lib/server/licensingSale';
+import { MANAGE_CULOCA_LICENSING_PERMISSION } from '$lib/licensing/shopApproval';
+import {
+	getCreatorAutoApprove,
+	getCreatorLicensingOptIn,
+	userHasPermission
+} from '$lib/server/licensingSale';
 import {
 	enrichItemWithResolvedAdobeStock,
 	setCulocaInStockSettings
@@ -10,10 +15,6 @@ import {
 export const POST: RequestHandler = async ({ request }) => {
 	const supabase = createAuthedSupabaseFromRequest(request);
 	const user = await requireAuthedUser(supabase);
-
-	if (!isLicenseCurator(user.id)) {
-		throw error(403, 'Nur der Culoca-Lizenz-Kurator darf Verkaufsfreigaben setzen.');
-	}
 
 	const body = await request.json().catch(() => ({}));
 	const itemId = typeof body?.itemId === 'string' ? body.itemId : '';
@@ -35,12 +36,25 @@ export const POST: RequestHandler = async ({ request }) => {
 		throw error(404, 'Bild nicht gefunden');
 	}
 
+	const isCurator =
+		isLicenseCurator(user.id) ||
+		(await userHasPermission(supabase, user.id, MANAGE_CULOCA_LICENSING_PERMISSION));
+	const isOwner = item.profile_id === user.id;
+	const ownerAutoApprove = isOwner && (await getCreatorAutoApprove(supabase, user.id));
+
+	if (!isCurator && !ownerAutoApprove) {
+		throw error(
+			403,
+			'Keine Berechtigung: Nur der Culoca-Lizenz-Kurator oder Ersteller mit Autofreigabe dürfen die Shop-Freigabe setzen.'
+		);
+	}
+
 	if (saleApproved) {
 		const optIn = await getCreatorLicensingOptIn(supabase, item.profile_id);
 		if (!optIn) {
 			throw error(
 				409,
-				'Der Ersteller hat dem Culoca-Lizenzverkauf noch nicht zugestimmt. Bitte zuerst Opt-in abwarten.'
+				'Der Ersteller hat dem Culoca-Lizenzverkauf noch nicht zugestimmt. Bitte zuerst Opt-in im Profil abwarten.'
 			);
 		}
 	}

@@ -44,8 +44,10 @@
 	import { buildAcquireLicensePageUrl, buildImageLicenseUrl } from '$lib/seo/licenseUrls';
 	import LicensePurchasePanel from '$lib/licensing/LicensePurchasePanel.svelte';
 	import LicenseRequestPanel from '$lib/licensing/LicenseRequestPanel.svelte';
-	import { getTierPriceCents, isItemForSale, canRequestLicense, isCulocaSaleApproved } from '$lib/licensing/tiers';
-	import { isLicenseCuratorClient, LICENSE_CURATOR_USER_ID } from '$lib/licensing/curator';
+	import { getTierPriceCents, isItemForSale, canRequestLicense, resolveItemShopApproved } from '$lib/licensing/tiers';
+	import { isLicenseCuratorClient } from '$lib/licensing/curator';
+	import { userHasAutoApproveCapability, MANAGE_CULOCA_LICENSING_PERMISSION } from '$lib/licensing/shopApproval';
+	import { userPermissions } from '$lib/sessionStore';
 	import {
 		getAdministrativeHierarchy,
 		normalizeAdminDisplayLabel
@@ -446,15 +448,16 @@
 		extended: $page.data.culocaSales?.extendedPriceCents ?? 9900
 	};
 	$: isLicenseCuratorUser = isLicenseCuratorClient(currentUser?.id);
-	$: creatorLicensingOptIn =
-		image?.profile_id === LICENSE_CURATOR_USER_ID ||
-		image?.profile?.culoca_licensing_opt_in === true ||
-		isCulocaSaleApproved(image?.stock_settings);
+	$: canManageCulocaLicensing =
+		isLicenseCuratorUser || $userPermissions?.[MANAGE_CULOCA_LICENSING_PERMISSION] === true;
+	$: creatorLicensingOptIn = image?.profile?.culoca_licensing_opt_in === true;
+	$: creatorAutoApprove = image?.profile?.culoca_licensing_auto_approve === true;
+	$: itemShopApproved = resolveItemShopApproved(image?.stock_settings, creatorAutoApprove);
 	$: saleEligibilityOptions = {
 		salesGloballyEnabled: culocaSalesGloballyEnabled,
 		fotoTypeId,
 		creatorLicensingOptIn,
-		curatorUserId: LICENSE_CURATOR_USER_ID
+		creatorAutoApprove
 	};
 	$: itemEligibleForSale =
 		contentType?.slug === 'foto' && !!image?.id && isItemForSale(image, saleEligibilityOptions);
@@ -464,7 +467,7 @@
 		isItemOwner &&
 		!(canEditItem && editMode) &&
 		culocaSalesGloballyEnabled &&
-		isCulocaSaleApproved(image?.stock_settings) &&
+		itemShopApproved &&
 		creatorLicensingOptIn;
 	$: showLicensePurchase =
 		itemEligibleForSale && !isItemOwner && !(canEditItem && editMode);
@@ -485,7 +488,9 @@
 		isItemOwner &&
 		culocaSalesGloballyEnabled &&
 		creatorLicensingOptIn &&
-		!isCulocaSaleApproved(image?.stock_settings);
+		!itemShopApproved;
+	$: ownerCanEditShopApproval =
+		isItemOwner && creatorAutoApprove && userHasAutoApproveCapability($userPermissions);
 	$: licenseStandardPrice = image
 		? getTierPriceCents('standard', image, culocaSalesPriceDefaults)
 		: culocaSalesPriceDefaults.standard;
@@ -4688,7 +4693,7 @@
 						replaceOriginalFile={replaceOriginalImage}
 					/>
 
-					{#if isCreator || isLicenseCuratorUser}
+					{#if isCreator || canManageCulocaLicensing}
 						<p class="stock-dashboard-hint">
 							<button
 								type="button"
@@ -4708,7 +4713,10 @@
 						</p>
 						{#if showLicenseSalePendingHint}
 							<p class="license-sale-pending-hint">
-								{#if isLicenseCuratorUser}
+								{#if ownerCanEditShopApproval}
+									Dieses Bild ist vom Shop ausgeschlossen. Unter „Stock konfigurieren“ können Sie es
+									wieder freigeben.
+								{:else if canManageCulocaLicensing}
 									Lizenzverkauf ist erlaubt, dieses Bild ist aber noch nicht shop-freigegeben. Unter
 									„Stock konfigurieren“ → „Für Culoca-Shop freigeben“ aktivieren.
 								{:else}
@@ -5311,12 +5319,14 @@
 			</button>
 		{/if}
 	{/key}
-	{#if showStockSettingsOverlay && image?.id && (isCreator || isLicenseCuratorUser)}
+	{#if showStockSettingsOverlay && image?.id && (isCreator || canManageCulocaLicensing)}
 		<StockSettingsOverlay
 			item={image}
-			title={isLicenseCuratorUser && !isCreator ? 'Lizenz & Stock' : 'Stock konfigurieren'}
+			title={canManageCulocaLicensing && !isCreator ? 'Lizenz & Stock' : 'Stock konfigurieren'}
 			isItemOwner={isCreator}
-			canManageCulocaLicense={isLicenseCuratorUser}
+			canManageCulocaLicense={canManageCulocaLicensing}
+			canEditOwnShopApproval={ownerCanEditShopApproval}
+			creatorAutoApprove={creatorAutoApprove}
 			creatorLicensingOptIn={creatorLicensingOptIn}
 			on:close={() => (showStockSettingsOverlay = false)}
 			on:updated={(e) => (image = mergeItemFromApiPatch(image, e.detail.item))}
@@ -6513,6 +6523,10 @@
 		font-size: 0.92rem;
 		color: var(--text-secondary);
 		line-height: 1.45;
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 0.75rem;
 	}
 	.stock-dashboard-hint a {
 		color: var(--culoca-orange, #ee7221);
@@ -6526,7 +6540,6 @@
 		border-radius: 8px;
 		padding: 0.38rem 0.68rem;
 		font: inherit;
-		margin-right: 0.55rem;
 		cursor: pointer;
 	}
 	.stock-dashboard-hint a:hover {

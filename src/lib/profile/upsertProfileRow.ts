@@ -1,6 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-const LICENSING_ONLY_KEYS = ['culoca_licensing_opt_in', 'culoca_licensing_opt_in_at'] as const;
+const LICENSING_ONLY_KEYS = [
+	'culoca_licensing_opt_in',
+	'culoca_licensing_opt_in_at',
+	'culoca_licensing_auto_approve'
+] as const;
 
 function isMissingColumnError(error: { message?: string; code?: string } | null, column: string) {
 	if (!error?.message) return false;

@@ -23,6 +23,8 @@ export interface UserPermissions {
   system_settings?: boolean;
   public_content?: boolean;
   gps_tracking?: boolean;
+  manage_culoca_licensing?: boolean;
+  culoca_license_auto_approve?: boolean;
 }
 
 export interface UserRole {

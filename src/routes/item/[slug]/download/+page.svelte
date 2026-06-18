@@ -21,7 +21,6 @@
 		LICENSE_TIER_DESCRIPTIONS,
 		LICENSE_TIER_LABELS
 	} from '$lib/licensing/tiers';
-	import { LICENSE_CURATOR_USER_ID } from '$lib/licensing/curator';
 	import { DEFAULT_CONTENT_TYPES } from '$lib/content/types';
 
 	export let data: any;
@@ -164,14 +163,13 @@
 		standard: $page.data.culocaSales?.standardPriceCents ?? 2900,
 		extended: $page.data.culocaSales?.extendedPriceCents ?? 9900
 	};
-	$: creatorLicensingOptIn =
-		image?.profile_id === LICENSE_CURATOR_USER_ID ||
-		image?.profile?.culoca_licensing_opt_in === true;
+	$: creatorLicensingOptIn = image?.profile?.culoca_licensing_opt_in === true;
+	$: creatorAutoApprove = image?.profile?.culoca_licensing_auto_approve === true;
 	$: saleEligibilityOptions = {
 		salesGloballyEnabled: culocaSalesGloballyEnabled,
 		fotoTypeId,
 		creatorLicensingOptIn,
-		curatorUserId: LICENSE_CURATOR_USER_ID
+		creatorAutoApprove
 	};
 	$: showLicensePurchase =
 		!isCreator &&

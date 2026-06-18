@@ -3,6 +3,8 @@
  * stock_settings.culoca: Kurator-Freigabe pro Bild.
  */
 
+import { resolveItemShopApproved } from './shopApproval';
+
 export type LicenseTier = 'standard' | 'extended';
 
 export type CulocaSaleSettings = {
@@ -59,6 +61,8 @@ export function isCulocaSaleApproved(stockSettings: unknown): boolean {
 	return getCulocaFromStockSettings(stockSettings)?.saleApproved === true;
 }
 
+export { resolveItemShopApproved, isExplicitShopOptOut } from './shopApproval';
+
 export type ItemForSaleInput = {
 	is_private?: boolean | null;
 	type_id?: number | null;
@@ -69,27 +73,25 @@ export type ItemForSaleInput = {
 export type ItemForSaleOptions = {
 	salesGloballyEnabled: boolean;
 	fotoTypeId: number;
-	/** Profil culoca_licensing_opt_in oder Kurator als Ersteller */
+	/** Profil culoca_licensing_opt_in */
 	creatorLicensingOptIn: boolean;
-	curatorUserId: string;
+	/** Eigene Bilder standardmäßig shop-freigegeben (Profil + Rollenrecht) */
+	creatorAutoApprove?: boolean;
+	/** @deprecated Nicht mehr für Freigabe-Logik verwendet */
+	curatorUserId?: string;
 };
 
 /**
- * Bild ist kaufbar nur wenn: global an, öffentliches Foto, Ersteller-Opt-in (oder Kurator),
- * und Kurator hat saleApproved gesetzt.
+ * Bild ist kaufbar wenn: global an, öffentliches Foto, Ersteller-Opt-in,
+ * und shop-freigegeben (Kurator-Freigabe oder Autofreigabe ohne Opt-out).
  */
 export function isItemForSale(item: ItemForSaleInput, options: ItemForSaleOptions): boolean {
 	if (!options.salesGloballyEnabled) return false;
 	if (item.is_private) return false;
 	if (item.type_id !== options.fotoTypeId) return false;
+	if (!options.creatorLicensingOptIn) return false;
 
-	const profileId = item.profile_id ?? null;
-	const creatorOk =
-		options.creatorLicensingOptIn ||
-		(!!profileId && profileId === options.curatorUserId);
-	if (!creatorOk) return false;
-
-	return isCulocaSaleApproved(item.stock_settings);
+	return resolveItemShopApproved(item.stock_settings, options.creatorAutoApprove === true);
 }
 
 export function getTierPriceCents(
