@@ -200,15 +200,17 @@ async function logDownload(
 	supabase: ReturnType<typeof createAuthedSupabase>,
 	item: DownloadItemRecord,
 	userId: string,
-	downloadType: string
+	downloadType: string,
+	unifiedRights?: { licensed?: boolean } | null
 ) {
 	try {
-		const downloadSource =
-			userId === item.profile_id || userId === item.user_id ? 'owner' : 'rights';
+		const downloadSource = getDownloadLogSource(item, userId, unifiedRights);
+		const legacyType =
+			unifiedRights?.licensed && downloadType === 'full_resolution' ? 'purchased' : downloadType;
 		await supabase.rpc('log_item_download', {
 			p_item_id: item.id,
 			p_user_id: userId,
-			p_download_type: downloadType,
+			p_download_type: legacyType,
 			p_download_source: downloadSource
 		});
 	} catch (logError) {
@@ -295,8 +297,22 @@ function getLegacyDownloadTypeForExport(options: DownloadExportOptions) {
 	return options.sizeMode === 'full' ? 'full_resolution' : 'preview';
 }
 
-function getDownloadEventSource(item: DownloadItemRecord, userId: string) {
-	return userId === item.profile_id || userId === item.user_id ? 'owner' : 'rights';
+function getDownloadLogSource(
+	item: DownloadItemRecord,
+	userId: string,
+	unifiedRights?: { licensed?: boolean } | null
+) {
+	if (userId === item.profile_id || userId === item.user_id) return 'owner';
+	if (unifiedRights?.licensed) return 'purchase';
+	return 'rights';
+}
+
+function getDownloadEventSource(
+	item: DownloadItemRecord,
+	userId: string,
+	unifiedRights?: { licensed?: boolean } | null
+) {
+	return getDownloadLogSource(item, userId, unifiedRights);
 }
 
 function getLegacyFilename(item: DownloadItemRecord) {
@@ -382,7 +398,7 @@ export const GET: RequestHandler = async ({ params, request }) => {
 		const filename = getLegacyFilename(item);
 		const contentType = getLegacyContentType(filename);
 
-		await logDownload(supabase, item, user.id, getLegacyDownloadTypeForRights(unifiedRights));
+		await logDownload(supabase, item, user.id, getLegacyDownloadTypeForRights(unifiedRights), unifiedRights);
 		await createOwnerDownloadNotification(
 			supabase,
 			item,
@@ -402,7 +418,7 @@ export const GET: RequestHandler = async ({ params, request }) => {
 			supabase,
 			item,
 			user.id,
-			getDownloadEventSource(item, user.id),
+			getDownloadEventSource(item, user.id, unifiedRights),
 			getLegacyDownloadTypeForRights(unifiedRights),
 			{
 				sizeMode: 'full',
@@ -463,7 +479,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
 				});
 			}
 
-			await logDownload(supabase, item, user.id, getLegacyDownloadTypeForExport(options));
+			await logDownload(supabase, item, user.id, getLegacyDownloadTypeForExport(options), unifiedRights);
 			await createOwnerDownloadNotification(
 				supabase,
 				item,
@@ -475,7 +491,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
 				supabase,
 				item,
 				user.id,
-				getDownloadEventSource(item, user.id),
+				getDownloadEventSource(item, user.id, unifiedRights),
 				getLegacyDownloadTypeForExport(options),
 				options
 			);
@@ -521,7 +537,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
 
 		try {
 			const rendered = await renderDownloadExport(originalBuffer, item, options);
-			await logDownload(supabase, item, user.id, getLegacyDownloadTypeForExport(options));
+			await logDownload(supabase, item, user.id, getLegacyDownloadTypeForExport(options), unifiedRights);
 			await createOwnerDownloadNotification(
 				supabase,
 				item,
@@ -533,7 +549,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
 				supabase,
 				item,
 				user.id,
-				getDownloadEventSource(item, user.id),
+				getDownloadEventSource(item, user.id, unifiedRights),
 				getLegacyDownloadTypeForExport(options),
 				options
 			);
@@ -559,7 +575,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
 				try {
 					const rewritten = await rewriteJpegMetadataWithoutSharp(originalBuffer, item, options);
 
-					await logDownload(supabase, item, user.id, getLegacyDownloadTypeForExport(options));
+					await logDownload(supabase, item, user.id, getLegacyDownloadTypeForExport(options), unifiedRights);
 					await createOwnerDownloadNotification(
 						supabase,
 						item,
@@ -571,7 +587,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
 						supabase,
 						item,
 						user.id,
-						getDownloadEventSource(item, user.id),
+						getDownloadEventSource(item, user.id, unifiedRights),
 						getLegacyDownloadTypeForExport(options),
 						options
 					);
@@ -603,7 +619,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
 			);
 			const filename = buildDownloadFilename(item, options);
 
-			await logDownload(supabase, item, user.id, getLegacyDownloadTypeForExport(options));
+			await logDownload(supabase, item, user.id, getLegacyDownloadTypeForExport(options), unifiedRights);
 			await createOwnerDownloadNotification(
 				supabase,
 				item,
@@ -615,7 +631,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
 				supabase,
 				item,
 				user.id,
-				getDownloadEventSource(item, user.id),
+				getDownloadEventSource(item, user.id, unifiedRights),
 				getLegacyDownloadTypeForExport(options),
 				options
 			);

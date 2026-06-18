@@ -76,6 +76,8 @@
         return 'Interface';
       case 'upload':
         return 'Upload & Adobe Stock';
+      case 'licenses':
+        return 'Meine Lizenzen';
       default:
         return 'Einstellungen';
     }

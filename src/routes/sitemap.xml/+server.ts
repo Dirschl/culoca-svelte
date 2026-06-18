@@ -251,9 +251,7 @@ export const GET: RequestHandler = async () => {
         // This gives Google a meaningful filename instead of UUID-based filenames
         // Note: <image:title> and <image:caption> are deprecated by Google
         // Focus on <image:loc> - the actual URL is what matters for indexing
-        const seoImageUrl = item.path_2048
-          ? `${baseUrl}/images/${item.slug}-2048${fileExtension}`
-          : `${baseUrl}/images/${item.slug}-512${fileExtension}`;
+        const seoImageUrl = `${baseUrl}/images/${item.slug}-2048${fileExtension}`;
         xml += `      <image:loc>${seoImageUrl}</image:loc>\n`;
         
         xml += '    </image:image>\n';

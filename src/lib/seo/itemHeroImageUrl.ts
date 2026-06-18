@@ -15,6 +15,6 @@ export function buildItemHeroCdnImageUrl(item: {
 	if (!imagePath || !item.slug) return null;
 	const extensionMatch = imagePath.match(/\.(jpg|jpeg|webp|png)$/i);
 	const fileExtension = extensionMatch ? extensionMatch[0].toLowerCase() : '.jpg';
-	const sizeSuffix = item.path_2048 ? '2048' : '512';
+	const sizeSuffix = '2048';
 	return `${IMAGES_BASE}/${item.slug}-${sizeSuffix}${fileExtension}`;
 }

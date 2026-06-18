@@ -7,6 +7,11 @@
   import { currentPathWithSearch, sanitizeReturnTo } from '$lib/returnTo';
   import { fetchProfileReviewItems } from '$lib/profile/review';
   import { FOTO_SEARCH_LANDING_PATH } from '$lib/content/routing';
+  import {
+    culocaSalesEnabled,
+    licenseCartCount,
+    refreshLicenseCartCount
+  } from '$lib/licensing/licenseCartStore';
 
   let mobileOpen = false;
   let openDropdown: string | null = null;
@@ -15,6 +20,7 @@
   let inboxActivityCount = 0;
   let followerAlertCount = 0;
   let lastInboxRefreshKey = '';
+  let lastCartRefreshKey = '';
   let liveInboxChannels: any[] = [];
   let liveInboxChannelKey = '';
   let chatDrawerOpen = false;
@@ -61,6 +67,17 @@
     isActive('/profile/freigaben') ||
     ($hasAdminPermission && isAdminRouteActive());
   $: inheritedReturnTo = sanitizeReturnTo($page.url.searchParams.get('returnTo'), currentPathWithSearch($page.url));
+  $: {
+    const cartKey = `${$isAuthenticated ? 'auth' : 'anon'}:${$currentUserId || 'none'}:${culocaSalesEnabled ? 'sales' : 'off'}`;
+    if (cartKey !== lastCartRefreshKey) {
+      lastCartRefreshKey = cartKey;
+      if ($isAuthenticated && culocaSalesEnabled) {
+        void refreshLicenseCartCount();
+      } else {
+        licenseCartCount.set(0);
+      }
+    }
+  }
 
   /** Nachrichten + Aktivität (Benachrichtigungen, nicht Follower / nicht Daten-Review). */
   $: dashboardInboxCount = inboxMessageCount + inboxActivityCount;
@@ -316,11 +333,18 @@
     document.addEventListener('keydown', handleKeydown);
     window.addEventListener('culoca:open-chat', handleOpenChat as EventListener);
     window.addEventListener('culoca:toggle-chat', handleToggleChat as EventListener);
+    const handleCartUpdated = () => {
+      if ($isAuthenticated && culocaSalesEnabled) {
+        void refreshLicenseCartCount();
+      }
+    };
+    window.addEventListener('culoca:cart-updated', handleCartUpdated);
     return () => {
       document.removeEventListener('click', handler);
       document.removeEventListener('keydown', handleKeydown);
       window.removeEventListener('culoca:open-chat', handleOpenChat as EventListener);
       window.removeEventListener('culoca:toggle-chat', handleToggleChat as EventListener);
+      window.removeEventListener('culoca:cart-updated', handleCartUpdated);
       teardownLiveInboxChannels();
     };
   });
@@ -356,6 +380,25 @@
       {#each visibleNavLinks as link}
         <a href={link.href} class="nav-link" class:active={isActive(link.href)} on:click={closeMobile}>{link.label}</a>
       {/each}
+
+      {#if culocaSalesEnabled}
+        <a
+          href={$isAuthenticated ? '/warenkorb' : '/login?returnTo=%2Fwarenkorb'}
+          class="nav-link cart-link"
+          class:active={isActive('/warenkorb')}
+          on:click={closeMobile}
+        >
+          Warenkorb
+          {#if $isAuthenticated && $licenseCartCount > 0}
+            <span
+              class="menu-count-badge menu-count-badge--cart"
+              aria-label={`${$licenseCartCount} Artikel im Warenkorb`}
+            >
+              {$licenseCartCount}
+            </span>
+          {/if}
+        </a>
+      {/if}
 
       <!-- User menu (desktop) -->
       <div class="dropdown desktop-only">
@@ -829,6 +872,17 @@
   .menu-count-badge--follower {
     background: #5b4a9e;
     color: #fff;
+  }
+
+  .menu-count-badge--cart {
+    background: #ee7221;
+    color: #fff;
+  }
+
+  .cart-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
   }
 
   .menu-count-badge--nav-tight {

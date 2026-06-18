@@ -12,6 +12,14 @@
 	import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
 	import { extractPhotoMetadataFields } from '$lib/metadata/photoMetadata';
 	import { getPublicItemHref, slugifySegment } from '$lib/content/routing';
+	import LicensePurchasePanel from '$lib/licensing/LicensePurchasePanel.svelte';
+	import {
+		getTierPriceCents,
+		isItemForSale,
+		LICENSE_TIER_DESCRIPTIONS,
+		LICENSE_TIER_LABELS
+	} from '$lib/licensing/tiers';
+	import { DEFAULT_CONTENT_TYPES } from '$lib/content/types';
 
 	export let data: any;
 
@@ -147,6 +155,27 @@
 		$unifiedRightsStore.rights?.download ||
 		$unifiedRightsStore.rights?.download_original
 	);
+	$: fotoTypeId = DEFAULT_CONTENT_TYPES.find((t) => t.slug === 'foto')?.id ?? 1;
+	$: culocaSalesGloballyEnabled = import.meta.env.PUBLIC_CULOCA_SALES_ENABLED === 'true';
+	$: culocaSalesPriceDefaults = {
+		standard: Number(import.meta.env.PUBLIC_CULOCA_LICENSE_STANDARD_PRICE_CENTS || 2900),
+		extended: Number(import.meta.env.PUBLIC_CULOCA_LICENSE_EXTENDED_PRICE_CENTS || 9900)
+	};
+	$: showLicensePurchase =
+		!isCreator &&
+		!canDownload &&
+		!$unifiedRightsStore.loading &&
+		!!image?.id &&
+		isItemForSale(image, {
+			salesGloballyEnabled: culocaSalesGloballyEnabled,
+			fotoTypeId
+		});
+	$: licenseStandardPrice = image
+		? getTierPriceCents('standard', image, culocaSalesPriceDefaults)
+		: culocaSalesPriceDefaults.standard;
+	$: licenseExtendedPrice = image
+		? getTierPriceCents('extended', image, culocaSalesPriceDefaults)
+		: culocaSalesPriceDefaults.extended;
 	$: previewImageUrl =
 		image?.slug && (image?.path_2048 || image?.path_512)
 			? getSeoImageUrl(
@@ -1204,6 +1233,9 @@
 	}
 
 	onMount(() => {
+		if (browser && $page.url.searchParams.get('purchase') === 'success' && image?.id) {
+			unifiedRightsStore.loadRights(image.id);
+		}
 		cropRect = centeredCropRect(getAspectRatioValue());
 		window.addEventListener('pointermove', handlePointerMove);
 		window.addEventListener('pointerup', handlePointerUp);
@@ -1316,6 +1348,37 @@
 						<span class="error-text">{estimateError}</span>
 					{/if}
 				</div>
+			</section>
+
+			{#if showLicensePurchase}
+				<LicensePurchasePanel
+					itemId={image.id}
+					itemTitle={image.title || ''}
+					salesEnabled={true}
+					standardPriceCents={licenseStandardPrice}
+					extendedPriceCents={licenseExtendedPrice}
+				/>
+			{/if}
+
+			<section id="lizenzbedingungen" class="settings-card license-terms-card">
+				<h2>Lizenz &amp; Kauf</h2>
+				<p>
+					Kommerzielle Nutzung erfolgt über eine erworbene Culoca-Bildlizenz. Rechnung, Steuern und
+					internationale Zahlungsabwicklung übernimmt Lemon Squeezy als Merchant of Record.
+				</p>
+				<ul>
+					<li>
+						<strong>{LICENSE_TIER_LABELS.standard}:</strong>
+						{LICENSE_TIER_DESCRIPTIONS.standard}
+					</li>
+					<li>
+						<strong>{LICENSE_TIER_LABELS.extended}:</strong>
+						{LICENSE_TIER_DESCRIPTIONS.extended}
+					</li>
+				</ul>
+				<p>
+					Details: <a href="/web/license#kommerziell">Allgemeine Lizenzbedingungen</a>
+				</p>
 			</section>
 
 			<section class="settings-card">

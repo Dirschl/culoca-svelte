@@ -31,6 +31,12 @@ export type ItemStockSettings = {
 			error: string | null;
 		}> | null;
 	};
+	/** Culoca-eigener Verkauf (Lemon Squeezy) */
+	culoca?: {
+		saleEnabled?: boolean;
+		standardPriceCents?: number | null;
+		extendedPriceCents?: number | null;
+	} | null;
 };
 
 /** Zurücksetzen nur Adobe-Zweig (FTP/Link), ohne restliches `stock_settings` zu löschen. */

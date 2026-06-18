@@ -162,7 +162,7 @@
   }
 
   function thumbUrl(item: { slug: string; path_512?: string | null; path_2048?: string | null }): string {
-    return getSeoImageUrl(item.slug, pickImagePath(item), '512');
+    return getSeoImageUrl(item.slug, pickImagePath(item), '2048');
   }
 
   function truncate(text: string | null | undefined, max: number): string {
@@ -551,7 +551,7 @@
         return Boolean(variant?.slug && pickImagePath(variant));
       })
       .map((variant: { slug: string; path_512?: string | null; path_2048?: string | null }) =>
-        getSeoImageUrl(variant.slug, pickImagePath(variant), '512')
+        getSeoImageUrl(variant.slug, pickImagePath(variant), '2048')
       )
       .filter((url): url is string => Boolean(url) && url !== rootUrl);
   }

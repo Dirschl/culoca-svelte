@@ -41,6 +41,9 @@
 		buildGeoPlaceGraph,
 		trimText
 	} from '$lib/seo/site';
+	import { buildAcquireLicensePageUrl, buildImageLicenseUrl } from '$lib/seo/licenseUrls';
+	import LicensePurchasePanel from '$lib/licensing/LicensePurchasePanel.svelte';
+	import { getTierPriceCents, isItemForSale } from '$lib/licensing/tiers';
 	import {
 		getAdministrativeHierarchy,
 		normalizeAdminDisplayLabel
@@ -434,6 +437,43 @@
 	// A configured video URL should always render, even if the current type default disables embeds.
 	$: hasVideoEmbed = !!image?.video_url;
 	$: shouldShowMainImage = contentType?.show_image !== false;
+	$: fotoTypeId = DEFAULT_CONTENT_TYPES.find((t) => t.slug === 'foto')?.id ?? 1;
+	$: culocaSalesGloballyEnabled = import.meta.env.PUBLIC_CULOCA_SALES_ENABLED === 'true';
+	$: culocaSalesPriceDefaults = {
+		standard: Number(import.meta.env.PUBLIC_CULOCA_LICENSE_STANDARD_PRICE_CENTS || 2900),
+		extended: Number(import.meta.env.PUBLIC_CULOCA_LICENSE_EXTENDED_PRICE_CENTS || 9900)
+	};
+	$: showLicensePurchase =
+		contentType?.slug === 'foto' &&
+		!!image?.id &&
+		!isCreator &&
+		!(canEditItem && editMode) &&
+		isItemForSale(image, {
+			salesGloballyEnabled: culocaSalesGloballyEnabled,
+			fotoTypeId
+		});
+	$: licenseStandardPrice = image
+		? getTierPriceCents('standard', image, culocaSalesPriceDefaults)
+		: culocaSalesPriceDefaults.standard;
+	$: licenseExtendedPrice = image
+		? getTierPriceCents('extended', image, culocaSalesPriceDefaults)
+		: culocaSalesPriceDefaults.extended;
+	$: itemAcquireLicenseUrl = image ? buildAcquireLicensePageUrl(image) : '';
+	$: itemImageLicenseUrl = image ? buildImageLicenseUrl(image) : '';
+	$: heroSeoDimensions = (() => {
+		if (!image) return { width: 2048, height: 1365 };
+		const originalWidth = image.width || 2048;
+		const originalHeight = image.height || 1365;
+		const maxDimension2048 = 2048;
+		const scale2048 =
+			originalWidth > maxDimension2048 || originalHeight > maxDimension2048
+				? Math.min(maxDimension2048 / originalWidth, maxDimension2048 / originalHeight)
+				: 1;
+		return {
+			width: Math.max(1, Math.min(Math.round(originalWidth * scale2048), maxDimension2048)),
+			height: Math.max(1, Math.min(Math.round(originalHeight * scale2048), maxDimension2048))
+		};
+	})();
 	$: nearbyGalleryOverride = getPageSettingBoolean(image?.page_settings, 'show_nearby_gallery');
 	$: shouldShowNearbyGallery = !!(image?.lat && image?.lon);
 	$: shouldShowMap = !!(contentType?.show_map && image?.lat && image?.lon);
@@ -3559,10 +3599,10 @@
 								: fileExtension === '.png'
 									? 'image/png'
 									: 'image/jpeg',
-						license: attribution?.licenseUrl ?? 'https://culoca.com/web/license',
+						license: itemImageLicenseUrl || attribution?.licenseUrl ?? 'https://culoca.com/web/license',
 						creditText: normalizedCreditText,
 						copyrightNotice: normalizedCopyrightNotice,
-						acquireLicensePage: attribution?.licenseUrl ?? 'https://culoca.com/web/license',
+						acquireLicensePage: itemAcquireLicenseUrl || attribution?.licenseUrl ?? 'https://culoca.com/web/license',
 						creator: {
 							'@type': attribution?.creatorIsOrganization ? 'Organization' : 'Person',
 							name: normalizedSchemaCreatorName
@@ -3630,8 +3670,8 @@
 								src={mainImageSrc}
 								alt={mainImageAlt}
 								class="main-image"
-								width={image.width && image.height ? image.width : undefined}
-								height={image.width && image.height ? image.height : undefined}
+								width={heroSeoDimensions.width}
+								height={heroSeoDimensions.height}
 								loading="eager"
 								decoding="async"
 								fetchpriority="high"
@@ -4042,6 +4082,15 @@
 				onStartChat={startCreatorChat}
 				onToggleGallery={toggleGallery}
 			/>
+			{#if showLicensePurchase}
+				<LicensePurchasePanel
+					itemId={image.id}
+					itemTitle={image.title || ''}
+					salesEnabled={true}
+					standardPriceCents={licenseStandardPrice}
+					extendedPriceCents={licenseExtendedPrice}
+				/>
+			{/if}
 			{#if favoriteStatus}
 				<p class="favorite-status">{favoriteStatus}</p>
 			{/if}

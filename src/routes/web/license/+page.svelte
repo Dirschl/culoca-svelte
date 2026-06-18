@@ -76,6 +76,20 @@
 <InfoPageLayout currentPage="license">
   <h1>Lizenzinformationen</h1>
   
+  <h2 id="kommerziell">Kommerzielle Bildlizenzen (Culoca Shop)</h2>
+  <p>
+    Für die kommerzielle Nutzung einzelner Fotos können Sie auf der jeweiligen Bildseite eine
+    <strong>Standard-</strong> oder <strong>Erweiterte Lizenz</strong> erwerben. Der Kauf erfolgt über
+    <strong>Lemon Squeezy</strong> als Merchant of Record — inklusive Rechnung, Steuerbehandlung und
+    internationaler Zahlungsmethoden. Nach dem Kauf steht der Download dauerhaft in Ihrem Culoca-Konto
+    unter <a href="/settings/licenses">Einstellungen → Meine Lizenzen</a> bereit.
+  </p>
+  <p>
+    Die konkreten Nutzungsrechte der erworbenen Stufe gelten pro Bild und pro Organisation/Projekt.
+    Eine Weiterveräußerung als Stock-Foto oder Template ist ausgeschlossen. Die vollständigen
+    Lizenzdetails finden Sie auf der Download-/Kaufseite des jeweiligen Bildes.
+  </p>
+
   <h2>Allgemeine Nutzungsbedingungen für Bilder auf Culoca</h2>
   
   <p>
