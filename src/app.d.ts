@@ -9,6 +9,13 @@ declare global {
 			};
 		}
 		// interface PageData {}
+		interface PageData {
+			culocaSales?: {
+				enabled: boolean;
+				standardPriceCents: number;
+				extendedPriceCents: number;
+			};
+		}
 		// interface PageState {}
 		// interface Platform {}
 	}

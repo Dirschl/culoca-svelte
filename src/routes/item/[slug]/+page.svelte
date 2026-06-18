@@ -438,10 +438,10 @@
 	$: hasVideoEmbed = !!image?.video_url;
 	$: shouldShowMainImage = contentType?.show_image !== false;
 	$: fotoTypeId = DEFAULT_CONTENT_TYPES.find((t) => t.slug === 'foto')?.id ?? 1;
-	$: culocaSalesGloballyEnabled = import.meta.env.PUBLIC_CULOCA_SALES_ENABLED === 'true';
+	$: culocaSalesGloballyEnabled = $page.data.culocaSales?.enabled === true;
 	$: culocaSalesPriceDefaults = {
-		standard: Number(import.meta.env.PUBLIC_CULOCA_LICENSE_STANDARD_PRICE_CENTS || 2900),
-		extended: Number(import.meta.env.PUBLIC_CULOCA_LICENSE_EXTENDED_PRICE_CENTS || 9900)
+		standard: $page.data.culocaSales?.standardPriceCents ?? 2900,
+		extended: $page.data.culocaSales?.extendedPriceCents ?? 9900
 	};
 	$: showLicensePurchase =
 		contentType?.slug === 'foto' &&

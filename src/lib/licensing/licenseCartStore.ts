@@ -3,11 +3,15 @@ import { authFetch } from '$lib/authFetch';
 
 export const licenseCartCount = writable(0);
 
-export const culocaSalesEnabled =
-	typeof import.meta !== 'undefined' && import.meta.env.PUBLIC_CULOCA_SALES_ENABLED === 'true';
+/** Runtime flag from +layout.server (CULOCA_SALES_ENABLED), not build-time PUBLIC_ env. */
+export const culocaSalesEnabled = writable(false);
+
+export function setCulocaSalesEnabled(enabled: boolean) {
+	culocaSalesEnabled.set(enabled);
+}
 
 export async function refreshLicenseCartCount(): Promise<number> {
-	if (!culocaSalesEnabled) {
+	if (!get(culocaSalesEnabled)) {
 		licenseCartCount.set(0);
 		return 0;
 	}

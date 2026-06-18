@@ -68,10 +68,10 @@
     ($hasAdminPermission && isAdminRouteActive());
   $: inheritedReturnTo = sanitizeReturnTo($page.url.searchParams.get('returnTo'), currentPathWithSearch($page.url));
   $: {
-    const cartKey = `${$isAuthenticated ? 'auth' : 'anon'}:${$currentUserId || 'none'}:${culocaSalesEnabled ? 'sales' : 'off'}`;
+    const cartKey = `${$isAuthenticated ? 'auth' : 'anon'}:${$currentUserId || 'none'}:${$culocaSalesEnabled ? 'sales' : 'off'}`;
     if (cartKey !== lastCartRefreshKey) {
       lastCartRefreshKey = cartKey;
-      if ($isAuthenticated && culocaSalesEnabled) {
+      if ($isAuthenticated && $culocaSalesEnabled) {
         void refreshLicenseCartCount();
       } else {
         licenseCartCount.set(0);
@@ -334,7 +334,7 @@
     window.addEventListener('culoca:open-chat', handleOpenChat as EventListener);
     window.addEventListener('culoca:toggle-chat', handleToggleChat as EventListener);
     const handleCartUpdated = () => {
-      if ($isAuthenticated && culocaSalesEnabled) {
+      if ($isAuthenticated && $culocaSalesEnabled) {
         void refreshLicenseCartCount();
       }
     };
@@ -381,7 +381,7 @@
         <a href={link.href} class="nav-link" class:active={isActive(link.href)} on:click={closeMobile}>{link.label}</a>
       {/each}
 
-      {#if culocaSalesEnabled}
+      {#if $culocaSalesEnabled}
         <a
           href={$isAuthenticated ? '/warenkorb' : '/login?returnTo=%2Fwarenkorb'}
           class="nav-link cart-link"

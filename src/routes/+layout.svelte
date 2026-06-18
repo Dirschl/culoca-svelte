@@ -10,6 +10,11 @@
   import { afterNavigate } from '$app/navigation';
   import { isDetailPath, LAST_LOCAL_ROUTE_KEY } from '$lib/returnTo';
   import GlobalUtilityFabs from '$lib/GlobalUtilityFabs.svelte';
+  import { setCulocaSalesEnabled } from '$lib/licensing/licenseCartStore';
+
+  export let data;
+
+  $: setCulocaSalesEnabled(data.culocaSales?.enabled === true);
 
   function storeLastLocalRoute(url: URL) {
     if (!browser || isDetailPath(url.pathname)) return;
