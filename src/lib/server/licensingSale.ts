@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { DEFAULT_CONTENT_TYPE_BY_SLUG } from '$lib/content/types';
 import { getLicenseCuratorUserId } from '$lib/licensing/curator';
-import { isItemForSale } from '$lib/licensing/tiers';
+import { isCulocaSaleApproved, isItemForSale } from '$lib/licensing/tiers';
 
 const FOTO_TYPE_ID = DEFAULT_CONTENT_TYPE_BY_SLUG.get('foto')?.id ?? 1;
 
@@ -36,7 +36,9 @@ export async function isItemEligibleForSale(
 	},
 	options: { salesGloballyEnabled: boolean }
 ): Promise<boolean> {
-	const creatorLicensingOptIn = await getCreatorLicensingOptIn(supabase, item.profile_id ?? null);
+	const saleApproved = isCulocaSaleApproved(item.stock_settings);
+	const creatorLicensingOptIn =
+		saleApproved || (await getCreatorLicensingOptIn(supabase, item.profile_id ?? null));
 	return isItemForSale(item, {
 		salesGloballyEnabled: options.salesGloballyEnabled,
 		fotoTypeId: FOTO_TYPE_ID,

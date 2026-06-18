@@ -448,7 +448,8 @@
 	$: isLicenseCuratorUser = isLicenseCuratorClient(currentUser?.id);
 	$: creatorLicensingOptIn =
 		image?.profile_id === LICENSE_CURATOR_USER_ID ||
-		image?.profile?.culoca_licensing_opt_in === true;
+		image?.profile?.culoca_licensing_opt_in === true ||
+		isCulocaSaleApproved(image?.stock_settings);
 	$: saleEligibilityOptions = {
 		salesGloballyEnabled: culocaSalesGloballyEnabled,
 		fotoTypeId,
@@ -457,10 +458,16 @@
 	};
 	$: itemEligibleForSale =
 		contentType?.slug === 'foto' && !!image?.id && isItemForSale(image, saleEligibilityOptions);
+	$: showLicenseShopOwner =
+		contentType?.slug === 'foto' &&
+		!!image?.id &&
+		isItemOwner &&
+		!(canEditItem && editMode) &&
+		culocaSalesGloballyEnabled &&
+		isCulocaSaleApproved(image?.stock_settings) &&
+		creatorLicensingOptIn;
 	$: showLicensePurchase =
 		itemEligibleForSale && !isItemOwner && !(canEditItem && editMode);
-	$: showLicensePurchasePreview =
-		itemEligibleForSale && isItemOwner && !(canEditItem && editMode);
 	$: showLicenseRequest =
 		contentType?.slug === 'foto' &&
 		!!image?.id &&
@@ -4410,9 +4417,9 @@
 				</section>
 			{/if}
 
-			{#if showLicensePurchase || showLicensePurchasePreview || showLicenseRequest}
+			{#if showLicensePurchase || showLicenseShopOwner || showLicenseRequest}
 				<div class="item-detail-inset">
-					{#if showLicensePurchase || showLicensePurchasePreview}
+					{#if showLicensePurchase || showLicenseShopOwner}
 						<LicensePurchasePanel
 							itemId={image.id}
 							itemTitle={image.title || ''}
@@ -4420,7 +4427,7 @@
 							standardPriceCents={licenseStandardPrice}
 							extendedPriceCents={licenseExtendedPrice}
 							embedded
-							preview={showLicensePurchasePreview}
+							ownerView={showLicenseShopOwner}
 						/>
 					{/if}
 					{#if showLicenseRequest}

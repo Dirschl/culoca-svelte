@@ -18,8 +18,8 @@
 	export let compact = false;
 	/** Ohne äußeren Rahmen/Hintergrund (z. B. auf der Bildseite unter der Galerie). */
 	export let embedded = false;
-	/** Ersteller-Vorschau: Shop-Block anzeigen, Warenkorb deaktiviert */
-	export let preview = false;
+	/** Ersteller-Ansicht: Shop-Status ohne deaktivierte Kauf-Buttons */
+	export let ownerView = false;
 
 	let addingTier: LicenseTier | null = null;
 	let cartAddedTier: LicenseTier | null = null;
@@ -73,33 +73,40 @@
 			<p class="license-purchase-subtitle">{itemTitle}</p>
 		{/if}
 		<p class="license-purchase-note">
-			{#if preview}
-				So sehen andere Nutzer den Shop auf dieser Seite. Zum Testen des Kaufs bitte ausloggen oder
-				ein anderes Konto verwenden.
+			{#if ownerView}
+				Dieses Bild ist im Culoca-Shop freigegeben. Andere Nutzer können Standard- oder
+				Erweiterte Lizenzen in den Warenkorb legen. Zum Testen des Kaufs die Seite im privaten
+				Fenster öffnen oder mit einem anderen Konto anmelden.
 			{:else}
 				Lizenzen legen Sie in den Warenkorb und bezahlen gesammelt über Lemon Squeezy (Merchant of
 				Record). Nach dem Kauf steht der Download dauerhaft in Ihrem Culoca-Konto bereit.
 			{/if}
 		</p>
 
+		{#if ownerView}
+			<p class="shop-active-badge" role="status">Im Culoca-Shop freigegeben</p>
+		{/if}
+
 		<div class="license-tiers">
 			{#each tiers as t}
-				<article class="license-tier-card">
+				<article class="license-tier-card" class:owner-tier={ownerView}>
 					<h3>{LICENSE_TIER_LABELS[t]}</h3>
 					<p class="tier-price">{formatPrice(t === 'standard' ? standardPriceCents : extendedPriceCents)}</p>
 					<p class="tier-desc">{LICENSE_TIER_DESCRIPTIONS[t]}</p>
-					<button
-						type="button"
-						class="cart-btn"
-						disabled={preview || addingTier !== null}
-						on:click={() => addToCart(t)}
-					>
-						{preview ? 'Nur Käufer-Vorschau' : addingTier === t ? 'Wird hinzugefügt …' : 'In den Warenkorb'}
-					</button>
-					{#if cartAddedTier === t}
-						<p class="cart-added">
-							Im Warenkorb. <a href="/warenkorb">Zum Warenkorb</a>
-						</p>
+					{#if !ownerView}
+						<button
+							type="button"
+							class="cart-btn"
+							disabled={addingTier !== null}
+							on:click={() => addToCart(t)}
+						>
+							{addingTier === t ? 'Wird hinzugefügt …' : 'In den Warenkorb'}
+						</button>
+						{#if cartAddedTier === t}
+							<p class="cart-added">
+								Im Warenkorb. <a href="/warenkorb">Zum Warenkorb</a>
+							</p>
+						{/if}
 					{/if}
 				</article>
 			{/each}
@@ -206,7 +213,23 @@
 
 	.cart-btn:disabled {
 		opacity: 0.65;
-		cursor: wait;
+		cursor: not-allowed;
+	}
+
+	.shop-active-badge {
+		display: inline-block;
+		margin: 0 0 0.85rem;
+		padding: 0.4rem 0.75rem;
+		border-radius: 999px;
+		background: color-mix(in srgb, #16a34a 14%, var(--bg-secondary, #f5f5f5));
+		border: 1px solid color-mix(in srgb, #16a34a 45%, transparent);
+		color: #15803d;
+		font-size: 0.88rem;
+		font-weight: 600;
+	}
+
+	.owner-tier {
+		border-color: color-mix(in srgb, #16a34a 35%, var(--border-color, #ddd));
 	}
 
 	.cart-added {
