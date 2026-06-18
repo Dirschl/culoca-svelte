@@ -16,9 +16,7 @@ export async function listCartForUser(
 ): Promise<CartLineDisplay[]> {
 	const { data: rows, error } = await supabase
 		.from('license_cart_items')
-		.select(
-			`id, item_id, license_tier, price_cents, added_at, items!inner(${ITEM_SELECT})`
-		)
+		.select(`id, item_id, license_tier, price_cents, added_at, items(${ITEM_SELECT})`)
 		.eq('user_id', userId)
 		.order('added_at', { ascending: true });
 
@@ -27,17 +25,19 @@ export async function listCartForUser(
 	const licensedItemIds = await getLicensedItemIds(supabase, userId);
 
 	return (rows || []).map((row: Record<string, unknown>) => {
-		const item = row.items as Record<string, unknown>;
+		const item = row.items as Record<string, unknown> | null;
 		return {
 			id: String(row.id),
 			item_id: String(row.item_id),
 			license_tier: row.license_tier as LicenseTier,
 			price_cents: Number(row.price_cents),
 			added_at: String(row.added_at),
-			item_title: (item.title as string) ?? null,
-			item_slug: (item.slug as string) ?? null,
-			item_href: getPublicItemHref(item as Parameters<typeof getPublicItemHref>[0]),
-			preview_path: (item.path_512 as string) ?? (item.path_2048 as string) ?? null,
+			item_title: (item?.title as string) ?? null,
+			item_slug: (item?.slug as string) ?? null,
+			item_href: item
+				? getPublicItemHref(item as Parameters<typeof getPublicItemHref>[0])
+				: null,
+			preview_path: (item?.path_512 as string) ?? (item?.path_2048 as string) ?? null,
 			already_licensed: licensedItemIds.has(String(row.item_id))
 		};
 	});

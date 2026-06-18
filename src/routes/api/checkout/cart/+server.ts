@@ -10,6 +10,7 @@ import { absoluteUrl } from '$lib/seo/site';
 import { LICENSE_TIER_LABELS } from '$lib/licensing/tiers';
 import { cartTotals, listCartForUser } from '$lib/server/licenseCart';
 import { serializeCartLineItems, type CartLinePayload } from '$lib/licensing/cart';
+import { supabaseAdmin } from '$lib/supabaseAdmin';
 
 export const POST: RequestHandler = async ({ request }) => {
 	if (!isCulocaSalesEnabled()) {
@@ -19,11 +20,14 @@ export const POST: RequestHandler = async ({ request }) => {
 	if (!lemonConfig) {
 		throw error(503, 'Zahlungsanbieter ist nicht konfiguriert.');
 	}
+	if (!supabaseAdmin) {
+		throw error(503, 'Datenbank-Konfiguration unvollständig (Service Role).');
+	}
 
 	const supabase = createAuthedSupabaseFromRequest(request);
 	const user = await requireAuthedUser(supabase);
 
-	const lines = await listCartForUser(supabase, user.id);
+	const lines = await listCartForUser(supabaseAdmin, user.id);
 	const payable = lines.filter((l) => !l.already_licensed);
 	const { totalCents, payableCount } = cartTotals(lines);
 
