@@ -3599,10 +3599,10 @@
 								: fileExtension === '.png'
 									? 'image/png'
 									: 'image/jpeg',
-						license: itemImageLicenseUrl || attribution?.licenseUrl ?? 'https://culoca.com/web/license',
+						license: (itemImageLicenseUrl || attribution?.licenseUrl) ?? 'https://culoca.com/web/license',
 						creditText: normalizedCreditText,
 						copyrightNotice: normalizedCopyrightNotice,
-						acquireLicensePage: itemAcquireLicenseUrl || attribution?.licenseUrl ?? 'https://culoca.com/web/license',
+						acquireLicensePage: (itemAcquireLicenseUrl || attribution?.licenseUrl) ?? 'https://culoca.com/web/license',
 						creator: {
 							'@type': attribution?.creatorIsOrganization ? 'Organization' : 'Person',
 							name: normalizedSchemaCreatorName
