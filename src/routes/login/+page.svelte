@@ -1,8 +1,10 @@
 <script lang="ts">
   import { sessionStore } from '../../lib/sessionStore';
   import { supabase } from '../../lib/supabaseClient';
-  import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
+  import { page } from '$app/stores';
+  import { browser } from '$app/environment';
+  import { sanitizeReturnTo } from '$lib/returnTo';
   import SiteNav from '$lib/SiteNav.svelte';
 
   let isLoggedIn = false;
@@ -38,11 +40,10 @@
 
   $: isLoggedIn = $sessionStore.isAuthenticated;
 
-  onMount(() => {
-    if (isLoggedIn) {
-      goto('/');
-    }
-  });
+  $: if (browser && isLoggedIn) {
+    const returnTo = sanitizeReturnTo($page.url.searchParams.get('returnTo'), '/');
+    goto(returnTo);
+  }
 
   function getAuthRedirectUrl(type?: 'recovery') {
     if (typeof window === 'undefined') return undefined;

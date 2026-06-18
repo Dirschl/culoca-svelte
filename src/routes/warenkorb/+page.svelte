@@ -4,7 +4,7 @@
 	import SiteNav from '$lib/SiteNav.svelte';
 	import SiteFooter from '$lib/SiteFooter.svelte';
 	import { authFetch } from '$lib/authFetch';
-	import { sessionStore } from '$lib/sessionStore';
+	import { sessionStore, sessionReady } from '$lib/sessionStore';
 	import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
 	import {
 		LICENSE_TIER_LABELS,
@@ -23,14 +23,17 @@
 	let searchQuery = '';
 
 	onMount(() => {
-		const unsub = sessionStore.subscribe(async (session) => {
-			if (!session?.user) {
+		let loaded = false;
+		return sessionReady.subscribe(async (ready) => {
+			if (!ready || loaded) return;
+			const session = sessionStore.get();
+			if (!session.isAuthenticated || !session.userId) {
 				goto(`/login?returnTo=${encodeURIComponent('/warenkorb')}`);
 				return;
 			}
+			loaded = true;
 			await loadCart();
 		});
-		return unsub;
 	});
 
 	async function loadCart() {
@@ -45,7 +48,7 @@
 			lines = data.lines || [];
 			totalCents = Number(data.totalCents ?? 0);
 			payableCount = Number(data.payableCount ?? 0);
-			notifyCartUpdated(lines.length);
+			notifyCartUpdated(Number(data?.count ?? data?.lines?.length ?? 0));
 		} catch (e) {
 			errorMessage = e instanceof Error ? e.message : 'Fehler beim Laden';
 		} finally {
@@ -85,7 +88,7 @@
 			lines = data.lines || [];
 			totalCents = Number(data.totalCents ?? 0);
 			payableCount = Number(data.payableCount ?? 0);
-			notifyCartUpdated(lines.length);
+			notifyCartUpdated(Number(data?.count ?? data?.lines?.length ?? 0));
 		} catch (e) {
 			errorMessage = e instanceof Error ? e.message : 'Entfernen fehlgeschlagen';
 		}

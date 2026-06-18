@@ -22,7 +22,7 @@ export async function refreshLicenseCartCount(): Promise<number> {
 			return 0;
 		}
 		const data = await response.json();
-		const count = Number(data?.count ?? 0);
+		const count = Number(data?.count ?? data?.lines?.length ?? 0);
 		licenseCartCount.set(count);
 		return count;
 	} catch {

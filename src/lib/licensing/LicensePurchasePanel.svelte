@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { sessionStore } from '$lib/sessionStore';
+	import { get } from 'svelte/store';
+	import { currentUserId } from '$lib/sessionStore';
 	import { authFetch } from '$lib/authFetch';
 	import {
 		LICENSE_TIER_DESCRIPTIONS,
@@ -20,14 +20,6 @@
 	let addingTier: LicenseTier | null = null;
 	let cartAddedTier: LicenseTier | null = null;
 	let errorMessage = '';
-	let currentUserId: string | null = null;
-
-	onMount(() => {
-		const unsub = sessionStore.subscribe((s) => {
-			currentUserId = s?.user?.id ?? null;
-		});
-		return unsub;
-	});
 
 	function formatPrice(cents: number): string {
 		return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(
@@ -40,7 +32,8 @@
 	async function addToCart(tier: LicenseTier) {
 		errorMessage = '';
 		cartAddedTier = null;
-		if (!currentUserId) {
+		const userId = get(currentUserId);
+		if (!userId) {
 			const returnTo = typeof window !== 'undefined' ? window.location.pathname : '/';
 			goto(`/login?returnTo=${encodeURIComponent(returnTo)}`);
 			return;
@@ -57,7 +50,7 @@
 			if (!response.ok) {
 				throw new Error(data?.error || data?.message || 'Warenkorb fehlgeschlagen');
 			}
-			notifyCartUpdated(Number(data?.count ?? 0));
+			notifyCartUpdated(Number(data?.count ?? data?.lines?.length ?? 0));
 			cartAddedTier = tier;
 		} catch (e) {
 			errorMessage = e instanceof Error ? e.message : 'Warenkorb fehlgeschlagen';

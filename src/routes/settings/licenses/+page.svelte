@@ -6,7 +6,7 @@
 	import SettingsDashboardNav from '$lib/settings/SettingsDashboardNav.svelte';
 	import { authFetch } from '$lib/authFetch';
 	import { goto } from '$app/navigation';
-	import { sessionStore } from '$lib/sessionStore';
+	import { sessionStore, sessionReady } from '$lib/sessionStore';
 	import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
 	import { LICENSE_TIER_LABELS } from '$lib/licensing/tiers';
 
@@ -45,14 +45,17 @@
 
 	onMount(() => {
 		showPurchaseSuccess = $page.url.searchParams.get('purchase') === 'success';
-		const unsub = sessionStore.subscribe(async (session) => {
-			if (!session?.user) {
+		let loaded = false;
+		return sessionReady.subscribe(async (ready) => {
+			if (!ready || loaded) return;
+			const session = sessionStore.get();
+			if (!session.isAuthenticated || !session.userId) {
 				goto(`/login?returnTo=${encodeURIComponent('/settings/licenses')}`);
 				return;
 			}
+			loaded = true;
 			await loadLicenses();
 		});
-		return unsub;
 	});
 
 	async function loadLicenses() {
