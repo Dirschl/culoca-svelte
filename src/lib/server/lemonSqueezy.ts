@@ -68,23 +68,28 @@ export async function createLemonCheckout(
 	config: LemonSqueezyConfig,
 	input: CreateCheckoutInput
 ): Promise<CreateCheckoutResult> {
+	const variantNumeric = Number(input.variantId);
+	const productOptions: Record<string, unknown> = {
+		name: input.productName,
+		description: input.productDescription,
+		redirect_url: input.redirectUrl,
+		receipt_button_text: 'Zu meinen Lizenzen',
+		receipt_link_url: input.redirectUrl,
+		receipt_thank_you_note:
+					'Vielen Dank! Ihre Lizenz ist in Ihrem Culoca-Konto unter Konto → Gekaufte Lizenzen verfügbar. Sie können das Bild jederzeit erneut herunterladen.',
+		...(input.previewImageUrl ? { media: [input.previewImageUrl] } : {})
+	};
+	if (Number.isFinite(variantNumeric) && variantNumeric > 0) {
+		productOptions.enabled_variants = [variantNumeric];
+	}
+
 	const body = {
 		data: {
 			type: 'checkouts',
 			attributes: {
 				custom_price: input.priceCents,
 				test_mode: input.testMode ?? config.testMode,
-				product_options: {
-					name: input.productName,
-					description: input.productDescription,
-					redirect_url: input.redirectUrl,
-					receipt_button_text: 'Zu meinen Lizenzen',
-					receipt_link_url: input.redirectUrl,
-					receipt_thank_you_note:
-						'Vielen Dank! Ihre Lizenz ist in Ihrem Culoca-Konto unter Einstellungen → Meine Lizenzen verfügbar. Sie können das Bild jederzeit erneut herunterladen.',
-					enabled_variants: [Number(input.variantId)],
-					...(input.previewImageUrl ? { media: [input.previewImageUrl] } : {})
-				},
+				product_options: productOptions,
 				checkout_data: {
 					custom: input.custom
 				}

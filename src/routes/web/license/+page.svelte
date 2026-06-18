@@ -82,7 +82,7 @@
     <strong>Standard-</strong> oder <strong>Erweiterte Lizenz</strong> erwerben. Der Kauf erfolgt über
     <strong>Lemon Squeezy</strong> als Merchant of Record — inklusive Rechnung, Steuerbehandlung und
     internationaler Zahlungsmethoden. Nach dem Kauf steht der Download dauerhaft in Ihrem Culoca-Konto
-    unter <a href="/settings/licenses">Einstellungen → Meine Lizenzen</a> bereit.
+    unter <a href="/dashboard?section=licenses">Konto → Gekaufte Lizenzen</a> bereit.
   </p>
   <p>
     Die konkreten Nutzungsrechte der erworbenen Stufe gelten pro Bild und pro Organisation/Projekt.

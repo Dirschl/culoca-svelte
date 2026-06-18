@@ -1360,27 +1360,6 @@
 				/>
 			{/if}
 
-			<section id="lizenzbedingungen" class="settings-card license-terms-card">
-				<h2>Lizenz &amp; Kauf</h2>
-				<p>
-					Kommerzielle Nutzung erfolgt über eine erworbene Culoca-Bildlizenz. Rechnung, Steuern und
-					internationale Zahlungsabwicklung übernimmt Lemon Squeezy als Merchant of Record.
-				</p>
-				<ul>
-					<li>
-						<strong>{LICENSE_TIER_LABELS.standard}:</strong>
-						{LICENSE_TIER_DESCRIPTIONS.standard}
-					</li>
-					<li>
-						<strong>{LICENSE_TIER_LABELS.extended}:</strong>
-						{LICENSE_TIER_DESCRIPTIONS.extended}
-					</li>
-				</ul>
-				<p>
-					Details: <a href="/web/license#kommerziell">Allgemeine Lizenzbedingungen</a>
-				</p>
-			</section>
-
 			<section class="settings-card">
 				<div class="group">
 					<h2>Bildgröße</h2>
@@ -1664,6 +1643,30 @@
 				{/if}
 			{/if}
 		</section>
+
+		{#if culocaSalesGloballyEnabled}
+			<section id="lizenzbedingungen" class="settings-card license-terms-card">
+				<h2>Lizenz &amp; Kauf</h2>
+				<p>
+					Kommerzielle Nutzung erfolgt über eine erworbene Culoca-Bildlizenz. Rechnung, Steuern und
+					internationale Zahlungsabwicklung übernimmt Lemon Squeezy als Merchant of Record.
+				</p>
+				<ul>
+					<li>
+						<strong>{LICENSE_TIER_LABELS.standard}:</strong>
+						{LICENSE_TIER_DESCRIPTIONS.standard}
+					</li>
+					<li>
+						<strong>{LICENSE_TIER_LABELS.extended}:</strong>
+						{LICENSE_TIER_DESCRIPTIONS.extended}
+					</li>
+				</ul>
+				<p>
+					Details: <a href="/web/license#kommerziell">Allgemeine Lizenzbedingungen</a>
+					· <a href="/dashboard?section=licenses">Gekaufte Lizenzen im Konto</a>
+				</p>
+			</section>
+		{/if}
 	</div>
 </main>
 

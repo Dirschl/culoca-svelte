@@ -1,11 +1,16 @@
-/** LS custom domain is dirschl.com (apex); www.dirschl.com is WordPress and breaks /checkout/*. */
+import { SITE_URL } from '$lib/seo/site';
+
+/** Ensure checkout uses apex host (e.g. culoca.com not www.culoca.com). */
 export function normalizeCheckoutUrl(checkoutUrl: string): string {
 	try {
 		const url = new URL(checkoutUrl);
-		if (url.hostname === 'www.dirschl.com' || url.hostname === 'dirschl.lemonsqueezy.com') {
-			url.hostname = 'dirschl.com';
+		const apex = new URL(SITE_URL).hostname.replace(/^www\./, '');
+
+		if (url.hostname === `www.${apex}`) {
+			url.hostname = apex;
 			return url.toString();
 		}
+
 		return checkoutUrl;
 	} catch {
 		return checkoutUrl;

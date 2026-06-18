@@ -47,7 +47,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
 	const hasExtended = payable.some((l) => l.license_tier === 'extended');
 	const checkoutTier = hasExtended ? 'extended' : 'standard';
-	const redirectUrl = absoluteUrl('/settings/licenses?purchase=success');
+	const redirectUrl = absoluteUrl('/dashboard?section=licenses&purchase=success');
 
 	const productName =
 		payableCount === 1

@@ -8,6 +8,8 @@
   import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
   import { fetchProfileReviewItems } from '$lib/profile/review';
   import StockSettingsOverlay from '$lib/stock/StockSettingsOverlay.svelte';
+  import LicensedPurchasesPanel from '$lib/licensing/LicensedPurchasesPanel.svelte';
+  import { authFetch } from '$lib/authFetch';
 
   const PAGE_SIZE = 12;
 
@@ -15,6 +17,7 @@
     'recent',
     'photos',
     'stock',
+    'licenses',
     'events',
     'favorites',
     'likes',
@@ -84,6 +87,9 @@
 
   let stockOverlayItem: any = null;
   let stockItemParamId = '';
+  let licenseCount = 0;
+  let licensesPanel: LicensedPurchasesPanel | null = null;
+  let showLicensePurchaseSuccess = false;
 
   $: totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
   $: canPrev = currentPage > 1;
@@ -814,6 +820,17 @@
     reviewCount = reviewItems.length;
   }
 
+  async function loadLicenseCount() {
+    try {
+      const response = await authFetch('/api/licenses');
+      const data = await response.json();
+      if (!response.ok) return;
+      licenseCount = Array.isArray(data.licenses) ? data.licenses.length : 0;
+    } catch {
+      licenseCount = 0;
+    }
+  }
+
   const secondaryTasks: Record<DashboardSecondaryKey, () => Promise<void>> = {
     events: loadEventItems,
     favorites: loadFavoriteItems,
@@ -831,6 +848,7 @@
     recent: [],
     photos: [],
     stock: [],
+    licenses: [],
     events: ['events'],
     favorites: ['favorites'],
     likes: ['likes'],
@@ -877,6 +895,10 @@
 
   function setActiveSection(section: DashboardSectionId) {
     activeSection = section;
+    if (section === 'licenses') {
+      void loadLicenseCount();
+      void licensesPanel?.loadLicenses();
+    }
     const keys = sectionToSecondaryKeys[section];
     if (browser && keys.length) {
       void Promise.all(keys.map((k) => loadSecondaryKey(k))).catch(() => {});
@@ -903,11 +925,14 @@
       if (sectionParam && isDashboardSectionId(sectionParam)) {
         activeSection = sectionParam;
       }
+      showLicensePurchaseSuccess =
+        new URL(window.location.href).searchParams.get('purchase') === 'success';
       stockItemParamId = new URL(window.location.href).searchParams.get('stockItem') || '';
       const priorityKeys = sectionToSecondaryKeys[activeSection];
       await Promise.all([
         loadRecentItems(),
         loadOwnItems(1, ''),
+        loadLicenseCount(),
         ...priorityKeys.map((k) => loadSecondaryKey(k))
       ]);
       if (activeSection === 'stock' && stockItemParamId) {
@@ -996,6 +1021,20 @@
               <span>Stock</span>
             </span>
             <strong>{restLoading ? '…' : stockAttentionCount}</strong>
+          </button>
+          <button
+            type="button"
+            class="dashboard-menu__link"
+            class:is-active={activeSection === 'licenses'}
+            on:click={() => setActiveSection('licenses')}
+          >
+            <span class="dashboard-menu__label">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z" />
+              </svg>
+              <span>Gekaufte Lizenzen</span>
+            </span>
+            <strong>{licenseCount}</strong>
           </button>
           <button
             type="button"
@@ -1295,6 +1334,13 @@
             <span>Seite {currentPage} von {totalPages}</span>
             <button type="button" on:click={() => goToPage(currentPage + 1)} disabled={!canNext}>Weiter</button>
           </div>
+        {:else if activeSection === 'licenses'}
+          <LicensedPurchasesPanel
+            bind:this={licensesPanel}
+            title=""
+            showLicenseIntro={true}
+            showPurchaseSuccess={showLicensePurchaseSuccess}
+          />
         {:else if activeSection === 'events'}
           <div class="panel-head panel-head--space">
             <h2>Meine Events</h2>
