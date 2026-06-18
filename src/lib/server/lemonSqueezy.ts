@@ -44,6 +44,57 @@ export function variantIdForTier(config: LemonSqueezyConfig, tier: LicenseTier):
 	return tier === 'extended' ? config.extendedVariantId : config.standardVariantId;
 }
 
+let storeCheckoutOriginPromise: Promise<string> | null = null;
+
+/** LS custom domains (e.g. dirschl.com) may be served by another site; use *.lemonsqueezy.com for checkout. */
+async function getStoreCheckoutOrigin(config: LemonSqueezyConfig): Promise<string> {
+	if (!storeCheckoutOriginPromise) {
+		storeCheckoutOriginPromise = fetchStoreCheckoutOrigin(config);
+	}
+	return storeCheckoutOriginPromise;
+}
+
+async function fetchStoreCheckoutOrigin(config: LemonSqueezyConfig): Promise<string> {
+	const slugOverride = process.env.LEMONSQUEEZY_STORE_SLUG?.trim();
+	if (slugOverride) {
+		return `https://${slugOverride}.lemonsqueezy.com`;
+	}
+
+	const response = await fetch(`https://api.lemonsqueezy.com/v1/stores/${config.storeId}`, {
+		headers: {
+			Accept: 'application/vnd.api+json',
+			Authorization: `Bearer ${config.apiKey}`
+		}
+	});
+
+	if (!response.ok) {
+		throw new Error(`Lemon Squeezy store lookup failed (${response.status})`);
+	}
+
+	const json = (await response.json()) as {
+		data?: { attributes?: { slug?: string } };
+	};
+	const slug = json.data?.attributes?.slug?.trim();
+	if (!slug) {
+		throw new Error('Lemon Squeezy store slug missing');
+	}
+
+	return `https://${slug}.lemonsqueezy.com`;
+}
+
+export function rewriteCheckoutToHostedOrigin(checkoutUrl: string, hostedOrigin: string): string {
+	try {
+		const url = new URL(checkoutUrl);
+		if (url.hostname.endsWith('.lemonsqueezy.com')) return checkoutUrl;
+		const origin = new URL(hostedOrigin);
+		url.protocol = origin.protocol;
+		url.hostname = origin.hostname;
+		return url.toString();
+	} catch {
+		return checkoutUrl;
+	}
+}
+
 type CheckoutCustomData = Record<string, string>;
 
 export type CreateCheckoutInput = {
@@ -115,11 +166,14 @@ export async function createLemonCheckout(
 	const json = (await response.json()) as {
 		data?: { id?: string; attributes?: { url?: string } };
 	};
-	const checkoutUrl = json.data?.attributes?.url;
+	const rawCheckoutUrl = json.data?.attributes?.url;
 	const checkoutId = json.data?.id;
-	if (!checkoutUrl || !checkoutId) {
+	if (!rawCheckoutUrl || !checkoutId) {
 		throw new Error('Lemon Squeezy checkout response missing url');
 	}
+
+	const hostedOrigin = await getStoreCheckoutOrigin(config);
+	const checkoutUrl = rewriteCheckoutToHostedOrigin(rawCheckoutUrl, hostedOrigin);
 
 	return { checkoutUrl, checkoutId };
 }
