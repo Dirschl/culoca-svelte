@@ -4101,22 +4101,6 @@
 				onStartChat={startCreatorChat}
 				onToggleGallery={toggleGallery}
 			/>
-			{#if showLicensePurchase}
-				<LicensePurchasePanel
-					itemId={image.id}
-					itemTitle={image.title || ''}
-					salesEnabled={true}
-					standardPriceCents={licenseStandardPrice}
-					extendedPriceCents={licenseExtendedPrice}
-				/>
-			{/if}
-			{#if showLicenseRequest}
-				<LicenseRequestPanel
-					itemId={image.id}
-					itemTitle={image.title || ''}
-					creatorUserId={image.profile_id || image.profile?.id || null}
-				/>
-			{/if}
 			{#if favoriteStatus}
 				<p class="favorite-status">{favoriteStatus}</p>
 			{/if}
@@ -4415,6 +4399,25 @@
 						fallbackRecommendations={nearbyFallbackRecommendations}
 					/>
 				</section>
+			{/if}
+
+			{#if showLicensePurchase}
+				<LicensePurchasePanel
+					itemId={image.id}
+					itemTitle={image.title || ''}
+					salesEnabled={true}
+					standardPriceCents={licenseStandardPrice}
+					extendedPriceCents={licenseExtendedPrice}
+					embedded
+				/>
+			{/if}
+			{#if showLicenseRequest}
+				<LicenseRequestPanel
+					itemId={image.id}
+					itemTitle={image.title || ''}
+					creatorUserId={image.profile_id || image.profile?.id || null}
+					embedded
+				/>
 			{/if}
 
 			<!-- SEO-optimiert: Serverseitig gerenderte Links für Google -->

@@ -16,6 +16,8 @@
 	export let standardPriceCents = 2900;
 	export let extendedPriceCents = 9900;
 	export let compact = false;
+	/** Ohne äußeren Rahmen/Hintergrund (z. B. auf der Bildseite unter der Galerie). */
+	export let embedded = false;
 
 	let addingTier: LicenseTier | null = null;
 	let cartAddedTier: LicenseTier | null = null;
@@ -61,7 +63,7 @@
 </script>
 
 {#if salesEnabled}
-	<section class="license-purchase" class:compact aria-labelledby="license-purchase-heading">
+	<section class="license-purchase" class:compact class:embedded aria-labelledby="license-purchase-heading">
 		<h2 id="license-purchase-heading" class="license-purchase-title">
 			{compact ? 'Lizenz kaufen' : 'Bildlizenz erwerben'}
 		</h2>
@@ -121,6 +123,19 @@
 	.compact {
 		margin: 1rem 0;
 		padding: 1rem;
+	}
+
+	.embedded {
+		margin: 1.25rem 0 0;
+		padding: 0;
+		border: none;
+		border-radius: 0;
+		background: transparent;
+	}
+
+	.embedded.compact {
+		margin: 1rem 0 0;
+		padding: 0;
 	}
 
 	.license-purchase-title {

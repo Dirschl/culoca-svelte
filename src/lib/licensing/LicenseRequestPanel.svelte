@@ -8,6 +8,8 @@
 	export let itemTitle = '';
 	export let creatorUserId: string | null = null;
 	export let compact = false;
+	/** Ohne äußeren Rahmen/Hintergrund */
+	export let embedded = false;
 
 	async function requestLicense() {
 		const userId = get(currentUserId);
@@ -22,7 +24,7 @@
 </script>
 
 {#if creatorUserId}
-	<section class="license-request" class:compact aria-labelledby="license-request-heading">
+	<section class="license-request" class:compact class:embedded aria-labelledby="license-request-heading">
 		<h2 id="license-request-heading" class="license-request-title">
 			{compact ? 'Lizenz anfragen' : 'Kommerzielle Lizenz'}
 		</h2>
@@ -53,6 +55,19 @@
 
 	.license-request.compact {
 		padding: 1rem;
+	}
+
+	.embedded {
+		margin: 1.25rem 0 0;
+		padding: 0;
+		border: none;
+		border-radius: 0;
+		background: transparent;
+	}
+
+	.embedded.compact {
+		margin: 1rem 0 0;
+		padding: 0;
 	}
 
 	.license-request-title {
