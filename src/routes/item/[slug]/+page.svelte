@@ -44,7 +44,7 @@
 	import { buildAcquireLicensePageUrl, buildImageLicenseUrl } from '$lib/seo/licenseUrls';
 	import LicensePurchasePanel from '$lib/licensing/LicensePurchasePanel.svelte';
 	import LicenseRequestPanel from '$lib/licensing/LicenseRequestPanel.svelte';
-	import { getTierPriceCents, isItemForSale, canRequestLicense, resolveItemShopApproved } from '$lib/licensing/tiers';
+	import { getTierPriceCents, isItemForSale, canRequestLicense, resolveItemShopApproved, getCulocaSaleDenial } from '$lib/licensing/tiers';
 	import { isLicenseCuratorClient } from '$lib/licensing/curator';
 	import { userHasAutoApproveCapability, MANAGE_CULOCA_LICENSING_PERMISSION } from '$lib/licensing/shopApproval';
 	import { userPermissions } from '$lib/sessionStore';
@@ -491,13 +491,30 @@
 			isViewerCreator: isItemOwner
 		}) &&
 		!!(image?.profile_id || image?.profile?.id);
+	$: culocaSaleDenial =
+		licensingSale?.saleDenied === true
+			? {
+					denied: true,
+					reason: licensingSale?.saleDeniedReason ?? null,
+					at: null,
+					by: null
+				}
+			: getCulocaSaleDenial(image?.stock_settings);
+	$: showLicenseSaleDeniedHint =
+		contentType?.slug === 'foto' &&
+		!!image?.id &&
+		isItemOwner &&
+		culocaSalesGloballyEnabled &&
+		creatorLicensingOptIn &&
+		culocaSaleDenial.denied;
 	$: showLicenseSalePendingHint =
 		contentType?.slug === 'foto' &&
 		!!image?.id &&
 		isItemOwner &&
 		culocaSalesGloballyEnabled &&
 		creatorLicensingOptIn &&
-		!itemShopApproved;
+		!itemShopApproved &&
+		!culocaSaleDenial.denied;
 	$: ownerCanEditShopApproval =
 		isItemOwner && creatorAutoApprove && userHasAutoApproveCapability($userPermissions);
 	$: licenseStandardPrice = image
@@ -4720,7 +4737,16 @@
 								>.
 							</span>
 						</p>
-						{#if showLicenseSalePendingHint}
+						{#if showLicenseSaleDeniedHint}
+							<p class="license-sale-denied-hint" role="status">
+								<strong>Verkauf nicht freigegeben</strong>
+								{#if culocaSaleDenial.reason}
+									<span>{culocaSaleDenial.reason}</span>
+								{:else}
+									<span>Der Culoca-Kurator hat dieses Bild für den Shop abgelehnt.</span>
+								{/if}
+							</p>
+						{:else if showLicenseSalePendingHint}
 							<p class="license-sale-pending-hint">
 								{#if ownerCanEditShopApproval}
 									Dieses Bild ist vom Shop ausgeschlossen. Unter „Stock konfigurieren“ können Sie es
@@ -6564,6 +6590,24 @@
 		font-size: 0.92rem;
 		color: var(--text-secondary);
 		line-height: 1.45;
+	}
+
+	.license-sale-denied-hint {
+		margin-top: 0.65rem;
+		padding: 0.65rem 0.75rem;
+		border: 1px solid color-mix(in srgb, #dc2626 40%, var(--border-color));
+		border-radius: 10px;
+		background: color-mix(in srgb, #dc2626 7%, var(--bg-secondary));
+		font-size: 0.92rem;
+		color: var(--text-secondary);
+		line-height: 1.5;
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+	}
+
+	.license-sale-denied-hint strong {
+		color: #b91c1c;
 	}
 
 	.adobe-stock-cta {

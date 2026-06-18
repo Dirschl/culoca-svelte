@@ -1,6 +1,7 @@
 import { error, json, type RequestHandler } from '@sveltejs/kit';
 import { createAuthedSupabaseFromRequest, requireAuthedUser } from '$lib/server/authedSupabase';
 import { isLicenseCurator } from '$lib/licensing/curator';
+import { resolveDenialReasonText, type CulocaSaleDenialPresetId } from '$lib/licensing/denialReasons';
 import { MANAGE_CULOCA_LICENSING_PERMISSION } from '$lib/licensing/shopApproval';
 import {
 	getCreatorAutoApprove,
@@ -12,6 +13,14 @@ import {
 	setCulocaInStockSettings
 } from '$lib/stock/itemStockSettings';
 
+const DENIAL_PRESET_IDS = new Set([
+	'no_model_release',
+	'no_castles',
+	'quality',
+	'rights_unclear',
+	'other'
+]);
+
 export const POST: RequestHandler = async ({ request }) => {
 	const supabase = createAuthedSupabaseFromRequest(request);
 	const user = await requireAuthedUser(supabase);
@@ -19,6 +28,11 @@ export const POST: RequestHandler = async ({ request }) => {
 	const body = await request.json().catch(() => ({}));
 	const itemId = typeof body?.itemId === 'string' ? body.itemId : '';
 	const saleApproved = body?.saleApproved === true;
+	const saleDenied = body?.saleDenied === true;
+	const denialPreset =
+		typeof body?.denialPreset === 'string' ? body.denialPreset : '';
+	const denialCustomText =
+		typeof body?.denialCustomText === 'string' ? body.denialCustomText.trim() : '';
 
 	if (!itemId) {
 		throw error(400, 'itemId fehlt');
@@ -49,6 +63,19 @@ export const POST: RequestHandler = async ({ request }) => {
 		);
 	}
 
+	if (saleDenied && !isCurator) {
+		throw error(403, 'Nur der Culoca-Lizenz-Kurator darf einen Verkauf mit Begründung ablehnen.');
+	}
+
+	if (saleDenied) {
+		if (!DENIAL_PRESET_IDS.has(denialPreset)) {
+			throw error(400, 'Bitte einen Ablehnungsgrund wählen.');
+		}
+		if (denialPreset === 'other' && !denialCustomText) {
+			throw error(400, 'Bitte einen Freitext für die Ablehnung angeben.');
+		}
+	}
+
 	if (saleApproved) {
 		const optIn = await getCreatorLicensingOptIn(supabase, item.profile_id);
 		if (!optIn) {
@@ -60,10 +87,18 @@ export const POST: RequestHandler = async ({ request }) => {
 	}
 
 	const now = new Date().toISOString();
+	const denialReason = saleDenied
+		? resolveDenialReasonText(denialPreset as CulocaSaleDenialPresetId, denialCustomText)
+		: null;
+
 	const stock_settings = setCulocaInStockSettings(item.stock_settings, {
 		saleApproved,
 		saleApprovedAt: saleApproved ? now : null,
-		saleApprovedBy: saleApproved ? user.id : null
+		saleApprovedBy: saleApproved ? user.id : null,
+		saleDenied,
+		saleDeniedReason: denialReason,
+		saleDeniedAt: saleDenied ? now : null,
+		saleDeniedBy: saleDenied ? user.id : null
 	});
 
 	const { data: updated, error: updateError } = await supabase
@@ -77,11 +112,16 @@ export const POST: RequestHandler = async ({ request }) => {
 		throw error(500, updateError.message);
 	}
 
+	let message = 'Verkaufsfreigabe für dieses Bild entfernt.';
+	if (saleApproved) {
+		message = 'Bild für Culoca-Lizenzverkauf freigegeben.';
+	} else if (saleDenied) {
+		message = 'Verkauf abgelehnt — der Ersteller sieht die Begründung auf der Bildseite.';
+	}
+
 	return json({
 		ok: true,
 		item: enrichItemWithResolvedAdobeStock(updated as Record<string, unknown>),
-		message: saleApproved
-			? 'Bild für Culoca-Lizenzverkauf freigegeben.'
-			: 'Verkaufsfreigabe für dieses Bild entfernt.'
+		message
 	});
 };

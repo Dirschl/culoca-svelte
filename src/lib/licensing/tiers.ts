@@ -14,6 +14,11 @@ export type CulocaSaleSettings = {
 	saleApproved?: boolean;
 	saleApprovedAt?: string | null;
 	saleApprovedBy?: string | null;
+	/** Kurator-Ablehnung (mit Begründung für den Ersteller) */
+	saleDenied?: boolean;
+	saleDeniedReason?: string | null;
+	saleDeniedAt?: string | null;
+	saleDeniedBy?: string | null;
 	standardPriceCents?: number | null;
 	extendedPriceCents?: number | null;
 };
@@ -44,6 +49,10 @@ export function parseCulocaSaleSettings(raw: unknown): CulocaSaleSettings | null
 		saleApproved,
 		saleApprovedAt: typeof o.saleApprovedAt === 'string' ? o.saleApprovedAt : null,
 		saleApprovedBy: typeof o.saleApprovedBy === 'string' ? o.saleApprovedBy : null,
+		saleDenied: o.saleDenied === true,
+		saleDeniedReason: typeof o.saleDeniedReason === 'string' ? o.saleDeniedReason : null,
+		saleDeniedAt: typeof o.saleDeniedAt === 'string' ? o.saleDeniedAt : null,
+		saleDeniedBy: typeof o.saleDeniedBy === 'string' ? o.saleDeniedBy : null,
 		standardPriceCents:
 			typeof o.standardPriceCents === 'number' ? o.standardPriceCents : null,
 		extendedPriceCents:
@@ -61,7 +70,7 @@ export function isCulocaSaleApproved(stockSettings: unknown): boolean {
 	return getCulocaFromStockSettings(stockSettings)?.saleApproved === true;
 }
 
-export { resolveItemShopApproved, isExplicitShopOptOut } from './shopApproval';
+export { resolveItemShopApproved, isExplicitShopOptOut, getCulocaSaleDenial } from './shopApproval';
 
 export type ItemForSaleInput = {
 	is_private?: boolean | null;

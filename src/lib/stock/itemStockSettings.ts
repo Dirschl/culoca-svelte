@@ -38,6 +38,10 @@ export type ItemStockSettings = {
 		saleApproved?: boolean;
 		saleApprovedAt?: string | null;
 		saleApprovedBy?: string | null;
+		saleDenied?: boolean;
+		saleDeniedReason?: string | null;
+		saleDeniedAt?: string | null;
+		saleDeniedBy?: string | null;
 		standardPriceCents?: number | null;
 		extendedPriceCents?: number | null;
 		/** @deprecated */
@@ -196,8 +200,13 @@ export function setCulocaInStockSettings(
 		culoca: {
 			...(parsedPrev ?? {}),
 			saleApproved: culoca.saleApproved === true,
-			saleApprovedAt: culoca.saleApprovedAt ?? null,
-			saleApprovedBy: culoca.saleApprovedBy ?? null,
+			saleApprovedAt: culoca.saleApproved === true ? (culoca.saleApprovedAt ?? null) : null,
+			saleApprovedBy: culoca.saleApproved === true ? (culoca.saleApprovedBy ?? null) : null,
+			saleDenied: culoca.saleDenied === true,
+			saleDeniedReason:
+				culoca.saleDenied === true ? (culoca.saleDeniedReason?.trim() || null) : null,
+			saleDeniedAt: culoca.saleDenied === true ? (culoca.saleDeniedAt ?? null) : null,
+			saleDeniedBy: culoca.saleDenied === true ? (culoca.saleDeniedBy ?? null) : null,
 			standardPriceCents: culoca.standardPriceCents ?? parsedPrev?.standardPriceCents ?? null,
 			extendedPriceCents: culoca.extendedPriceCents ?? parsedPrev?.extendedPriceCents ?? null
 		}

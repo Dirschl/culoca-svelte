@@ -5,6 +5,12 @@
   import { getSeoImageUrl } from '$lib/utils/seoImageUrl';
   import { slugifySegment } from '$lib/content/routing';
   import { getCulocaFromStockSettings, resolveItemShopApproved } from '$lib/licensing/tiers';
+  import { getCulocaSaleDenial } from '$lib/licensing/shopApproval';
+  import {
+    CULOCA_SALE_DENIAL_PRESETS,
+    matchDenialPresetFromReason,
+    type CulocaSaleDenialPresetId
+  } from '$lib/licensing/denialReasons';
 
   export let item: any;
   export let title = 'Stock-Einstellungen';
@@ -33,12 +39,16 @@
   let flash = '';
   let syncKey = '';
   let culocaSaleApproved = false;
+  let culocaSaleDenied = false;
+  let denialPreset: CulocaSaleDenialPresetId = 'quality';
+  let denialCustomText = '';
   let culocaBusy = false;
 
   $: culocaSettings = getCulocaFromStockSettings(item?.stock_settings);
+  $: culocaDenial = getCulocaSaleDenial(item?.stock_settings);
   $: culocaShopActive = resolveItemShopApproved(item?.stock_settings, creatorAutoApprove);
   $: {
-    const nextKey = `${item?.id || ''}:${item?.adobe_stock_url || ''}:${item?.adobe_stock_asset_id || ''}:${culocaShopActive ? '1' : '0'}`;
+    const nextKey = `${item?.id || ''}:${item?.adobe_stock_url || ''}:${item?.adobe_stock_asset_id || ''}:${culocaShopActive ? '1' : '0'}:${culocaDenial.denied ? 'd' : 'p'}:${culocaDenial.reason || ''}`;
     if (nextKey !== syncKey) {
       syncKey = nextKey;
       stockUrl = item?.adobe_stock_url || '';
@@ -46,7 +56,17 @@
       metadataMode = 'culoca';
       filenameMode = 'web';
       flash = '';
-      culocaSaleApproved = culocaShopActive;
+      culocaSaleApproved = culocaSettings?.saleApproved === true;
+      culocaSaleDenied = culocaDenial.denied;
+      const matched = matchDenialPresetFromReason(culocaDenial.reason);
+      denialPreset = matched.presetId;
+      denialCustomText = matched.customText;
+    }
+  }
+
+  function onCulocaApproveToggle() {
+    if (culocaSaleApproved) {
+      culocaSaleDenied = false;
     }
   }
 
@@ -207,10 +227,24 @@
     culocaBusy = true;
     flash = '';
     try {
+      const payload: Record<string, unknown> = {
+        itemId: item.id,
+        saleApproved: culocaSaleApproved
+      };
+      if (canManageCulocaLicense) {
+        payload.saleDenied = !culocaSaleApproved && culocaSaleDenied;
+        if (payload.saleDenied) {
+          payload.denialPreset = denialPreset;
+          payload.denialCustomText = denialCustomText;
+        }
+      } else {
+        payload.saleDenied = false;
+      }
+
       const res = await authFetch('/api/licensing/item-approval', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ itemId: item.id, saleApproved: culocaSaleApproved })
+        body: JSON.stringify(payload)
       });
       const data = await res.json();
       if (!res.ok) {
@@ -249,7 +283,13 @@
       {#if canEditCulocaShop}
         <span>
           Culoca-Shop:
-          <code>{culocaShopActive ? 'freigegeben' : 'nicht freigegeben'}</code>
+          <code
+            >{culocaShopActive
+              ? 'freigegeben'
+              : culocaDenial.denied
+                ? 'abgelehnt'
+                : 'nicht freigegeben'}</code
+          >
         </span>
       {/if}
     </div>
@@ -360,10 +400,41 @@
             <input
               type="checkbox"
               bind:checked={culocaSaleApproved}
+              on:change={onCulocaApproveToggle}
               disabled={!isItemOwner && !creatorLicensingOptIn}
             />
             <span>Für Culoca-Shop freigeben (Standard/Erweiterte Lizenz)</span>
           </label>
+          {#if canManageCulocaLicense && !culocaSaleApproved}
+            <label class="stock-choice culoca-deny-row">
+              <input type="checkbox" bind:checked={culocaSaleDenied} />
+              <span>Verkauf ablehnen — Ersteller sieht die Begründung auf der Bildseite</span>
+            </label>
+            {#if culocaSaleDenied}
+              <label class="stock-overlay-label">
+                <span>Ablehnungsgrund</span>
+                <select bind:value={denialPreset}>
+                  {#each CULOCA_SALE_DENIAL_PRESETS as preset}
+                    <option value={preset.id}>{preset.label}</option>
+                  {/each}
+                </select>
+              </label>
+              {#if denialPreset === 'other'}
+                <label class="stock-overlay-label">
+                  <span>Begründung (Freitext)</span>
+                  <textarea
+                    bind:value={denialCustomText}
+                    rows="3"
+                    placeholder="z. B. Motiv passt nicht zum Culoca-Sortiment …"
+                  ></textarea>
+                </label>
+              {/if}
+            {:else}
+              <p class="stock-overlay-note stock-overlay-muted">
+                Ohne Freigabe und ohne Ablehnung bleibt das Bild in der Warteschlange.
+              </p>
+            {/if}
+          {/if}
           <div class="stock-overlay-actions">
             <button
               type="button"
@@ -409,6 +480,28 @@
 
   .culoca-approve-row {
     margin-top: 0.5rem;
+  }
+
+  .culoca-deny-row {
+    margin-top: 0.35rem;
+    border-color: color-mix(in srgb, #dc2626 30%, var(--border-color));
+  }
+
+  .stock-overlay-muted {
+    font-size: 0.88rem;
+    color: var(--text-muted);
+  }
+
+  .stock-overlay-label textarea,
+  .stock-overlay-label select {
+    width: 100%;
+    margin-top: 0.35rem;
+    padding: 0.45rem 0.55rem;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font: inherit;
   }
   .stock-overlay-panel {
     width: min(760px, 100%);

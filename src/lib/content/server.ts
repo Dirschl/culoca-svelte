@@ -25,7 +25,7 @@ import { enrichItemWithResolvedAdobeStock } from '$lib/stock/itemStockSettings';
 import { fixDeepUtf8InObject } from '$lib/utils/utf8Mojibake';
 import { isCulocaSalesEnabled } from '$lib/server/lemonSqueezy';
 import { isItemEligibleForSale } from '$lib/server/licensingSale';
-import { resolveItemShopApproved } from '$lib/licensing/tiers';
+import { resolveItemShopApproved, getCulocaSaleDenial } from '$lib/licensing/tiers';
 
 type ItemRecord = ContentItemLike & {
 	user_id?: string | null;
@@ -661,6 +661,7 @@ export async function loadContentPage(args: {
 	const salesGloballyEnabled = isCulocaSalesEnabled();
 	const creatorOptIn = profileData.profile?.culoca_licensing_opt_in === true;
 	const creatorAutoApprove = profileData.profile?.culoca_licensing_auto_approve === true;
+	const culocaDenial = getCulocaSaleDenial(item.stock_settings);
 	const shopApproved = resolveItemShopApproved(item.stock_settings, creatorAutoApprove);
 	const saleEligible =
 		type?.slug === 'foto' &&
@@ -686,7 +687,9 @@ export async function loadContentPage(args: {
 			eligible: saleEligible,
 			creatorOptIn,
 			creatorAutoApprove,
-			shopApproved
+			shopApproved,
+			saleDenied: culocaDenial.denied,
+			saleDeniedReason: culocaDenial.reason
 		},
 		seoHubs: {
 			typePath,
