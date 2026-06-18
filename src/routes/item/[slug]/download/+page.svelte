@@ -163,8 +163,12 @@
 		standard: $page.data.culocaSales?.standardPriceCents ?? 2900,
 		extended: $page.data.culocaSales?.extendedPriceCents ?? 9900
 	};
-	$: creatorLicensingOptIn = image?.profile?.culoca_licensing_opt_in === true;
-	$: creatorAutoApprove = image?.profile?.culoca_licensing_auto_approve === true;
+	$: licensingSale = $page.data.licensingSale;
+	$: creatorLicensingOptIn =
+		licensingSale?.creatorOptIn === true || image?.profile?.culoca_licensing_opt_in === true;
+	$: creatorAutoApprove =
+		licensingSale?.creatorAutoApprove === true ||
+		image?.profile?.culoca_licensing_auto_approve === true;
 	$: saleEligibilityOptions = {
 		salesGloballyEnabled: culocaSalesGloballyEnabled,
 		fotoTypeId,
@@ -176,7 +180,8 @@
 		!canDownload &&
 		!$unifiedRightsStore.loading &&
 		!!image?.id &&
-		isItemForSale(image, saleEligibilityOptions);
+		(licensingSale?.eligible === true ||
+			(culocaSalesGloballyEnabled && isItemForSale(image, saleEligibilityOptions)));
 	$: showLicenseRequest =
 		!isCreator &&
 		!canDownload &&

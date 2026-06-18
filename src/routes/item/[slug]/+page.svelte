@@ -450,9 +450,15 @@
 	$: isLicenseCuratorUser = isLicenseCuratorClient(currentUser?.id);
 	$: canManageCulocaLicensing =
 		isLicenseCuratorUser || $userPermissions?.[MANAGE_CULOCA_LICENSING_PERMISSION] === true;
-	$: creatorLicensingOptIn = image?.profile?.culoca_licensing_opt_in === true;
-	$: creatorAutoApprove = image?.profile?.culoca_licensing_auto_approve === true;
-	$: itemShopApproved = resolveItemShopApproved(image?.stock_settings, creatorAutoApprove);
+	$: licensingSale = $page.data.licensingSale;
+	$: creatorLicensingOptIn =
+		licensingSale?.creatorOptIn === true || image?.profile?.culoca_licensing_opt_in === true;
+	$: creatorAutoApprove =
+		licensingSale?.creatorAutoApprove === true ||
+		image?.profile?.culoca_licensing_auto_approve === true;
+	$: itemShopApproved =
+		licensingSale?.shopApproved === true ||
+		resolveItemShopApproved(image?.stock_settings, creatorAutoApprove);
 	$: saleEligibilityOptions = {
 		salesGloballyEnabled: culocaSalesGloballyEnabled,
 		fotoTypeId,
@@ -460,7 +466,10 @@
 		creatorAutoApprove
 	};
 	$: itemEligibleForSale =
-		contentType?.slug === 'foto' && !!image?.id && isItemForSale(image, saleEligibilityOptions);
+		contentType?.slug === 'foto' &&
+		!!image?.id &&
+		(licensingSale?.eligible === true ||
+			(culocaSalesGloballyEnabled && isItemForSale(image, saleEligibilityOptions)));
 	$: showLicenseShopOwner =
 		contentType?.slug === 'foto' &&
 		!!image?.id &&

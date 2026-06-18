@@ -23,6 +23,9 @@ import { fixUtf8MojibakeIfNeeded, sanitizeItemForItemPageClient } from '$lib/ser
 import { createSupabaseServerClient } from '$lib/server/supabaseServer';
 import { enrichItemWithResolvedAdobeStock } from '$lib/stock/itemStockSettings';
 import { fixDeepUtf8InObject } from '$lib/utils/utf8Mojibake';
+import { isCulocaSalesEnabled } from '$lib/server/lemonSqueezy';
+import { isItemEligibleForSale } from '$lib/server/licensingSale';
+import { resolveItemShopApproved } from '$lib/licensing/tiers';
 
 type ItemRecord = ContentItemLike & {
 	user_id?: string | null;
@@ -655,6 +658,15 @@ export async function loadContentPage(args: {
 					}) as Record<string, unknown>
 				);
 
+	const salesGloballyEnabled = isCulocaSalesEnabled();
+	const creatorOptIn = profileData.profile?.culoca_licensing_opt_in === true;
+	const creatorAutoApprove = profileData.profile?.culoca_licensing_auto_approve === true;
+	const shopApproved = resolveItemShopApproved(item.stock_settings, creatorAutoApprove);
+	const saleEligible =
+		type?.slug === 'foto' &&
+		salesGloballyEnabled &&
+		(await isItemEligibleForSale(supabase, item, { salesGloballyEnabled }));
+
 	return {
 		image: imageForClient,
 		attribution,
@@ -669,6 +681,13 @@ export async function loadContentPage(args: {
 		groupItems: siblings,
 		activeGroupItemId: item.id,
 		availableTypes,
+		licensingSale: {
+			globallyEnabled: salesGloballyEnabled,
+			eligible: saleEligible,
+			creatorOptIn,
+			creatorAutoApprove,
+			shopApproved
+		},
 		seoHubs: {
 			typePath,
 			typeLabel: type?.name || null,
