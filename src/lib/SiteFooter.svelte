@@ -44,6 +44,7 @@
       <ul>
         <li><a href="/web">System</a></li>
         <li><a href="/web/license">Lizenz</a></li>
+        <li><a href="/web/widerruf">Widerruf</a></li>
         <li><a href="/web/google">Google Earth</a></li>
         <li><a href="/web/impressum">Impressum</a></li>
         <li><a href="/web/datenschutz">Datenschutz</a></li>
@@ -62,6 +63,8 @@
     <span>&copy; {year} DIRSCHL.com GmbH</span>
     <span class="footer-sep" aria-hidden="true">&middot;</span>
     <a href="/web/impressum">Impressum</a>
+    <span class="footer-sep" aria-hidden="true">&middot;</span>
+    <a href="/web/widerruf">Widerruf</a>
     <span class="footer-sep" aria-hidden="true">&middot;</span>
     <a href="/web/datenschutz">Datenschutz</a>
   </div>

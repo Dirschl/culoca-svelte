@@ -6,6 +6,7 @@
 		LICENSE_TIER_DESCRIPTIONS,
 		LICENSE_TIER_LABELS
 	} from '$lib/licensing/tiers';
+	import { LEMON_SQUEEZY_CUSTOMER_LINKS as ls } from '$lib/licensing/lemonSqueezyCustomerLinks';
 
 	export let showPurchaseSuccess = false;
 	export let showLicenseIntro = true;
@@ -136,6 +137,8 @@
 			</ul>
 			<p class="legal-link">
 				<a href="/web/license#kommerziell">Allgemeine Lizenzbedingungen</a>
+				· <a href="/web/license#widerruf">Rückerstattung</a>
+				· <a href={ls.myOrders} rel="noopener noreferrer">Rechnungen (LS)</a>
 			</p>
 		</div>
 	{/if}

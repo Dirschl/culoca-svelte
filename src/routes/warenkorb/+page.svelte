@@ -285,7 +285,9 @@
 				</button>
 				<p class="legal-hint">
 					Mit dem Kauf akzeptieren Sie die
-					<a href="/web/license#kommerziell">Culoca-Lizenzbedingungen</a>.
+					<a href="/web/license#kommerziell">Culoca-Lizenzbedingungen</a>
+					sowie die <a href="/web/license#zahlung">Zahlungs- und Rückerstattungsinfos</a>
+					und <a href="/web/widerruf">Widerrufsbelehrung</a> (Lemon Squeezy).
 				</p>
 			</footer>
 		{/if}
