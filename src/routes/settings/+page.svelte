@@ -279,7 +279,11 @@
 
     } catch (error) {
       console.error('Error saving profile:', error);
-      showMessage('Fehler beim Speichern des Profils', 'error');
+      const message =
+        error && typeof error === 'object' && 'message' in error
+          ? String((error as { message: string }).message)
+          : 'Fehler beim Speichern des Profils';
+      showMessage(message, 'error');
     } finally {
       saving = false;
     }

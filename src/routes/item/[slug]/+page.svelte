@@ -44,7 +44,7 @@
 	import { buildAcquireLicensePageUrl, buildImageLicenseUrl } from '$lib/seo/licenseUrls';
 	import LicensePurchasePanel from '$lib/licensing/LicensePurchasePanel.svelte';
 	import LicenseRequestPanel from '$lib/licensing/LicenseRequestPanel.svelte';
-	import { getTierPriceCents, isItemForSale, canRequestLicense } from '$lib/licensing/tiers';
+	import { getTierPriceCents, isItemForSale, canRequestLicense, isCulocaSaleApproved } from '$lib/licensing/tiers';
 	import { isLicenseCuratorClient, LICENSE_CURATOR_USER_ID } from '$lib/licensing/curator';
 	import {
 		getAdministrativeHierarchy,
@@ -455,22 +455,30 @@
 		creatorLicensingOptIn,
 		curatorUserId: LICENSE_CURATOR_USER_ID
 	};
+	$: itemEligibleForSale =
+		contentType?.slug === 'foto' && !!image?.id && isItemForSale(image, saleEligibilityOptions);
 	$: showLicensePurchase =
-		contentType?.slug === 'foto' &&
-		!!image?.id &&
-		!isCreator &&
-		!(canEditItem && editMode) &&
-		isItemForSale(image, saleEligibilityOptions);
+		itemEligibleForSale && !isItemOwner && !(canEditItem && editMode);
+	$: showLicensePurchasePreview =
+		itemEligibleForSale && isItemOwner && !(canEditItem && editMode);
 	$: showLicenseRequest =
 		contentType?.slug === 'foto' &&
 		!!image?.id &&
-		!isCreator &&
+		!isItemOwner &&
+		!isLicenseCuratorUser &&
 		!(canEditItem && editMode) &&
 		canRequestLicense(image, {
 			...saleEligibilityOptions,
-			isViewerCreator: isCreator
+			isViewerCreator: isItemOwner
 		}) &&
 		!!(image?.profile_id || image?.profile?.id);
+	$: showLicenseSalePendingHint =
+		contentType?.slug === 'foto' &&
+		!!image?.id &&
+		isItemOwner &&
+		culocaSalesGloballyEnabled &&
+		creatorLicensingOptIn &&
+		!isCulocaSaleApproved(image?.stock_settings);
 	$: licenseStandardPrice = image
 		? getTierPriceCents('standard', image, culocaSalesPriceDefaults)
 		: culocaSalesPriceDefaults.standard;
@@ -796,9 +804,8 @@
 		$sessionStore.isAuthenticated && $sessionStore.userId ? { id: $sessionStore.userId } : null;
 	$: isCreator =
 		!!currentUser &&
-		(currentUser.id === image?.profile_id ||
-			currentUser.id === image?.user_id ||
-			currentUser.id === '0ceb2320-0553-463b-971a-a0eef5ecdf09');
+		(currentUser.id === image?.profile_id || currentUser.id === image?.user_id);
+	$: isItemOwner = isCreator;
 	$: canEditItem = !!(isCreator || $unifiedRightsStore.rights?.edit);
 
 	// Admin-Berechtigung prüfen
@@ -4403,9 +4410,9 @@
 				</section>
 			{/if}
 
-			{#if showLicensePurchase || showLicenseRequest}
+			{#if showLicensePurchase || showLicensePurchasePreview || showLicenseRequest}
 				<div class="item-detail-inset">
-					{#if showLicensePurchase}
+					{#if showLicensePurchase || showLicensePurchasePreview}
 						<LicensePurchasePanel
 							itemId={image.id}
 							itemTitle={image.title || ''}
@@ -4413,6 +4420,7 @@
 							standardPriceCents={licenseStandardPrice}
 							extendedPriceCents={licenseExtendedPrice}
 							embedded
+							preview={showLicensePurchasePreview}
 						/>
 					{/if}
 					{#if showLicenseRequest}
@@ -4691,6 +4699,17 @@
 								>.
 							</span>
 						</p>
+						{#if showLicenseSalePendingHint}
+							<p class="license-sale-pending-hint">
+								{#if isLicenseCuratorUser}
+									Lizenzverkauf ist erlaubt, dieses Bild ist aber noch nicht shop-freigegeben. Unter
+									„Stock konfigurieren“ → „Für Culoca-Shop freigeben“ aktivieren.
+								{:else}
+									Sie haben dem Lizenzverkauf zugestimmt; der Culoca-Kurator muss dieses Bild noch
+									einzeln freigeben, bevor Käufer es erwerben können.
+								{/if}
+							</p>
+						{/if}
 					{/if}
 				</div>
 				<!-- Column 2: All EXIF/Meta -->
@@ -6505,6 +6524,17 @@
 	}
 	.stock-dashboard-hint a:hover {
 		text-decoration: underline;
+	}
+
+	.license-sale-pending-hint {
+		margin-top: 0.65rem;
+		padding: 0.65rem 0.75rem;
+		border: 1px solid color-mix(in srgb, #f59e0b 45%, var(--border-color));
+		border-radius: 10px;
+		background: color-mix(in srgb, #f59e0b 8%, var(--bg-secondary));
+		font-size: 0.92rem;
+		color: var(--text-secondary);
+		line-height: 1.45;
 	}
 
 	.adobe-stock-cta {

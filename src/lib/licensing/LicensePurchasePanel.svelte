@@ -18,6 +18,8 @@
 	export let compact = false;
 	/** Ohne äußeren Rahmen/Hintergrund (z. B. auf der Bildseite unter der Galerie). */
 	export let embedded = false;
+	/** Ersteller-Vorschau: Shop-Block anzeigen, Warenkorb deaktiviert */
+	export let preview = false;
 
 	let addingTier: LicenseTier | null = null;
 	let cartAddedTier: LicenseTier | null = null;
@@ -71,8 +73,13 @@
 			<p class="license-purchase-subtitle">{itemTitle}</p>
 		{/if}
 		<p class="license-purchase-note">
-			Lizenzen legen Sie in den Warenkorb und bezahlen gesammelt über Lemon Squeezy (Merchant of
-			Record). Nach dem Kauf steht der Download dauerhaft in Ihrem Culoca-Konto bereit.
+			{#if preview}
+				So sehen andere Nutzer den Shop auf dieser Seite. Zum Testen des Kaufs bitte ausloggen oder
+				ein anderes Konto verwenden.
+			{:else}
+				Lizenzen legen Sie in den Warenkorb und bezahlen gesammelt über Lemon Squeezy (Merchant of
+				Record). Nach dem Kauf steht der Download dauerhaft in Ihrem Culoca-Konto bereit.
+			{/if}
 		</p>
 
 		<div class="license-tiers">
@@ -84,10 +91,10 @@
 					<button
 						type="button"
 						class="cart-btn"
-						disabled={addingTier !== null}
+						disabled={preview || addingTier !== null}
 						on:click={() => addToCart(t)}
 					>
-						{addingTier === t ? 'Wird hinzugefügt …' : 'In den Warenkorb'}
+						{preview ? 'Nur Käufer-Vorschau' : addingTier === t ? 'Wird hinzugefügt …' : 'In den Warenkorb'}
 					</button>
 					{#if cartAddedTier === t}
 						<p class="cart-added">

@@ -19,6 +19,7 @@
 	import type { ProfileSection } from '$lib/profile/profileSection';
 	import { isProfileSection } from '$lib/profile/profileSection';
 	import { isLicenseCuratorClient } from '$lib/licensing/curator';
+	import { formatProfileSaveError, upsertProfileRow } from '$lib/profile/upsertProfileRow';
 
 	let user: any = null;
 	let profile: any = null;
@@ -1123,8 +1124,8 @@
 			};
 
 			// Update profile
-			const { error } = await supabase.from('profiles').upsert(profileData, { onConflict: 'id' });
-			if (error) throw error;
+			const { error: saveError, licensingSkipped } = await upsertProfileRow(supabase, profileData);
+			if (saveError) throw saveError;
 
 			// Sync is_private field in items table if privacy mode changed
 			if (privacyModeChanged) {
@@ -1134,7 +1135,14 @@
 
 			profile = profileData;
 			culoca_licensing_opt_in_prev = culoca_licensing_opt_in;
-			showMessage('Profil erfolgreich gespeichert!', 'success');
+			if (licensingSkipped) {
+				showMessage(
+					'Profil gespeichert. Lizenz-Zustimmung konnte noch nicht übernommen werden (Datenbank-Migration ausstehend).',
+					'success'
+				);
+			} else {
+				showMessage('Profil erfolgreich gespeichert!', 'success');
+			}
 			if (avatarPreview) {
 				URL.revokeObjectURL(avatarPreview);
 				avatarPreview = null;
@@ -1144,7 +1152,7 @@
 			setTimeout(() => goto(returnTo), 500);
 		} catch (error) {
 			console.error('Error saving profile:', error);
-			showMessage('Fehler beim Speichern des Profils', 'error');
+			showMessage(formatProfileSaveError(error as { message?: string; code?: string }), 'error');
 		} finally {
 			saving = false;
 		}
