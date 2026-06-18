@@ -1,8 +1,10 @@
 <script lang="ts">
   import { page } from '$app/stores';
   import { PRIMARY_REGIONAL_FEED_PATH } from '$lib/content/routing';
+  import { LEMON_SQUEEZY_CUSTOMER_LINKS as ls } from '$lib/licensing/lemonSqueezyCustomerLinks';
 
   const year = new Date().getFullYear();
+  const externalLinkRel = 'noopener noreferrer';
   /** Region-SEO-Hubs: keine App-Links (Galerie/Karte), nur Inhaltsnavigation. */
   $: regionHubSeo = $page.url.pathname === '/region' || $page.url.pathname.startsWith('/region/');
 </script>
@@ -44,7 +46,10 @@
       <ul>
         <li><a href="/web">System</a></li>
         <li><a href="/web/license">Lizenz</a></li>
-        <li><a href="/web/widerruf">Widerruf</a></li>
+        <li>
+          <a href={ls.buyerTerms} rel={externalLinkRel}>Käufer-AGB (Lemon Squeezy)</a>
+        </li>
+        <li><a href="/web/widerruf">Widerrufsbelehrung</a></li>
         <li><a href="/web/google">Google Earth</a></li>
         <li><a href="/web/impressum">Impressum</a></li>
         <li><a href="/web/datenschutz">Datenschutz</a></li>
@@ -64,9 +69,11 @@
     <span class="footer-sep" aria-hidden="true">&middot;</span>
     <a href="/web/impressum">Impressum</a>
     <span class="footer-sep" aria-hidden="true">&middot;</span>
-    <a href="/web/widerruf">Widerruf</a>
+    <a href="/web/widerruf">Widerrufsbelehrung</a>
     <span class="footer-sep" aria-hidden="true">&middot;</span>
     <a href="/web/datenschutz">Datenschutz</a>
+    <span class="footer-sep" aria-hidden="true">&middot;</span>
+    <a href={ls.buyerTerms} rel={externalLinkRel}>Käufer-AGB</a>
   </div>
 </footer>
 
