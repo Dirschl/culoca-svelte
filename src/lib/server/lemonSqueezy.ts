@@ -86,6 +86,17 @@ export function rewriteCheckoutToHostedOrigin(checkoutUrl: string, hostedOrigin:
 	try {
 		const url = new URL(checkoutUrl);
 		if (url.hostname.endsWith('.lemonsqueezy.com')) return checkoutUrl;
+
+		const knownHosts: Record<string, string> = {
+			'dirschl.com': 'dirschl.lemonsqueezy.com',
+			'www.dirschl.com': 'dirschl.lemonsqueezy.com'
+		};
+		const mapped = knownHosts[url.hostname];
+		if (mapped) {
+			url.hostname = mapped;
+			return url.toString();
+		}
+
 		const origin = new URL(hostedOrigin);
 		url.protocol = origin.protocol;
 		url.hostname = origin.hostname;
@@ -123,9 +134,6 @@ export async function createLemonCheckout(
 			attributes: {
 				custom_price: input.priceCents,
 				test_mode: input.testMode ?? config.testMode,
-				checkout_options: {
-					embed: true
-				},
 				product_options: {
 					name: input.productName,
 					description: input.productDescription,
