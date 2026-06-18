@@ -164,9 +164,22 @@
 
 	.license-purchase-note,
 	.legal-hint {
+		margin: 0;
 		font-size: 0.9rem;
 		color: var(--text-secondary, #666);
 		line-height: 1.45;
+	}
+
+	.shop-active-badge {
+		display: inline-block;
+		margin: 0.75rem 0 0.85rem;
+		padding: 0.4rem 0.75rem;
+		border-radius: 999px;
+		background: color-mix(in srgb, #16a34a 14%, var(--bg-secondary, #f5f5f5));
+		border: 1px solid color-mix(in srgb, #16a34a 45%, transparent);
+		color: #15803d;
+		font-size: 0.88rem;
+		font-weight: 600;
 	}
 
 	.license-tiers {
@@ -214,18 +227,6 @@
 	.cart-btn:disabled {
 		opacity: 0.65;
 		cursor: not-allowed;
-	}
-
-	.shop-active-badge {
-		display: inline-block;
-		margin: 0 0 0.85rem;
-		padding: 0.4rem 0.75rem;
-		border-radius: 999px;
-		background: color-mix(in srgb, #16a34a 14%, var(--bg-secondary, #f5f5f5));
-		border: 1px solid color-mix(in srgb, #16a34a 45%, transparent);
-		color: #15803d;
-		font-size: 0.88rem;
-		font-weight: 600;
 	}
 
 	.owner-tier {
