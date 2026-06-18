@@ -283,12 +283,20 @@
 				>
 					{checkoutLoading ? 'Weiterleitung …' : 'Zur Kasse'}
 				</button>
-				<p class="legal-hint">
-					Mit dem Kauf akzeptieren Sie die
-					<a href="/web/license#kommerziell">Culoca-Lizenzbedingungen</a>
-					sowie die <a href="/web/license#zahlung">Zahlungs- und Rückerstattungsinfos</a>
-					und <a href="/web/widerruf">Widerrufsbelehrung</a> (Lemon Squeezy).
-				</p>
+				<div class="cart-checkout-notes">
+					<p class="legal-hint">
+						Mit dem Kauf akzeptieren Sie die
+						<a href="/web/license#kommerziell">Culoca-Lizenzbedingungen</a>
+						sowie die <a href="/web/license#zahlung">Zahlungs- und Rückerstattungsinfos</a>
+						und <a href="/web/widerruf">Widerrufsbelehrung</a> (Lemon Squeezy).
+					</p>
+					<p class="download-hint">
+						In Culoca werden die erworbenen Lizenzen im
+						<a href="/dashboard?section=licenses">Dashboard → Gekaufte Lizenzen</a>
+						zum Download in voller Auflösung bereitgestellt. Im Einzeldownload können Sie
+						zusätzlich das Format selbst festlegen.
+					</p>
+				</div>
 			</footer>
 		{/if}
 
@@ -314,10 +322,36 @@
 	}
 
 	.intro,
-	.legal-hint,
 	.empty {
 		color: var(--text-secondary, #666);
 		max-width: 60ch;
+	}
+
+	.cart-checkout-notes {
+		margin-top: 1.15rem;
+		display: grid;
+		gap: 0.65rem;
+		max-width: 62ch;
+	}
+
+	.legal-hint,
+	.download-hint {
+		margin: 0;
+		font-size: 0.9rem;
+		line-height: 1.5;
+		color: var(--text-secondary, #666);
+	}
+
+	.legal-hint a,
+	.download-hint a {
+		color: var(--culoca-orange, #ee7221);
+		font-weight: 600;
+		text-decoration: none;
+	}
+
+	.legal-hint a:hover,
+	.download-hint a:hover {
+		text-decoration: underline;
 	}
 
 	.toolbar {
