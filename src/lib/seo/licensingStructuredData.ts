@@ -4,6 +4,52 @@ import {
 	buildAcquireLicensePageUrl,
 	buildImageLicenseUrl
 } from '$lib/seo/licenseUrls';
+import { absoluteUrl } from '$lib/seo/site';
+
+const CULOCA_WIDERRUF_URL = absoluteUrl('/web/widerruf');
+
+/** Gemeinsame Offer-Felder für digitale Bildlizenzen (Google Merchant Listings). */
+function buildDigitalLicenseOfferExtras() {
+	return {
+		itemCondition: 'https://schema.org/NewCondition',
+		hasMerchantReturnPolicy: {
+			'@type': 'MerchantReturnPolicy',
+			applicableCountry: 'DE',
+			returnPolicyCategory: 'https://schema.org/MerchantReturnFiniteReturnWindow',
+			merchantReturnDays: 14,
+			returnMethod: 'https://schema.org/ReturnByMail',
+			returnFees: 'https://schema.org/FreeReturn',
+			merchantReturnLink: CULOCA_WIDERRUF_URL
+		},
+		shippingDetails: {
+			'@type': 'OfferShippingDetails',
+			shippingRate: {
+				'@type': 'MonetaryAmount',
+				value: 0,
+				currency: 'EUR'
+			},
+			shippingDestination: {
+				'@type': 'DefinedRegion',
+				addressCountry: 'DE'
+			},
+			deliveryTime: {
+				'@type': 'ShippingDeliveryTime',
+				handlingTime: {
+					'@type': 'QuantitativeValue',
+					minValue: 0,
+					maxValue: 0,
+					unitCode: 'DAY'
+				},
+				transitTime: {
+					'@type': 'QuantitativeValue',
+					minValue: 0,
+					maxValue: 0,
+					unitCode: 'DAY'
+				}
+			}
+		}
+	};
+}
 
 export function resolveImageLicenseSchemaUrls(args: {
 	commercialSale: boolean;
@@ -28,22 +74,26 @@ export function buildCommercialLicenseOffers(args: {
 	pageUrl: string;
 	standardPriceCents: number;
 	extendedPriceCents: number;
+	itemId?: string | null;
 }) {
-	const offer = (name: string, cents: number) => ({
+	const extras = buildDigitalLicenseOfferExtras();
+	const offer = (name: string, cents: number, tier: 'standard' | 'extended') => ({
 		'@type': 'Offer',
 		name,
 		price: (cents / 100).toFixed(2),
 		priceCurrency: 'EUR',
 		availability: 'https://schema.org/InStock',
 		url: args.pageUrl,
+		...(args.itemId ? { sku: `culoca-license-${tier}-${args.itemId}` } : {}),
 		seller: {
 			'@type': 'Organization',
 			name: 'Culoca'
-		}
+		},
+		...extras
 	});
 	return [
-		offer(LICENSE_TIER_LABELS.standard, args.standardPriceCents),
-		offer(LICENSE_TIER_LABELS.extended, args.extendedPriceCents)
+		offer(LICENSE_TIER_LABELS.standard, args.standardPriceCents, 'standard'),
+		offer(LICENSE_TIER_LABELS.extended, args.extendedPriceCents, 'extended')
 	];
 }
 
@@ -54,16 +104,22 @@ export function buildLicenseProductJsonLd(args: {
 	pageUrl: string;
 	standardPriceCents: number;
 	extendedPriceCents: number;
+	itemId?: string | null;
 }) {
 	return {
 		'@type': 'Product',
 		name: args.productName,
 		description: args.description,
+		brand: {
+			'@type': 'Brand',
+			name: 'Culoca'
+		},
 		...(args.imageUrl ? { image: args.imageUrl } : {}),
 		offers: buildCommercialLicenseOffers({
 			pageUrl: args.pageUrl,
 			standardPriceCents: args.standardPriceCents,
-			extendedPriceCents: args.extendedPriceCents
+			extendedPriceCents: args.extendedPriceCents,
+			itemId: args.itemId
 		})
 	};
 }

@@ -4,7 +4,7 @@ import {
 	buildAcquireLicensePageUrl,
 	buildImageLicenseUrl
 } from './licenseUrls';
-import { resolveImageLicenseSchemaUrls } from './licensingStructuredData';
+import { resolveImageLicenseSchemaUrls, buildLicenseProductJsonLd } from './licensingStructuredData';
 
 describe('licenseUrls', () => {
 	it('builds download acquire URL from canonical path', () => {
@@ -55,5 +55,30 @@ describe('resolveImageLicenseSchemaUrls', () => {
 		expect(
 			resolveImageLicenseSchemaUrls({ commercialSale: false, item: {} }).license
 		).toBe(CULOCA_LICENSE_TERMS_URL);
+	});
+});
+
+describe('buildLicenseProductJsonLd', () => {
+	it('includes brand and merchant listing fields on offers', () => {
+		const product = buildLicenseProductJsonLd({
+			productName: 'Bildlizenz: Test',
+			description: 'Test',
+			pageUrl: 'https://culoca.com/item/x/download',
+			standardPriceCents: 2900,
+			extendedPriceCents: 9900,
+			itemId: 'abc-123'
+		});
+		expect(product.brand).toEqual({ '@type': 'Brand', name: 'Culoca' });
+		expect(product.offers).toHaveLength(2);
+		const offer = product.offers[0] as Record<string, unknown>;
+		expect(offer.sku).toBe('culoca-license-standard-abc-123');
+		expect(offer.hasMerchantReturnPolicy).toMatchObject({
+			'@type': 'MerchantReturnPolicy',
+			merchantReturnLink: 'https://culoca.com/web/widerruf'
+		});
+		expect(offer.shippingDetails).toMatchObject({
+			'@type': 'OfferShippingDetails',
+			shippingRate: { value: 0, currency: 'EUR' }
+		});
 	});
 });

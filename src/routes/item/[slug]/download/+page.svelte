@@ -228,7 +228,8 @@
 					imageUrl: previewImageUrl || null,
 					pageUrl: itemAcquireLicenseUrl,
 					standardPriceCents: licenseStandardPrice,
-					extendedPriceCents: licenseExtendedPrice
+					extendedPriceCents: licenseExtendedPrice,
+					itemId: image.id
 				})
 			: null;
 	$: downloadPageJsonLd =
