@@ -36,5 +36,22 @@ describe('extractPhotoMetadataFields', () => {
     expect(result.caption).toBe('Pfarrkirche St. Georg und Urban im Abendlicht');
     expect(result.description).toBe('Historisches Gotteshaus im Abendlicht.');
   });
+
+  it('does not map IPTC caption-abstract text into caption', () => {
+    const result = extractPhotoMetadataFields({
+      Headline: 'Pfarrkirche St. Georg und Urban, Stubenberg, Rottal-Inn',
+      Caption:
+        'Pfarrkirche St. Georg und Urban in Stubenberg, Rottal-Inn, Niederbayern. Historisches Gotteshaus im ländlichen Holzland, Deutschland.',
+      Description:
+        'Pfarrkirche St. Georg und Urban in Stubenberg, Rottal-Inn, Niederbayern. Historisches Gotteshaus im ländlichen Holzland, Deutschland.',
+      XPSubject: 'Pfarrkirche St. Georg und Urban im Abendlicht'
+    });
+
+    expect(result.title).toBe('Pfarrkirche St. Georg und Urban, Stubenberg, Rottal-Inn');
+    expect(result.caption).toBe('Pfarrkirche St. Georg und Urban im Abendlicht');
+    expect(result.description).toBe(
+      'Pfarrkirche St. Georg und Urban in Stubenberg, Rottal-Inn, Niederbayern. Historisches Gotteshaus im ländlichen Holzland, Deutschland.'
+    );
+  });
 });
 

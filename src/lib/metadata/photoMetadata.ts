@@ -120,15 +120,15 @@ export function extractPhotoMetadataFields(exifData: Record<string, unknown> | n
     exif['photoshop:headline'],
     exif['IPTC:Headline'],
     iptc.Headline,
-    exif['XMP:Caption'],
-    exif['XMP-dc:Caption'],
-    exif['dc:caption'],
-    exif.Caption,
     findNestedText(exif, [
       (key) => key === 'headline',
       (key) => key.endsWith(':headline'),
-      (key) => key === 'caption',
-      (key) => key.endsWith(':caption')
+      (key) => key === 'title',
+      (key) => key.endsWith(':title'),
+      (key) => key === 'xpsubject',
+      (key) => key.endsWith(':xpsubject'),
+      (key) => key === 'xpcomment',
+      (key) => key.endsWith(':xpcomment')
     ])
   );
 

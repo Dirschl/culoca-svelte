@@ -385,6 +385,36 @@ export const POST = async ({ request }) => {
               description = extracted.description;
             }
 
+            // Serverseitige Korrektur für bekannte Import-Fehlbelegung:
+            // - sehr kurzer Titel (z. B. erstes Keyword wie "Abendlicht")
+            // - Caption wurde fälschlich mit Beschreibung belegt
+            // In diesem Fall bevorzugen wir die serverseitig extrahierten Werte.
+            const normalizedFormTitle = (formTitle || '').trim();
+            const normalizedFormCaption = (formCaption || '').trim();
+            const normalizedFormDescription = (formDescription || '').trim();
+            const normalizedExtractedTitle = (extracted.title || '').trim();
+            const normalizedExtractedCaption = (extracted.caption || '').trim();
+            const normalizedExtractedDescription = (extracted.description || '').trim();
+
+            const hasLikelyBrokenClientCaption =
+              normalizedFormCaption.length > 0 &&
+              normalizedFormCaption === normalizedFormDescription &&
+              normalizedExtractedCaption.length > 0 &&
+              normalizedExtractedCaption !== normalizedExtractedDescription;
+
+            const hasLikelyBrokenClientTitle =
+              normalizedFormTitle.length > 0 &&
+              normalizedExtractedTitle.length > normalizedFormTitle.length + 8 &&
+              normalizedFormTitle.length <= 20;
+
+            if (hasLikelyBrokenClientCaption) {
+              caption = normalizedExtractedCaption;
+            }
+
+            if (hasLikelyBrokenClientTitle) {
+              title = normalizedExtractedTitle;
+            }
+
             // Camera info
             if (exif.Make && exif.Model) {
               camera = `${fixEncoding(exif.Make)} ${fixEncoding(exif.Model)}`;
