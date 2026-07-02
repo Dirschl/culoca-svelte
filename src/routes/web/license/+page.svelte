@@ -1,6 +1,7 @@
 <script lang="ts">
   import InfoPageLayout from '$lib/InfoPageLayout.svelte';
   import { LEMON_SQUEEZY_CUSTOMER_LINKS as ls } from '$lib/licensing/lemonSqueezyCustomerLinks';
+  import { CULOCA_CONTACT_EMAIL, culocaContactMailto } from '$lib/site/contact';
   import {
     LICENSE_TIER_DESCRIPTIONS,
     LICENSE_TIER_LABELS
@@ -73,7 +74,7 @@
       "contactPoint": {
         "@type": "ContactPoint",
         "telephone": "+49-179-9766666",
-        "email": "johann.dirschl@gmx.de"
+        "email": "culoca@dirschl.com"
       }
     }
   }
@@ -207,7 +208,7 @@
   </ul>
   <p>
     Schreiben Sie dazu an
-    <a href="mailto:johann.dirschl@gmx.de">johann.dirschl@gmx.de</a> mit
+    <a href={culocaContactMailto}>{CULOCA_CONTACT_EMAIL}</a> mit
     <strong>Bestellnummer</strong> (aus der Lemon-Squeezy-Kaufbestätigung) und den gewünschten Bild-Links.
     Ein Tausch ist eine Kulanzregelung von Culoca/DIRSCHL.com GmbH und ersetzt kein gesetzliches Widerrufsrecht;
     bei berechtigten Rückerstattungen der Zahlung gilt der Abschnitt
@@ -267,7 +268,7 @@
     <li>
       <strong>Technisches Problem</strong> (Download fehlt trotz Zahlung): zuerst
       <a href="/dashboard?section=licenses">Gekaufte Lizenzen</a> prüfen; bei anhaltendem Problem
-      <a href="mailto:johann.dirschl@gmx.de">Culoca-Support</a> mit Bestellnummer kontaktieren.
+      <a href={culocaContactMailto}>Culoca-Support</a> mit Bestellnummer kontaktieren.
     </li>
     <li>
       <strong>Rückerstattung der Zahlung</strong> über Lemon Squeezy:
@@ -346,7 +347,7 @@
     <h2>Kontakt</h2>
     <p>Fragen zu Lizenzen, Tausch oder kommerzieller Nutzung:</p>
     <ul>
-      <li><strong>E-Mail:</strong> <a class="contact-link" href="mailto:johann.dirschl@gmx.de">johann.dirschl@gmx.de</a></li>
+      <li><strong>E-Mail:</strong> <a class="contact-link" href={culocaContactMailto}>{CULOCA_CONTACT_EMAIL}</a></li>
       <li><strong>Telefon:</strong> <a class="contact-link" href="tel:+491799766666">+49 179 9766666</a></li>
     </ul>
     <p>

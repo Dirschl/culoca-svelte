@@ -79,7 +79,7 @@
       "contactPoint": {
         "@type": "ContactPoint",
         "telephone": "+49-179-9766666",
-        "email": "johann.dirschl@gmx.de"
+        "email": "culoca@dirschl.com"
       }
     },
     "breadcrumb": {

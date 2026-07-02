@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { CULOCA_CONTACT_EMAIL, culocaContactMailto } from '$lib/site/contact';
 </script>
 
 <svelte:head>
@@ -29,7 +30,7 @@
       
       <h3>2. Löschung per E-Mail</h3>
       <div class="option-box">
-        <p>Senden Sie eine E-Mail an <a href="mailto:johann.dirschl@gmx.de">johann.dirschl@gmx.de</a> mit dem Betreff "Datenlöschung" und geben Sie folgende Informationen an:</p>
+        <p>Senden Sie eine E-Mail an <a href={culocaContactMailto}>{CULOCA_CONTACT_EMAIL}</a> mit dem Betreff "Datenlöschung" und geben Sie folgende Informationen an:</p>
         <ul>
           <li>Ihren Namen</li>
           <li>Ihre E-Mail-Adresse (mit der Sie sich registriert haben)</li>
@@ -67,7 +68,7 @@
           <strong>Johann Dirschl</strong><br>
           Waldberg 84<br>
           84571 Reischach<br><br>
-          E-Mail: <a href="mailto:johann.dirschl@gmx.de">johann.dirschl@gmx.de</a><br>
+          E-Mail: <a href={culocaContactMailto}>{CULOCA_CONTACT_EMAIL}</a><br>
           Mobil: +49 179 9766666<br>
           Büro: +49 8670 8674004
         </p>

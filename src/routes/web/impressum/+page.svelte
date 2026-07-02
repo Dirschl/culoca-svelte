@@ -1,5 +1,6 @@
 <script>
   import InfoPageLayout from '$lib/InfoPageLayout.svelte';
+  import { CULOCA_CONTACT_EMAIL, culocaContactMailto } from '$lib/site/contact';
 </script>
 
 <svelte:head>
@@ -66,7 +67,7 @@
       "contactPoint": {
         "@type": "ContactPoint",
         "telephone": "+49-179-9766666",
-        "email": "johann.dirschl@gmx.de"
+        "email": "culoca@dirschl.com"
       }
     }
   }
@@ -89,7 +90,7 @@
       <li><strong>Geschäftsführer:</strong> Johann Dirschl</li>
       <li><strong>Adresse:</strong> Waldberg 84, 84571 Reischach</li>
       <li><strong>Telefon:</strong> <a class="contact-link" href="tel:+491799766666">+49 179 9766666</a></li>
-      <li><strong>E-Mail:</strong> <a class="contact-link" href="mailto:johann.dirschl@gmx.de">johann.dirschl@gmx.de</a></li>
+      <li><strong>E-Mail:</strong> <a class="contact-link" href={culocaContactMailto}>{CULOCA_CONTACT_EMAIL}</a></li>
     </ul>
   </div>
   

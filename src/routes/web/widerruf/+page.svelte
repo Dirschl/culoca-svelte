@@ -1,6 +1,7 @@
 <script lang="ts">
   import InfoPageLayout from '$lib/InfoPageLayout.svelte';
   import { LEMON_SQUEEZY_CUSTOMER_LINKS as ls } from '$lib/licensing/lemonSqueezyCustomerLinks';
+  import { CULOCA_CONTACT_EMAIL, culocaContactMailto } from '$lib/site/contact';
 
   const externalLinkRel = 'noopener noreferrer';
 </script>
@@ -75,7 +76,7 @@
         <strong>Nutzungslizenz &amp; Download:</strong> DIRSCHL.com GmbH (Culoca) —
         bei Fragen zur Lizenz oder zum
         <a href="/web/license#tausch">Lizenz-Tausch</a>:
-        <a href="mailto:johann.dirschl@gmx.de">johann.dirschl@gmx.de</a>.
+        <a href={culocaContactMailto}>{CULOCA_CONTACT_EMAIL}</a>.
       </li>
     </ul>
   </div>
@@ -132,7 +133,7 @@
     <p>
       An<br />
       DIRSCHL.com GmbH, Waldberg 84, 84571 Reischach, Deutschland<br />
-      E-Mail: johann.dirschl@gmx.de
+      E-Mail: {CULOCA_CONTACT_EMAIL}
     </p>
     <p>
       — und/oder bei Rückerstattung der Zahlung —<br />
@@ -156,7 +157,7 @@
     <p><strong>Culoca / DIRSCHL.com GmbH</strong> (Lizenz, Tausch, technische Fragen)</p>
     <ul>
       <li>DIRSCHL.com GmbH, Waldberg 84, 84571 Reischach, Deutschland</li>
-      <li>E-Mail: <a href="mailto:johann.dirschl@gmx.de">johann.dirschl@gmx.de</a></li>
+      <li>E-Mail: <a href={culocaContactMailto}>{CULOCA_CONTACT_EMAIL}</a></li>
       <li>Telefon: <a href="tel:+491799766666">+49 179 9766666</a></li>
     </ul>
     <p><strong>Lemon Squeezy</strong> (Zahlung, Rechnung, Rückerstattung)</p>

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { CULOCA_CONTACT_EMAIL, culocaContactMailto } from '$lib/site/contact';
+
   const currentYear = new Date().getFullYear();
 </script>
 
@@ -17,7 +19,7 @@
       <p><strong>Festnetz:</strong> <a href="tel:+49-8670-5590127">+49 8670 5590127</a></p>
       <p><strong>Büro:</strong> <a href="tel:+49-8670-8674004">+49 8670 8674004</a></p>
       <p><strong>Fax:</strong> <a href="tel:+49-8670-8674005">+49 8670 8674005</a></p>
-      <p><strong>Email:</strong> <a href="mailto:johann.dirschl@gmx.de">johann.dirschl@gmx.de</a></p>
+      <p><strong>Email:</strong> <a href={culocaContactMailto}>{CULOCA_CONTACT_EMAIL}</a></p>
     </div>
     
     <div class="footer-section">

@@ -2,6 +2,7 @@
   import { page } from '$app/stores';
   import { PRIMARY_REGIONAL_FEED_PATH } from '$lib/content/routing';
   import { LEMON_SQUEEZY_CUSTOMER_LINKS as ls } from '$lib/licensing/lemonSqueezyCustomerLinks';
+  import { CULOCA_CONTACT_EMAIL, culocaContactMailto } from '$lib/site/contact';
 
   const year = new Date().getFullYear();
   const externalLinkRel = 'noopener noreferrer';
@@ -59,7 +60,7 @@
     <div class="footer-col">
       <h4>Kontakt</h4>
       <p class="footer-company">DIRSCHL.com GmbH</p>
-      <p><a href="mailto:johann.dirschl@gmx.de">johann.dirschl@gmx.de</a></p>
+      <p><a href={culocaContactMailto}>{CULOCA_CONTACT_EMAIL}</a></p>
       <p><a href="tel:+491799766666">+49 179 9766666</a></p>
     </div>
   </div>

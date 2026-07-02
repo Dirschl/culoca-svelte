@@ -9,6 +9,7 @@
   import SiteFooter from '$lib/SiteFooter.svelte';
   import { ITEM_TYPES, ITEM_TYPE_LABELS, getAvailableTypes, getTypeDescription } from '$lib/constants/itemTypes';
   import { extractPhotoMetadataFields } from '$lib/metadata/photoMetadata';
+  import { CULOCA_CONTACT_EMAIL, culocaContactMailto } from '$lib/site/contact';
 
   // Map picker state
   let mapContainer: HTMLElement;
@@ -1479,7 +1480,7 @@
       <div class="bulk-upload-info-tool">
         <p>
           Der Culoca Image Describer ist derzeit als <strong>Beta für macOS</strong> verfügbar und benötigt einen gültigen API-Key. 
-          Bei Interesse melden Sie sich gerne unter <a href="mailto:johann.dirschl@gmx.de">johann.dirschl@gmx.de</a>.
+          Bei Interesse melden Sie sich gerne unter <a href={culocaContactMailto}>{CULOCA_CONTACT_EMAIL}</a>.
         </p>
       </div>
     </section>
