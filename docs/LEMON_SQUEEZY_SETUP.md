@@ -91,6 +91,7 @@ LEMONSQUEEZY_STORE_ID=410993
 LEMONSQUEEZY_WEBHOOK_SECRET=...       # Secret des Culoca-Store-Webhooks (im LS-Dashboard)
 LEMONSQUEEZY_VARIANT_STANDARD_ID=1807065
 LEMONSQUEEZY_VARIANT_EXTENDED_ID=1807072
+# Test: true | Live: false (oder Variable entfernen)
 LEMONSQUEEZY_TEST_MODE=true
 
 # Optional: Checkout-Host, falls Subdomain (z. B. checkout.culoca.com)
@@ -105,16 +106,14 @@ PUBLIC_CULOCA_LICENSE_EXTENDED_PRICE_CENTS=9900
 # CULOCA_LICENSE_CURATOR_USER_ID=0ceb2320-0553-463b-971a-a0eef5ecdf09
 ```
 
-## 2b. Lizenz-Governance (Kurator-Shop)
+## 2b. Lizenz-Governance
 
-Vorerst verkauft nur der **Kurator** (DIRSCHL) kuratiert:
+1. **Migrationen** ausführen (siehe Abschnitt 3 + `2026-06-19` … `2026-06-22`).
+2. **Ersteller** aktiviert im Profil **Bildlizenzen** (`culoca_licensing_opt_in`). Optional: **Auto-Freigabe** (`culoca_licensing_auto_approve`).
+3. **Pro Bild:** Kurator kann freigeben oder ablehnen (Stock-Overlay). Bei Auto-Freigabe gilt das Bild als verkaufbar, bis es explizit abgelehnt wird.
+4. Ohne Opt-in oder ohne Freigabe: kein Shop — Besucher sehen **Lizenz anfragen**.
 
-1. **Migration** `database-migrations/2026-06-19_culoca-licensing-governance.sql` ausführen (`profiles.culoca_licensing_opt_in`).
-2. **Ersteller** stimmt im Profil unter **Bildlizenzen** zu (`culoca_licensing_opt_in`).
-3. **Kurator** gibt pro Bild frei: Stock-/Lizenz-Overlay → „Für Culoca-Shop freigeben“ (`stock_settings.culoca.saleApproved`).
-4. Ohne beides: kein Shop — Besucher sehen **Lizenz anfragen** (Chat mit Ersteller).
-
-API: `POST /api/licensing/item-approval` (nur Kurator).
+API: `POST /api/licensing/item-approval` (Kurator).
 
 `SUPABASE_SERVICE_ROLE_KEY` muss gesetzt sein (Webhook schreibt Lizenzen).
 
@@ -138,10 +137,34 @@ Im Supabase SQL Editor (Reihenfolge):
 
 APIs: `GET/POST/PATCH/DELETE /api/cart`, `POST /api/checkout/cart`
 
-## 5. Testmodus
+## 5. Testmodus → Live (Go-Live)
 
-- `LEMONSQUEEZY_TEST_MODE=true` + LS Test mode
-- Nach Freischaltung: Live mode + `LEMONSQUEEZY_TEST_MODE=false`
+**Aktuell:** Culoca läuft im LS-Testmodus. Für echte Zahlungen beide Seiten umschalten:
+
+### Checkliste
+
+| Schritt | Wo | Aktion |
+|---------|-----|--------|
+| 1 | Lemon Squeezy Dashboard | Store **Culoca** (`#410993`) öffnen → oben **Test mode** → **Live mode** |
+| 2 | Vercel → culoca-svelte → Settings → Environment Variables | `LEMONSQUEEZY_TEST_MODE` auf `false` setzen (oder Variable löschen) |
+| 3 | Vercel | **Redeploy** (Production) |
+| 4 | culoca.com | Testkauf: Bild → Warenkorb → Kasse → echte Zahlung (z. B. Standard €29) |
+| 5 | Supabase | `license_purchases` prüfen: neuer Eintrag nach Webhook |
+| 6 | Dashboard | `/dashboard?section=licenses` → Download verfügbar |
+
+### Wichtig vor dem ersten Live-Kauf
+
+- `CULOCA_SALES_ENABLED=true` und `PUBLIC_CULOCA_SALES_ENABLED=true` (Production)
+- `LEMONSQUEEZY_API_KEY`, `LEMONSQUEEZY_STORE_ID=410993`, Variant-IDs `1807065` / `1807072`
+- Webhook `https://culoca.com/api/webhooks/lemon-squeezy` mit Secret in Vercel
+- `SUPABASE_SERVICE_ROLE_KEY` gesetzt (Webhook + Warenkorb)
+- Ersteller-Profil: `culoca_licensing_opt_in` aktiv; Bild shop-freigegeben oder auto-approve
+
+### Testmodus (Entwicklung)
+
+- LS Dashboard: **Test mode**
+- Vercel: `LEMONSQUEEZY_TEST_MODE=true`
+- Testkäufe erzeugen keine echten Abbuchungen
 
 ## 6. Migration vom gemeinsamen dirschl-Store
 

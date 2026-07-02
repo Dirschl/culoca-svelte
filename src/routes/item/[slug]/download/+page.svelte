@@ -23,10 +23,7 @@
 	} from '$lib/licensing/tiers';
 	import { DEFAULT_CONTENT_TYPES } from '$lib/content/types';
 	import { buildAcquireLicensePageUrl, buildImageLicenseUrl } from '$lib/seo/licenseUrls';
-	import {
-		buildLicenseProductJsonLd,
-		resolveImageLicenseSchemaUrls
-	} from '$lib/seo/licensingStructuredData';
+	import { resolveImageLicenseSchemaUrls } from '$lib/seo/licensingStructuredData';
 	import { toCanonicalAbsoluteUrl } from '$lib/seo/site';
 
 	export let data: any;
@@ -220,18 +217,6 @@
 		item: image || {},
 		attributionLicenseUrl: data?.attribution?.licenseUrl
 	});
-	$: downloadProductJsonLd =
-		shopCommercialSale && itemAcquireLicenseUrl
-			? buildLicenseProductJsonLd({
-					productName: `Bildlizenz: ${downloadPageTitle}`,
-					description: downloadMetaDescription,
-					imageUrl: previewImageUrl || null,
-					pageUrl: itemAcquireLicenseUrl,
-					standardPriceCents: licenseStandardPrice,
-					extendedPriceCents: licenseExtendedPrice,
-					itemId: image.id
-				})
-			: null;
 	$: downloadPageJsonLd =
 		downloadPageUrl && image
 			? {
@@ -247,7 +232,17 @@
 							description: downloadMetaDescription,
 							inLanguage: 'de',
 							isPartOf: { '@type': 'WebSite', name: 'Culoca', url: 'https://culoca.com/' },
-							...(downloadProductJsonLd ? { mainEntity: downloadProductJsonLd } : {})
+							...(shopCommercialSale && previewImageUrl
+								? {
+										mainEntity: {
+											'@type': 'ImageObject',
+											contentUrl: previewImageUrl,
+											name: downloadPageTitle,
+											license: licenseSchemaUrls.license,
+											acquireLicensePage: licenseSchemaUrls.acquireLicensePage
+										}
+									}
+								: {})
 						}
 					]
 				}

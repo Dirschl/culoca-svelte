@@ -42,10 +42,7 @@
 		trimText
 	} from '$lib/seo/site';
 	import { buildAcquireLicensePageUrl, buildImageLicenseUrl } from '$lib/seo/licenseUrls';
-	import {
-		buildLicenseProductJsonLd,
-		resolveImageLicenseSchemaUrls
-	} from '$lib/seo/licensingStructuredData';
+	import { resolveImageLicenseSchemaUrls } from '$lib/seo/licensingStructuredData';
 	import LicensePurchasePanel from '$lib/licensing/LicensePurchasePanel.svelte';
 	import LicenseRequestPanel from '$lib/licensing/LicenseRequestPanel.svelte';
 	import { getTierPriceCents, isItemForSale, canRequestLicense, resolveItemShopApproved, getCulocaSaleDenial } from '$lib/licensing/tiers';
@@ -534,24 +531,6 @@
 		item: image || {},
 		attributionLicenseUrl: attribution?.licenseUrl
 	});
-	$: licenseProductImageUrl = (() => {
-		if (!image?.slug) return null;
-		const path = image.path_2048 || image.path_512;
-		const ext = path?.match(/\.(jpg|jpeg|webp|png)$/i)?.[0]?.toLowerCase() || '.jpg';
-		return `https://culoca.com/images/${image.slug}-2048${ext}`;
-	})();
-	$: licenseProductJsonLd =
-		itemEligibleForSale && image?.id && itemAcquireLicenseUrl
-			? buildLicenseProductJsonLd({
-					productName: `Bildlizenz: ${image.title || image.original_name || 'Culoca Foto'}`,
-					description: `Kommerzielle Standard- oder Erweiterte Lizenz für „${image.title || image.original_name || 'Foto'}“ auf Culoca.`,
-					imageUrl: licenseProductImageUrl,
-					pageUrl: itemAcquireLicenseUrl,
-					standardPriceCents: licenseStandardPrice,
-					extendedPriceCents: licenseExtendedPrice,
-					itemId: image.id
-				})
-			: null;
 	$: heroSeoDimensions = (() => {
 		if (!image) return { width: 2048, height: 1365 };
 		const originalWidth = image.width || 2048;
@@ -3725,8 +3704,7 @@
 						primaryImageOfPage: {
 							'@id': imageUrl2048
 						}
-					},
-					...(licenseProductJsonLd ? [licenseProductJsonLd] : [])
+					}
 				]
 			},
 			null,
