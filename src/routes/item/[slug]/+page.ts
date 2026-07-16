@@ -1,4 +1,5 @@
 import type { PageLoad } from './$types';
+import { toCanonicalAbsoluteUrl } from '$lib/seo/site';
 
 export const load: PageLoad = async ({ data, url }) => {
 	const image = data?.image;
@@ -44,7 +45,7 @@ export const load: PageLoad = async ({ data, url }) => {
 				image.description ||
 				image.caption ||
 				`Bild von ${image.title || image.original_name || 'unbekannt'}`,
-			url: url.toString().replace(/\/$/, '') + '/', // Ensure trailing slash
+			url: data?.canonicalPath ? toCanonicalAbsoluteUrl(data.canonicalPath) : url.toString().replace(/\/$/, ''),
 			author: attribution?.authorMeta ?? attribution?.creatorName ?? '',
 			publishedTime: image.created_at || '',
 			width: width2048, // Use 2048px dimensions, not original

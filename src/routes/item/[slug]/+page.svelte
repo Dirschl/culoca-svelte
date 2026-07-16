@@ -331,6 +331,10 @@
 		...geoHierarchyLevels.map((level) => ({ name: level.label, path: level.path }))
 	]);
 	$: itemBreadcrumbJsonLd = buildBreadcrumbJsonLd(geoBreadcrumbLinks);
+	$: itemBreadcrumbGraphNode = {
+		'@type': itemBreadcrumbJsonLd['@type'],
+		itemListElement: itemBreadcrumbJsonLd.itemListElement
+	};
 	$: geoPlaceGraph = buildGeoPlaceGraph({
 		currentPath: canonicalPath
 			? canonicalPathNormalized(canonicalPath)
@@ -3584,6 +3588,7 @@
 		{@const imageUrl2048 =
 			primaryImageAbsoluteUrl ||
 			(hasPath2048 ? `https://culoca.com/images/${image.slug}-2048${fileExtension}` : '')}
+		{@const imageUrl512 = image?.slug ? buildSeoSizedImageUrl('512') || '' : ''}
 
 		<!-- Calculate dimensions for 2048px and 512px versions (proportional scaling) -->
 		<!-- Note: image.width and image.height are original dimensions after EXIF orientation -->
@@ -3650,13 +3655,15 @@
 			{
 				'@context': 'https://schema.org',
 				'@graph': [
-					itemBreadcrumbJsonLd,
+					itemBreadcrumbGraphNode,
 					...geoPlaceGraph.nodes,
 					{
 						'@type': 'ImageObject',
 						'@id': imageUrl2048,
 						url: imageUrl2048,
 						contentUrl: imageUrl2048,
+						thumbnailUrl: imageUrl512 || imageUrl2048,
+						image: imageUrl2048,
 						name: normalizedItemName,
 						caption: normalizedCaption,
 						description: normalizedDescription,
@@ -3702,6 +3709,12 @@
 							'@id': geoPlaceGraph.currentPlaceId
 						},
 						primaryImageOfPage: {
+							'@id': imageUrl2048
+						},
+						image: {
+							'@id': imageUrl2048
+						},
+						mainEntity: {
 							'@id': imageUrl2048
 						}
 					}

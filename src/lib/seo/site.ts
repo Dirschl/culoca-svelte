@@ -121,14 +121,14 @@ export function buildGeoPlaceGraph(input: GeoPlaceJsonLdInput) {
       ? {
           key: 'state',
           name: stateName,
-          path: input.countryPath || input.currentPath
+          path: input.statePath || input.countryPath || input.currentPath
         }
       : null,
     regionName && !samePlaceValue(regionName, stateName) && !samePlaceValue(regionName, districtName)
       ? {
           key: 'region',
           name: regionName,
-          path: input.districtPath || input.countryPath || input.currentPath
+          path: input.regionPath || input.statePath || input.countryPath || input.currentPath
         }
       : null,
     districtName
