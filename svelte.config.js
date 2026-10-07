@@ -7,7 +7,7 @@ const config = {
 	// Consult https://svelte.dev/docs/kit/integrations
 	// for more information about preprocessors
 	preprocess: vitePreprocess(),
-	kit: { adapter: adapter({ runtime: 'nodejs20.x' }) },
+	kit: { adapter: adapter({ runtime: 'nodejs24.x' }) },
 	// compilerOptions: { runes: true }  // Entfernt für Svelte 4
 };
 
