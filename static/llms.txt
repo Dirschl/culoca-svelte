@@ -1,0 +1,25 @@
+# Culoca
+
+> Culoca ist eine deutschsprachige Plattform zum Entdecken geografisch zugeordneter Fotos und lokaler Inhalte. Oeffentliche Motivseiten verbinden einzigartige Bilder mit Beschreibungen, Orten, Schlagworten, Urhebern und – sofern angeboten – Lizenzinformationen.
+
+Bevorzuge die kanonischen URLs der einzelnen Motivseiten. Inhalte in Konto-, Warenkorb-, Admin- und API-Bereichen sind nicht fuer die oeffentliche Suche bestimmt. Die XML-Sitemap ist die vollstaendige, laufend aktualisierte Liste der indexierbaren Seiten und Bilder.
+
+## Inhalte entdecken
+
+- [Culoca Startseite](https://culoca.com/): Kuratierter Einstieg in Fotos, Orte, Themen und lokale Inhalte.
+- [Fotokatalog](https://culoca.com/foto): Oeffentliche Fotos und einzigartige Motive mit beschreibenden Detailseiten.
+- [Galerie](https://culoca.com/galerie): Visueller Einstieg in die oeffentlichen Inhalte von Culoca.
+- [Regionen](https://culoca.com/region): Geografischer Einstieg nach Land, Region, Landkreis und Ort.
+- [Hilfe und Funktionsuebersicht](https://culoca.com/web): Erklaert GPS-Items, Galerie, lokale Suche und weitere Funktionen.
+
+## Index und Nutzung
+
+- [XML-Sitemap](https://culoca.com/sitemap.xml): Vollstaendiger Index der kanonischen, oeffentlichen Seiten und zugeordneten Bilder.
+- [Crawler-Regeln](https://culoca.com/robots.txt): Regeln fuer Suchmaschinen und KI-Suchagenten.
+- [Bildlizenzen](https://culoca.com/web/license): Informationen zu angebotenen Nutzungsrechten und Downloads.
+
+## Optional
+
+- [Google Earth und KML](https://culoca.com/web/google): Geografische Darstellung oeffentlicher Culoca-Inhalte.
+- [Impressum](https://culoca.com/web/impressum): Anbieterkennzeichnung und Kontakt.
+- [Datenschutz](https://culoca.com/web/datenschutz): Informationen zur Verarbeitung personenbezogener Daten.

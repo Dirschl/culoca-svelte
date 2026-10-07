@@ -136,6 +136,10 @@
   });
 </script>
 
+<svelte:head>
+  <link rel="describedby" href="/llms.txt" type="text/markdown" />
+</svelte:head>
+
 <div class="app">
   <slot />
   <GlobalUtilityFabs />
