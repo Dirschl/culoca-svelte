@@ -1,8 +1,13 @@
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
+import { configDefaults } from 'vitest/config';
 
-export default defineConfig({
+const config = {
 	plugins: [sveltekit()],
+	test: {
+		// Historical source snapshots are reference material, not executable test suites.
+		exclude: [...configDefaults.exclude, 'src-backup-*/**']
+	},
 	build: {
 		rollupOptions: {
 			output: {
@@ -24,4 +29,6 @@ export default defineConfig({
 			allow: ['..']
 		}
 	}
-});
+};
+
+export default defineConfig(config);

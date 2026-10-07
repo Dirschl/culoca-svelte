@@ -19,7 +19,9 @@ Aktuell zwei Stores im selben Account:
 
 Culoca verwendet **nur den Culoca-Store** (`LEMONSQUEEZY_STORE_ID=410993`). Der dirschl-Store (`389397`) bleibt für SaaS-Produkte.
 
-**API-Key:** Ein Account-Key gilt für alle Stores im Konto (dirschl + culoca). Kein separater Key nötig.
+**Wichtig:** Test- und Live-Modus verwenden getrennte API-Keys, Webhooks, Produkte und
+Variant-IDs. Die unten dokumentierten IDs sind der derzeit getestete Testmodus-Stand und
+dürfen nicht ungeprüft als Live-IDs übernommen werden.
 
 Referenz: [Multiple Stores](https://docs.lemonsqueezy.com/help/your-account/multiple-stores) · [Custom Domain](https://docs.lemonsqueezy.com/help/domains/adding-a-custom-domain)
 
@@ -41,7 +43,7 @@ Im Dashboard (Account-Dropdown → **Stores** → **New store**):
 
 Keine LS-Lizenzschlüssel — Culoca verwaltet Rechte in `license_purchases`.
 
-### Produkte im Culoca-Store (Stand 2026-06-18)
+### Produkte im Culoca-Store, Testmodus (Stand 2026-06-18)
 
 | Produkt | Produkt-ID | Variant-ID (API) | Checkout-Slug (Share-URL) | Preis |
 |---------|------------|------------------|-----------------------------|-------|
@@ -78,7 +80,9 @@ Der dirschl-Webhook (`www.dirschl.com/wp-json/…`) bleibt im dirschl-Store unve
 
 ### API-Key
 
-Settings → API: derselbe Account-Key funktioniert für alle Stores. Beim Checkout/API-Call wird der Store über `LEMONSQUEEZY_STORE_ID` gewählt.
+Settings → API: Für Produktion einen **Live-API-Key** verwenden. Ein Test-Key kann
+keine Live-Ressourcen ansprechen. Der Checkout/API-Call wählt den Store zusätzlich über
+`LEMONSQUEEZY_STORE_ID`.
 
 ## 2. Umgebungsvariablen (Vercel)
 
@@ -139,24 +143,27 @@ APIs: `GET/POST/PATCH/DELETE /api/cart`, `POST /api/checkout/cart`
 
 ## 5. Testmodus → Live (Go-Live)
 
-**Aktuell:** Culoca läuft im LS-Testmodus. Für echte Zahlungen beide Seiten umschalten:
+**Aktuell:** Culoca läuft im LS-Testmodus. Ein Umschalten der einzelnen Variable genügt
+nicht: Lemon Squeezy trennt Test- und Live-Ressourcen vollständig.
 
 ### Checkliste
 
 | Schritt | Wo | Aktion |
 |---------|-----|--------|
-| 1 | Lemon Squeezy Dashboard | Store **Culoca** (`#410993`) öffnen → oben **Test mode** → **Live mode** |
-| 2 | Vercel → culoca-svelte → Settings → Environment Variables | `LEMONSQUEEZY_TEST_MODE` auf `false` setzen (oder Variable löschen) |
-| 3 | Vercel | **Redeploy** (Production) |
-| 4 | culoca.com | Testkauf: Bild → Warenkorb → Kasse → echte Zahlung (z. B. Standard €29) |
-| 5 | Supabase | `license_purchases` prüfen: neuer Eintrag nach Webhook |
-| 6 | Dashboard | `/dashboard?section=licenses` → Download verfügbar |
+| 1 | Lemon Squeezy Dashboard | Culoca-Store aktivieren und in **Live mode** wechseln |
+| 2 | Lemon Squeezy | Standard- und Erweiterte Lizenz in Live anlegen/kopieren; die neuen Live-Variant-IDs notieren |
+| 3 | Lemon Squeezy → Settings → API | neuen **Live-API-Key** erstellen |
+| 4 | Lemon Squeezy → Webhooks (Live) | `https://culoca.com/api/webhooks/lemon-squeezy` mit `order_created` und `order_refunded` anlegen; neues Secret notieren |
+| 5 | Vercel → culoca-svelte → Environment Variables | Live-Key, Live-Variant-IDs, Live-Webhook-Secret und ggf. Live-Store-ID einsetzen; `LEMONSQUEEZY_TEST_MODE=false` |
+| 6 | Vercel | **Redeploy** (Production) und `/api/health` sowie Checkout kontrollieren |
+| 7 | culoca.com | Einen echten Kauf mit kleinem Betrag durchführen und anschließend erstatten |
+| 8 | Supabase/Dashboard | Kaufrecht, Download, Warenkorb-Leerung und Entzug nach Erstattung prüfen |
 
 ### Wichtig vor dem ersten Live-Kauf
 
 - `CULOCA_SALES_ENABLED=true` und `PUBLIC_CULOCA_SALES_ENABLED=true` (Production)
-- `LEMONSQUEEZY_API_KEY`, `LEMONSQUEEZY_STORE_ID=410993`, Variant-IDs `1807065` / `1807072`
-- Webhook `https://culoca.com/api/webhooks/lemon-squeezy` mit Secret in Vercel
+- Live-Werte für `LEMONSQUEEZY_API_KEY`, Store-ID und beide Variant-IDs (nicht die oben stehenden Test-IDs voraussetzen)
+- Live-Webhook `https://culoca.com/api/webhooks/lemon-squeezy` mit seinem Live-Secret in Vercel
 - `SUPABASE_SERVICE_ROLE_KEY` gesetzt (Webhook + Warenkorb)
 - Ersteller-Profil: `culoca_licensing_opt_in` aktiv; Bild shop-freigegeben oder auto-approve
 

@@ -31,7 +31,7 @@ async function mergeProfileLicensingFlags(
 	}
 
 	if (!data) return row;
-	return { ...row, ...data };
+	return { ...row, ...(data as unknown as Record<string, unknown>) };
 }
 
 /**

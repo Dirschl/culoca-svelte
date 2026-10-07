@@ -20,6 +20,8 @@ function applyMultiWordSearch<T>(query: T, search: string) {
   return nextQuery;
 }
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 async function attachChildCounts(items: any[]) {
   const rootIds = items
     .filter((item) => !item.group_root_item_id)
@@ -30,7 +32,8 @@ async function attachChildCounts(items: any[]) {
   const { data, error } = await supabase
     .from('items')
     .select('group_root_item_id')
-    .in('group_root_item_id', rootIds);
+    .in('group_root_item_id', rootIds)
+    .or('is_private.is.null,is_private.eq.false');
 
   if (error || !data) {
     return items.map((item) => ({ ...item, child_count: 0 }));
@@ -141,7 +144,7 @@ async function fetchVisibleRpcPage({
 
 export async function GET({ url }: any) {
   try {
-    const page = parseInt(url.searchParams.get('page') || '0');
+    const page = Math.max(0, parseInt(url.searchParams.get('page') || '0') || 0);
     const search = url.searchParams.get('search') || '';
     const lat = parseFloat(url.searchParams.get('lat') || '0');
     const lon = parseFloat(url.searchParams.get('lon') || '0');
@@ -150,26 +153,21 @@ export async function GET({ url }: any) {
     const userId = url.searchParams.get('user_id');
     const typeId = parseInt(url.searchParams.get('type_id') || '0') || null;
     const pageSize = Math.min(100, Math.max(1, parseInt(url.searchParams.get('page_size') || '50') || 50));
+
+    if (userId && !UUID_PATTERN.test(userId)) {
+      return json({ error: 'Invalid user_id' }, { status: 400 });
+    }
     
     console.log('[Search API] Request params:', { page, search, lat, lon, locationFilterLat, locationFilterLon, userId });
 
-    // Hole aktuelle User-ID für Privacy-Filter
-    const { data: { user } } = await supabase.auth.getUser();
-    const currentUserId = user?.id || null;
-
-    // Verwende IMMER die gallery_items_search_postgis Funktion
-    // Diese Funktion wendet den User-Filter korrekt an, auch ohne Suchbegriff
     logDatabaseOperation('Calling gallery_items_search_postgis', { page, lat, lon, userId, search });
     
-    // Wenn User-Filter gesetzt ist: Verwende userId als current_user_id
-    // Wenn kein User-Filter: Verwende eingeloggten User für Privacy
-    const effectiveUserId = userId || currentUserId;
-
     // Kein Standort aktiv: Suchtreffer nach Aktualität statt Distanz.
-    // Gilt nur ohne User-Filter und ohne Location-Filter.
+    // Profilfilter laufen ebenfalls über die direkte, strikt öffentliche Abfrage:
+    // Eine frei übergebene Profil-ID darf nie als angemeldeter Benutzer gelten.
     const hasLocationFilter = locationFilterLat !== 0 && locationFilterLon !== 0;
     const hasGpsCoordinates = lat !== 0 && lon !== 0;
-    if (!hasGpsCoordinates && !hasLocationFilter && !userId) {
+    if ((!hasGpsCoordinates && !hasLocationFilter) || userId) {
       const from = page * pageSize;
       const to = from + pageSize - 1;
       const trimmedSearch = search.trim();
@@ -195,10 +193,10 @@ export async function GET({ url }: any) {
         query = query.eq('type_id', typeId);
       }
 
-      if (currentUserId) {
-        query = query.or(`is_private.is.null,is_private.eq.false,profile_id.eq.${currentUserId}`);
-      } else {
-        query = query.or('is_private.is.null,is_private.eq.false');
+      query = query.or('is_private.is.null,is_private.eq.false');
+
+      if (userId) {
+        query = query.eq('profile_id', userId);
       }
 
       const { data: newestItems, error: newestError, count } = await query;
@@ -218,7 +216,7 @@ export async function GET({ url }: any) {
         search,
         hasGPS: false,
         hasLocationFilter: false,
-        hasUserFilter: false,
+        hasUserFilter: !!userId,
         sortMode: 'latest'
       });
     }
@@ -230,13 +228,12 @@ export async function GET({ url }: any) {
       user_lon: lon || 0,
       page_value: page,
       page_size_value: pageSize,
-      current_user_id: effectiveUserId,
+      current_user_id: null,
       search_term: searchTerm
     });
     console.log('[Search API] User filter logic:', { 
       userId, 
-      currentUserId, 
-      effectiveUserId,
+      effectiveUserId: null,
       hasUserFilter: !!userId,
       searchTerm: search,
       hasSearchTerm: !!(search && search.trim() !== '')
@@ -247,7 +244,7 @@ export async function GET({ url }: any) {
       pageSize,
       lat,
       lon,
-      effectiveUserId,
+      effectiveUserId: null,
       searchTerm,
       typeId
     });
@@ -298,11 +295,7 @@ export async function GET({ url }: any) {
       visibleCountQuery = applyMultiWordSearch(visibleCountQuery, trimmedSearch);
     }
 
-    if (currentUserId) {
-      visibleCountQuery = visibleCountQuery.or(`is_private.is.null,is_private.eq.false,profile_id.eq.${currentUserId}`);
-    } else {
-      visibleCountQuery = visibleCountQuery.or('is_private.is.null,is_private.eq.false');
-    }
+    visibleCountQuery = visibleCountQuery.or('is_private.is.null,is_private.eq.false');
 
     if (userId) {
       visibleCountQuery = visibleCountQuery.eq('profile_id', userId);

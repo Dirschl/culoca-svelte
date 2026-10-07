@@ -121,7 +121,7 @@
     return !!normalizeFieldValue(value || '');
   }
 
-  function isFiniteCoordinate(value: number | null | undefined): boolean {
+  function isFiniteCoordinate(value: number | null | undefined): value is number {
     return typeof value === 'number' && Number.isFinite(value);
   }
 
@@ -1030,16 +1030,19 @@
       return { destroy() {} };
     }
 
+    const stickyElement = stickyInner;
+    const cardElement = card;
+
     const desktopBreakpoint = 860;
     const stickyTop = 120;
     const bottomGap = 16;
 
     function resetStyles() {
-      stickyInner.style.position = '';
-      stickyInner.style.top = '';
-      stickyInner.style.left = '';
-      stickyInner.style.width = '';
-      stickyInner.style.bottom = '';
+      stickyElement.style.position = '';
+      stickyElement.style.top = '';
+      stickyElement.style.left = '';
+      stickyElement.style.width = '';
+      stickyElement.style.bottom = '';
     }
 
     function updateSticky() {
@@ -1048,34 +1051,34 @@
         return;
       }
 
-      const cardRect = card.getBoundingClientRect();
+      const cardRect = cardElement.getBoundingClientRect();
       const nodeRect = node.getBoundingClientRect();
-      const stickyHeight = stickyInner.offsetHeight;
+      const stickyHeight = stickyElement.offsetHeight;
       const maxStickyTop = cardRect.bottom - stickyHeight - bottomGap;
 
       if (cardRect.top > stickyTop) {
-        stickyInner.style.position = 'sticky';
-        stickyInner.style.top = `${stickyTop}px`;
-        stickyInner.style.left = '';
-        stickyInner.style.width = '';
-        stickyInner.style.bottom = '';
+        stickyElement.style.position = 'sticky';
+        stickyElement.style.top = `${stickyTop}px`;
+        stickyElement.style.left = '';
+        stickyElement.style.width = '';
+        stickyElement.style.bottom = '';
         return;
       }
 
       if (maxStickyTop <= stickyTop) {
-        stickyInner.style.position = 'absolute';
-        stickyInner.style.top = 'auto';
-        stickyInner.style.left = '1rem';
-        stickyInner.style.width = 'calc(100% - 2rem)';
-        stickyInner.style.bottom = `${bottomGap}px`;
+        stickyElement.style.position = 'absolute';
+        stickyElement.style.top = 'auto';
+        stickyElement.style.left = '1rem';
+        stickyElement.style.width = 'calc(100% - 2rem)';
+        stickyElement.style.bottom = `${bottomGap}px`;
         return;
       }
 
-      stickyInner.style.position = 'fixed';
-      stickyInner.style.top = `${stickyTop}px`;
-      stickyInner.style.left = `${nodeRect.left + 16}px`;
-      stickyInner.style.width = `${Math.max(node.clientWidth - 32, 0)}px`;
-      stickyInner.style.bottom = '';
+      stickyElement.style.position = 'fixed';
+      stickyElement.style.top = `${stickyTop}px`;
+      stickyElement.style.left = `${nodeRect.left + 16}px`;
+      stickyElement.style.width = `${Math.max(node.clientWidth - 32, 0)}px`;
+      stickyElement.style.bottom = '';
     }
 
     const onScrollOrResize = () => {
@@ -1084,7 +1087,7 @@
 
     const resizeObserver = new ResizeObserver(onScrollOrResize);
     resizeObserver.observe(node);
-    resizeObserver.observe(stickyInner);
+    resizeObserver.observe(stickyElement);
     window.addEventListener('scroll', onScrollOrResize, { passive: true });
     window.addEventListener('resize', onScrollOrResize);
     onScrollOrResize();

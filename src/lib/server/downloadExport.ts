@@ -1,4 +1,4 @@
-import type { Gravity, Metadata, Sharp, Strategy } from 'sharp';
+import type { Gravity, Metadata, Sharp } from 'sharp';
 import { promises as fs } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -84,13 +84,18 @@ const DEFAULT_OPTIONS: Required<
 const SOURCE_CACHE_TTL_MS = 5 * 60 * 1000;
 const SOURCE_CACHE_MAX_ENTRIES = 24;
 
-let sharpFactoryPromise: Promise<(typeof import('sharp'))['default']> | null = null;
+type SharpFactory = typeof import('sharp');
+
+let sharpFactoryPromise: Promise<SharpFactory> | null = null;
 const sourceBufferCache = new Map<string, { buffer: Buffer; expiresAt: number }>();
 const sourceBufferInflight = new Map<string, Promise<Buffer>>();
 
 async function getSharp() {
 	if (!sharpFactoryPromise) {
-		sharpFactoryPromise = import('sharp').then((module) => module.default);
+		sharpFactoryPromise = import('sharp').then((module) => {
+			const imported = module as unknown as { default?: SharpFactory };
+			return imported.default ?? (module as unknown as SharpFactory);
+		});
 	}
 
 	return sharpFactoryPromise;
@@ -789,7 +794,7 @@ export async function renderDownloadExport(
 		width: number;
 		height: number;
 		fit: 'cover' | 'inside';
-		position?: Gravity | Strategy;
+		position?: Gravity | number | string;
 		withoutEnlargement?: boolean;
 	} | null = null;
 	let extractConfig: {

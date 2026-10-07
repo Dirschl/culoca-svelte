@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { error } from '@sveltejs/kit';
 import { getHubSeoPolicy } from '$lib/seo/policy';
 import { getPublicItemHref, slugifySegment } from '$lib/content/routing';
@@ -39,7 +39,7 @@ function pickFullNameSearchNeedle(slug: string): string | null {
 }
 
 async function resolveProfileForPermalink(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient<any, 'public', any>,
   segment: string
 ): Promise<ProfileRow | null> {
   const accountname = normalizePermalinkSegment(segment);

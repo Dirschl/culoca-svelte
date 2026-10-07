@@ -2,6 +2,8 @@ import { error, json, type RequestHandler } from '@sveltejs/kit';
 import {
 	getLemonSqueezyConfig,
 	parseWebhookOrder,
+	validateWebhookOrderContext,
+	validateWebhookSource,
 	verifyLemonWebhookSignature,
 	type LemonWebhookPayload
 } from '$lib/server/lemonSqueezy';
@@ -37,6 +39,12 @@ export const POST: RequestHandler = async ({ request }) => {
 			return json({ ok: true, skipped: true });
 		}
 
+		const contextError = validateWebhookOrderContext(payload, config, order);
+		if (contextError) {
+			console.warn('[Lemon Webhook] rejected order_created:', contextError);
+			throw error(400, contextError);
+		}
+
 		const attrs = payload.data?.attributes || {};
 		const orderId = String(payload.data?.id || attrs.identifier || '');
 		if (!orderId) {
@@ -70,12 +78,20 @@ export const POST: RequestHandler = async ({ request }) => {
 				sellerProfileId,
 				licenseTier: line.license_tier,
 				lemonOrderId: orderId,
-				lemonOrderNumber: (attrs.order_number as string) ?? null,
-				lemonVariantId: attrs.variant_id != null ? String(attrs.variant_id) : null,
+				lemonOrderNumber: attrs.order_number != null ? String(attrs.order_number) : null,
+				lemonVariantId:
+					attrs.first_order_item && typeof attrs.first_order_item === 'object'
+						? String((attrs.first_order_item as Record<string, unknown>).variant_id ?? '') || null
+						: null,
 				lemonCustomerId: attrs.customer_id != null ? String(attrs.customer_id) : null,
 				priceCents: linePrice,
 				currency: (attrs.currency as string) ?? null,
-				metadata: { event: eventName, checkout_mode: order.mode }
+				metadata: {
+					event: eventName,
+					checkout_mode: order.mode,
+					test_mode: attrs.test_mode,
+					store_id: attrs.store_id
+				}
 			});
 			granted += 1;
 		}
@@ -88,10 +104,15 @@ export const POST: RequestHandler = async ({ request }) => {
 	}
 
 	if (eventName === 'order_refunded') {
-		const orderId = String(payload.data?.id || '');
-		if (orderId) {
-			await revokeLicenseByOrderId(orderId);
+		const contextError = validateWebhookSource(payload, config);
+		if (contextError) {
+			console.warn('[Lemon Webhook] rejected order_refunded:', contextError);
+			throw error(400, contextError);
 		}
+
+		const orderId = String(payload.data?.id || '');
+		if (!orderId) throw error(400, 'Missing order id');
+		await revokeLicenseByOrderId(orderId);
 		return json({ ok: true, revoked: true });
 	}
 

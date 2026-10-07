@@ -98,7 +98,10 @@ export async function listBuyerLicenses(buyerUserId: string): Promise<LicensePur
 		.order('purchased_at', { ascending: false });
 
 	if (error) throw error;
-	return (data || []) as LicensePurchaseRow[];
+	return (data || []).map((row) => ({
+		...row,
+		items: Array.isArray(row.items) ? row.items[0] ?? null : row.items ?? null
+	})) as unknown as LicensePurchaseRow[];
 }
 
 export async function buyerHasActiveLicense(buyerUserId: string, itemId: string): Promise<boolean> {

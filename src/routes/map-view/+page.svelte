@@ -56,6 +56,7 @@
 <svelte:head>
   <title>CULOCA - Map View</title>
   <meta name="description" content="Interaktive Kartenansicht mit GPS-basierten Fotos" />
+  <link rel="canonical" href="https://culoca.com/map-view" />
   
   <!-- Open Graph Meta-Tags -->
   <meta property="og:title" content="CULOCA - Map View" />

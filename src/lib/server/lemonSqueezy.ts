@@ -137,8 +137,9 @@ export function verifyLemonWebhookSignature(
 ): boolean {
 	if (!secret || !signatureHeader) return false;
 	const digest = createHmac('sha256', secret).update(rawBody).digest('hex');
+	if (!/^[a-f0-9]{64}$/i.test(signatureHeader)) return false;
 	try {
-		return timingSafeEqual(Buffer.from(digest), Buffer.from(signatureHeader));
+		return timingSafeEqual(Buffer.from(digest, 'hex'), Buffer.from(signatureHeader, 'hex'));
 	} catch {
 		return false;
 	}
@@ -161,6 +162,45 @@ export type ParsedWebhookOrder = {
 	mode: 'cart' | 'single';
 	lineItems: CartLinePayload[];
 };
+
+export function validateWebhookSource(
+	payload: LemonWebhookPayload,
+	config: LemonSqueezyConfig
+): string | null {
+	if (payload.data?.type !== 'orders') return 'Unexpected webhook resource type';
+
+	const attrs = payload.data?.attributes || {};
+	if (String(attrs.store_id ?? '') !== config.storeId) return 'Webhook store mismatch';
+	if (attrs.test_mode !== config.testMode) return 'Webhook test mode mismatch';
+
+	return null;
+}
+
+export function validateWebhookOrderContext(
+	payload: LemonWebhookPayload,
+	config: LemonSqueezyConfig,
+	order: ParsedWebhookOrder
+): string | null {
+	const sourceError = validateWebhookSource(payload, config);
+	if (sourceError) return sourceError;
+
+	const attrs = payload.data?.attributes || {};
+	if (attrs.status !== 'paid') return 'Order is not paid';
+
+	const firstOrderItem =
+		attrs.first_order_item && typeof attrs.first_order_item === 'object'
+			? (attrs.first_order_item as Record<string, unknown>)
+			: null;
+	const actualVariantId = String(firstOrderItem?.variant_id ?? '');
+	const expectedTier = order.lineItems.some((line) => line.license_tier === 'extended')
+		? 'extended'
+		: 'standard';
+	if (actualVariantId !== variantIdForTier(config, expectedTier)) {
+		return 'Webhook variant mismatch';
+	}
+
+	return null;
+}
 
 export function parseWebhookOrder(payload: LemonWebhookPayload): ParsedWebhookOrder | null {
 	const custom = payload.meta?.custom_data;
