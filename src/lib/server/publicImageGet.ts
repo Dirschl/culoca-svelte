@@ -24,6 +24,8 @@ const dbForPublicImages = supabaseAdmin ?? supabase;
 const SUPABASE_STORAGE_URL = 'https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public';
 
 const IMAGE_EXTS = ['.webp', '.jpg', '.jpeg', '.png'] as const;
+const PUBLIC_IMAGE_CACHE_CONTROL =
+	'public, max-age=86400, s-maxage=86400, stale-while-revalidate=604800';
 
 function normalizeStorageKey(path: string | null | undefined): string | null {
 	if (!path) return null;
@@ -258,7 +260,7 @@ export async function respondPublicImage(
 				status: 304,
 				headers: {
 					ETag: etag,
-					'Cache-Control': 'public, max-age=3600, stale-while-revalidate=86400',
+					'Cache-Control': PUBLIC_IMAGE_CACHE_CONTROL,
 					'X-Robots-Tag': xRobotsTag,
 					'X-Content-Type-Options': 'nosniff'
 				}
@@ -270,7 +272,7 @@ export async function respondPublicImage(
 
 		const headers = new Headers({
 			'Content-Type': finalContentType,
-			'Cache-Control': 'public, max-age=3600, stale-while-revalidate=86400',
+			'Cache-Control': PUBLIC_IMAGE_CACHE_CONTROL,
 			'Content-Disposition': `inline; filename="${actualSlug}${fileExtension}"`,
 			'Access-Control-Allow-Origin': '*',
 			ETag: etag,

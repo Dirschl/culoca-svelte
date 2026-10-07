@@ -49,9 +49,12 @@ export const handle: Handle = async ({ event, resolve }) => {
 	const contentType = response.headers.get('content-type') || '';
 	const isHtmlDocument = contentType.includes('text/html');
 	if (isHtmlDocument) {
-		response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
-		response.headers.set('Pragma', 'no-cache');
-		response.headers.set('Expires', '0');
+		// HTML darf lokal gespeichert, muss aber vor Wiederverwendung validiert werden.
+		// `no-store` verhinderte bislang auch bedingte Requests mit dem von SvelteKit
+		// gelieferten ETag und zwang Crawler bei jedem Besuch zum Volltransfer.
+		response.headers.set('Cache-Control', 'private, no-cache, must-revalidate');
+		response.headers.delete('Pragma');
+		response.headers.delete('Expires');
 	}
 
 	return response;

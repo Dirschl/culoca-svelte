@@ -8,6 +8,21 @@ import { buildGeoHierarchy } from '$lib/geo/hierarchy';
 import { createSupabaseServerClient } from '$lib/server/supabaseServer';
 import { isItemShopIndexable, loadProfileLicensingMap } from '$lib/server/sitemapLicensing';
 
+function xmlEscape(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+function sitemapDate(value: unknown): string | null {
+  if (!value) return null;
+  const date = new Date(String(value));
+  return Number.isNaN(date.getTime()) ? null : date.toISOString().split('T')[0];
+}
+
 export const GET: RequestHandler = async () => {
   try {
     console.log('[Sitemap] Generating dynamic sitemap...');
@@ -71,7 +86,8 @@ export const GET: RequestHandler = async () => {
           .from('items')
           .select('id, slug, title, description, path_2048, path_512, created_at, updated_at, type_id, group_root_item_id, group_slug, canonical_path, country_slug, country_name, state_slug, state_name, region_slug, region_name, district_slug, district_name, municipality_slug, municipality_name, show_in_main_feed, is_private, ends_at, profile_id, stock_settings')
           .not('slug', 'is', null)
-          .not('path_512', 'is', null)
+          // Auch Motive aufnehmen, bei denen nur die grosse Variante vorhanden ist.
+          .or('path_2048.not.is.null,path_512.not.is.null')
           // Public items include false and null (legacy rows)
           .or('is_private.eq.false,is_private.is.null')
           .order('updated_at', { ascending: false })
@@ -129,11 +145,16 @@ export const GET: RequestHandler = async () => {
       }
     }
 
+    const seenCanonicalPaths = new Set<string>();
     const sitemapItems = allItems.filter((item) => {
       const rootItem = item.group_root_item_id ? rootMap.get(item.group_root_item_id) ?? null : null;
       const type = item.type_id ? typeMap.get(item.type_id) ?? null : null;
       const canonicalPath = getStoredOrComputedCanonicalPath({ item, rootItem, type });
-      return !!canonicalPath && isVisibleInMainFeed(item);
+      if (!canonicalPath || !isVisibleInMainFeed(item) || seenCanonicalPaths.has(canonicalPath)) {
+        return false;
+      }
+      seenCanonicalPaths.add(canonicalPath);
+      return true;
     });
 
     console.log(`[Sitemap] Found ${sitemapItems.length} public items`);
@@ -143,6 +164,18 @@ export const GET: RequestHandler = async () => {
       sitemapItems.map((item) => item.profile_id).filter(Boolean)
     );
     let licenseDownloadUrlCount = 0;
+    const contentDates = sitemapItems
+      .map((item) => sitemapDate(item.updated_at || item.created_at))
+      .filter((value): value is string => !!value)
+      .sort();
+    const latestContentDate = contentDates[contentDates.length - 1] ?? null;
+    const latestDateByType = new Map<number, string>();
+    for (const item of sitemapItems) {
+      const date = sitemapDate(item.updated_at || item.created_at);
+      if (!date || !item.type_id) continue;
+      const previous = latestDateByType.get(item.type_id);
+      if (!previous || date > previous) latestDateByType.set(item.type_id, date);
+    }
 
     // Generate XML
     let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
@@ -151,10 +184,18 @@ export const GET: RequestHandler = async () => {
     // Add static pages with lastmod, priority und changefreq
     for (const page of staticPages) {
       xml += '  <url>\n';
-      xml += `    <loc>${baseUrl}${page.url}</loc>\n`;
-      // Add lastmod for static pages (date only, no seconds to avoid micro-updates)
-      const currentDate = new Date().toISOString().split('T')[0];
-      xml += `    <lastmod>${currentDate}</lastmod>\n`;
+      xml += `    <loc>${xmlEscape(`${baseUrl}${page.url}`)}</loc>\n`;
+      // Nur echte Inhaltsuebersichten mit dem letzten Inhaltsdatum markieren.
+      // Fuer statische Rechts-/Infoseiten waere ein taeglich erfundenes lastmod irrefuehrend.
+      const typeDefinition = Array.from(DEFAULT_CONTENT_TYPE_BY_ID.values()).find(
+        (typeDef) => page.url === `/${typeDef.slug}`
+      );
+      const pageLastModified = typeDefinition?.id
+        ? latestDateByType.get(typeDefinition.id) ?? null
+        : ['', '/region', '/galerie', '/map-view'].includes(page.url)
+          ? latestContentDate
+          : null;
+      if (pageLastModified) xml += `    <lastmod>${pageLastModified}</lastmod>\n`;
       xml += `    <priority>${page.priority}</priority>\n`;
       xml += `    <changefreq>${page.changefreq}</changefreq>\n`;
       xml += '  </url>\n';
@@ -166,9 +207,9 @@ export const GET: RequestHandler = async () => {
       const typePages = Math.max(1, Math.ceil(typeItems.length / 24));
       for (let p = 2; p <= Math.min(typePages, 2); p++) {
         xml += '  <url>\n';
-        xml += `    <loc>${baseUrl}/${typeDef.slug}?seite=${p}</loc>\n`;
-        const currentDate = new Date().toISOString().split('T')[0];
-        xml += `    <lastmod>${currentDate}</lastmod>\n`;
+        xml += `    <loc>${xmlEscape(`${baseUrl}/${typeDef.slug}?seite=${p}`)}</loc>\n`;
+        const typeLastModified = latestDateByType.get(typeDef.id);
+        if (typeLastModified) xml += `    <lastmod>${typeLastModified}</lastmod>\n`;
         xml += '    <priority>0.6</priority>\n';
         xml += '    <changefreq>daily</changefreq>\n';
         xml += '  </url>\n';
@@ -176,12 +217,16 @@ export const GET: RequestHandler = async () => {
     }
 
     const itemCountsByProfile = new Map<string, number>();
+    const latestDateByProfile = new Map<string, string>();
     for (const item of sitemapItems) {
       if (!item.profile_id) continue;
       itemCountsByProfile.set(item.profile_id, (itemCountsByProfile.get(item.profile_id) || 0) + 1);
+      const date = sitemapDate(item.updated_at || item.created_at);
+      const previous = latestDateByProfile.get(item.profile_id);
+      if (date && (!previous || date > previous)) latestDateByProfile.set(item.profile_id, date);
     }
 
-    const geoHubPaths = new Set<string>();
+    const latestDateByGeoHub = new Map<string, string>();
     for (const item of sitemapItems) {
       const rootItem = item.group_root_item_id ? rootMap.get(item.group_root_item_id) ?? null : null;
       const geoSource = rootItem || item;
@@ -197,15 +242,22 @@ export const GET: RequestHandler = async () => {
         municipalitySlug: geoSource.municipality_slug,
         municipalityName: geoSource.municipality_name
       });
+      const itemDate = sitemapDate(item.updated_at || item.created_at);
       for (const level of levels) {
-        geoHubPaths.add(level.path);
+        const previous = latestDateByGeoHub.get(level.path);
+        if (itemDate && (!previous || itemDate > previous)) {
+          latestDateByGeoHub.set(level.path, itemDate);
+        } else if (!latestDateByGeoHub.has(level.path)) {
+          latestDateByGeoHub.set(level.path, '');
+        }
       }
     }
 
-    for (const path of Array.from(geoHubPaths).sort()) {
+    for (const path of Array.from(latestDateByGeoHub.keys()).sort()) {
       xml += '  <url>\n';
-      xml += `    <loc>${baseUrl}${path}</loc>\n`;
-      xml += `    <lastmod>${new Date().toISOString().split('T')[0]}</lastmod>\n`;
+      xml += `    <loc>${xmlEscape(`${baseUrl}${path}`)}</loc>\n`;
+      const hubLastModified = latestDateByGeoHub.get(path);
+      if (hubLastModified) xml += `    <lastmod>${hubLastModified}</lastmod>\n`;
       xml += '    <priority>0.7</priority>\n';
       xml += '    <changefreq>weekly</changefreq>\n';
       xml += '  </url>\n';
@@ -222,8 +274,9 @@ export const GET: RequestHandler = async () => {
       for (const profile of profiles || []) {
         if (!profile.accountname) continue;
         xml += '  <url>\n';
-        xml += `    <loc>${baseUrl}/${profile.accountname}</loc>\n`;
-        xml += `    <lastmod>${new Date().toISOString().split('T')[0]}</lastmod>\n`;
+        xml += `    <loc>${xmlEscape(`${baseUrl}/${profile.accountname}`)}</loc>\n`;
+        const profileLastModified = latestDateByProfile.get(profile.id);
+        if (profileLastModified) xml += `    <lastmod>${profileLastModified}</lastmod>\n`;
         xml += '    <priority>0.7</priority>\n';
         xml += '    <changefreq>weekly</changefreq>\n';
         xml += '  </url>\n';
@@ -238,12 +291,12 @@ export const GET: RequestHandler = async () => {
       if (!canonicalPath) continue;
 
       xml += '  <url>\n';
-      xml += `    <loc>${baseUrl}${canonicalPath}</loc>\n`;
+      xml += `    <loc>${xmlEscape(`${baseUrl}${canonicalPath}`)}</loc>\n`;
       
       // Verwende tatsächliches Änderungsdatum für bessere Crawl-Effizienz
       const lastModDate = item.updated_at || item.created_at;
-      const formattedDate = lastModDate ? new Date(lastModDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
-      xml += `    <lastmod>${formattedDate}</lastmod>\n`;
+      const formattedDate = sitemapDate(lastModDate);
+      if (formattedDate) xml += `    <lastmod>${formattedDate}</lastmod>\n`;
       xml += `    <priority>0.95</priority>\n`;
       xml += `    <changefreq>weekly</changefreq>\n`;
       
@@ -263,7 +316,7 @@ export const GET: RequestHandler = async () => {
         // Note: <image:title> and <image:caption> are deprecated by Google
         // Focus on <image:loc> - the actual URL is what matters for indexing
         const seoImageUrl = `${baseUrl}/images/${item.slug}-2048${fileExtension}`;
-        xml += `      <image:loc>${seoImageUrl}</image:loc>\n`;
+        xml += `      <image:loc>${xmlEscape(seoImageUrl)}</image:loc>\n`;
         
         xml += '    </image:image>\n';
       }
@@ -273,8 +326,8 @@ export const GET: RequestHandler = async () => {
       if (isItemShopIndexable(item, profileLicensingMap)) {
         licenseDownloadUrlCount += 1;
         xml += '  <url>\n';
-        xml += `    <loc>${baseUrl}${canonicalPath}/download</loc>\n`;
-        xml += `    <lastmod>${formattedDate}</lastmod>\n`;
+        xml += `    <loc>${xmlEscape(`${baseUrl}${canonicalPath}/download`)}</loc>\n`;
+        if (formattedDate) xml += `    <lastmod>${formattedDate}</lastmod>\n`;
         xml += '    <priority>0.9</priority>\n';
         xml += '    <changefreq>weekly</changefreq>\n';
         xml += '  </url>\n';

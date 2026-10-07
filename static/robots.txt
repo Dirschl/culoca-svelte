@@ -2,6 +2,14 @@ User-agent: facebookexternalhit
 User-agent: Facebot
 Allow: /
 
+# ChatGPT-Suche und nutzerinitiierte Abrufe duerfen die oeffentlichen Inhalte lesen.
+# Eigene Gruppen sind absichtlich explizit, damit spaetere Wildcard-Regeln sie nicht versehentlich sperren.
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
 User-agent: *
 Allow: /
 
@@ -73,6 +81,3 @@ Disallow: /api/test-simple/
 
 # Sitemap location
 Sitemap: https://culoca.com/sitemap.xml
-
-# Crawl-delay for polite crawling
-Crawl-delay: 1 

@@ -1,7 +1,7 @@
 <svelte:head>
   <title>Galerie - Culoca</title>
   <meta name="description" content="Entdecke und teile Fotos, Events, Anzeigen, dein Profil oder Firma als GPS Items mit Geo Koordinaten. Zeige was dir gefällt starte deine eigene Culoca Galerie." />
-  <meta name="robots" content="index, follow, noimageindex" />
+  <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
   <meta name="author" content="DIRSCHL.com GmbH" />
   <meta name="keywords" content="GPS, Geo-Lokalisierung, Fotos, Bilder, Galerie, lokale Suche, versteckte Orte, Sehenswürdigkeiten, Events, Culoca, Entdeckungen, Umgebung, Regional, Fotografie, Wandern, Freizeit, Plattform, App, Landschaft, Lost Places, Fotolocations, Reiseführer, Urlaub, kennenlernen, Social Media, digital, für alle, Standort, Lokal, Items, Distanz, Entfernung, Freigeben, Download, Karten, Routenplaner, Anzeigen, Unterhaltung, Orte, Ort" />
   <link rel="canonical" href="https://culoca.com/galerie" />
