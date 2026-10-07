@@ -8,7 +8,7 @@ const LEGACY_GEO_ROOT_SEGMENTS = new Set(['de', 'at', 'ch', 'lu', 'mc']);
 const LEGACY_ITEM_REDIRECTS = new Map([
 	[
 		'/foto/rapsfelder-lutbild-arbing-reischach-altoetting-oberbayern-johann-dirschl',
-		'/foto/rapsfelder-luftbild-arbing-reischach-altoetting-oberbayern-johann-dirschl'
+		'/de/altoetting/reischach/rapsfelder-luftbild-arbing-reischach-altoetting-oberbayern-johann-dirschl'
 	]
 ]);
 
