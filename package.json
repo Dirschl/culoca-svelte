@@ -90,6 +90,6 @@
 		"@img/sharp-linux-x64": "0.34.3"
 	},
 	"engines": {
-		"node": "20.x"
+		"node": "24.x"
 	}
 }
