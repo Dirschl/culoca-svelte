@@ -4,6 +4,14 @@ import { GEO_ROUTE_PREFIX } from '$lib/geo/hierarchy';
 /** Länder-Kurzcodes: früher Country-Hub unter `/de` statt `/region/de` — nicht Items umleiten. */
 const LEGACY_GEO_ROOT_SEGMENTS = new Set(['de', 'at', 'ch', 'lu', 'mc']);
 
+// Alte, bereits veröffentlichte Motiv-URLs bleiben nach redaktionellen Slug-Korrekturen erreichbar.
+const LEGACY_ITEM_REDIRECTS = new Map([
+	[
+		'/foto/rapsfelder-lutbild-arbing-reischach-altoetting-oberbayern-johann-dirschl',
+		'/foto/rapsfelder-luftbild-arbing-reischach-altoetting-oberbayern-johann-dirschl'
+	]
+]);
+
 /**
  * Nur kurze Pfade (1–3 Segmente nach Land) → Region-Hub. Items bleiben unter
  * `/de/landkreis/gemeinde/slug` (4 Segmente), keine Umleitung.
@@ -24,6 +32,11 @@ export const handle: Handle = async ({ event, resolve }) => {
 	if (pathname === '/foto/upload' || pathname.startsWith('/foto/upload/')) {
 		const rest = pathname === '/foto/upload' ? '' : pathname.slice('/foto/upload'.length);
 		return Response.redirect(new URL(`/upload${rest}${event.url.search}`, event.url.origin), 301);
+	}
+
+	const correctedItemPath = LEGACY_ITEM_REDIRECTS.get(pathname);
+	if (correctedItemPath) {
+		return Response.redirect(new URL(`${correctedItemPath}${event.url.search}`, event.url.origin), 301);
 	}
 
 	const legacyTarget = legacyGeoRedirectTarget(pathname);
