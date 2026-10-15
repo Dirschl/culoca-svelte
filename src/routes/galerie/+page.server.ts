@@ -58,7 +58,7 @@ export const load: PageServerLoad = async ({ url, request }) => {
       const canonicalRows = data.length
         ? await supabase
             .from('items')
-            .select('id, slug, canonical_path, country_slug, district_slug, municipality_slug')
+            .select('id, slug, canonical_path, country_slug, district_slug, municipality_slug, page_settings')
             .in('id', data.map((item: any) => item.id))
         : { data: [], error: null };
 
@@ -68,7 +68,8 @@ export const load: PageServerLoad = async ({ url, request }) => {
           canonical_path: getPublicItemHref(item),
           country_slug: item.country_slug,
           district_slug: item.district_slug,
-          municipality_slug: item.municipality_slug
+          municipality_slug: item.municipality_slug,
+          is_panorama: item.page_settings?.panorama?.enabled === true
         }
       ]));
 
@@ -90,7 +91,8 @@ export const load: PageServerLoad = async ({ url, request }) => {
         original_name: item.original_name,
         created_at: item.created_at,
         accountname: item.accountname,
-        full_name: item.full_name
+        full_name: item.full_name,
+        is_panorama: canonicalById.get(item.id)?.is_panorama === true
       }));
       
       // Total count aus erstem Item extrahieren

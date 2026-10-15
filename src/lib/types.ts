@@ -26,4 +26,5 @@ export type NewsFlashImage = {
   show_in_main_feed?: boolean;
   starts_at?: string | null;
   ends_at?: string | null;
+  is_panorama?: boolean;
 }; 

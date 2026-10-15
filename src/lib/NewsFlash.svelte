@@ -49,7 +49,7 @@ async function attachCanonicalPaths<T extends { id: string }>(items: T[]): Promi
 
   const { data, error } = await supabase
     .from('items')
-    .select('id, slug, canonical_path, country_slug, district_slug, municipality_slug')
+    .select('id, slug, canonical_path, country_slug, district_slug, municipality_slug, page_settings')
     .in('id', items.map((item) => item.id));
 
   if (error || !data) {
@@ -64,7 +64,8 @@ async function attachCanonicalPaths<T extends { id: string }>(items: T[]): Promi
         canonical_path: getPublicItemHref(item),
         country_slug: item.country_slug,
         district_slug: item.district_slug,
-        municipality_slug: item.municipality_slug
+        municipality_slug: item.municipality_slug,
+        is_panorama: item.page_settings?.panorama?.enabled === true
       }
     ])
   );
@@ -73,7 +74,8 @@ async function attachCanonicalPaths<T extends { id: string }>(items: T[]): Promi
     canonical_path: canonicalById.get(item.id)?.canonical_path || null,
     country_slug: canonicalById.get(item.id)?.country_slug || null,
     district_slug: canonicalById.get(item.id)?.district_slug || null,
-    municipality_slug: canonicalById.get(item.id)?.municipality_slug || null
+    municipality_slug: canonicalById.get(item.id)?.municipality_slug || null,
+    is_panorama: canonicalById.get(item.id)?.is_panorama === true
   }));
 }
 
@@ -104,7 +106,8 @@ $: if (initialItems && initialItems.length > 0 && (images.length === 0 || curren
     height: item.height,
     title: item.title,
     description: item.description,
-    original_name: item.original_name
+    original_name: item.original_name,
+    is_panorama: item.is_panorama === true || item.page_settings?.panorama?.enabled === true
   }));
   loading = false;
   lastImageId = images[0]?.id || null;
@@ -151,7 +154,8 @@ async function loadNewsFlashImagesDirectFromDB(): Promise<NewsFlashDisplayImage[
       height: item.height,
       title: item.title,
       description: item.description,
-      original_name: item.original_name
+      original_name: item.original_name,
+      is_panorama: item.is_panorama === true || item.page_settings?.panorama?.enabled === true
     })));
     
     console.log('[NewsFlash] Geladene Images:', images.slice(0, 5));
@@ -368,6 +372,9 @@ function handleScroll(event: Event) {
             <a href={getItemHref(img)} class="newsflash-thumb" tabindex="0" role="button" aria-label={img.title || img.original_name || 'Bild'} title={img.title || img.original_name || 'Bild'} style="width:{displayWidth}px;" on:click={() => rememberLocalRouteForItem(currentBrowserRoute())}>
               <div class="newsflash-image-frame">
                 <img src={seoImageUrl || `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${img.path_512}`} alt={img.title || img.original_name || 'Bild'} width={displayWidth} height="140" loading="lazy" />
+                {#if img.is_panorama}
+                  <div class="newsflash-panorama-badge" aria-label="Interaktives 360-Grad-Panorama">360°</div>
+                {/if}
                 {#if showDistance && userLat !== null && userLon !== null && img.lat && img.lon && getDistanceFromLatLonInMeters}
                   <div class="newsflash-distance-topright">
                     {getDistanceFromLatLonInMeters(userLat, userLon, img.lat, img.lon)}
@@ -403,6 +410,9 @@ function handleScroll(event: Event) {
             <a href={getItemHref(img)} class="newsflash-thumb" tabindex="0" role="button" aria-label={img.title || img.original_name || 'Bild'} title={img.title || img.original_name || 'Bild'} on:click={() => rememberLocalRouteForItem(currentBrowserRoute())}>
               <div class="newsflash-image-frame">
                 <img src={seoGridImageUrl || `https://caskhmcbvtevdwsolvwk.supabase.co/storage/v1/object/public/images-512/${img.path_512}`} alt={img.title || img.original_name || 'Bild'} />
+                {#if img.is_panorama}
+                  <div class="newsflash-panorama-badge" aria-label="Interaktives 360-Grad-Panorama">360°</div>
+                {/if}
                 {#if showDistance && userLat !== null && userLon !== null && img.lat && img.lon && getDistanceFromLatLonInMeters}
                   <div class="newsflash-distance-topright">
                     {getDistanceFromLatLonInMeters(userLat, userLon, img.lat, img.lon)}
@@ -700,6 +710,22 @@ function handleScroll(event: Event) {
   pointer-events: none;
   -webkit-backdrop-filter: blur(var(--overlay-blur));
   backdrop-filter: blur(var(--overlay-blur));
+}
+.newsflash-panorama-badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 2;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.72);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  pointer-events: none;
+  -webkit-backdrop-filter: blur(5px);
+  backdrop-filter: blur(5px);
 }
 .newsflash-thumb:focus, .newsflash-thumb:hover {
   outline: none !important;
