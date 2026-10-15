@@ -1349,7 +1349,7 @@
 		<link rel="canonical" href={downloadPageUrl} />
 	{/if}
 	<meta name="description" content={downloadMetaDescription} />
-	<meta name="robots" content="index, follow" />
+	<meta name="robots" content="noindex, follow" />
 	<meta property="og:type" content="website" />
 	<meta property="og:site_name" content="Culoca" />
 	<meta

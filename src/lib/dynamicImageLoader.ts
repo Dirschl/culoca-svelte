@@ -236,7 +236,8 @@ export class DynamicImageLoader {
           height,
           created_at,
           user_id,
-          is_private
+          is_private,
+          page_settings
         `)
         .not('lat', 'is', null)
         .not('lon', 'is', null)

@@ -56,7 +56,7 @@ async function attachCanonicalPaths(items: any[]) {
 
   const { data, error } = await supabase
     .from('items')
-    .select('id, canonical_path, group_root_item_id, country_slug, district_slug, municipality_slug')
+    .select('id, canonical_path, group_root_item_id, country_slug, district_slug, municipality_slug, page_settings')
     .in('id', items.map((item) => item.id));
 
   if (error || !data) {
@@ -70,7 +70,8 @@ async function attachCanonicalPaths(items: any[]) {
     group_root_item_id: itemById.get(item.id)?.group_root_item_id ?? item.group_root_item_id ?? null,
     country_slug: itemById.get(item.id)?.country_slug ?? item.country_slug ?? null,
     district_slug: itemById.get(item.id)?.district_slug ?? item.district_slug ?? null,
-    municipality_slug: itemById.get(item.id)?.municipality_slug ?? item.municipality_slug ?? null
+    municipality_slug: itemById.get(item.id)?.municipality_slug ?? item.municipality_slug ?? null,
+    is_panorama: itemById.get(item.id)?.page_settings?.panorama?.enabled === true
   }));
 }
 
@@ -175,7 +176,7 @@ export async function GET({ url }: any) {
       let query = supabase
         .from('items')
         .select(
-          'id, slug, title, description, lat, lon, path_512, path_2048, path_64, width, height, created_at, profile_id, user_id, is_private, gallery, keywords, original_name, canonical_path, country_slug, district_slug, municipality_slug, type_id, group_root_item_id, group_slug, show_in_main_feed, ends_at, external_url, video_url',
+          'id, slug, title, description, lat, lon, path_512, path_2048, path_64, width, height, created_at, profile_id, user_id, is_private, gallery, keywords, original_name, canonical_path, country_slug, district_slug, municipality_slug, type_id, group_root_item_id, group_slug, show_in_main_feed, ends_at, external_url, video_url, page_settings',
           { count: 'exact' }
         )
         .eq('gallery', true)
@@ -206,7 +207,13 @@ export async function GET({ url }: any) {
         return json({ error: 'Failed to fetch latest search items', details: newestError }, { status: 500 });
       }
 
-      const visibleItems = await attachChildCounts((newestItems || []).filter((item) => isVisibleInMainFeed(item)));
+      const visibleItems = await attachChildCounts((newestItems || [])
+        .filter((item) => isVisibleInMainFeed(item))
+        .map((item: any) => ({
+          ...item,
+          is_panorama: item.page_settings?.panorama?.enabled === true,
+          page_settings: undefined
+        })));
 
       return json({
         items: visibleItems,

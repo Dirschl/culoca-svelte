@@ -138,7 +138,8 @@
         keywords: img.keywords,
         path_64: img.path_64,
         path_512: img.path_512,
-        path_2048: img.path_2048
+        path_2048: img.path_2048,
+        is_panorama: img.is_panorama === true || img.page_settings?.panorama?.enabled === true
       };
     }).filter((p: any) => p.src);
     
@@ -233,7 +234,8 @@
             keywords: img.keywords,
             path_64: img.path_64,
             path_512: img.path_512,
-            path_2048: img.path_2048
+            path_2048: img.path_2048,
+            is_panorama: img.is_panorama === true || img.page_settings?.panorama?.enabled === true
           };
         }).filter((p: any) => p.src);
         

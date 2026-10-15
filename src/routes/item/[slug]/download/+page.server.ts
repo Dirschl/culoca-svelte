@@ -2,8 +2,11 @@ import type { PageServerLoad } from './$types';
 import { error } from '@sveltejs/kit';
 import { loadContentPage } from '$lib/content/server';
 
-export const load: PageServerLoad = async ({ params, url, depends }) => {
+export const load: PageServerLoad = async ({ params, url, depends, setHeaders }) => {
   depends('app:item-download');
+  setHeaders({
+    'X-Robots-Tag': 'noindex, follow'
+  });
 
   const result = await loadContentPage({
     slug: params.slug,

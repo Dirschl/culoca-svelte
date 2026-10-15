@@ -66,6 +66,7 @@
 		"vitest-browser-svelte": "^0.1.0"
 	},
 	"dependencies": {
+		"@photo-sphere-viewer/core": "^5.15.1",
 		"@sparticuz/chromium": "^141.0.0",
 		"@supabase/supabase-js": "^2.50.2",
 		"dotenv": "^17.0.0",

@@ -16,6 +16,7 @@ interface LoadedImage {
   is_private?: boolean;
   profile_id?: string;
   distance?: number;
+  is_panorama?: boolean;
 }
 
 interface LoadedRegion {
@@ -111,7 +112,7 @@ class IntelligentImageLoader {
       
       let fallbackQuery = supabase
         .from('items')
-        .select('id, lat, lon, path_512, path_2048, path_64, title, description, width, height, is_private, profile_id')
+        .select('id, lat, lon, path_512, path_2048, path_64, title, description, width, height, is_private, profile_id, page_settings')
         .not('lat', 'is', null)
         .not('lon', 'is', null)
         .not('path_512', 'is', null)
@@ -148,6 +149,7 @@ class IntelligentImageLoader {
         height: item.height,
         is_private: item.is_private,
         profile_id: item.profile_id,
+        is_panorama: item.page_settings?.panorama?.enabled === true,
         distance: this.calculateDistance(lat, lon, item.lat, item.lon) // Calculate distance client-side in meters
       }));
       

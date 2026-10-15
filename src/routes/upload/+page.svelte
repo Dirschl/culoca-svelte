@@ -1157,6 +1157,7 @@
               <input type="file" accept="image/*" capture="environment" on:change={handleFileSelect} hidden />
             </label>
             <a href="/bulk-upload" class="secondary-link">Zum Batch-Uploader</a>
+            <a href="/upload/360" class="secondary-link">360°-Panorama hochladen</a>
           </div>
           <div class="hero-steps">
             <div><span>1</span>Dateien ziehen oder auswählen</div>

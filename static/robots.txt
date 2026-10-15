@@ -81,3 +81,4 @@ Disallow: /api/test-simple/
 
 # Sitemap location
 Sitemap: https://culoca.com/sitemap.xml
+Sitemap: https://culoca.com/sitemap-images.xml

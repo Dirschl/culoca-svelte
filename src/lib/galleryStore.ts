@@ -38,6 +38,7 @@ type GalleryMappedItem = {
   path_512: string | null;
   path_2048: string | null;
   original_name?: string | null;
+  is_panorama: boolean;
 };
 
 // Gallery Items and Loading State
@@ -255,7 +256,8 @@ export async function loadMoreGallery(params: { search?: string; lat?: number; l
           group_root_item_id: item.group_root_item_id ?? null,
           path_64: item.path_64,
           path_512: item.path_512,
-          path_2048: item.path_2048
+          path_2048: item.path_2048,
+          is_panorama: item.is_panorama === true
         };
       });
 

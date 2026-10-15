@@ -6,7 +6,6 @@ import {
 import { DEFAULT_CONTENT_TYPE_BY_ID } from '$lib/content/types';
 import { buildGeoHierarchy } from '$lib/geo/hierarchy';
 import { createSupabaseServerClient } from '$lib/server/supabaseServer';
-import { isItemShopIndexable, loadProfileLicensingMap } from '$lib/server/sitemapLicensing';
 
 function xmlEscape(value: unknown): string {
   return String(value ?? '')
@@ -91,6 +90,7 @@ export const GET: RequestHandler = async () => {
           // Public items include false and null (legacy rows)
           .or('is_private.eq.false,is_private.is.null')
           .order('updated_at', { ascending: false })
+          .order('id', { ascending: true })
           .range(offset, offset + batchSize - 1);
         
         if (error) {
@@ -159,11 +159,6 @@ export const GET: RequestHandler = async () => {
 
     console.log(`[Sitemap] Found ${sitemapItems.length} public items`);
 
-    const profileLicensingMap = await loadProfileLicensingMap(
-      supabase,
-      sitemapItems.map((item) => item.profile_id).filter(Boolean)
-    );
-    let licenseDownloadUrlCount = 0;
     const contentDates = sitemapItems
       .map((item) => sitemapDate(item.updated_at || item.created_at))
       .filter((value): value is string => !!value)
@@ -179,7 +174,7 @@ export const GET: RequestHandler = async () => {
 
     // Generate XML
     let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
-    xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n';
+    xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n';
 
     // Add static pages with lastmod, priority und changefreq
     for (const page of staticPages) {
@@ -300,38 +295,8 @@ export const GET: RequestHandler = async () => {
       xml += `    <priority>0.95</priority>\n`;
       xml += `    <changefreq>weekly</changefreq>\n`;
       
-      // Add enhanced image data for better SEO
-      // Use SEO-friendly URL with size suffix: /images/{slug}-2048.jpg (no query parameters)
-      if (item.path_2048 || item.path_512) {
-        xml += '    <image:image>\n';
-        
-        // Determine file extension from path_2048 or path_512
-        // Extract extension from the actual file path (e.g., "abc123.jpg" -> ".jpg")
-        const imagePath = item.path_2048 || item.path_512;
-        const extensionMatch = imagePath.match(/\.(jpg|jpeg|webp|png)$/i);
-        const fileExtension = extensionMatch ? extensionMatch[0].toLowerCase() : '.jpg';
-        
-        // Use SEO-friendly URL with size suffix (2048px version preferred)
-        // This gives Google a meaningful filename instead of UUID-based filenames
-        // Note: <image:title> and <image:caption> are deprecated by Google
-        // Focus on <image:loc> - the actual URL is what matters for indexing
-        const seoImageUrl = `${baseUrl}/images/${item.slug}-2048${fileExtension}`;
-        xml += `      <image:loc>${xmlEscape(seoImageUrl)}</image:loc>\n`;
-        
-        xml += '    </image:image>\n';
-      }
-      
       xml += '  </url>\n';
 
-      if (isItemShopIndexable(item, profileLicensingMap)) {
-        licenseDownloadUrlCount += 1;
-        xml += '  <url>\n';
-        xml += `    <loc>${xmlEscape(`${baseUrl}${canonicalPath}/download`)}</loc>\n`;
-        if (formattedDate) xml += `    <lastmod>${formattedDate}</lastmod>\n`;
-        xml += '    <priority>0.9</priority>\n';
-        xml += '    <changefreq>weekly</changefreq>\n';
-        xml += '  </url>\n';
-      }
     }
 
     // Entfernt: Keine "gone" Einträge mehr
@@ -339,7 +304,7 @@ export const GET: RequestHandler = async () => {
 
     xml += '</urlset>';
 
-    console.log(`[Sitemap] Generated sitemap with ${staticPages.length} static pages, ${sitemapItems.length} items and ${licenseDownloadUrlCount} license/download URLs`);
+    console.log(`[Sitemap] Generated sitemap with ${staticPages.length} static pages and ${sitemapItems.length} items`);
     console.log(`[Sitemap] Items use their actual updated_at/created_at dates for better crawl efficiency`);
 
     return new Response(xml, {

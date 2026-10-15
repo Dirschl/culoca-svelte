@@ -90,6 +90,7 @@
 	import { useJustifiedLayout } from '$lib/galleryStore';
 	import FloatingActionButtons from '$lib/FloatingActionButtons.svelte';
 	import FollowButton from '$lib/FollowButton.svelte';
+	import PanoramaViewer from '$lib/detail/PanoramaViewer.svelte';
 
 	// Scroll to top state
 	let showScrollToTop = false;
@@ -1006,6 +1007,13 @@
 	let mainImageProgressive = false;
 	let mainFigureBackgroundUrl = '';
 	let mainImageSrc = '';
+	let panoramaSettings: null | {
+		path: string;
+		width?: number;
+		height?: number;
+		headingDegrees?: number;
+	} = null;
+	let panoramaUrl = '';
 	$: if (image) {
 		const imagePath = image.path_2048 || image.path_512;
 		if (!imagePath || !image.slug) {
@@ -1020,6 +1028,17 @@
 			mainFigureBackgroundUrl = mainImageProgressive ? url512 : '';
 			mainImageSrc = url2048 || url512;
 		}
+	}
+	$: {
+		const rawPanorama = image?.page_settings?.panorama;
+		panoramaSettings =
+			rawPanorama?.enabled === true && typeof rawPanorama?.path === 'string'
+				? rawPanorama
+				: null;
+		panoramaUrl =
+			panoramaSettings && image?.slug
+				? `/images/panorama/${encodeURIComponent(image.slug)}`
+				: '';
 	}
 
 	// Beispiel: Handler für Location-Filter
@@ -3742,24 +3761,41 @@
 			<div class="passepartout-container">
 				{#if shouldShowMainImage}
 					{#key image.id}
-						<figure
-							class="main-figure"
-							class:main-figure--progressive={mainImageProgressive}
-							style={mainFigureBackgroundUrl
-								? `background-image: url(${JSON.stringify(mainFigureBackgroundUrl)});`
-								: ''}
-						>
-							<img
-								src={mainImageSrc}
+						{#if panoramaSettings && panoramaUrl}
+							<PanoramaViewer
+								{panoramaUrl}
+								posterUrl={mainImageSrc}
 								alt={mainImageAlt}
-								class="main-image"
-								width={heroSeoDimensions.width}
-								height={heroSeoDimensions.height}
-								loading="eager"
-								decoding="async"
-								fetchpriority="high"
+								backHref={imageBackHref || '/'}
+								headingDegrees={Number(panoramaSettings.headingDegrees) || 0}
 							/>
-						</figure>
+						{:else}
+							<a
+								href={imageBackHref || '/'}
+								class="main-image-back-link"
+								title="Zur vorherigen Übersicht zurückkehren"
+								aria-label="Zur vorherigen Übersicht zurückkehren"
+							>
+								<figure
+									class="main-figure"
+									class:main-figure--progressive={mainImageProgressive}
+									style={mainFigureBackgroundUrl
+										? `background-image: url(${JSON.stringify(mainFigureBackgroundUrl)});`
+										: ''}
+								>
+									<img
+										src={mainImageSrc}
+										alt={mainImageAlt}
+										class="main-image"
+										width={heroSeoDimensions.width}
+										height={heroSeoDimensions.height}
+										loading="eager"
+										decoding="async"
+										fetchpriority="high"
+									/>
+								</figure>
+							</a>
+						{/if}
 					{/key}
 					{#if hasVariantStrip}
 						<div class="variant-strip" data-nosnippet>
@@ -5419,6 +5455,18 @@
 		margin: 0;
 		width: fit-content;
 		max-width: 100%;
+	}
+	.main-image-back-link {
+		display: block;
+		width: fit-content;
+		max-width: 100%;
+		color: inherit;
+		text-decoration: none;
+		cursor: pointer;
+	}
+	.main-image-back-link:focus-visible {
+		outline: 3px solid var(--culoca-orange, #ee7221);
+		outline-offset: 3px;
 	}
 	.main-figure--progressive {
 		background-size: contain;

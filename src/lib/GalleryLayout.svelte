@@ -1,6 +1,5 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { goto } from '$app/navigation';
   import justifiedLayout from 'justified-layout';
   import { getPublicItemHref } from '$lib/content/routing';
   import { currentBrowserRoute, rememberLocalRouteForItem } from '$lib/returnTo';
@@ -37,6 +36,7 @@
     region_slug?: string | null;
     district_slug?: string | null;
     municipality_slug?: string | null;
+    is_panorama?: boolean;
   }[] = [];
   export let layout: 'justified' | 'grid' = 'justified';
   export let containerWidth = 1200; // Set a reasonable default width
@@ -162,43 +162,6 @@
     municipality_slug?: string | null;
   }) {
     return getPublicItemHref(item);
-  }
-
-  function handleImageClick(itemSlug: string) {
-    const item = items.find(item => item.slug === itemSlug);
-    if (item && item.slug) {
-	      const href = getItemHref(item);
-	      rememberLocalRouteForItem(currentBrowserRoute());
-      console.log('[GalleryLayout] Click detected for item:', itemSlug);
-      console.log('[GalleryLayout] Item found:', item);
-      console.log('[GalleryLayout] Attempting navigation to:', href);
-      
-      // Use SvelteKit goto for proper navigation (like main page)
-      goto(href);
-      console.log('[GalleryLayout] goto() called successfully');
-    } else {
-      console.error('[GalleryLayout] Item not found for slug:', itemSlug);
-    }
-  }
-
-  function handleKeydown(event: KeyboardEvent, itemSlug: string) {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      const item = items.find(item => item.slug === itemSlug);
-      if (item && item.slug) {
-	        const href = getItemHref(item);
-	        rememberLocalRouteForItem(currentBrowserRoute());
-        console.log('[GalleryLayout] Keyboard navigation for item:', itemSlug);
-        console.log('[GalleryLayout] Attempting navigation to:', href);
-        
-        // Use SvelteKit goto for proper navigation
-        goto(href);
-        
-        console.log('[GalleryLayout] goto() called successfully');
-      } else {
-        console.error('[GalleryLayout] Item not found for keyboard navigation:', itemSlug);
-      }
-    }
   }
 
   function handleGalleryToggle(event: Event, itemId: string) {
@@ -386,6 +349,22 @@
     backdrop-filter: blur(var(--overlay-blur));
   }
 
+  .gallery-panorama-badge {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    z-index: 3;
+    padding: 3px 7px;
+    background: rgba(0, 0, 0, 0.7);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.2;
+    pointer-events: none;
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+  }
+
 
 
   /* Empty state */
@@ -479,19 +458,14 @@
               <a 
                 href={getItemHref(item)}
                 class="justified-pic-container" 
-                role="button" 
-                tabindex="0" 
-                aria-label="View image {item.id}" 
+                aria-label={item.title ? `${item.title} ansehen` : 'Bild ansehen'}
                 style="left:{boxes[index].left}px; top:{boxes[index].top}px; width:{boxes[index].width}px; height:{boxes[index].height}px;"
                 title={item.title || ''}
-	                on:click|preventDefault={async (e) => {
-	                  rememberLocalRouteForItem(currentBrowserRoute());
-	                  if (forceReload) {
-                    // Force full page reload for detail page navigation
-                    window.location.href = getItemHref(item);
-                  } else {
-                    // Use SvelteKit navigation for main page navigation
-                    await goto(getItemHref(item), { invalidateAll: true });
+                on:click={(event) => {
+                  rememberLocalRouteForItem(currentBrowserRoute());
+                  if (forceReload) {
+                    event.preventDefault();
+                    window.location.assign(getItemHref(item));
                   }
                 }}
               >
@@ -499,9 +473,12 @@
                   <img 
                     class="justified-pic" 
                     src={item.src} 
-                    alt="" 
+                    alt={item.title || 'Foto auf Culoca'}
                     loading="lazy"
                   />
+                  {#if item.is_panorama}
+                    <div class="gallery-panorama-badge" aria-label="Interaktives 360-Grad-Panorama">360°</div>
+                  {/if}
                   {#if showDistance && userLat !== null && userLon !== null && item.lat && item.lon}
                     <div class="gallery-distance-topright">
                       {#if item.distance !== undefined && item.distance !== null}
@@ -579,28 +556,25 @@
         <a 
           href={getItemHref(item)}
           class="grid-item" 
-          tabindex="0" 
-          role="button" 
-          aria-label="View image {item.slug}"
+          aria-label={item.title ? `${item.title} ansehen` : 'Bild ansehen'}
           title={item.title || ''}
-	          on:click|preventDefault={async (e) => {
-	            console.log('🔍 [GalleryLayout] Clicked item slug:', item.slug);
-	            rememberLocalRouteForItem(currentBrowserRoute());
-	            if (forceReload) {
-              // Force full page reload for detail page navigation
-              window.location.href = getItemHref(item);
-            } else {
-              // Use SvelteKit navigation for main page navigation
-              await goto(getItemHref(item), { invalidateAll: true });
+          on:click={(event) => {
+            rememberLocalRouteForItem(currentBrowserRoute());
+            if (forceReload) {
+              event.preventDefault();
+              window.location.assign(getItemHref(item));
             }
           }}
         >
           <div class="gallery-image-frame grid-image-frame">
             <img 
               src={item.src}
-              alt="" 
+              alt={item.title || 'Foto auf Culoca'}
               loading="lazy"
             />
+            {#if item.is_panorama}
+              <div class="gallery-panorama-badge" aria-label="Interaktives 360-Grad-Panorama">360°</div>
+            {/if}
             {#if showDistance && userLat !== null && userLon !== null && item.lat && item.lon}
               <div class="gallery-distance-topright">
                 {#if item.distance !== undefined && item.distance !== null}

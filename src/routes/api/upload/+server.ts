@@ -15,6 +15,7 @@ import {
 import { sanitizeKeywords } from '$lib/content/keywords';
 import { normalizeGeoDraft } from '$lib/content/locationTaxonomy';
 import { extractPhotoMetadataFields } from '$lib/metadata/photoMetadata';
+import { renderPanorama, type PanoramaDetectionSource } from '$lib/server/panorama';
 dotenv.config();
 
 // -- Helper: fix IPTC strings that were decoded as Latin-1 instead of UTF-8
@@ -102,6 +103,16 @@ export const POST = async ({ request }) => {
     const originalPaths = form.getAll('original_path') as string[];
     const originalFilenames = form.getAll('original_filename') as string[];
     const clientExifJsonRaw = form.get('exif_json') as string | null;
+    const panoramaRequested = form.get('panorama') === 'true';
+    const panoramaDetectionRaw = form.get('panorama_detection_source');
+    const panoramaDetectionSource: PanoramaDetectionSource =
+      panoramaDetectionRaw === 'xmp' || panoramaDetectionRaw === 'aspect-ratio'
+        ? panoramaDetectionRaw
+        : 'manual';
+    const panoramaHeadingRaw = form.get('panorama_heading_degrees');
+    const panoramaHeadingDegrees = panoramaHeadingRaw == null || panoramaHeadingRaw === ''
+      ? 0
+      : Number(panoramaHeadingRaw);
 
     // NEW: Allow profile_id to be passed explicitly from the client.
     const passedProfileId = form.get('profile_id') as string | null;
@@ -275,6 +286,17 @@ export const POST = async ({ request }) => {
         const sizes = await resizeJPG(buf);
         console.log('✅ Image resized successfully');
 
+        const panorama = panoramaRequested
+          ? await renderPanorama(buf, {
+              headingDegrees: Number.isFinite(panoramaHeadingDegrees) ? panoramaHeadingDegrees : 0
+            })
+          : null;
+        if (panorama) {
+          console.log(
+            `✅ 360° panorama rendered: ${panorama.width}x${panorama.height}, ${panorama.fileSize} bytes, quality ${panorama.quality}`
+          );
+        }
+
         // NEU: Get ACTUAL dimensions after EXIF orientation is applied
         let width = 2048;
         let height = 2048;
@@ -328,6 +350,19 @@ export const POST = async ({ request }) => {
         };
         // Bereinige die EXIF-Daten von Null-Bytes und Steuerzeichen
         const exifToStore = cleanExifData(rawExifData);
+        if (panorama) {
+          exifToStore.ProjectionType = 'equirectangular';
+          exifToStore.UsePanoramaViewer = true;
+          exifToStore.FullPanoWidthPixels = panorama.width;
+          exifToStore.FullPanoHeightPixels = panorama.height;
+          exifToStore.CroppedAreaImageWidthPixels = panorama.width;
+          exifToStore.CroppedAreaImageHeightPixels = panorama.height;
+          exifToStore.CroppedAreaLeftPixels = 0;
+          exifToStore.CroppedAreaTopPixels = 0;
+          exifToStore.PoseHeadingDegrees = Number.isFinite(panoramaHeadingDegrees)
+            ? panoramaHeadingDegrees
+            : 0;
+        }
 
         // Check for manual input from FormData (bulk upload)
         const formTitle = form.get('title') as string;
@@ -504,6 +539,7 @@ export const POST = async ({ request }) => {
         const filename2048 = filename.replace(/\.[^.]+$/, extension2048);
         const filename512 = filename.replace(/\.[^.]+$/, extension512);
         const filename64 = filename.replace(/\.[^.]+$/, extension64);
+        const panoramaFilename = panorama ? `${id}-panorama.jpg` : null;
         
         // Upload 2048px version
         let upload2048Error = null;
@@ -580,6 +616,20 @@ export const POST = async ({ request }) => {
           console.error('64px upload failed:', upload64Error);
         } else {
           console.log('64px upload successful');
+        }
+
+        if (panorama && panoramaFilename) {
+          const { error: panoramaUploadError } = await supabase.storage
+            .from('images-2048')
+            .upload(panoramaFilename, panorama.buffer, {
+              contentType: 'image/jpeg',
+              cacheControl: '31536000',
+              upsert: false
+            });
+          if (panoramaUploadError) {
+            throw error(500, `360°-Panorama konnte nicht gespeichert werden: ${panoramaUploadError.message}`);
+          }
+          console.log(`✅ 360° panorama uploaded: ${panoramaFilename}`);
         }
 
         // STEP 5: Hetzner WebDAV Upload (abhängig von save_originals)
@@ -708,10 +758,29 @@ export const POST = async ({ request }) => {
           slug // <--- Slug speichern
         };
 
+        if (panorama && panoramaFilename) {
+          dbRecord.page_settings = {
+            panorama: {
+              enabled: true,
+              projection: 'equirectangular',
+              path: panoramaFilename,
+              bucket: 'images-2048',
+              width: panorama.width,
+              height: panorama.height,
+              fileSize: panorama.fileSize,
+              quality: panorama.quality,
+              headingDegrees: Number.isFinite(panoramaHeadingDegrees) ? panoramaHeadingDegrees : 0,
+              detectionSource: panoramaDetectionSource,
+              gpano: true
+            }
+          };
+        }
+
         try {
           const moderation = await analyzeImageModeration(buf, originalData.type || 'image/jpeg');
           if (moderation) {
             dbRecord.page_settings = {
+              ...(dbRecord.page_settings || {}),
               moderation
             };
           }
@@ -878,6 +947,9 @@ export const POST = async ({ request }) => {
           // Clean up uploaded file if database insert fails
           console.log('Cleaning up uploaded file due to database error...');
           await supabase.storage.from('images-512').remove([filename512]);
+          if (panoramaFilename) {
+            await supabase.storage.from('images-2048').remove([panoramaFilename]);
+          }
           throw error(500, `Database error: ${(dbError as any).message}`);
         }
 
